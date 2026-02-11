@@ -1,0 +1,14 @@
+# 核心依赖（纯 Python，无需编译）
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+passlib==1.7.4
+python-jose==3.3.0
+
+# 数据库（纯 Python）
+tortoise-orm==0.20.0
+aiosqlite==0.19.0
+
+# 可选：Excel 功能（如果安装慢可以先注释掉）
+# pandas==2.1.4
+# openpyxl==3.1.2

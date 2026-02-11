@@ -1,0 +1,16 @@
+services:
+  erp:
+    build: .
+    container_name: erp-system
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    environment:
+      - DATABASE_URL=sqlite:///app/data/erp.db
+      - SECRET_KEY=your-secret-key-please-change-this-in-production  # 务必改为随机长字符串
+      - KD100_KEY=${KD100_KEY:-XpPBYgtD8108}
+      - KD100_CUSTOMER=${KD100_CUSTOMER:-D3BCCD5CFC26523D9655037FCF45D6FB}
+      - KD100_CALLBACK_URL=http://erp3.iepose.cn/api/logistics/kd100/callback
+    restart: unless-stopped
