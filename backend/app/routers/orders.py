@@ -1,0 +1,580 @@
+from typing import Optional
+from decimal import Decimal
+from datetime import datetime, timedelta
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from tortoise import transactions
+from tortoise.expressions import F
+
+from app.auth.dependencies import get_current_user, require_permission
+from app.models import (
+    User, Product, Warehouse, Location, Customer, Salesperson,
+    Order, OrderItem, WarehouseStock, StockLog, Payment, PaymentOrder,
+    Shipment, ShipmentItem, RebateLog
+)
+from app.schemas.order import OrderCreate, CancelRequest
+from app.services.order_service import (
+    validate_order_entities, resolve_item_entities, process_item_stock,
+    process_rebate_deduction, process_order_settlement, release_cancelled_stock
+)
+from app.services.operation_log_service import log_operation
+from app.utils.generators import generate_order_no
+from app.utils.errors import parse_date
+from app.logger import get_logger
+
+logger = get_logger("orders")
+
+router = APIRouter(prefix="/api/orders", tags=["订单管理"])
+
+
+@router.post("")
+async def create_order(data: OrderCreate, user: User = Depends(require_permission("sales"))):
+    async with transactions.in_transaction():
+        try:
+            order_no = generate_order_no("ORD")
+            total_amount = Decimal("0")
+            total_cost = Decimal("0")
+            total_profit = Decimal("0")
+
+            # 1. 校验关联实体
+            customer, warehouse, salesperson, consignment_wh = await validate_order_entities(data)
+
+            # 2. 创建订单主记录
+            is_cleared = data.order_type == "CASH" or (data.order_type == "RETURN" and data.refunded)
+            shipping_status = "pending" if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT"] else "completed"
+            order = await Order.create(
+                order_no=order_no, order_type=data.order_type,
+                customer=customer, warehouse=warehouse,
+                related_order_id=data.related_order_id if data.order_type == "RETURN" else None,
+                refunded=data.refunded if data.order_type == "RETURN" else False,
+                remark=data.remark, salesperson=salesperson,
+                creator=user, is_cleared=is_cleared,
+                shipping_status=shipping_status
+            )
+
+            # 3. 创建订单行 + 库存处理
+            for item in data.items:
+                product, working_warehouse, working_location, cost_price = await resolve_item_entities(
+                    item, warehouse, data
+                )
+
+                qty = item.quantity
+                unit_price = Decimal(str(item.unit_price))
+                amount = unit_price * qty
+                item_rebate = Decimal(str(item.rebate_amount)) if item.rebate_amount else Decimal("0")
+
+                if item_rebate > 0:
+                    if item_rebate > amount:
+                        raise HTTPException(status_code=400, detail=f"商品 {product.name} 返利金额不能超过行金额")
+                    amount = amount - item_rebate
+                profit = amount - cost_price * qty
+
+                if data.order_type == "RETURN":
+                    # profit was already correctly calculated as (amount - cost_price * qty)
+                    # before negation, so we negate the actual profit value, not abs(profit)
+                    profit = -profit
+                    amount = -abs(amount)
+                    qty = abs(qty)
+                    item_rebate = Decimal("0")
+
+                total_amount += amount
+                total_cost += cost_price * qty
+                total_profit += profit
+
+                await OrderItem.create(
+                    order=order, product=product,
+                    warehouse=working_warehouse, location=working_location,
+                    quantity=qty if data.order_type != "RETURN" else -qty,
+                    unit_price=unit_price, cost_price=cost_price,
+                    amount=amount, profit=profit, rebate_amount=item_rebate
+                )
+
+                # 库存操作
+                await process_item_stock(
+                    data.order_type, product, working_warehouse, working_location,
+                    qty, order, user, consignment_wh, cost_price=cost_price
+                )
+
+            # 4. 返利扣减
+            await process_rebate_deduction(data, customer, order, order_no, user)
+
+            # 5. 更新订单金额
+            order.total_amount = total_amount
+            order.total_cost = total_cost
+            order.total_profit = total_profit
+            if data.order_type == "RETURN" and data.refunded:
+                order.is_cleared = True
+                order.paid_amount = abs(total_amount)
+            elif is_cleared:
+                order.paid_amount = abs(total_amount)
+            await order.save()
+
+            # 6. 结算处理（挂账/收款/退款）
+            credit_used = await process_order_settlement(data, customer, order, total_amount, user, order_no)
+
+            actual_amount_due = total_amount - order.paid_amount
+
+            # 7. 操作日志
+            order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
+            await log_operation(user, "ORDER_CREATE", "ORDER", order.id,
+                f"创建{order_type_names.get(data.order_type, data.order_type)}订单 {order_no}，金额 ¥{float(total_amount):.2f}")
+
+            return {
+                "id": order.id, "order_no": order_no,
+                "shipping_status": shipping_status,
+                "total_amount": float(total_amount),
+                "paid_amount": float(order.paid_amount),
+                "rebate_used": float(order.rebate_used),
+                "credit_used": credit_used,
+                "amount_due": actual_amount_due,
+                "message": "订单创建成功"
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("订单创建失败", exc_info=e)
+            raise HTTPException(status_code=500, detail="操作失败，请重试")
+
+
+@router.get("")
+async def list_orders(order_type: Optional[str] = None, customer_id: Optional[int] = None,
+                      start_date: Optional[str] = None, end_date: Optional[str] = None,
+                      shipping_status: Optional[str] = None,
+                      offset: int = 0, limit: int = 100, user: User = Depends(get_current_user)):
+    limit = min(limit, 1000)
+    query = Order.all()
+    if order_type:
+        query = query.filter(order_type=order_type)
+    if customer_id:
+        query = query.filter(customer_id=customer_id)
+    if start_date:
+        query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
+    if end_date:
+        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+    if shipping_status:
+        query = query.filter(shipping_status=shipping_status)
+
+    total = await query.count()
+    orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse", "creator", "related_order", "salesperson")
+    has_finance = user.role == "admin" or "finance" in (user.permissions or [])
+
+    result = []
+    for o in orders:
+        item = {
+            "id": o.id, "order_no": o.order_no, "order_type": o.order_type,
+            "customer_name": o.customer.name if o.customer else None,
+            "customer_id": o.customer_id,
+            "warehouse_name": o.warehouse.name if o.warehouse else None,
+            "total_amount": float(o.total_amount),
+            "paid_amount": float(o.paid_amount),
+            "is_cleared": o.is_cleared, "remark": o.remark,
+            "salesperson_name": o.salesperson.name if o.salesperson else None,
+            "creator_name": o.creator.display_name if o.creator else None,
+            "created_at": o.created_at.isoformat(),
+            "related_order_no": o.related_order.order_no if o.related_order else None,
+            "related_order_id": o.related_order_id,
+            "shipping_status": o.shipping_status,
+        }
+        if has_finance:
+            item["total_cost"] = float(o.total_cost)
+            item["total_profit"] = float(o.total_profit)
+        result.append(item)
+    return {"items": result, "total": total}
+
+
+@router.get("/{order_id}")
+async def get_order(order_id: int, user: User = Depends(get_current_user)):
+    order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "related_order", "salesperson").first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    items = await OrderItem.filter(order_id=order_id).select_related("product")
+    has_finance = user.role == "admin" or "finance" in (user.permissions or [])
+
+    returned_quantities = {}
+    if order.order_type in ["CASH", "CREDIT"]:
+        return_orders = await Order.filter(related_order_id=order_id, order_type="RETURN")
+        if return_orders:
+            ret_order_ids = [r.id for r in return_orders]
+            ret_items = await OrderItem.filter(order_id__in=ret_order_ids)
+            for ret_item in ret_items:
+                if ret_item.product_id not in returned_quantities:
+                    returned_quantities[ret_item.product_id] = 0
+                returned_quantities[ret_item.product_id] += abs(ret_item.quantity)
+
+    credit_used = 0
+    other_payment = 0
+    if order.order_type == "CASH":
+        if order.paid_amount > 0:
+            credit_used = float(order.paid_amount)
+            if order.paid_amount < order.total_amount:
+                other_payment = float(order.total_amount) - float(order.paid_amount)
+    elif order.order_type in ["CREDIT", "CONSIGN_SETTLE"]:
+        if order.paid_amount > 0:
+            credit_used = float(order.paid_amount)
+            other_payment = float(order.total_amount) - float(order.paid_amount)
+
+    payment_records = []
+    direct_payments = await Payment.filter(order_id=order.id).all()
+    for dp in direct_payments:
+        payment_records.append({
+            "id": dp.id, "payment_no": dp.payment_no,
+            "amount": float(dp.amount), "payment_method": dp.payment_method,
+            "source": dp.source, "is_confirmed": dp.is_confirmed,
+            "created_at": dp.created_at.isoformat()
+        })
+    po_links = await PaymentOrder.filter(order_id=order.id).select_related("payment").all()
+    seen_ids = {dp.id for dp in direct_payments}
+    for link in po_links:
+        if link.payment_id not in seen_ids:
+            seen_ids.add(link.payment_id)
+            payment_records.append({
+                "id": link.payment.id, "payment_no": link.payment.payment_no,
+                "amount": float(link.amount), "payment_method": link.payment.payment_method,
+                "source": link.payment.source, "is_confirmed": link.payment.is_confirmed,
+                "created_at": link.payment.created_at.isoformat()
+            })
+
+    rebate_refund_records = []
+    refund_rebate_logs = await RebateLog.filter(
+        reference_type="ORDER", reference_id=order.id, type="refund"
+    ).all()
+    for rl in refund_rebate_logs:
+        rebate_refund_records.append({
+            "id": rl.id, "amount": float(rl.amount),
+            "remark": rl.remark, "created_at": rl.created_at.isoformat()
+        })
+
+    child_orders = await Order.filter(related_order_id=order.id).all()
+    related_children = [{"id": co.id, "order_no": co.order_no, "order_type": co.order_type} for co in child_orders]
+
+    shipment_list = await Shipment.filter(order_id=order_id).order_by("id").all()
+    shipment_ids = [sh.id for sh in shipment_list]
+    all_si = await ShipmentItem.filter(shipment_id__in=shipment_ids).select_related("product").all() if shipment_ids else []
+    si_by_shipment = {}
+    for si in all_si:
+        si_by_shipment.setdefault(si.shipment_id, []).append(si)
+
+    shipments_info = []
+    for sh in shipment_list:
+        ti = []
+        if sh.last_tracking_info:
+            try:
+                ti = json.loads(sh.last_tracking_info)
+            except Exception:
+                pass
+        si_list = si_by_shipment.get(sh.id, [])
+        shipments_info.append({
+            "id": sh.id, "carrier_name": sh.carrier_name,
+            "tracking_no": sh.tracking_no, "sn_code": sh.sn_code,
+            "status": sh.status, "status_text": sh.status_text,
+            "last_info": ti[0].get("context", "") if ti else None,
+            "tracking_info": ti,
+            "items": [{
+                "product_name": si.product.name,
+                "product_sku": si.product.sku,
+                "quantity": si.quantity,
+                "sn_codes": si.sn_codes
+            } for si in si_list]
+        })
+
+    return {
+        "id": order.id, "order_no": order.order_no, "order_type": order.order_type,
+        "customer": {"id": order.customer.id, "name": order.customer.name} if order.customer else None,
+        "warehouse": {"id": order.warehouse.id, "name": order.warehouse.name} if order.warehouse else None,
+        "total_amount": float(order.total_amount),
+        "total_cost": float(order.total_cost) if has_finance else None,
+        "total_profit": float(order.total_profit) if has_finance else None,
+        "paid_amount": float(order.paid_amount),
+        "rebate_used": float(order.rebate_used),
+        "credit_used": credit_used, "other_payment": other_payment,
+        "payment_records": payment_records,
+        "is_cleared": order.is_cleared,
+        "shipping_status": order.shipping_status,
+        "refunded": order.refunded, "remark": order.remark,
+        "salesperson_name": order.salesperson.name if order.salesperson else None,
+        "creator_name": order.creator.display_name if order.creator else None,
+        "created_at": order.created_at.isoformat(),
+        "related_order": {"id": order.related_order.id, "order_no": order.related_order.order_no} if order.related_order else None,
+        "related_children": related_children,
+        "rebate_refund_records": rebate_refund_records,
+        "shipments": shipments_info,
+        "items": [{
+            "product_id": i.product_id, "product_sku": i.product.sku,
+            "product_name": i.product.name, "quantity": i.quantity,
+            "id": i.id,
+            "shipped_qty": i.shipped_qty,
+            "returned_quantity": returned_quantities.get(i.product_id, 0),
+            "available_return_quantity": max(0, abs(i.quantity) - returned_quantities.get(i.product_id, 0)),
+            "unit_price": float(i.unit_price),
+            "cost_price": float(i.cost_price) if has_finance else None,
+            "amount": float(i.amount),
+            "profit": float(i.profit) if has_finance else None,
+            "rebate_amount": float(i.rebate_amount) if i.rebate_amount else 0
+        } for i in items]
+    }
+
+
+@router.get("/{order_id}/cancel-preview")
+async def cancel_preview(order_id: int, user: User = Depends(require_permission("sales"))):
+    """获取取消订单的预览信息"""
+    order = await Order.filter(id=order_id).select_related("customer").first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.shipping_status not in ("pending", "partial"):
+        raise HTTPException(status_code=400, detail="该订单不可取消")
+
+    items = await OrderItem.filter(order_id=order_id).select_related("product").all()
+
+    shipped_items = []
+    cancel_items = []
+    new_order_amount = Decimal("0")
+    cancel_amount = Decimal("0")
+
+    for item in items:
+        shipped = item.shipped_qty
+        total = abs(item.quantity)
+        remaining = total - shipped
+
+        if shipped > 0:
+            item_amount = Decimal(str(shipped)) * item.unit_price
+            new_order_amount += item_amount
+            shipped_items.append({
+                "order_item_id": item.id,
+                "product_name": item.product.name,
+                "product_sku": item.product.sku,
+                "shipped_qty": shipped,
+                "unit_price": float(item.unit_price),
+                "amount": float(item_amount),
+                "original_rebate_amount": float(item.rebate_amount) if item.rebate_amount else 0
+            })
+        if remaining > 0:
+            item_amount = Decimal(str(remaining)) * item.unit_price
+            cancel_amount += item_amount
+            cancel_items.append({
+                "order_item_id": item.id,
+                "product_name": item.product.name,
+                "product_sku": item.product.sku,
+                "cancel_qty": remaining,
+                "unit_price": float(item.unit_price),
+                "amount": float(item_amount)
+            })
+
+    is_partial = len(shipped_items) > 0
+    total = abs(order.total_amount) if order.total_amount else Decimal("0")
+    paid = order.paid_amount or Decimal("0")
+    rebate = order.rebate_used or Decimal("0")
+
+    if is_partial and total > 0:
+        ratio = new_order_amount / total
+        default_new_paid = (paid * ratio).quantize(Decimal("0.01"))
+        default_new_rebate = (rebate * ratio).quantize(Decimal("0.01"))
+        if default_new_paid + default_new_rebate != new_order_amount:
+            default_new_rebate = new_order_amount - default_new_paid
+        if default_new_rebate > rebate:
+            default_new_rebate = rebate
+            default_new_paid = new_order_amount - default_new_rebate
+        if default_new_paid > paid:
+            default_new_paid = paid
+            default_new_rebate = new_order_amount - default_new_paid
+    else:
+        default_new_paid = Decimal("0")
+        default_new_rebate = Decimal("0")
+
+    if is_partial and new_order_amount > 0:
+        alloc_rebate_sum = Decimal("0")
+        alloc_paid_sum = Decimal("0")
+        for i, si in enumerate(shipped_items):
+            item_amt = Decimal(str(si["amount"]))
+            if i < len(shipped_items) - 1:
+                ratio = item_amt / new_order_amount
+                si_rebate = (default_new_rebate * ratio).quantize(Decimal("0.01"))
+                si_paid = item_amt - si_rebate
+            else:
+                si_rebate = default_new_rebate - alloc_rebate_sum
+                si_paid = item_amt - si_rebate
+            si["default_paid"] = float(si_paid)
+            si["default_rebate"] = float(si_rebate)
+            alloc_rebate_sum += si_rebate
+            alloc_paid_sum += si_paid
+
+    default_refund = paid - default_new_paid
+    default_refund_rebate = rebate - default_new_rebate
+
+    return {
+        "order_id": order.id,
+        "order_no": order.order_no,
+        "order_type": order.order_type,
+        "customer_name": order.customer.name if order.customer else None,
+        "total_amount": float(total),
+        "paid_amount": float(paid),
+        "rebate_used": float(rebate),
+        "shipped_items": shipped_items,
+        "cancel_items": cancel_items,
+        "new_order_amount": float(new_order_amount),
+        "default_new_paid": float(default_new_paid),
+        "default_new_rebate": float(default_new_rebate),
+        "default_refund": float(default_refund),
+        "default_refund_rebate": float(default_refund_rebate),
+        "is_partial": is_partial
+    }
+
+
+@router.post("/{order_id}/cancel")
+async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(require_permission("sales"))):
+    """取消订单，支持完整财务闭环和部分发货拆单"""
+    async with transactions.in_transaction():
+        order = await Order.filter(id=order_id).select_related("customer", "warehouse").first()
+        if not order:
+            raise HTTPException(status_code=404, detail="订单不存在")
+        if order.shipping_status not in ("pending", "partial"):
+            raise HTTPException(status_code=400, detail="该订单不可取消")
+        if order.order_type not in ("CASH", "CREDIT", "CONSIGN_OUT"):
+            raise HTTPException(status_code=400, detail="该订单类型不支持取消")
+
+        customer = order.customer
+        items = await OrderItem.filter(order_id=order_id).select_related("product", "warehouse", "location").all()
+
+        # 提前校验退款金额，避免不可逆操作后才发现参数错误
+        if customer and order.order_type in ("CASH", "CREDIT"):
+            if data.refund_amount and Decimal(str(data.refund_amount)) > order.paid_amount:
+                raise HTTPException(status_code=400, detail="退款金额不能超过已付金额")
+
+        has_shipped = any(item.shipped_qty > 0 for item in items)
+        new_order = None
+
+        # 1. 释放未发货库存预留
+        await release_cancelled_stock(items, order, user)
+
+        # 2. 部分发货：生成新订单
+        if has_shipped:
+            new_order_no = f"{order.order_no}-S"
+            new_total = Decimal("0")
+            new_cost = Decimal("0")
+            new_profit = Decimal("0")
+
+            new_order = await Order.create(
+                order_no=new_order_no,
+                order_type=order.order_type,
+                customer=customer,
+                warehouse=order.warehouse,
+                related_order=order,
+                shipping_status="completed",
+                remark=f"由取消订单 {order.order_no} 拆分生成（已发货部分）",
+                salesperson_id=order.salesperson_id,
+                creator=user
+            )
+
+            alloc_map = {}
+            if data.item_allocations:
+                for alloc in data.item_allocations:
+                    alloc_map[alloc.order_item_id] = alloc
+
+            for item in items:
+                if item.shipped_qty <= 0:
+                    continue
+                item_amount = Decimal(str(item.shipped_qty)) * item.unit_price
+                item_cost = Decimal(str(item.shipped_qty)) * item.cost_price
+                item_rebate = Decimal("0")
+                if item.id in alloc_map:
+                    item_rebate = alloc_map[item.id].rebate_amount
+                item_profit = item_amount - item_cost - item_rebate  # subtract rebate from profit
+                new_total += item_amount
+                new_cost += item_cost
+                new_profit += item_profit
+
+                await OrderItem.create(
+                    order=new_order,
+                    product_id=item.product_id,
+                    warehouse_id=item.warehouse_id,
+                    location_id=item.location_id,
+                    quantity=-item.shipped_qty if item.quantity < 0 else item.shipped_qty,
+                    unit_price=item.unit_price,
+                    cost_price=item.cost_price,
+                    amount=item_amount,
+                    profit=item_profit,
+                    rebate_amount=item_rebate,
+                    shipped_qty=item.shipped_qty
+                )
+
+            new_paid = Decimal(str(data.new_order_paid_amount or 0))
+            new_rebate = Decimal(str(data.new_order_rebate_used or 0))
+            new_order.total_amount = new_total
+            new_order.total_cost = new_cost
+            new_order.total_profit = new_profit
+            new_order.paid_amount = new_paid
+            new_order.rebate_used = new_rebate
+            new_order.is_cleared = (new_paid + new_rebate) >= new_total
+            await new_order.save()
+
+            await Shipment.filter(order_id=order.id).update(order_id=new_order.id)
+            await Payment.filter(order_id=order.id).update(order_id=new_order.id)
+
+            await log_operation(user, "ORDER_CREATE", "ORDER", new_order.id,
+                f"取消拆分生成订单 {new_order_no}（原订单 {order.order_no}）")
+
+        # 3. 财务回退
+        if customer and order.order_type in ("CASH", "CREDIT"):
+            refund_amount = Decimal(str(data.refund_amount or 0))
+            refund_rebate = Decimal(str(data.refund_rebate or 0))
+
+            # 退款金额不能超过已付金额
+            if refund_amount and refund_amount > order.paid_amount:
+                raise HTTPException(status_code=400, detail="退款金额不能超过已付金额")
+
+            if refund_rebate > 0:
+                await Customer.filter(id=customer.id).update(
+                    rebate_balance=F('rebate_balance') + refund_rebate
+                )
+                await customer.refresh_from_db()
+                await RebateLog.create(
+                    target_type="customer", target_id=customer.id,
+                    type="refund", amount=refund_rebate,
+                    balance_after=customer.rebate_balance,
+                    reference_type="ORDER", reference_id=order.id,
+                    remark=f"取消订单 {order.order_no} 退回返利",
+                    creator=user
+                )
+
+            if refund_amount > 0:
+                if data.refund_method == "balance":
+                    await Customer.filter(id=customer.id).update(
+                        balance=F('balance') - refund_amount
+                    )
+                else:
+                    pay_no = generate_order_no("REF")
+                    await Payment.create(
+                        payment_no=pay_no, customer=customer, order=order,
+                        amount=-refund_amount,
+                        payment_method=data.refund_payment_method or "cash",
+                        source="REFUND", is_confirmed=False,
+                        remark=f"取消订单 {order.order_no} 退款",
+                        creator=user
+                    )
+
+            if order.order_type == "CREDIT":
+                cancel_balance_amount = abs(order.total_amount) - (abs(new_order.total_amount) if new_order else Decimal("0"))
+                if cancel_balance_amount > 0:
+                    await Customer.filter(id=customer.id).update(
+                        balance=F('balance') - cancel_balance_amount
+                    )
+
+        # 4. 标记原订单取消
+        order.shipping_status = "cancelled"
+        await order.save()
+
+        await log_operation(user, "ORDER_CANCEL", "ORDER", order.id,
+            f"取消订单 {order.order_no}" + (f"，拆分生成 {new_order.order_no}" if new_order else ""))
+
+    result = {
+        "message": "订单已取消",
+        "shipping_status": "cancelled"
+    }
+    if new_order:
+        result["new_order_id"] = new_order.id
+        result["new_order_no"] = new_order.order_no
+        result["message"] = f"订单已取消，已发货部分生成新订单 {new_order.order_no}"
+
+    return result

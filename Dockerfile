@@ -1,37 +1,43 @@
-FROM python:3.11-slim
+# ---- 阶段1: 构建前端 ----
+FROM node:20-alpine AS frontend-builder
+WORKDIR /build
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN npm config set registry ${NPM_REGISTRY}
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npx vite build --outDir /build/dist
+
+# ---- 阶段2: 生产镜像 ----
+FROM python:3.12-slim
+
+ENV TZ=Asia/Shanghai
+
+ARG APT_MIRROR=mirrors.aliyun.com
+RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 使用阿里云 pip 镜像加速
-RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
-    pip config set global.trusted-host mirrors.aliyun.com
+COPY backend/requirements.txt .
+ARG PYPI_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir -r requirements.txt -i ${PYPI_MIRROR}
 
-# 安装依赖
-RUN pip install --no-cache-dir \
-    fastapi \
-    uvicorn[standard] \
-    tortoise-orm \
-    aiosqlite \
-    passlib[bcrypt] \
-    python-jose[cryptography] \
-    python-multipart \
-    openpyxl \
-    pandas \
-    httpx
+COPY backend/ .
+COPY --from=frontend-builder /build/dist /app/static
 
-# 复制应用文件
-COPY main.py .
-COPY index.html .
+RUN mkdir -p /app/backups \
+    && adduser --disabled-password --no-create-home appuser \
+    && chown -R appuser:appuser /app
 
-# 创建数据目录
-RUN mkdir -p /app/data
+EXPOSE 8090
 
-# 暴露端口
-EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')" || exit 1
 
-# 设置环境变量
-ENV DATABASE_URL=sqlite:///app/data/erp.db
-ENV SECRET_KEY=
+USER appuser
 
-# 直接用 uvicorn 启动，模块名固定为 main
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8090", "--workers", "1"]

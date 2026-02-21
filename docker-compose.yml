@@ -1,16 +1,47 @@
 services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp123456}
+      POSTGRES_DB: erp
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - erp-net
+
   erp:
     build: .
-    container_name: erp-system
+    restart: always
     ports:
-      - "8080:8000"
-    volumes:
-      - ./data:/app/data
-      - ./backups:/app/backups
+      - "127.0.0.1:8090:8090"
     environment:
-      - DATABASE_URL=sqlite:///app/data/erp.db
-      - SECRET_KEY=your-secret-key-please-change-this-in-production  # 务必改为随机长字符串
-      - KD100_KEY=${KD100_KEY:-XpPBYgtD8108}
-      - KD100_CUSTOMER=${KD100_CUSTOMER:-D3BCCD5CFC26523D9655037FCF45D6FB}
-      - KD100_CALLBACK_URL=http://erp3.iepose.cn/api/logistics/kd100/callback
-    restart: unless-stopped
+      DATABASE_URL: postgres://erp:${POSTGRES_PASSWORD:-erp123456}@db:5432/erp
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-secret-in-production}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./backups:/app/backups
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - erp-net
+
+networks:
+  erp-net:
+    driver: bridge
+
+volumes:
+  pgdata:
