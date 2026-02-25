@@ -312,7 +312,7 @@ const getReturnLocations = (warehouseId) => {
 }
 
 const settleTotal = computed(() =>
-  consignSettleItems.value.reduce((s, i) => s + Math.round((i.settle_quantity || 0) * (i.unit_price || 0) * 100) / 100, 0)
+  Math.round(consignSettleItems.value.reduce((s, i) => s + Math.round((i.settle_quantity || 0) * (i.unit_price || 0) * 100) / 100, 0) * 100) / 100
 )
 const settleQuantity = computed(() =>
   consignSettleItems.value.reduce((s, i) => s + (i.settle_quantity || 0), 0)

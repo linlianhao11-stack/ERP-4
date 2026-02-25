@@ -6,7 +6,6 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 from tortoise.expressions import F
-from tortoise.transactions import in_transaction
 
 from app.models import (
     User, Product, Warehouse, Location, Customer, Salesperson,
@@ -90,23 +89,32 @@ async def validate_order_entities(data):
     return customer, warehouse, salesperson, consignment_wh
 
 
-async def resolve_item_entities(item, warehouse, data):
+async def resolve_item_entities(item, warehouse, data, entities_cache=None):
     """
     解析单个订单行的商品、仓库、仓位。
     返回 (product, working_warehouse, working_location, cost_price)
     """
-    product = await Product.filter(id=item.product_id, is_active=True).first()
+    if entities_cache and 'products' in entities_cache:
+        product = entities_cache['products'].get(item.product_id)
+    else:
+        product = await Product.filter(id=item.product_id, is_active=True).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"商品不存在: {item.product_id}")
 
     item_warehouse = None
     item_location = None
     if item.warehouse_id:
-        item_warehouse = await Warehouse.filter(id=item.warehouse_id, is_active=True).first()
+        if entities_cache and 'warehouses' in entities_cache:
+            item_warehouse = entities_cache['warehouses'].get(item.warehouse_id)
+        else:
+            item_warehouse = await Warehouse.filter(id=item.warehouse_id, is_active=True).first()
         if not item_warehouse:
             raise HTTPException(status_code=404, detail=f"商品的仓库不存在: {item.warehouse_id}")
     if item.location_id:
-        item_location = await Location.filter(id=item.location_id, is_active=True).first()
+        if entities_cache and 'locations' in entities_cache:
+            item_location = entities_cache['locations'].get(item.location_id)
+        else:
+            item_location = await Location.filter(id=item.location_id, is_active=True).first()
         if not item_location:
             raise HTTPException(status_code=404, detail=f"商品的仓位不存在: {item.location_id}")
         check_wh = item_warehouse if item_warehouse else warehouse

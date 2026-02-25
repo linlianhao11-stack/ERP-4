@@ -27,7 +27,7 @@ async def validate_and_add_sn_codes(sn_codes: List[str], warehouse_id: int, prod
         seen.add(sn)
 
     async with in_transaction():
-        existing = await SnCode.filter(sn_code__in=sn_codes).all()
+        existing = await SnCode.filter(sn_code__in=sn_codes).select_for_update().all()
         if existing:
             codes = ", ".join(s.sn_code for s in existing)
             raise HTTPException(status_code=400, detail=f"SN码已存在: {codes}")
@@ -41,8 +41,8 @@ async def validate_and_add_sn_codes(sn_codes: List[str], warehouse_id: int, prod
                 )
                 for sn in sn_codes
             ])
-        except IntegrityError as e:
-            raise HTTPException(status_code=400, detail=f"SN码已存在（并发冲突）: {e}")
+        except IntegrityError:
+            raise HTTPException(status_code=409, detail="SN码已存在，请检查后重试")
 
 
 async def validate_and_consume_sn_codes(sn_codes: List[str], shipment, user,

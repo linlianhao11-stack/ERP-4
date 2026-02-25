@@ -2,14 +2,15 @@ from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, field_validator
 
 VALID_PERMISSIONS = [
-    "dashboard", "sales", "stock_view", "stock_edit", "finance",
+    "dashboard", "sales", "customer", "stock_view", "stock_edit",
+    "finance", "finance_confirm", "logistics",
     "purchase", "purchase_approve", "purchase_pay", "purchase_receive",
-    "logs", "admin"
+    "settings", "logs", "admin"
 ]
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=2, max_length=50)
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
     display_name: Optional[str] = None
     role: Literal["admin", "user"] = "user"
     permissions: List[str] = []
@@ -25,7 +26,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     display_name: Optional[str] = None
-    password: Optional[str] = Field(None, min_length=6, max_length=128)
+    password: Optional[str] = Field(None, min_length=8, max_length=128)
     role: Optional[Literal["admin", "user"]] = None
     permissions: Optional[List[str]] = None
 

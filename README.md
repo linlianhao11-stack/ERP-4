@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.8.6
+# 轻量级 ERP 系统 v4.10.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售等核心业务流程。
 
@@ -14,7 +14,8 @@
 | 后端 | FastAPI + Uvicorn | FastAPI 0.109 |
 | ORM | Tortoise ORM | v0.20 |
 | 数据库 | PostgreSQL | v16 |
-| 认证 | JWT (python-jose) | — |
+| 认证 | JWT (PyJWT) | — |
+| 测试 | pytest + pytest-asyncio | — |
 | 部署 | Docker + Docker Compose | — |
 
 ## 项目结构
@@ -30,6 +31,8 @@ erp-4/
 ├── backend/
 │   ├── main.py                 # FastAPI 入口，lifespan 管理
 │   ├── requirements.txt        # Python 依赖
+│   ├── tests/                  # pytest 测试（认证、密码策略）
+│   ├── pytest.ini              # pytest 配置
 │   ├── app/
 │   │   ├── config.py           # 全局配置（环境变量 + 默认值）
 │   │   ├── database.py         # Tortoise ORM 初始化
@@ -60,7 +63,7 @@ erp-4/
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
         │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
         │   └── common/         # 通用组件（StatusBadge, FilterBar）
-        ├── composables/        # 组合式函数
+        ├── composables/        # 组合式函数（useApi、useFormat、useIdleTimeout 等）
         └── styles/             # 全局样式
 ```
 

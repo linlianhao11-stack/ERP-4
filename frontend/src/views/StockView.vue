@@ -699,7 +699,7 @@ const openTransferForStock = (p, s) => {
   transferForm.quantity = 1
   transferForm.remark = ''
   transferProductSearch.value = `${p.sku} - ${p.name}`
-  transferSourceQty.value = s.quantity
+  transferSourceQty.value = s.available_qty ?? (s.quantity - (s.reserved_qty || 0))
 }
 
 const saveTransferHandler = async () => {
@@ -742,6 +742,8 @@ const openImportModal = () => {
 }
 
 const downloadTemplateHandler = async () => {
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     const { data } = await getTemplate()
     const url = URL.createObjectURL(data)
@@ -753,6 +755,8 @@ const downloadTemplateHandler = async () => {
     showToast('模板已下载')
   } catch (e) {
     showToast('下载失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
@@ -774,13 +778,15 @@ const previewImportHandler = async (e) => {
 }
 
 const confirmImportHandler = async () => {
+  if (appStore.submitting) return
   if (!importFile.value) {
     showToast('请先选择文件', 'error')
     return
   }
-  const formData = new FormData()
-  formData.append('file', importFile.value)
+  appStore.submitting = true
   try {
+    const formData = new FormData()
+    formData.append('file', importFile.value)
     const { data } = await importProducts(formData)
     showToast(data.message)
     closeModal()
@@ -789,6 +795,8 @@ const confirmImportHandler = async () => {
     warehousesStore.loadLocations()
   } catch (ex) {
     showToast('导入失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
@@ -800,6 +808,8 @@ const cancelImportHandler = () => {
 }
 
 const handleExportStock = async () => {
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     const params = {}
     if (stockWarehouseFilter.value) params.warehouse_id = stockWarehouseFilter.value
@@ -815,6 +825,8 @@ const handleExportStock = async () => {
     showToast('导出成功')
   } catch (e) {
     showToast('导出失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 

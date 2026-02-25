@@ -18,10 +18,19 @@ def needs_rehash(hashed: str) -> bool:
     return pwd_context.needs_update(hashed)
 
 
+COMMON_WEAK_PASSWORDS = {
+    "password", "12345678", "123456789", "qwerty123", "abc12345",
+    "password1", "iloveyou", "admin123", "welcome1", "monkey123",
+    "changeme", "administrator", "root1234",
+}
+
+
 def validate_password_strength(password: str) -> None:
     """校验密码强度，不通过则抛出 HTTPException"""
     from fastapi import HTTPException
-    if len(password) < 6:
-        raise HTTPException(status_code=400, detail="密码长度不能少于6位")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="密码长度不能少于8位")
     if not any(c.isdigit() for c in password) or not any(c.isalpha() for c in password):
         raise HTTPException(status_code=400, detail="密码必须包含字母和数字")
+    if password.lower() in COMMON_WEAK_PASSWORDS:
+        raise HTTPException(status_code=400, detail="密码过于常见，请使用更复杂的密码")

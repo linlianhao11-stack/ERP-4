@@ -511,6 +511,8 @@ const saveWarehouse = async () => {
     appStore.showToast('请输入仓库名称', 'error')
     return
   }
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default })
     appStore.showToast('保存成功')
@@ -518,11 +520,15 @@ const saveWarehouse = async () => {
     warehousesStore.loadWarehouses()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
 const handleCreateWarehouse = async () => {
   if (!newWarehouseName.value) return
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     await createWarehouse({ name: newWarehouseName.value })
     appStore.showToast('创建成功')
@@ -530,6 +536,8 @@ const handleCreateWarehouse = async () => {
     warehousesStore.loadWarehouses()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '创建失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
@@ -565,6 +573,8 @@ const saveLocation = async () => {
     appStore.showToast('请输入仓位编号', 'error')
     return
   }
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     await updateLocation(locationForm.id, { code: locationForm.code.trim(), name: locationForm.name || null })
     appStore.showToast('保存成功')
@@ -573,12 +583,16 @@ const saveLocation = async () => {
     warehousesStore.loadLocations()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
 const handleCreateLocation = async (warehouseId) => {
   const input = getLocationInput(warehouseId)
   if (!input.code || !input.code.trim()) return
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     await createLocation({ warehouse_id: warehouseId, code: input.code.trim(), name: input.name.trim() || null })
     appStore.showToast('创建成功')
@@ -588,6 +602,8 @@ const handleCreateLocation = async (warehouseId) => {
     warehousesStore.loadLocations()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '创建失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
@@ -614,6 +630,8 @@ const saveSalesperson = async () => {
     appStore.showToast('请输入销售员姓名', 'error')
     return
   }
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     await updateSalesperson(salespersonForm.id, { name: salespersonForm.name.trim(), phone: salespersonForm.phone || null })
     appStore.showToast('保存成功')
@@ -621,6 +639,8 @@ const saveSalesperson = async () => {
     settingsStore.loadSalespersons()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 
@@ -663,6 +683,8 @@ const editUser = (u) => {
 }
 
 const saveUser = async () => {
+  if (appStore.submitting) return
+  appStore.submitting = true
   try {
     if (userForm.id) {
       await updateUser(userForm.id, userForm)
@@ -674,6 +696,8 @@ const saveUser = async () => {
     settingsStore.loadUsers()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 

@@ -7,9 +7,9 @@ export const toggleUser = (id) => api.post('/users/' + id + '/toggle')
 
 export const getBackups = () => api.get('/backups')
 export const createBackup = () => api.post('/backup')
-export const downloadBackup = (filename) => api.get('/backups/' + filename, { responseType: 'blob' })
-export const deleteBackup = (filename) => api.delete('/backups/' + filename)
-export const restoreBackup = (filename) => api.post('/backups/' + filename + '/restore')
+export const downloadBackup = (filename) => api.get('/backups/' + encodeURIComponent(filename), { responseType: 'blob' })
+export const deleteBackup = (filename) => api.delete('/backups/' + encodeURIComponent(filename))
+export const restoreBackup = (filename) => api.post('/backups/' + encodeURIComponent(filename) + '/restore')
 export const uploadRestoreBackup = (file) => {
   const formData = new FormData()
   formData.append('file', file)

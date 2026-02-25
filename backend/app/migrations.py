@@ -135,13 +135,13 @@ async def migrate_order_item_warehouse():
 
     if "warehouse_id" not in col_names:
         await conn.execute_query(
-            "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS warehouse_id INT REFERENCES warehouses(id) ON DELETE CASCADE"
+            "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS warehouse_id INT REFERENCES warehouses(id) ON DELETE SET NULL"
         )
         logger.info("迁移: order_items 表添加 warehouse_id 列")
 
     if "location_id" not in col_names:
         await conn.execute_query(
-            "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS location_id INT REFERENCES locations(id) ON DELETE CASCADE"
+            "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS location_id INT REFERENCES locations(id) ON DELETE SET NULL"
         )
         logger.info("迁移: order_items 表添加 location_id 列")
 
@@ -172,6 +172,8 @@ async def migrate_add_indexes():
         ("idx_operation_logs_created_at", "operation_logs", "created_at"),
         ("idx_sn_codes_warehouse_product", "sn_codes", "warehouse_id, product_id, status"),
         ("idx_stock_logs_warehouse_product", "stock_logs", "warehouse_id, product_id"),
+        ("idx_purchase_orders_status", "purchase_orders", "status"),
+        ("idx_purchase_orders_supplier_created", "purchase_orders", "supplier_id, created_at"),
     ]
     created = 0
     for name, table, columns in indexes:
@@ -184,6 +186,37 @@ async def migrate_add_indexes():
             logger.warning(f"创建索引 {name} 失败: {e}")
     if created:
         logger.info(f"性能索引检查完成: {created} 个索引已确认存在")
+
+    # C7: warehouses.customer_id FK constraint
+    try:
+        await conn.execute_query(
+            "ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS customer_id INT REFERENCES customers(id) ON DELETE SET NULL"
+        )
+    except Exception as e:
+        logger.warning(f"添加 warehouses.customer_id FK 失败（可忽略）: {e}")
+
+    # M1: partial unique index for virtual warehouses per customer
+    try:
+        await conn.execute_query(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_warehouse_customer_virtual ON warehouses(customer_id) WHERE is_virtual = TRUE AND customer_id IS NOT NULL"
+        )
+    except Exception as e:
+        logger.warning(f"创建 idx_warehouse_customer_virtual 失败（可忽略）: {e}")
+
+    # M8: indexes on product.category and product.brand
+    try:
+        await conn.execute_query(
+            "CREATE INDEX IF NOT EXISTS idx_products_category ON products(category) WHERE category IS NOT NULL AND category != ''"
+        )
+    except Exception as e:
+        logger.warning(f"创建 idx_products_category 失败（可忽略）: {e}")
+
+    try:
+        await conn.execute_query(
+            "CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand) WHERE brand IS NOT NULL AND brand != ''"
+        )
+    except Exception as e:
+        logger.warning(f"创建 idx_products_brand 失败（可忽略）: {e}")
 
 
 async def migrate_purchase_order_payment_method():
@@ -325,8 +358,8 @@ async def migrate_shipping_flow():
             CREATE TABLE shipment_items (
                 id SERIAL PRIMARY KEY,
                 shipment_id INT NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
-                order_item_id INT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
-                product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                order_item_id INT NOT NULL REFERENCES order_items(id) ON DELETE RESTRICT,
+                product_id INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
                 quantity INT NOT NULL,
                 sn_codes TEXT
             )

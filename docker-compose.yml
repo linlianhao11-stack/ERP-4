@@ -2,9 +2,11 @@ services:
   db:
     image: postgres:16-alpine
     restart: always
+    mem_limit: 512m
+    cpus: 1.0
     environment:
       POSTGRES_USER: erp
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp123456}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp123456}  # ⚠️ 生产环境必须通过 .env 设置强密码
       POSTGRES_DB: erp
       TZ: Asia/Shanghai
     volumes:
@@ -14,12 +16,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - erp-net
 
   erp:
     build: .
     restart: always
+    mem_limit: 512m
+    cpus: 1.0
     ports:
       - "127.0.0.1:8090:8090"
     environment:

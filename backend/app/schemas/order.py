@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 
 class OrderItemRequest(BaseModel):
     product_id: int
-    quantity: int = Field(gt=0)
-    unit_price: Decimal = Field(ge=0)
+    quantity: int = Field(gt=0, le=999999)
+    unit_price: Decimal = Field(ge=0, le=99999999)
     warehouse_id: Optional[int] = None
     location_id: Optional[int] = None
     rebate_amount: Optional[Decimal] = Field(default=None, ge=0)
@@ -20,8 +20,8 @@ class OrderCreate(BaseModel):
     refunded: Optional[bool] = False
     use_credit: Optional[bool] = False
     payment_method: Optional[str] = None
-    items: List[OrderItemRequest] = Field(min_length=1)
-    remark: Optional[str] = None
+    items: List[OrderItemRequest] = Field(min_length=1, max_length=100)
+    remark: Optional[str] = Field(None, max_length=2000)
     rebate_amount: Optional[Decimal] = Field(default=None, ge=0)
 
 class CancelItemAllocation(BaseModel):

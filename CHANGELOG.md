@@ -1,5 +1,143 @@
 # 迭代记录
 
+## v4.10.0 — 第三轮全量审查与登录流程修复（2026-02-25）
+
+> 基于第三轮全量代码审查（后端 + 前端 + 基础设施七路并行），共完成 45 项修复，涵盖并发安全、外键完整性、权限补全、登录流程修复与无限循环防御。同批次发现并修复 2 个生产级 Bug（强制改密流程卡死、logout 无限循环）。
+
+### Critical（8 项）
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 1 | `services/stock_service.py` | **RETURN 订单自锁**: `update_weighted_entry_date` 移除嵌套 `in_transaction` 和 `nowait=True`，消除退货流程内事务自死锁 |
+| 2 | `routers/orders.py` | **并发双重取消**: `cancel_order` 订单查询改为 `select_for_update()`，防止并发请求同时恢复库存 |
+| 3 | `routers/orders.py` | **退款零值校验**: `refund_amount` 判断改为 `is not None`（原 truthy 判断忽略 0 元退款）；移除库存释放后的重复退款金额校验 |
+| 4 | `routers/logistics.py` | **shipped_qty 超扣**: 扣减改为 CAS 保护（`shipped_qty__gte=si.quantity` filter），防并发撤单导致字段变负 |
+| 5 | `migrations.py` | **级联删除风险**: `order_items.warehouse_id/location_id` FK 由 `ON DELETE CASCADE` 改为 `SET NULL` |
+| 6 | `migrations.py` | **级联删除风险**: `shipment_items.product_id/order_item_id` FK 由 `ON DELETE CASCADE` 改为 `RESTRICT` |
+| 7 | `models/warehouse.py` + `migrations.py` | **虚拟外键**: `Warehouse.customer_id` 由裸 `IntField` 改为正式 `ForeignKeyField`，DDL 添加外键约束 + `idx_warehouse_customer_virtual` 部分唯一索引 |
+| 8 | `api/index.js` | **去重请求误报**: 主动 abort 的重复请求（`ERR_CANCELED`）静默忽略，不触发错误 Toast；`dedupKey` 在 error 拦截器中正确清理 |
+
+### Important（17 项）
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 1 | `schemas/user.py` | **权限定义缺口**: `VALID_PERMISSIONS` 补全 `"customer"` / `"finance_confirm"` / `"logistics"` / `"settings"` 四个缺失权限 |
+| 2 | `schemas/user.py` + `schemas/auth.py` | **密码长度不一致**: `UserCreate/UserUpdate.password` 和 `ChangePasswordRequest.new_password` 最短长度由 6 改为 8，与密码策略对齐 |
+| 3 | `services/backup_service.py` | **恢复无安全备份**: 执行 `DROP SCHEMA` 前检查 `pre_backup` 是否创建成功，失败则中止恢复 |
+| 4 | `main.py` | **畸形 Content-Length**: `RequestSizeLimitMiddleware` 捕获 `int()` 转换的 `ValueError`，避免 500 错误 |
+| 5 | `routers/finance.py` | **收款竞态**: `create_payment` 的客户查询加 `select_for_update()` 行锁 |
+| 6 | `routers/purchase_orders.py` | **采购无分页**: 列表接口添加 `offset/limit` 分页，返回 `{items, total}` |
+| 7 | `routers/finance.py` | **导出无上限**: 财务导出添加 `.limit(10000)` 防超大结果集 |
+| 8 | `routers/customers.py` | **交易无上限**: `get_customer_transactions` 添加 `.limit(500)` |
+| 9 | `schemas/stock.py` | **数量无上限**: `RestockRequest.quantity` 和 `StockTransferRequest.quantity` 添加 `le=999999` |
+| 10 | `stores/auth.js` | **checkAuth 重复调用**: 添加 `_checkPromise` 去重，并发多次调用共享同一 Promise |
+| 11 | `stores/products.js` | **按仓库加载污染全局**: `loadProducts(warehouseId)` 仅更新仓库维度缓存，不再覆盖全局 `products.value` |
+| 12 | `composables/useApi.js` | **缺少 put/del**: 添加 `put()` 和 `del()` 方法，支持 AbortController 取消 |
+| 13 | `main.py` | **index.html 重复读取**: `_read_index_html()` 生产模式下缓存文件内容，避免每次请求都读磁盘 |
+| 14 | `views/SalesView.vue` | **购物车 v-for key**: 使用 `_cartIdCounter` 生成稳定 `item._id` 作为 `:key`，消除 DOM 复用错误 |
+| 15 | `views/SalesView.vue` | **退货 AbortController 泄漏**: `onUnmounted` 中止 `_returnOrderAbort` 并置空 |
+| 16 | `views/SettingsView.vue` | **重复提交**: 6 个操作处理函数添加 `appStore.submitting` 防重复守卫 |
+| 17 | `components/business/PurchaseOrdersPanel.vue` | **定时器泄漏**: `onUnmounted(() => clearTimeout(_poSearchTimer))` |
+
+### Minor（18 项）
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 1 | `migrations.py` | 添加 `idx_warehouse_customer_virtual` 部分唯一索引（`WHERE is_virtual = true`） |
+| 2 | `schemas/warehouse.py` | `WarehouseUpdate.name` 添加 `min_length=1, max_length=200`；`LocationUpdate.code` 添加 `min_length=1, max_length=50` |
+| 3 | `schemas/warehouse.py` | `LocationUpdate.name` 添加 `max_length=100` |
+| 4 | `schemas/order.py` | `OrderItem.unit_price` 添加 `ge=0` 非负约束 |
+| 5 | `schemas/order.py` | `OrderCreate.remark` 添加 `max_length=2000` |
+| 6 | `routers/customers.py` | `list_customers` 返回 `{items, total}` 结构（与其他列表接口统一） |
+| 7 | `services/order_service.py` | 移除未使用的 `from tortoise.transactions import in_transaction` |
+| 8 | `migrations.py` | 添加 `products.category` 和 `products.brand` 字段索引，加速按品类/品牌查询 |
+| 9 | `Dockerfile` | 锁定镜像版本：`node:20-alpine` → `node:20.19-alpine`，`python:3.12-slim` → `python:3.12.10-slim` |
+| 10 | `utils/constants.js` | 移除 `menuItems` / `bottomNavItems` 中未使用的 emoji `icon` 属性 |
+| 11 | `composables/useSort.js` | 移除未使用的 `computed` 导入 |
+| 12 | `composables/usePermission.js` | 权限检查委托给 `authStore.hasPermission()`，消除重复逻辑 |
+| 13 | `stores/warehouses.js` | 添加 `loading` 和 `error` ref，加载函数正确设置/清除状态 |
+| 14 | `views/LogisticsView.vue` | localStorage 恢复列配置改为 `{ ...defaultColumns, ...savedColumns }` 合并默认值，防缺字段 |
+| 15 | `stores/auth.js` | `logout()` 移除 `erp_last_active`（已在 `logout` 函数内统一清理） |
+| 16 | `schemas/stock.py` | `StockTransferRequest` 注释补全 |
+| 17 | `routers/auth.py` | `logout` 改用 `get_current_user_allow_password_change`，强制改密用户也可正常登出 |
+| 18 | `api/index.js` | 401 拦截器仅对非 logout 端点触发 `_onUnauthorized`，防重入 |
+
+---
+
+### 登录流程 Bug 修复（同版本热修复）
+
+**Bug 1 — 强制改密表单不显示（登录后卡死在登录页）**
+
+- **根因**: `App.vue` 中 `v-if="authStore.user"` 控制模板分支。`doLogin()` 调用 `authStore.setAuth()` 后 `user` 变为非空，Vue 销毁旧 LoginView 组件（`showChangePwd` 重置为 `false`），重建新实例——改密表单永远不可见。
+- **修复**:
+  - `LoginView.vue`: `must_change_password` 时仅写 `localStorage.erp_token`，不调用 `authStore.setAuth()`，保持组件存活
+  - `routers/auth.py`: `change-password` 接口返回新 `access_token` + `user`（因 `token_version++` 旧 token 已失效）
+  - `LoginView.vue`: 改密成功后用新 token 调用 `authStore.setAuth()`，再跳转 `/dashboard`
+
+**Bug 2 — logout 400+ 无限循环**
+
+- **根因**: `logout()` 调用 `logoutApi()` 若返回 401，401 拦截器触发 `_onUnauthorized()` → `authStore.logout()` → `logoutApi()` → 401 → 无限递归，短时间内产生 400+ 并发请求。
+- **修复**:
+  - `api/index.js`: 401 拦截器检测 `/auth/logout` 端点，跳过 `_onUnauthorized` 调用
+  - `stores/auth.js`: `logout()` 添加 `_loggingOut` 重入守卫，并发调用直接返回
+
+---
+
+## v4.9.0 — 第二轮全量审查与系统优化（2026-02-22）
+
+> 基于第二轮全量代码审查（后端 + 前端 + 基础设施三方向并行），共完成 29 项优化，涵盖安全加固、性能提升、前端质量、基础设施和 Schema 验证。
+
+### Phase 1: 安全与稳定性
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 1 | `database.py` | **连接池超时**: 追加 `command_timeout=30&timeout=10` 参数，防止长查询耗尽连接池 |
+| 2 | `routers/auth.py` | **登录限流竞态**: 添加 `asyncio.Lock` 保护 `_login_attempts` 字典的读-检查-写操作，防止并发绕过 |
+| 3 | `routers/products.py` | **文件上传 MIME 验证**: 增加 content_type 白名单 + 文件头魔数校验（PK\x03\x04 / OLE2），拒绝伪造后缀 |
+| 4 | `main.py` | **请求体大小限制**: 添加 `RequestSizeLimitMiddleware`，全局限制 50MB，超出返回 413 |
+| 5 | `routers/auth.py` + `api/auth.js` + `stores/auth.js` | **登出接口**: 新增 `POST /api/auth/logout`（递增 token_version 使旧 Token 立即失效），前端 logout 改为 async 调用 |
+| 6 | `docker-compose.yml` | **Docker 资源限制**: db 和 erp 服务均添加 `mem_limit: 512m` + `cpus: 1.0` |
+| 7 | `main.py` | **版本号更新**: FastAPI title 更新为 v4.9.0 |
+
+### Phase 2: 性能与可靠性
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 8 | `routers/products.py` | **产品列表分页**: 添加 `offset/limit` 参数（默认 200，最大 1000），返回 `{items, total}` |
+| 9 | `routers/users.py` | **用户列表上限**: 添加 `.limit(500)` 安全上限 |
+| 10 | `services/order_service.py` + `routers/orders.py` | **N+1 查询优化**: 订单创建前批量预取 Product/Warehouse/Location（`filter(id__in=...)`），构建 `entities_cache` 字典传入 `resolve_item_entities` |
+| 11 | `routers/orders.py` | **移除泛型异常捕获**: 删除 `except Exception` catch-all，让全局异常处理器处理意外错误 |
+| 12 | `api/index.js` | **前端超时 + 重试**: axios 添加 `timeout: 30000`，GET 请求 5xx 自动重试一次（1s 延迟） |
+| 13 | `services/stock_service.py` | **锁等待优化**: `select_for_update()` 改为 `select_for_update(nowait=True)`，锁冲突返回 409 提示重试 |
+| 14 | `main.py` | **SPA fallback 修复**: `'.' in path` 改为 `_STATIC_EXTENSIONS` frozenset 白名单，避免 `/customer/john.doe` 被误判为静态文件 |
+
+### Phase 3: 前端质量
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 15 | 新建 `composables/useApi.js` | **AbortController 取消机制**: 可取消请求 composable，组件 unmount 时自动 abort 未完成请求 |
+| 16 | `api/index.js` | **防重复提交**: 拦截器对相同 POST/PUT/DELETE 请求去重（`_pendingRequests` Map） |
+| 17 | `stores/products.js` + `stores/customers.js` | **Store 错误状态**: 添加 `error` ref，加载失败时可被 UI 消费 |
+
+### Phase 4: 基础设施
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 18 | 新建 `tests/conftest.py` + `tests/test_auth.py` | **后端测试框架**: pytest + pytest-asyncio，SQLite 内存测试 DB，6 个认证/密码测试用例 |
+| 19 | `requirements.txt` | 添加 `pytest>=8.0.0` + `pytest-asyncio>=0.23.0` |
+| 20 | `Dockerfile` | **多 Worker + 泄漏保护**: CMD 改为 `--workers 2 --limit-max-requests 10000` |
+| 21 | `.gitignore` | 添加 `*.log` |
+
+### Phase 5: 验证增强
+
+| # | 文件 | 修复内容 |
+|---|------|----------|
+| 22 | `schemas/product.py` | **SKU 正则**: `^[A-Za-z0-9\u4e00-\u9fff\-_.]+$`；价格字段添加 `le=99999999`；字符串添加 `max_length` |
+| 23 | `schemas/order.py` | 数量 `le=999999`，单价 `le=99999999`，items 列表 `max_length=100` |
+| 24 | `auth/password.py` | **密码策略加强**: 最低 8 位 + 10 个常见弱密码黑名单（大小写不敏感匹配） |
+
+---
+
 ## v4.8.8 — 全量代码审查与安全加固（第八轮）（2026-02-21）
 
 > 基于第八轮全量代码审查（覆盖后端 Models/Schemas/Routers/Services、基础设施、前端 Views/Components/Stores），共修复 ~45 个问题，涉及并发安全、输入校验、安全依赖升级、前端防重复提交等。

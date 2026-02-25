@@ -6,7 +6,7 @@ class WarehouseCreate(BaseModel):
     is_default: bool = False
 
 class WarehouseUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
     is_default: Optional[bool] = None
 
 class LocationCreate(BaseModel):
@@ -15,5 +15,5 @@ class LocationCreate(BaseModel):
     name: Optional[str] = None
 
 class LocationUpdate(BaseModel):
-    code: Optional[str] = None
+    code: Optional[str] = Field(None, min_length=1, max_length=50)
     name: Optional[str] = None

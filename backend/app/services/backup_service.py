@@ -122,6 +122,8 @@ def do_restore(filename):
 
     # 恢复前自动备份当前数据（安全网）
     pre_backup = do_backup("pre_restore")
+    if not pre_backup:
+        raise RuntimeError("无法创建安全备份，取消恢复操作")
 
     if is_postgres():
         # 第1步：清空数据库（删除并重建 public schema）

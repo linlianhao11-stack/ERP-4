@@ -471,7 +471,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/app'
 import { useProductsStore } from '../../stores/products'
 import { useWarehousesStore } from '../../stores/warehouses'
@@ -551,8 +551,8 @@ const filteredPoSuppliers = computed(() => {
   )
 })
 
-const poTotal = computed(() => poForm.items.reduce((s, i) => s + i.amount, 0))
-const poRebateTotal = computed(() => poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0))
+const poTotal = computed(() => Math.round(poForm.items.reduce((s, i) => s + i.amount, 0) * 100) / 100)
+const poRebateTotal = computed(() => Math.round(poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0) * 100) / 100)
 const poFinalAmount = computed(() => {
   let amount = poTotal.value
   if (poForm.use_rebate) amount -= poRebateTotal.value
@@ -560,9 +560,9 @@ const poFinalAmount = computed(() => {
   return Math.max(0, amount)
 })
 const returnTotalAmount = computed(() => {
-  return returnForm.items
+  return Math.round(returnForm.items
     .filter(i => i.checked && i.return_quantity > 0)
-    .reduce((s, i) => s + i.return_quantity * i.unit_amount, 0)
+    .reduce((s, i) => s + i.return_quantity * i.unit_amount, 0) * 100) / 100
 })
 
 const poTargetLocations = computed(() => {
@@ -998,7 +998,7 @@ const openReturnModal = (po) => {
       product_name: `${it.product_sku} - ${it.product_name}`,
       returnable_qty: it.returnable_quantity,
       return_quantity: it.returnable_quantity,
-      unit_amount: it.amount / it.quantity,
+      unit_amount: it.quantity > 0 ? it.amount / it.quantity : 0,
       checked: false
     }))
   showReturnModal.value = true
@@ -1047,4 +1047,6 @@ onMounted(() => {
   warehousesStore.loadWarehouses()
   warehousesStore.loadLocations()
 })
+
+onUnmounted(() => clearTimeout(_poSearchTimer))
 </script>

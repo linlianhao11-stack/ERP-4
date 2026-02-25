@@ -54,7 +54,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
@@ -72,6 +72,8 @@ const showChangePwd = ref(false)
 // 暂存登录时的原始密码，用于改密接口的 old_password
 let tempOldPassword = ''
 
+onUnmounted(() => { tempOldPassword = '' })
+
 const doLogin = async () => {
   if (!form.username || !form.password) {
     appStore.showToast('请填写用户名和密码', 'error')
@@ -80,13 +82,18 @@ const doLogin = async () => {
   loading.value = true
   try {
     const { data } = await login(form)
-    authStore.setAuth(data.access_token, data.user)
-    localStorage.setItem('erp_last_active', Date.now().toString())
     if (data.must_change_password) {
+      // 仅将 token 存入 localStorage 供改密接口使用，不设置 authStore.user
+      // 原因：一旦 authStore.user 非空，App.vue 会切换模板分支，销毁当前组件实例，
+      // 导致 showChangePwd 状态丢失，改密表单无法显示
+      localStorage.setItem('erp_token', data.access_token)
+      localStorage.setItem('erp_last_active', Date.now().toString())
       tempOldPassword = form.password
       showChangePwd.value = true
       appStore.showToast('请先修改默认密码', 'warning')
     } else {
+      authStore.setAuth(data.access_token, data.user)
+      localStorage.setItem('erp_last_active', Date.now().toString())
       router.push('/dashboard')
     }
   } catch (e) {
@@ -111,10 +118,12 @@ const doChangePassword = async () => {
   }
   loading.value = true
   try {
-    await changePassword({ old_password: tempOldPassword, new_password: pwdForm.new_password })
+    const { data } = await changePassword({ old_password: tempOldPassword, new_password: pwdForm.new_password })
     appStore.showToast('密码修改成功')
-    showChangePwd.value = false
     tempOldPassword = ''
+    // 后端改密后会使旧 token 失效并返回新 token，用新 token 完成登录
+    authStore.setAuth(data.access_token, data.user)
+    localStorage.setItem('erp_last_active', Date.now().toString())
     router.push('/dashboard')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '密码修改失败', 'error')

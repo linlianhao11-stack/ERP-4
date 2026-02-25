@@ -5,6 +5,14 @@ from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_HOURS
 
 
+class TokenExpiredError(Exception):
+    pass
+
+
+class TokenInvalidError(Exception):
+    pass
+
+
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
@@ -12,11 +20,11 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_token(token: str):
+def verify_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except ExpiredSignatureError:
-        return {"error": "expired"}
+        raise TokenExpiredError("Token has expired")
     except InvalidTokenError:
-        return None
+        raise TokenInvalidError("Invalid token")

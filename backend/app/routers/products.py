@@ -20,14 +20,18 @@ router = APIRouter(prefix="/api/products", tags=["商品管理"])
 
 @router.get("")
 async def list_products(keyword: Optional[str] = None, category: Optional[str] = None,
-                        warehouse_id: Optional[int] = None, user: User = Depends(get_current_user)):
+                        warehouse_id: Optional[int] = None,
+                        offset: int = 0, limit: int = 200,
+                        user: User = Depends(get_current_user)):
+    limit = min(limit, 1000)  # 安全上限
     query = Product.filter(is_active=True)
     if keyword:
         for word in keyword.split():
             query = query.filter(Q(sku__icontains=word) | Q(name__icontains=word) | Q(brand__icontains=word) | Q(category__icontains=word))
     if category:
         query = query.filter(category=category)
-    products = await query.order_by("-updated_at")
+    total = await query.count()
+    products = await query.order_by("-updated_at").offset(offset).limit(limit)
 
     # 批量查询所有库存（避免 N+1）
     product_ids = [p.id for p in products]
@@ -82,7 +86,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
             item["cost_price"] = float(p.cost_price)
         result.append(item)
 
-    return result
+    return {"items": result, "total": total}
 
 
 @router.get("/categories/list")
@@ -162,6 +166,23 @@ async def download_template(user: User = Depends(require_permission("stock_edit"
     )
 
 
+_EXCEL_MIME_TYPES = {
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/octet-stream',
+}
+
+
+def _validate_excel_file(file: UploadFile, content: bytes):
+    """验证上传文件是否为合法的 Excel 文件"""
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="请上传Excel文件")
+    if file.content_type and file.content_type not in _EXCEL_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="文件类型不正确，请上传Excel文件")
+    if len(content) >= 4 and content[:4] != b'PK\x03\x04' and content[:8] != b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
+        raise HTTPException(status_code=400, detail="文件内容格式不正确，请上传Excel文件")
+
+
 @router.post("/import/preview")
 async def preview_import(file: UploadFile = File(...), user: User = Depends(require_permission("stock_edit"))):
     try:
@@ -169,9 +190,8 @@ async def preview_import(file: UploadFile = File(...), user: User = Depends(requ
     except ImportError:
         raise HTTPException(status_code=500, detail="pandas未安装")
 
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="请上传Excel文件")
     content = await file.read()
+    _validate_excel_file(file, content)
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="文件过大，最大支持10MB")
     df = pd.read_excel(io.BytesIO(content))
@@ -302,9 +322,8 @@ async def import_products(file: UploadFile = File(...), user: User = Depends(req
     except ImportError:
         raise HTTPException(status_code=500, detail="pandas未安装")
 
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="请上传Excel文件")
     content = await file.read()
+    _validate_excel_file(file, content)
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="文件过大，最大支持10MB")
     df = pd.read_excel(io.BytesIO(content))

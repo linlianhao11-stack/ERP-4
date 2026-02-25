@@ -59,8 +59,8 @@ const visibleItems = computed(() =>
   menuItems.filter(item => authStore.hasPermission(item.perm))
 )
 
-const handleLogout = () => {
-  authStore.logout()
+const handleLogout = async () => {
+  await authStore.logout()
   router.push('/login')
 }
 </script>

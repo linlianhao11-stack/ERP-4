@@ -159,15 +159,15 @@ async def refund_supplier_credit(
     data: CreditRefundRequest,
     user: User = Depends(require_permission("purchase"))
 ):
-    supplier = await Supplier.filter(id=supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="供应商不存在")
-
     amount = Decimal(str(data.amount))
-    if amount > supplier.credit_balance:
-        raise HTTPException(status_code=400, detail=f"退款金额超过在账资金余额（可用: ¥{float(supplier.credit_balance):.2f}）")
 
     async with transactions.in_transaction():
+        supplier = await Supplier.filter(id=supplier_id).select_for_update().first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="供应商不存在")
+        if amount > supplier.credit_balance:
+            raise HTTPException(status_code=400, detail=f"退款金额超过在账资金余额（可用: ¥{float(supplier.credit_balance):.2f}）")
+
         await Supplier.filter(id=supplier_id).update(credit_balance=F('credit_balance') - amount)
         await supplier.refresh_from_db()
 

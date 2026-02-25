@@ -505,7 +505,7 @@ const columnLabels = {
 
 let _savedColumns = null
 try { _savedColumns = JSON.parse(localStorage.getItem('logistics_columns')) } catch (e) { /* ignore corrupt data */ }
-const visibleColumns = reactive(_savedColumns || { ...defaultColumns })
+const visibleColumns = reactive({ ...defaultColumns, ...(_savedColumns || {}) })
 
 const showColumnMenu = ref(false)
 

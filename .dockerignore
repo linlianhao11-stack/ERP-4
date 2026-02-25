@@ -4,6 +4,9 @@ frontend/dist
 backend/static
 backend/backups
 backend/.venv
+backend/tests
+backend/pytest.ini
+backend/requirements-dev.txt
 backups
 data
 **/__pycache__
@@ -11,9 +14,7 @@ data
 .git
 .claude
 *.md
-/main.py
 index.html
-nul.~#0
 .env
 .env.*
 !.env.example

@@ -15,8 +15,8 @@ async def list_customers(keyword: Optional[str] = None, limit: int = 200, offset
         Customer, filters={"is_active": True}, keyword=keyword,
         keyword_fields=["name", "phone"], order_by="name", offset=offset, limit=limit
     )
-    return [{"id": c.id, "name": c.name, "contact_person": c.contact_person, "phone": c.phone,
-             "address": c.address, "balance": float(c.balance), "rebate_balance": float(c.rebate_balance)} for c in customers]
+    return {"items": [{"id": c.id, "name": c.name, "contact_person": c.contact_person, "phone": c.phone,
+             "address": c.address, "balance": float(c.balance), "rebate_balance": float(c.rebate_balance)} for c in customers], "total": total}
 
 
 @router.post("")
@@ -65,7 +65,7 @@ async def get_customer_transactions(customer_id: int, year: Optional[int] = None
             end_date = datetime(year, month + 1, 1)
         query = query.filter(created_at__gte=start_date, created_at__lt=end_date)
 
-    orders = await query.order_by("-created_at").select_related("warehouse", "creator", "salesperson")
+    orders = await query.order_by("-created_at").limit(500).select_related("warehouse", "creator", "salesperson")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
 
     stats = {

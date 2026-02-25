@@ -6,7 +6,7 @@ class Warehouse(models.Model):
     name = fields.CharField(max_length=100)
     is_default = fields.BooleanField(default=False)
     is_virtual = fields.BooleanField(default=False)
-    customer_id = fields.IntField(null=True)
+    customer = fields.ForeignKeyField("models.Customer", related_name="warehouses", null=True, on_delete=fields.SET_NULL)
     is_active = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 

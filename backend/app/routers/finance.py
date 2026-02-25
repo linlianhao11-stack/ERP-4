@@ -121,7 +121,7 @@ async def export_orders(
     if end_date:
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
 
-    orders = await query.order_by("-created_at").select_related(
+    orders = await query.order_by("-created_at").limit(10000).select_related(
         "customer", "warehouse", "creator", "related_order", "salesperson")
 
     output = io.StringIO()
@@ -269,7 +269,7 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
     """回款核销"""
     from tortoise import transactions
     async with transactions.in_transaction():
-        customer = await Customer.filter(id=data.customer_id).first()
+        customer = await Customer.filter(id=data.customer_id).select_for_update().first()
         if not customer:
             raise HTTPException(status_code=404, detail="客户不存在")
 
@@ -300,8 +300,8 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
                 break
             pay_this = min(remaining, unpaid)
             await Order.filter(id=order.id).update(paid_amount=F('paid_amount') + pay_this)
-            # Reload to check if cleared
-            order = await Order.filter(id=order.id).first()
+            # Reload with lock to check if cleared (prevents race with concurrent payments)
+            order = await Order.filter(id=order.id).select_for_update().first()
             if order.paid_amount >= order.total_amount:
                 await Order.filter(id=order.id).update(is_cleared=True)
 

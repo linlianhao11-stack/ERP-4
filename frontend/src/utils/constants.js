@@ -16,24 +16,24 @@ export const iconMap = {
 }
 
 export const menuItems = [
-  { key: 'dashboard', name: '首页', icon: '📊', perm: 'dashboard' },
-  { key: 'sales', name: '销售', icon: '🛒', perm: 'sales' },
-  { key: 'stock', name: '库存', icon: '📦', perm: 'stock_view' },
-  { key: 'purchase', name: '采购', icon: '🛍️', perm: 'purchase' },
-  { key: 'consignment', name: '寄售', icon: '🔄', perm: 'consignment' },
-  { key: 'logistics', name: '物流', icon: '🚚', perm: 'logistics' },
-  { key: 'finance', name: '财务', icon: '💰', perm: 'finance' },
-  { key: 'customers', name: '客户', icon: '👥', perm: 'customer' },
-  { key: 'settings', name: '设置', icon: '⚙️', perm: '_any' }
+  { key: 'dashboard', name: '首页', perm: 'dashboard' },
+  { key: 'sales', name: '销售', perm: 'sales' },
+  { key: 'stock', name: '库存', perm: 'stock_view' },
+  { key: 'purchase', name: '采购', perm: 'purchase' },
+  { key: 'consignment', name: '寄售', perm: 'consignment' },
+  { key: 'logistics', name: '物流', perm: 'logistics' },
+  { key: 'finance', name: '财务', perm: 'finance' },
+  { key: 'customers', name: '客户', perm: 'customer' },
+  { key: 'settings', name: '设置', perm: '_any' }
 ]
 
 export const bottomNavItems = [
-  { key: 'dashboard', name: '首页', icon: '📊', perm: 'dashboard' },
-  { key: 'sales', name: '销售', icon: '🛒', perm: 'sales' },
-  { key: 'stock', name: '库存', icon: '📦', perm: 'stock_view' },
-  { key: 'consignment', name: '寄售', icon: '🔄', perm: 'consignment' },
-  { key: 'logistics', name: '物流', icon: '🚚', perm: 'logistics' },
-  { key: 'finance', name: '财务', icon: '💰', perm: 'finance' }
+  { key: 'dashboard', name: '首页', perm: 'dashboard' },
+  { key: 'sales', name: '销售', perm: 'sales' },
+  { key: 'stock', name: '库存', perm: 'stock_view' },
+  { key: 'consignment', name: '寄售', perm: 'consignment' },
+  { key: 'logistics', name: '物流', perm: 'logistics' },
+  { key: 'finance', name: '财务', perm: 'finance' }
 ]
 
 export const allPermissions = [

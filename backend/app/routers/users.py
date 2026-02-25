@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/users", tags=["用户管理"])
 
 @router.get("")
 async def list_users(user: User = Depends(require_permission("admin"))):
-    users = await User.all().order_by("id")
+    users = await User.all().order_by("id").limit(500)
     return [{"id": u.id, "username": u.username, "display_name": u.display_name,
              "role": u.role, "permissions": u.permissions, "is_active": u.is_active} for u in users]
 

@@ -1,5 +1,7 @@
+import asyncio
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
+from tortoise.expressions import F
 from app.auth.jwt import create_access_token
 from app.auth.dependencies import get_current_user, get_current_user_allow_password_change
 from app.models import User
@@ -13,6 +15,7 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 # 登录尝试记录: {ip: [timestamp, ...]}
 _login_attempts = {}
 _last_cleanup = 0
+_login_lock = asyncio.Lock()
 
 
 def _cleanup_login_attempts():
@@ -33,21 +36,27 @@ def _cleanup_login_attempts():
 
 @router.post("/login")
 async def login(data: LoginRequest, request: Request):
-    forwarded = request.headers.get("x-forwarded-for")
-    # Take the last IP in X-Forwarded-For (added by the last trusted proxy) to avoid client spoofing
-    client_ip = forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "unknown")
+    # Rate limiting relies on socket IP only; X-Forwarded-For is client-controlled and trivially spoofed.
+    # Deploy behind nginx (with set_real_ip_from) so request.client.host reflects the real client IP.
+    client_ip = request.client.host if request.client else "unknown"
     now_ts = datetime.now().timestamp()
-    _cleanup_login_attempts()
-    attempts = _login_attempts.get(client_ip, [])
-    attempts = [t for t in attempts if now_ts - t < LOGIN_WINDOW_SECONDS]
-    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
-        raise HTTPException(status_code=429, detail=f"登录尝试过于频繁，请{LOGIN_WINDOW_SECONDS // 60}分钟后再试")
-    user = await User.filter(username=data.username, is_active=True).first()
-    if not user or not verify_password(data.password, user.password_hash):
-        attempts.append(now_ts)
-        _login_attempts[client_ip] = attempts
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    _login_attempts.pop(client_ip, None)
+    # Hold the lock across the entire check-verify-increment sequence to close the
+    # race window where concurrent requests could bypass the rate limit.
+    # This serializes login attempts but is acceptable for a 5-attempt limit.
+    async with _login_lock:
+        _cleanup_login_attempts()
+        attempts = _login_attempts.get(client_ip, [])
+        attempts = [t for t in attempts if now_ts - t < LOGIN_WINDOW_SECONDS]
+        if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+            raise HTTPException(status_code=429, detail=f"登录尝试过于频繁，请{LOGIN_WINDOW_SECONDS // 60}分钟后再试")
+        # Query user inside lock scope
+        user = await User.filter(username=data.username, is_active=True).first()
+        if not user or not verify_password(data.password, user.password_hash):
+            attempts.append(now_ts)
+            _login_attempts[client_ip] = attempts
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
+        # Success - clear attempts
+        _login_attempts.pop(client_ip, None)
     # 透明迁移：旧 pbkdf2_sha256 哈希自动升级为 bcrypt
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(data.password)
@@ -82,7 +91,26 @@ async def change_password(data: ChangePasswordRequest, user: User = Depends(get_
         raise HTTPException(status_code=400, detail="原密码错误")
     user.password_hash = hash_password(data.new_password)
     user.must_change_password = False
-    user.token_version += 1
     await user.save()
+    # Atomic increment of token_version to avoid lost-update under concurrent requests
+    await User.filter(id=user.id).update(token_version=F('token_version') + 1)
+    # Re-fetch to get the updated token_version for creating the new JWT token
+    user = await User.get(id=user.id)
     await log_operation(user, "PASSWORD_CHANGE", "USER", user.id, f"用户 {user.username} 修改密码")
-    return {"message": "密码修改成功"}
+    new_token = create_access_token({"user_id": user.id, "username": user.username, "role": user.role, "token_version": user.token_version})
+    return {
+        "message": "密码修改成功",
+        "access_token": new_token,
+        "user": {
+            "id": user.id, "username": user.username,
+            "display_name": user.display_name, "role": user.role,
+            "permissions": user.permissions or []
+        }
+    }
+
+
+@router.post("/logout")
+async def logout(user: User = Depends(get_current_user_allow_password_change)):
+    # Atomic increment of token_version to invalidate all existing tokens
+    await User.filter(id=user.id).update(token_version=F('token_version') + 1)
+    return {"message": "已登出"}

@@ -6,6 +6,7 @@ import { fuzzyMatchAny } from '../utils/helpers'
 export const useCustomersStore = defineStore('customers', () => {
   const customers = ref([])
   const customerSearch = ref('')
+  const error = ref(null)
   const _loaded = ref(false)
 
   const filteredCustomers = computed(() => {
@@ -15,12 +16,14 @@ export const useCustomersStore = defineStore('customers', () => {
   })
 
   const loadCustomers = async () => {
+    error.value = null
     try {
       const { data } = await getCustomers()
       customers.value = data
       _loaded.value = true
     } catch (e) {
-      console.error('加载客户失败', e)
+      error.value = '客户数据加载失败'
+      console.error('loadCustomers error:', e)
     }
   }
 
@@ -33,5 +36,5 @@ export const useCustomersStore = defineStore('customers', () => {
     return _loadingPromise
   }
 
-  return { customers, customerSearch, filteredCustomers, loadCustomers, ensureLoaded }
+  return { customers, customerSearch, error, filteredCustomers, loadCustomers, ensureLoaded }
 })

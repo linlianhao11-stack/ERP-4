@@ -696,8 +696,8 @@ const onItemRebateChange = (index) => {
 const recalcCancelTotals = () => {
   const preview = cancelPreviewData.value
   if (!preview) return
-  const totalPaid = cancelForm.item_allocations.reduce((s, i) => s + i.paid, 0)
-  const totalRebate = cancelForm.item_allocations.reduce((s, i) => s + i.rebate, 0)
+  const totalPaid = Math.round(cancelForm.item_allocations.reduce((s, i) => s + i.paid, 0) * 100) / 100
+  const totalRebate = Math.round(cancelForm.item_allocations.reduce((s, i) => s + i.rebate, 0) * 100) / 100
   cancelForm.new_order_paid_amount = +totalPaid.toFixed(2)
   cancelForm.new_order_rebate_used = +totalRebate.toFixed(2)
   cancelForm.refund_amount = +(preview.paid_amount - cancelForm.new_order_paid_amount).toFixed(2)

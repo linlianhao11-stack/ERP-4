@@ -20,6 +20,9 @@ Thumbs.db
 backend/backups/
 backups/
 
+# 日志文件
+*.log
+
 # IDE
 .vscode/
 .idea/

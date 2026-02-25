@@ -1,7 +1,7 @@
 """认证依赖"""
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.auth.jwt import verify_token
+from app.auth.jwt import verify_token, TokenExpiredError, TokenInvalidError
 from app.models.user import User
 
 security = HTTPBearer(auto_error=False)
@@ -11,11 +11,12 @@ async def _authenticate_user(credentials: HTTPAuthorizationCredentials = Depends
     """验证Token并返回用户，不检查must_change_password"""
     if not credentials:
         raise HTTPException(status_code=401, detail="未授权")
-    payload = verify_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token无效")
-    if isinstance(payload, dict) and payload.get("error") == "expired":
+    try:
+        payload = verify_token(credentials.credentials)
+    except TokenExpiredError:
         raise HTTPException(status_code=401, detail="Token已过期，请重新登录")
+    except TokenInvalidError:
+        raise HTTPException(status_code=401, detail="Token无效")
     user_id = payload.get("user_id")
     if not isinstance(user_id, int):
         raise HTTPException(status_code=401, detail="Token无效")

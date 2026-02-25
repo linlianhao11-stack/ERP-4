@@ -100,7 +100,7 @@
         <button @click="cart = []" class="text-[#ff3b30] text-xs" v-show="cart.length">清空</button>
       </div>
       <div class="flex-1 overflow-y-auto cart-items">
-        <div v-for="(item, idx) in cart" :key="idx" class="p-2 border-b">
+        <div v-for="(item, idx) in cart" :key="item._id" class="p-2 border-b">
           <div class="flex justify-between items-center mb-1">
             <div class="font-medium truncate text-sm flex-1">{{ item.name }}</div>
             <div class="flex gap-1 ml-2">
@@ -403,7 +403,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import { useProductsStore } from '../stores/products'
@@ -586,6 +586,7 @@ const onToggleVirtualStock = async () => {
   }
 }
 
+let _cartIdCounter = 0
 const addToCart = (p) => {
   const stock = getStock(p)
   if (stock <= 0 && saleForm.order_type !== 'RETURN') {
@@ -604,6 +605,7 @@ const addToCart = (p) => {
       e.quantity++
     } else {
       cart.value.push({
+        _id: ++_cartIdCounter,
         product_id: p.id,
         name: p.name,
         unit_price: p.retail_price,
@@ -626,6 +628,7 @@ const addToCart = (p) => {
       } else {
         const fullProduct = products.value.find(prod => prod.id === p.id)
         cart.value.push({
+          _id: ++_cartIdCounter,
           product_id: p.id,
           name: p.name,
           unit_price: p.retail_price,
@@ -651,6 +654,7 @@ const duplicateCartLine = (idx) => {
   const item = cart.value[idx]
   const fullProduct = products.value.find(prod => prod.id === item.product_id)
   cart.value.splice(idx + 1, 0, {
+    _id: ++_cartIdCounter,
     product_id: item.product_id,
     name: item.name,
     unit_price: item.unit_price,
@@ -798,6 +802,15 @@ const confirmSubmitOrder = async () => {
   const useRebate = orderConfirm.value.use_rebate
   const totalRebate = useRebate ? orderConfirm.value.items.reduce((s, i) => s + (i.rebate_amount || 0), 0) : 0
 
+  if (useRebate) {
+    for (const item of orderConfirm.value.items) {
+      if (item.rebate_amount && item.rebate_amount > item.unit_price * item.quantity) {
+        appStore.showToast(`${item.name} 的返利金额不能超过商品小计`, 'error')
+        return
+      }
+    }
+  }
+
   if (useRebate && totalRebate > orderConfirm.value.rebate_balance) {
     appStore.showToast('返利总额超过可用余额', 'error')
     return
@@ -885,5 +898,9 @@ onMounted(() => {
   if (!customers.value.length) customersStore.loadCustomers()
   if (!salespersons.value.length) settingsStore.loadSalespersons()
   if (!paymentMethods.value.length) settingsStore.loadPaymentMethods()
+})
+
+onUnmounted(() => {
+  if (_returnOrderAbort) _returnOrderAbort.abort()
 })
 </script>

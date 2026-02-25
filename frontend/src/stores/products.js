@@ -4,19 +4,22 @@ import { getProducts } from '../api/products'
 
 export const useProductsStore = defineStore('products', () => {
   const products = ref([])
+  const error = ref(null)
   const _loaded = ref(false)
 
   const loadProducts = async (warehouseId) => {
+    error.value = null
     try {
-      const params = {}
-      if (warehouseId) params.warehouse_id = warehouseId
+      const params = warehouseId ? { warehouse_id: warehouseId } : {}
       const { data } = await getProducts(params)
-      products.value = data
       if (!warehouseId) {
+        products.value = data.items ?? data
         _loaded.value = true
       }
+      return data
     } catch (e) {
-      console.error('加载商品失败', e)
+      error.value = '商品数据加载失败'
+      console.error(e)
     }
   }
 
@@ -29,5 +32,5 @@ export const useProductsStore = defineStore('products', () => {
     return _loadingPromise
   }
 
-  return { products, loadProducts, ensureLoaded }
+  return { products, error, loadProducts, ensureLoaded }
 })

@@ -34,6 +34,8 @@ async def list_purchase_orders(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 200,
     user: User = Depends(require_permission("purchase", "purchase_approve", "purchase_pay", "purchase_receive"))
 ):
     query = PurchaseOrder.all()
@@ -45,9 +47,11 @@ async def list_purchase_orders(
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
     if search:
         query = query.filter(Q(po_no__icontains=search) | Q(supplier__name__icontains=search))
-    orders = await query.order_by("-created_at").select_related(
+    limit = min(limit, 1000)
+    total = await query.count()
+    orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related(
         "supplier", "creator", "paid_by", "reviewed_by", "target_warehouse", "target_location")
-    return [{
+    return {"items": [{
         "id": o.id, "po_no": o.po_no, "supplier_id": o.supplier_id,
         "supplier_name": o.supplier.name if o.supplier else "",
         "status": o.status, "total_amount": float(o.total_amount),
@@ -62,7 +66,7 @@ async def list_purchase_orders(
         "paid_at": o.paid_at.isoformat() if o.paid_at else None,
         "payment_method": o.payment_method,
         "created_at": o.created_at.isoformat(),
-    } for o in orders]
+    } for o in orders], "total": total}
 
 
 @router.get("/export")
@@ -525,7 +529,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
 
             # 计算退货金额（按比例）
             unit_amount = poi.amount / poi.quantity if poi.quantity > 0 else Decimal("0")
-            item_return_amount = round(unit_amount * ret_item.return_quantity, 2)
+            item_return_amount = (unit_amount * ret_item.return_quantity).quantize(Decimal("0.01"))
             total_return_amount += item_return_amount
 
             # 从仓库扣减库存（汇总该仓库所有仓位的库存）

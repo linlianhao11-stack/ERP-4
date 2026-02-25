@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue'
+import { reactive } from 'vue'
 
 export function useSort(defaultKey = '', defaultOrder = '') {
   const sortState = reactive({ key: defaultKey, order: defaultOrder })

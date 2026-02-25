@@ -1,5 +1,5 @@
 # ---- 阶段1: 构建前端 ----
-FROM node:20-alpine AS frontend-builder
+FROM node:20.19-alpine AS frontend-builder
 WORKDIR /build
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN npm config set registry ${NPM_REGISTRY}
@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN npx vite build --outDir /build/dist
 
 # ---- 阶段2: 生产镜像 ----
-FROM python:3.12-slim
+FROM python:3.12.10-slim
 
 ENV TZ=Asia/Shanghai
 
@@ -35,9 +35,9 @@ RUN mkdir -p /app/backups \
 
 EXPOSE 8090
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')" || exit 1
 
 USER appuser
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8090", "--workers", "1"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8090", "--workers", "2", "--limit-max-requests", "10000"]

@@ -149,8 +149,8 @@ router.afterEach((to, from) => {
   loadForRoute(to.name)
 })
 
-useIdleTimeout(() => {
-  authStore.logout()
+useIdleTimeout(async () => {
+  await authStore.logout()
   router.push('/login')
   appStore.showToast('由于长时间未操作，已自动退出登录', 'warning')
 })

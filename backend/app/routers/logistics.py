@@ -560,9 +560,17 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                     before_qty = stock.quantity if stock else 0
 
                     if stock:
+                        # When deleting a shipment we restore stock to "reserved" state because the
+                        # parent order still exists and expects the items to be fulfilled. Therefore
+                        # reserved_qty += si.quantity is the intended behaviour.  However, if the
+                        # reservation was already released (e.g. order cancelled between ship and
+                        # delete), blindly adding could push reserved_qty above quantity. Clamp
+                        # the addition so reserved_qty never exceeds the new quantity.
+                        new_quantity = stock.quantity + si.quantity
+                        safe_reserved_add = min(si.quantity, max(0, new_quantity - stock.reserved_qty))
                         await WarehouseStock.filter(id=stock.id).update(
                             quantity=F('quantity') + si.quantity,
-                            reserved_qty=F('reserved_qty') + si.quantity
+                            reserved_qty=F('reserved_qty') + safe_reserved_add
                         )
                     else:
                         await WarehouseStock.create(
@@ -612,10 +620,16 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                                 exc_info=e
                             )
 
-            # 恢复 OrderItem.shipped_qty
-            await OrderItem.filter(id=si.order_item_id).update(
+            # 恢复 OrderItem.shipped_qty (CAS-style guard to prevent underflow)
+            updated = await OrderItem.filter(
+                id=si.order_item_id,
+                shipped_qty__gte=si.quantity
+            ).update(
                 shipped_qty=F('shipped_qty') - si.quantity
             )
+            if not updated:
+                # Log warning but don't fail - shipped_qty was already 0 or lower
+                logger.warning("shipped_qty underflow prevented", extra={"data": {"order_item_id": si.order_item_id}})
             # 恢复 SN 码状态
             sn_objs = await SnCode.filter(shipment_id=shipment_id, product_id=si.product_id, status="shipped").all()
             for sn_obj in sn_objs:

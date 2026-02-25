@@ -10,7 +10,7 @@ def _get_db_url():
     if url.startswith("postgres") and "?" not in url:
         min_size = os.environ.get("DB_POOL_MIN", "2")
         max_size = os.environ.get("DB_POOL_MAX", "10")
-        url += f"?minsize={min_size}&maxsize={max_size}"
+        url += f"?minsize={min_size}&maxsize={max_size}&command_timeout=30&timeout=10"
     return url
 
 

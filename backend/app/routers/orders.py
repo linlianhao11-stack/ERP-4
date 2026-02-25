@@ -54,9 +54,27 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             )
 
             # 3. 创建订单行 + 库存处理
+            # 批量预加载实体，避免 N+1 查询
+            _product_ids = list(set(i.product_id for i in data.items))
+            _warehouse_ids = list(set(
+                i.warehouse_id for i in data.items if i.warehouse_id
+            ))
+            if data.warehouse_id and data.warehouse_id not in _warehouse_ids:
+                _warehouse_ids.append(data.warehouse_id)
+            _location_ids = list(set(
+                i.location_id for i in data.items if i.location_id
+            ))
+            if data.location_id and data.location_id not in _location_ids:
+                _location_ids.append(data.location_id)
+
+            _products_map = {p.id: p for p in await Product.filter(id__in=_product_ids, is_active=True)} if _product_ids else {}
+            _warehouses_map = {w.id: w for w in await Warehouse.filter(id__in=_warehouse_ids, is_active=True)} if _warehouse_ids else {}
+            _locations_map = {l.id: l for l in await Location.filter(id__in=_location_ids, is_active=True)} if _location_ids else {}
+            _entities_cache = {'products': _products_map, 'warehouses': _warehouses_map, 'locations': _locations_map}
+
             for item in data.items:
                 product, working_warehouse, working_location, cost_price = await resolve_item_entities(
-                    item, warehouse, data
+                    item, warehouse, data, entities_cache=_entities_cache
                 )
 
                 qty = item.quantity
@@ -133,9 +151,6 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error("订单创建失败", exc_info=e)
-            raise HTTPException(status_code=500, detail="操作失败，请重试")
 
 
 @router.get("")
@@ -426,7 +441,7 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
 async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(require_permission("sales"))):
     """取消订单，支持完整财务闭环和部分发货拆单"""
     async with transactions.in_transaction():
-        order = await Order.filter(id=order_id).select_related("customer", "warehouse").first()
+        order = await Order.filter(id=order_id).select_for_update().select_related("customer", "warehouse").first()
         if not order:
             raise HTTPException(status_code=404, detail="订单不存在")
         if order.shipping_status not in ("pending", "partial"):
@@ -439,8 +454,8 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
 
         # 提前校验退款金额，避免不可逆操作后才发现参数错误
         if customer and order.order_type in ("CASH", "CREDIT"):
-            if data.refund_amount and Decimal(str(data.refund_amount)) > order.paid_amount:
-                raise HTTPException(status_code=400, detail="退款金额不能超过已付金额")
+            if data.refund_amount is not None and Decimal(str(data.refund_amount)) > order.paid_amount:
+                raise HTTPException(status_code=400, detail="退款金额不能超过已收款金额")
 
         has_shipped = any(item.shipped_qty > 0 for item in items)
         new_order = None
@@ -519,10 +534,6 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
         if customer and order.order_type in ("CASH", "CREDIT"):
             refund_amount = Decimal(str(data.refund_amount or 0))
             refund_rebate = Decimal(str(data.refund_rebate or 0))
-
-            # 退款金额不能超过已付金额
-            if refund_amount and refund_amount > order.paid_amount:
-                raise HTTPException(status_code=400, detail="退款金额不能超过已付金额")
 
             if refund_rebate > 0:
                 await Customer.filter(id=customer.id).update(
