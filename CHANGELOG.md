@@ -1,5 +1,52 @@
 # 迭代记录
 
+## v4.11.0 — 第四轮全量审查：安全加固+数据一致性+前端精度（2026-02-25）
+
+> 第四轮全量代码审查（8 路并行代理），共完成 31 项修复，覆盖后端安全、数据一致性、前端金额精度、DevOps 优化。
+
+### Critical 修复（12 项）
+
+| # | 类别 | 修复内容 |
+|---|------|---------|
+| C1 | 安全 | XFF 信任移除，仅用 socket IP 防限频绕过 |
+| C2 | 安全 | 弱密码黑名单扩充（+admin123/changeme/administrator） |
+| C3 | 安全 | RequestSizeLimitMiddleware chunked 编码说明 |
+| C4 | 安全 | token_version 改用 F() 原子更新防并发丢失 |
+| C5 | 数据 | supplier credit_balance TOCTOU（select_for_update+事务内检查） |
+| C6 | 数据 | 收款分配 re-read 加 select_for_update |
+| C7 | 数据 | SN 码竞态修复 + IntegrityError 信息脱敏 |
+| C8 | 数据 | 库存并发创建 IntegrityError 捕获重试 |
+| C9 | 前端 | 金额浮点累加 Math.round 包装 |
+| C10 | 前端 | unit_amount 除零守卫 |
+| C11 | 前端 | 返利单项金额校验 |
+| C12 | DevOps | DB 弱默认密码警告 + .env.example 强化 |
+
+### Important 修复（19 项）
+
+| # | 类别 | 修复内容 |
+|---|------|---------|
+| I1 | 后端 | verify_token 改用异常替代混合返回类型 |
+| I2 | 后端 | 登录限频锁持有整个 check-verify-increment 流程 |
+| I4 | 后端 | 健康检查移除服务器时间字段 |
+| I6 | 后端 | round() → Decimal.quantize() 统一 |
+| I7 | 后端 | 删除发货单 reserved_qty 溢出防护 |
+| I8-10 | 后端 | Schema-Model max_length 不匹配修复（warehouse/supplier/salesperson） |
+| I11 | 后端 | 新增 purchase_orders 索引（status, supplier+created_at） |
+| I12 | 前端 | checkAuth 中 logout() 加 await |
+| I13 | 前端 | tempOldPassword 组件卸载时清除 |
+| I14 | 前端 | 调拨用 available_qty 替代 quantity |
+| I15 | 前端 | duplicateCartLine 补充 _id |
+| I17 | 前端 | 导入/导出操作添加 submitting 防重复 |
+| I20 | 前端 | ensureLoaded 改 Promise.all 并行加载 |
+| FC-9 | 前端 | backup API 路径 encodeURIComponent |
+| I21 | DevOps | 测试依赖拆分 requirements-dev.txt |
+| I22 | DevOps | .dockerignore 排除 tests/pytest.ini |
+| I23 | DevOps | db 服务添加日志轮转 |
+| I24 | DevOps | HEALTHCHECK start-period 10s→60s |
+| — | DevOps | .dockerignore 清理无效条目 |
+
+---
+
 ## v4.10.0 — 第三轮全量审查与登录流程修复（2026-02-25）
 
 > 基于第三轮全量代码审查（后端 + 前端 + 基础设施七路并行），共完成 45 项修复，涵盖并发安全、外键完整性、权限补全、登录流程修复与无限循环防御。同批次发现并修复 2 个生产级 Bug（强制改密流程卡死、logout 无限循环）。
