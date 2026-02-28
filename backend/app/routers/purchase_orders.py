@@ -556,6 +556,42 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
                 from app.logger import get_logger as _gl
                 _gl("purchase_orders").warning(f"自动生成应付单失败: {e}")
 
+            # 钩子：采购收货 → 自动生成入库单
+            try:
+                from app.services.delivery_service import create_purchase_receipt
+                from app.models.delivery import PurchaseReceiptBill as PRB
+                prb_exists = await PRB.filter(
+                    account_set_id=po.account_set_id, purchase_order_id=po.id
+                ).exists()
+                if not prb_exists:
+                    receipt_items = []
+                    received_pois = await PurchaseOrderItem.filter(
+                        purchase_order_id=po.id, received_quantity__gt=0
+                    ).select_related("product").all()
+                    for poi in received_pois:
+                        receipt_items.append({
+                            "purchase_order_item_id": poi.id,
+                            "product_id": poi.product_id,
+                            "product_name": poi.product.name if poi.product else str(poi.product_id),
+                            "quantity": poi.received_quantity,
+                            "tax_inclusive_price": str(poi.tax_inclusive_price),
+                            "tax_exclusive_price": str(poi.tax_exclusive_price),
+                            "tax_rate": str(poi.tax_rate * 100) if poi.tax_rate < 1 else str(poi.tax_rate),
+                        })
+                    if receipt_items:
+                        wh_id = po.target_warehouse_id
+                        await create_purchase_receipt(
+                            account_set_id=po.account_set_id,
+                            supplier_id=po.supplier_id,
+                            purchase_order_id=po.id,
+                            warehouse_id=wh_id,
+                            items=receipt_items,
+                            creator=user,
+                        )
+            except Exception as e:
+                from app.logger import get_logger as _gl2
+                _gl2("purchase_orders").warning(f"自动生成入库单失败: {e}")
+
         await log_operation(user, "PURCHASE_RECEIVE", "PURCHASE_ORDER", po.id,
             f"采购收货 {po.po_no}，{', '.join(received_details)}，状态→{po.status}")
 

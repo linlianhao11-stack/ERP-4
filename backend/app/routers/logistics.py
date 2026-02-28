@@ -443,6 +443,34 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
             except Exception as e:
                 logger.warning(f"自动生成应收单失败: {e}")
 
+            # 钩子：发货完成 → 自动生成出库单
+            try:
+                from app.services.delivery_service import create_sales_delivery
+                from app.models import Product
+                shipped_items = []
+                for oi in all_items:
+                    if oi.shipped_qty > 0:
+                        product = await Product.filter(id=oi.product_id).first()
+                        shipped_items.append({
+                            "order_item_id": oi.id,
+                            "product_id": oi.product_id,
+                            "product_name": product.name if product else str(oi.product_id),
+                            "quantity": oi.shipped_qty,
+                            "cost_price": str(oi.cost_price),
+                            "sale_price": str(oi.unit_price),
+                        })
+                if shipped_items:
+                    await create_sales_delivery(
+                        account_set_id=order.account_set_id,
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        warehouse_id=order.warehouse_id,
+                        items=shipped_items,
+                        creator=user,
+                    )
+            except Exception as e:
+                logger.warning(f"自动生成出库单失败: {e}")
+
     if not is_self_pickup and data.tracking_no:
         try:
             await refresh_shipment_tracking(shipment)
