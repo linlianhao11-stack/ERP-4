@@ -23,7 +23,7 @@ from app.routers import (
     rebates, suppliers, purchase_orders, operation_logs,
     settings, sn, product_brands, disbursement_methods,
     account_sets, chart_of_accounts, accounting_periods, vouchers,
-    receivables,
+    receivables, payables,
 )
 
 
@@ -123,6 +123,7 @@ app.include_router(chart_of_accounts.router)
 app.include_router(accounting_periods.router)
 app.include_router(vouchers.router)
 app.include_router(receivables.router)
+app.include_router(payables.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
