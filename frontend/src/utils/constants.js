@@ -59,6 +59,12 @@ export const allPermissions = [
   { key: 'accounting_approve', name: '凭证审核' },
   { key: 'accounting_post', name: '凭证过账' },
   { key: 'period_end', name: '期末处理' },
+  { key: 'accounting_ar_view', name: '应收查看' },
+  { key: 'accounting_ar_edit', name: '应收编辑' },
+  { key: 'accounting_ar_confirm', name: '应收确认' },
+  { key: 'accounting_ap_view', name: '应付查看' },
+  { key: 'accounting_ap_edit', name: '应付编辑' },
+  { key: 'accounting_ap_confirm', name: '应付确认' },
 ]
 
 export const orderTypeNames = {
