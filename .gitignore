@@ -26,3 +26,9 @@ backups/
 # IDE
 .vscode/
 .idea/
+
+# Word 临时文件
+~$*.docx
+
+# Claude Code worktrees
+.claude/worktrees/
