@@ -346,3 +346,97 @@ async def unpost_voucher(
     v.posted_at = None
     await v.save()
     return {"message": "反过账成功"}
+
+
+@router.get("/{voucher_id}/pdf")
+async def get_voucher_pdf(
+    voucher_id: int,
+    user: User = Depends(require_permission("accounting_view")),
+):
+    """单张凭证PDF下载"""
+    from app.utils.pdf_print import generate_voucher_pdf
+    v = await Voucher.filter(id=voucher_id).prefetch_related("creator", "approved_by", "posted_by").first()
+    if not v:
+        raise HTTPException(status_code=404, detail="凭证不存在")
+    entries = await VoucherEntry.filter(voucher_id=v.id).order_by("line_no").all()
+    # Build dicts
+    voucher_dict = {
+        "voucher_no": v.voucher_no,
+        "voucher_date": str(v.voucher_date),
+        "attachment_count": 0,
+        "total_debit": v.total_debit,
+        "total_credit": v.total_credit,
+        "creator_name": v.creator.username if v.creator else "",
+        "approved_by_name": v.approved_by.username if v.approved_by else "",
+        "posted_by_name": v.posted_by.username if v.posted_by else "",
+    }
+    # Get account names for entries
+    entry_list = []
+    for e in entries:
+        acct = await ChartOfAccount.filter(id=e.account_id).first()
+        entry_list.append({
+            "summary": e.summary,
+            "account_name": f"{acct.code} {acct.name}" if acct else "",
+            "debit_amount": e.debit_amount,
+            "credit_amount": e.credit_amount,
+        })
+    pdf_bytes = generate_voucher_pdf(voucher_dict, entry_list)
+    import io
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={v.voucher_no}.pdf"}
+    )
+
+
+@router.post("/batch-pdf")
+async def batch_voucher_pdf(
+    data: dict,
+    user: User = Depends(require_permission("accounting_view")),
+):
+    """批量凭证PDF下载"""
+    from app.utils.pdf_print import generate_voucher_pdf, merge_pdfs
+    import io
+    from fastapi.responses import StreamingResponse
+
+    ids = data.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="请选择凭证")
+
+    pdf_list = []
+    for vid in ids:
+        v = await Voucher.filter(id=vid).prefetch_related("creator", "approved_by", "posted_by").first()
+        if not v:
+            continue
+        entries = await VoucherEntry.filter(voucher_id=v.id).order_by("line_no").all()
+        voucher_dict = {
+            "voucher_no": v.voucher_no,
+            "voucher_date": str(v.voucher_date),
+            "attachment_count": 0,
+            "total_debit": v.total_debit,
+            "total_credit": v.total_credit,
+            "creator_name": v.creator.username if v.creator else "",
+            "approved_by_name": v.approved_by.username if v.approved_by else "",
+            "posted_by_name": v.posted_by.username if v.posted_by else "",
+        }
+        entry_list = []
+        for e in entries:
+            acct = await ChartOfAccount.filter(id=e.account_id).first()
+            entry_list.append({
+                "summary": e.summary,
+                "account_name": f"{acct.code} {acct.name}" if acct else "",
+                "debit_amount": e.debit_amount,
+                "credit_amount": e.credit_amount,
+            })
+        pdf_list.append(generate_voucher_pdf(voucher_dict, entry_list))
+
+    if not pdf_list:
+        raise HTTPException(status_code=404, detail="未找到凭证")
+
+    merged = merge_pdfs(pdf_list)
+    return StreamingResponse(
+        io.BytesIO(merged),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=vouchers_batch.pdf"}
+    )
