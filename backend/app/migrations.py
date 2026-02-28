@@ -17,6 +17,7 @@ async def run_migrations():
     await migrate_purchase_order_payment_method()
     await migrate_purchase_return_fields()
     await migrate_shipping_flow()
+    await migrate_accounting_phase1()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -386,3 +387,80 @@ async def migrate_order_updated_at():
     await conn.execute_query(
         "UPDATE orders SET updated_at = created_at WHERE updated_at IS NULL"
     )
+
+
+async def migrate_accounting_phase1():
+    """阶段1财务基础设施迁移：现有表新增字段 + 会计索引（幂等）"""
+    conn = connections.get("default")
+
+    # Warehouse: account_set_id
+    wh_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'warehouses'"
+    )
+    wh_col_names = [c["name"] for c in wh_cols]
+    if "account_set_id" not in wh_col_names:
+        await conn.execute_query(
+            "ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL"
+        )
+        logger.info("迁移: warehouses 表添加 account_set_id 列")
+
+    # Orders: account_set_id
+    o_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'orders'"
+    )
+    if "account_set_id" not in [c["name"] for c in o_cols]:
+        await conn.execute_query(
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL"
+        )
+        logger.info("迁移: orders 表添加 account_set_id 列")
+
+    # PurchaseOrders: account_set_id
+    po_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'purchase_orders'"
+    )
+    if "account_set_id" not in [c["name"] for c in po_cols]:
+        await conn.execute_query(
+            "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL"
+        )
+        logger.info("迁移: purchase_orders 表添加 account_set_id 列")
+
+    # Payments: account_set_id
+    pay_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'payments'"
+    )
+    if "account_set_id" not in [c["name"] for c in pay_cols]:
+        await conn.execute_query(
+            "ALTER TABLE payments ADD COLUMN IF NOT EXISTS account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL"
+        )
+        logger.info("迁移: payments 表添加 account_set_id 列")
+
+    # Products: tax_rate
+    prod_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'products'"
+    )
+    if "tax_rate" not in [c["name"] for c in prod_cols]:
+        await conn.execute_query(
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_rate DECIMAL(5,2) DEFAULT 13.00"
+        )
+        logger.info("迁移: products 表添加 tax_rate 列")
+
+    # 会计相关索引
+    accounting_indexes = [
+        ("idx_chart_of_accounts_set_code", "chart_of_accounts", "account_set_id, code"),
+        ("idx_accounting_periods_set_name", "accounting_periods", "account_set_id, period_name"),
+        ("idx_vouchers_set_period", "vouchers", "account_set_id, period_name"),
+        ("idx_vouchers_set_type_no", "vouchers", "account_set_id, voucher_type, voucher_no"),
+        ("idx_voucher_entries_voucher", "voucher_entries", "voucher_id"),
+        ("idx_voucher_entries_account", "voucher_entries", "account_id"),
+        ("idx_orders_account_set", "orders", "account_set_id"),
+        ("idx_purchase_orders_account_set", "purchase_orders", "account_set_id"),
+        ("idx_payments_account_set", "payments", "account_set_id"),
+        ("idx_warehouses_account_set", "warehouses", "account_set_id"),
+    ]
+    for name, table, columns in accounting_indexes:
+        try:
+            await conn.execute_query(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+        except Exception as e:
+            logger.warning(f"创建索引 {name} 失败（可忽略）: {e}")
+
+    logger.info("阶段1财务迁移完成")
