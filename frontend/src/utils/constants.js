@@ -67,6 +67,40 @@ export const allPermissions = [
   { key: 'accounting_ap_confirm', name: '应付确认' },
 ]
 
+export const permissionGroups = [
+  { label: '首页', icon: 'dashboard', main: 'dashboard', children: [] },
+  { label: '销售管理', icon: 'sales', main: 'sales', children: [] },
+  { label: '库存管理', icon: 'stock', main: 'stock_view', children: [
+    { key: 'stock_edit', name: '库存操作（入库/调拨/盘点）' },
+  ]},
+  { label: '采购管理', icon: 'purchase', main: 'purchase', children: [
+    { key: 'purchase_approve', name: '采购审核' },
+    { key: 'purchase_pay', name: '采购付款' },
+    { key: 'purchase_receive', name: '采购收货' },
+  ]},
+  { label: '寄售管理', icon: 'consignment', main: 'consignment', children: [] },
+  { label: '物流管理', icon: 'logistics', main: 'logistics', children: [] },
+  { label: '财务管理', icon: 'finance', main: 'finance', children: [
+    { key: 'finance_confirm', name: '确认收款' },
+  ]},
+  { label: '会计管理', icon: 'accounting', main: 'accounting_view', children: [
+    { key: 'accounting_edit', name: '会计录入' },
+    { key: 'accounting_approve', name: '凭证审核' },
+    { key: 'accounting_post', name: '凭证过账' },
+    { key: 'period_end', name: '期末处理' },
+    { key: 'accounting_ar_view', name: '应收查看' },
+    { key: 'accounting_ar_edit', name: '应收编辑' },
+    { key: 'accounting_ar_confirm', name: '应收确认' },
+    { key: 'accounting_ap_view', name: '应付查看' },
+    { key: 'accounting_ap_edit', name: '应付编辑' },
+    { key: 'accounting_ap_confirm', name: '应付确认' },
+  ]},
+  { label: '客户管理', icon: 'customers', main: 'customer', children: [] },
+  { label: '系统设置', icon: 'settings', main: 'settings', children: [
+    { key: 'logs', name: '操作日志' },
+  ]},
+]
+
 export const orderTypeNames = {
   CASH: '现款', CREDIT: '账期',
   CONSIGN_OUT: '寄售调拨', CONSIGN_SETTLE: '寄售结算',

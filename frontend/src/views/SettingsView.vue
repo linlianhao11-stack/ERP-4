@@ -7,6 +7,7 @@
       <span @click="settingsTab = 'general'" :class="['tab', settingsTab === 'general' ? 'active' : '']">常规设置</span>
       <span v-if="hasPermission('finance')" @click="settingsTab = 'finance'" :class="['tab', settingsTab === 'finance' ? 'active' : '']">财务设置</span>
       <span v-if="hasPermission('admin')" @click="settingsTab = 'logs'" :class="['tab', settingsTab === 'logs' ? 'active' : '']">系统日志</span>
+      <span v-if="hasPermission('admin')" @click="settingsTab = 'permissions'" :class="['tab', settingsTab === 'permissions' ? 'active' : '']">权限管理</span>
     </div>
 
     <!-- General Tab -->
@@ -256,6 +257,83 @@
       </div>
     </div>
 
+    <!-- Permissions Tab -->
+    <div v-if="settingsTab === 'permissions'" class="flex gap-5" style="min-height: 60vh">
+      <!-- Left: User list -->
+      <div class="w-56 shrink-0">
+        <div class="card p-3">
+          <h3 class="font-semibold mb-3 text-sm">选择用户</h3>
+          <div class="space-y-1 max-h-[60vh] overflow-y-auto">
+            <div v-for="u in users" :key="u.id"
+              @click="selectPermUser(u)"
+              :class="['flex items-center justify-between p-2.5 rounded-lg cursor-pointer text-sm transition-colors',
+                permSelectedUser?.id === u.id ? 'bg-[#0071e3] text-white' : 'hover:bg-[#f5f5f7]']">
+              <div>
+                <div class="font-medium">{{ u.display_name || u.username }}</div>
+                <div :class="['text-xs', permSelectedUser?.id === u.id ? 'text-white/70' : 'text-[#86868b]']">@{{ u.username }}</div>
+              </div>
+              <span v-if="u.role === 'admin'"
+                :class="['text-xs px-1.5 py-0.5 rounded',
+                  permSelectedUser?.id === u.id ? 'bg-white/20 text-white' : 'bg-[#e8f4fd] text-[#0071e3]']">管理员</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Permission cards -->
+      <div class="flex-1 min-w-0">
+        <div v-if="!permSelectedUser" class="card p-12 text-center text-[#86868b] text-sm">
+          <div class="text-3xl mb-3 opacity-30">🔐</div>
+          请从左侧选择一个用户来管理权限
+        </div>
+
+        <div v-else-if="permSelectedUser.role === 'admin'" class="card p-12 text-center">
+          <div class="text-3xl mb-3 opacity-30">👑</div>
+          <div class="text-[#0071e3] font-semibold mb-1">{{ permSelectedUser.display_name || permSelectedUser.username }}</div>
+          <div class="text-[#86868b] text-sm">管理员拥有全部权限，无需单独配置</div>
+        </div>
+
+        <div v-else>
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm text-[#86868b]">
+              正在编辑 <span class="font-semibold text-[#1d1d1f]">{{ permSelectedUser.display_name || permSelectedUser.username }}</span> 的权限
+            </div>
+            <button @click="savePermissions" class="btn btn-primary btn-sm">保存权限</button>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div v-for="group in permissionGroups" :key="group.main" class="card p-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <component :is="iconMap[group.icon]" class="w-4 h-4 text-[#0071e3]" />
+                  <span class="font-semibold text-sm">{{ group.label }}</span>
+                </div>
+                <button type="button" @click="toggleMainPerm(group)"
+                  :class="['w-10 h-[22px] rounded-full transition-colors relative shrink-0',
+                    permUserPerms.includes(group.main) ? 'bg-[#34c759]' : 'bg-[#d2d2d7]']">
+                  <span :class="['absolute top-[3px] left-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform',
+                    permUserPerms.includes(group.main) ? 'translate-x-[18px]' : '']"></span>
+                </button>
+              </div>
+              <div v-if="group.children.length && permUserPerms.includes(group.main)" class="space-y-2 mt-3 pt-3 border-t border-[#e5e5ea]">
+                <div v-for="child in group.children" :key="child.key" class="flex items-center justify-between pl-6">
+                  <span class="text-sm text-[#6e6e73]">{{ child.name }}</span>
+                  <button type="button" @click="toggleChildPerm(child.key)"
+                    :class="['w-9 h-5 rounded-full transition-colors relative shrink-0',
+                      permUserPerms.includes(child.key) ? 'bg-[#34c759]' : 'bg-[#d2d2d7]']">
+                    <span :class="['absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform',
+                      permUserPerms.includes(child.key) ? 'translate-x-4' : '']"></span>
+                  </button>
+                </div>
+              </div>
+              <div v-else-if="group.children.length" class="text-xs text-[#86868b] mt-3 pt-3 border-t border-[#e5e5ea]">
+                开启主开关后可配置子权限
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Warehouse Modal -->
     <div v-if="showWarehouseModal" class="modal-overlay active" @click.self="showWarehouseModal = false">
       <div class="modal-content">
@@ -337,11 +415,12 @@
           </div>
           <div v-if="userForm.role === 'user'">
             <label class="label">权限</label>
-            <div class="grid form-grid grid-cols-2 gap-1">
-              <label v-for="p in allPermissions" :key="p.key" class="flex items-center text-sm">
-                <input type="checkbox" v-model="userForm.permissions" :value="p.key" class="mr-2">
-                {{ p.name }}
-              </label>
+            <div class="bg-[#f5f5f7] rounded-lg p-3 text-sm text-[#6e6e73]">
+              <span v-if="userForm.permissions?.length">已配置 {{ userForm.permissions.length }} 项权限</span>
+              <span v-else>暂未配置权限</span>
+              <span class="mx-1">·</span>
+              <button type="button" @click="showUserModal = false; settingsTab = 'permissions'; selectPermUser(users.find(u => u.id === userForm.id))"
+                class="text-[#0071e3] hover:underline">前往权限管理</button>
             </div>
           </div>
           <div class="flex gap-3 pt-3">
@@ -402,7 +481,7 @@ import { createSalesperson, updateSalesperson, deleteSalesperson as deleteSalesp
 import { createSnConfig, deleteSnConfig as deleteSnConfigApi } from '../api/sn'
 import { getAccountSets } from '../api/accounting'
 import { getOpLogs } from '../api/settings'
-import { allPermissions } from '../utils/constants'
+import { allPermissions, permissionGroups, iconMap } from '../utils/constants'
 import { usePermission } from '../composables/usePermission'
 
 const authStore = useAuthStore()
@@ -485,6 +564,10 @@ const backupLoading = ref(false)
 const restoreLoading = ref(false)
 const showRestoreModal = ref(false)
 const restoreFile = ref(null)
+
+// Permissions management
+const permSelectedUser = ref(null)
+const permUserPerms = ref([])
 
 // Op logs
 const opLogFilter = ref('')
@@ -922,6 +1005,53 @@ const handleDeleteSnConfig = async (id) => {
     settingsStore.loadSnConfigs()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
+  }
+}
+
+// === Permissions Management ===
+const selectPermUser = (u) => {
+  if (!u) return
+  permSelectedUser.value = u
+  permUserPerms.value = [...(u.permissions || [])]
+}
+
+const toggleMainPerm = (group) => {
+  const idx = permUserPerms.value.indexOf(group.main)
+  if (idx >= 0) {
+    // Turn off main → remove main + all children
+    permUserPerms.value.splice(idx, 1)
+    for (const child of group.children) {
+      const ci = permUserPerms.value.indexOf(child.key)
+      if (ci >= 0) permUserPerms.value.splice(ci, 1)
+    }
+  } else {
+    permUserPerms.value.push(group.main)
+  }
+}
+
+const toggleChildPerm = (key) => {
+  const idx = permUserPerms.value.indexOf(key)
+  if (idx >= 0) {
+    permUserPerms.value.splice(idx, 1)
+  } else {
+    permUserPerms.value.push(key)
+  }
+}
+
+const savePermissions = async () => {
+  if (!permSelectedUser.value || appStore.submitting) return
+  appStore.submitting = true
+  try {
+    await updateUser(permSelectedUser.value.id, { permissions: permUserPerms.value })
+    appStore.showToast('权限已保存')
+    await settingsStore.loadUsers()
+    // Refresh selected user data
+    const updated = users.value.find(u => u.id === permSelectedUser.value.id)
+    if (updated) permSelectedUser.value = updated
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
+  } finally {
+    appStore.submitting = false
   }
 }
 

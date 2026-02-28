@@ -35,7 +35,7 @@
               {{ loading.preview ? '预览中...' : '预览结转' }}
             </button>
             <button
-              v-if="previewData && previewData.entries && previewData.entries.length > 0 && !previewData.already_exists"
+              v-if="hasPermission('period_end') && previewData && previewData.entries && previewData.entries.length > 0 && !previewData.already_exists"
               @click="handleExecute"
               class="btn btn-primary btn-sm"
               :disabled="loading.execute"
@@ -106,7 +106,7 @@
               {{ loading.check ? '检查中...' : '执行检查' }}
             </button>
             <button
-              v-if="allChecksPassed && !selectedPeriodObj?.is_closed"
+              v-if="hasPermission('period_end') && allChecksPassed && !selectedPeriodObj?.is_closed"
               @click="handleClosePeriod"
               class="btn btn-primary btn-sm"
               :disabled="loading.close"
@@ -146,7 +146,7 @@
       <div v-if="selectedMonth === 12" class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
           <h4 class="text-[15px] font-semibold text-[#1d1d1f]">年度结转</h4>
-          <button @click="handleYearClose" class="btn btn-primary btn-sm" :disabled="loading.yearClose">
+          <button v-if="hasPermission('period_end')" @click="handleYearClose" class="btn btn-primary btn-sm" :disabled="loading.yearClose">
             {{ loading.yearClose ? '结转中...' : '年度结转' }}
           </button>
         </div>
@@ -172,7 +172,7 @@
       </div>
 
       <!-- 4. 反结账按钮（admin + 已结账） -->
-      <div v-if="isAdmin && selectedPeriodObj?.is_closed" class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
+      <div v-if="hasPermission('period_end') && selectedPeriodObj?.is_closed" class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between">
           <div>
             <h4 class="text-[15px] font-semibold text-[#1d1d1f]">反结账</h4>
@@ -239,6 +239,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAuthStore } from '../../stores/auth'
 import { useAppStore } from '../../stores/app'
+import { usePermission } from '../../composables/usePermission'
 import {
   getAccountingPeriods,
   previewCarryForward,
@@ -253,7 +254,7 @@ const accountingStore = useAccountingStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const isAdmin = computed(() => authStore.user?.role === 'admin')
+const { hasPermission } = usePermission()
 
 // --- 期间选择 ---
 const selectedPeriod = ref('')
