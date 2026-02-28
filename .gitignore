@@ -32,3 +32,6 @@ backups/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Worktrees
+.worktrees/
