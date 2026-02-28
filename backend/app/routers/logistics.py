@@ -403,6 +403,46 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
         order.shipping_status = "completed" if all_shipped else "partial"
         await order.save()
 
+        # 钩子：发货完成 → 自动生成应收单
+        if order.shipping_status == "completed" and getattr(order, "account_set_id", None):
+            try:
+                from app.services.ar_service import create_receivable_bill, create_receipt_bill_for_payment
+                from app.models import Payment
+
+                if order.order_type in ("CASH", "CREDIT", "CONSIGN_SETTLE"):
+                    total = abs(order.total_amount)
+                    if order.order_type == "CASH":
+                        rb = await create_receivable_bill(
+                            account_set_id=order.account_set_id,
+                            customer_id=order.customer_id,
+                            order_id=order.id,
+                            total_amount=total,
+                            status="completed",
+                            creator=user,
+                        )
+                        payment = await Payment.filter(order_id=order.id).first()
+                        if payment:
+                            await create_receipt_bill_for_payment(
+                                account_set_id=order.account_set_id,
+                                customer_id=order.customer_id,
+                                receivable_bill=rb,
+                                payment_id=payment.id,
+                                amount=total,
+                                payment_method=payment.payment_method or "现金",
+                                creator=user,
+                            )
+                    else:  # CREDIT / CONSIGN_SETTLE
+                        await create_receivable_bill(
+                            account_set_id=order.account_set_id,
+                            customer_id=order.customer_id,
+                            order_id=order.id,
+                            total_amount=total,
+                            status="pending",
+                            creator=user,
+                        )
+            except Exception as e:
+                logger.warning(f"自动生成应收单失败: {e}")
+
     if not is_self_pickup and data.tracking_no:
         try:
             await refresh_shipment_tracking(shipment)
