@@ -11,6 +11,7 @@ PRESET_ACCOUNTS = [
     ("1221", "其他应收款", None, 1, "asset", "debit", True, False, False),
     ("1403", "原材料", None, 1, "asset", "debit", True, False, False),
     ("1405", "库存商品", None, 1, "asset", "debit", True, False, False),
+    ("1407", "发出商品", None, 1, "asset", "debit", True, False, False),
     ("1601", "固定资产", None, 1, "asset", "debit", True, False, False),
     ("1602", "累计折旧", None, 1, "asset", "credit", True, False, False),
     # 负债类
