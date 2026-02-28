@@ -35,6 +35,8 @@
       <span @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</span>
       <span @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</span>
       <span @click="tab = 'invoices'" :class="['tab', tab === 'invoices' ? 'active' : '']">发票管理</span>
+      <span @click="tab = 'period-end'" :class="['tab', tab === 'period-end' ? 'active' : '']">期末处理</span>
+      <span @click="tab = 'reports'" :class="['tab', tab === 'reports' ? 'active' : '']">财务报表</span>
     </div>
 
     <!-- 首次进入引导卡片（无账套） -->
@@ -61,6 +63,8 @@
       <ReceivablePanel v-if="tab === 'receivables'" />
       <PayablePanel v-if="tab === 'payables'" />
       <InvoicePanel v-if="tab === 'invoices'" />
+      <PeriodEndPanel v-if="tab === 'period-end'" />
+      <FinancialReportPanel v-if="tab === 'reports'" />
     </template>
 
     <!-- 账套管理弹窗 -->
@@ -210,6 +214,8 @@ import LedgerPanel from '../components/business/LedgerPanel.vue'
 import ReceivablePanel from '../components/business/ReceivablePanel.vue'
 import PayablePanel from '../components/business/PayablePanel.vue'
 import InvoicePanel from '../components/business/InvoicePanel.vue'
+import PeriodEndPanel from '../components/business/PeriodEndPanel.vue'
+import FinancialReportPanel from '../components/business/FinancialReportPanel.vue'
 
 const accountingStore = useAccountingStore()
 const authStore = useAuthStore()
