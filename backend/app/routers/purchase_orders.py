@@ -341,6 +341,27 @@ async def confirm_purchase_payment(po_id: int, data: PurchasePayRequest = Purcha
     po.paid_by = user
     po.paid_at = now()
     await po.save()
+
+    # 钩子：采购付款 → 自动生成付款单
+    if getattr(po, "account_set_id", None):
+        try:
+            from app.services.ap_service import create_disbursement_for_po_payment
+            from app.models.ar_ap import PayableBill
+            payable = await PayableBill.filter(
+                account_set_id=po.account_set_id, purchase_order_id=po.id
+            ).first()
+            await create_disbursement_for_po_payment(
+                account_set_id=po.account_set_id,
+                supplier_id=po.supplier_id,
+                payable_bill=payable,
+                amount=po.total_amount,
+                disbursement_method=data.payment_method or "对公转账",
+                creator=user,
+            )
+        except Exception as e:
+            from app.logger import get_logger as _gl
+            _gl("purchase_orders").warning(f"自动生成付款单失败: {e}")
+
     await log_operation(user, "PURCHASE_PAY", "PURCHASE_ORDER", po.id,
         f"确认付款 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
     return {"message": "付款确认成功"}
@@ -498,6 +519,35 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
         elif any_received:
             po.status = "partial"
         await po.save()
+
+        # 钩子：采购收货 → 自动生成应付单
+        if getattr(po, "account_set_id", None):
+            try:
+                from app.services.ap_service import create_payable_bill
+                from app.models.ar_ap import PayableBill as PB
+                exists = await PB.filter(
+                    account_set_id=po.account_set_id, purchase_order_id=po.id
+                ).exists()
+                if not exists:
+                    received_items = await PurchaseOrderItem.filter(
+                        purchase_order_id=po.id, received_quantity__gt=0
+                    ).all()
+                    received_total = sum(
+                        (it.amount / it.quantity * it.received_quantity).quantize(Decimal("0.01"))
+                        for it in received_items if it.quantity > 0
+                    )
+                    if received_total > 0:
+                        await create_payable_bill(
+                            account_set_id=po.account_set_id,
+                            supplier_id=po.supplier_id,
+                            purchase_order_id=po.id,
+                            total_amount=received_total,
+                            status="pending",
+                            creator=user,
+                        )
+            except Exception as e:
+                from app.logger import get_logger as _gl
+                _gl("purchase_orders").warning(f"自动生成应付单失败: {e}")
 
         await log_operation(user, "PURCHASE_RECEIVE", "PURCHASE_ORDER", po.id,
             f"采购收货 {po.po_no}，{', '.join(received_details)}，状态→{po.status}")

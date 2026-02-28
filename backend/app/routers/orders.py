@@ -133,6 +133,21 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
             actual_amount_due = total_amount - order.paid_amount
 
+            # 6.5 钩子：退货 → 红字应收单
+            if data.order_type == "RETURN" and getattr(order, "account_set_id", None):
+                try:
+                    from app.services.ar_service import create_receivable_bill
+                    await create_receivable_bill(
+                        account_set_id=order.account_set_id,
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        total_amount=total_amount,  # 已为负数
+                        status="completed",
+                        creator=user,
+                    )
+                except Exception as e:
+                    logger.warning(f"退货自动生成红字应收单失败: {e}")
+
             # 7. 操作日志
             order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
             await log_operation(user, "ORDER_CREATE", "ORDER", order.id,
