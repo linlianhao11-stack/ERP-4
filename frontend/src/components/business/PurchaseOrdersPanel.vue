@@ -11,6 +11,10 @@
         <option value="returned">已退货</option>
         <option value="rejected">已拒绝</option>
       </select>
+      <select v-if="accountSets.length" v-model="purchaseAccountSetFilter" @change="loadPurchaseOrders" class="input text-sm" style="width:120px">
+        <option value="">全部账套</option>
+        <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
       <input type="date" v-model="purchaseDateStart" @change="loadPurchaseOrders" class="input text-sm" style="width:130px">
       <input type="date" v-model="purchaseDateEnd" @change="loadPurchaseOrders" class="input text-sm" style="width:130px">
       <input v-model="purchaseSearch" @input="debouncedLoadPurchaseOrders" class="input text-sm flex-1" placeholder="搜索单号/供应商..." style="min-width:120px">
@@ -115,7 +119,8 @@
               <option :value="null">不指定</option>
               <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <div class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+            <div v-if="poForm.account_set_id" class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+            <div v-else class="text-xs text-[#ff9500] mt-1">未选择财务账套，收货后将不会自动生成财务单据（应付单/入库单）</div>
           </div>
 
           <!-- Items -->
@@ -512,6 +517,7 @@ const warehouses = computed(() => warehousesStore.warehouses)
 // Orders state
 const purchaseOrders = ref([])
 const purchaseStatusFilter = ref('')
+const purchaseAccountSetFilter = ref('')
 const purchaseDateStart = ref('')
 const purchaseDateEnd = ref('')
 const purchaseSearch = ref('')
@@ -612,6 +618,7 @@ const loadPurchaseOrders = async () => {
     if (purchaseDateStart.value) params.start_date = purchaseDateStart.value
     if (purchaseDateEnd.value) params.end_date = purchaseDateEnd.value
     if (purchaseSearch.value) params.search = purchaseSearch.value
+    if (purchaseAccountSetFilter.value) params.account_set_id = purchaseAccountSetFilter.value
     const { data } = await getPurchaseOrders(params)
     purchaseOrders.value = data
   } catch (e) {
@@ -636,6 +643,7 @@ const handleExportPurchaseOrders = async () => {
     if (purchaseDateStart.value) params.start_date = purchaseDateStart.value
     if (purchaseDateEnd.value) params.end_date = purchaseDateEnd.value
     if (purchaseSearch.value) params.search = purchaseSearch.value
+    if (purchaseAccountSetFilter.value) params.account_set_id = purchaseAccountSetFilter.value
     const response = await exportPurchaseOrdersApi(params)
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')

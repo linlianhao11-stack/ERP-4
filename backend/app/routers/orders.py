@@ -177,7 +177,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 @router.get("")
 async def list_orders(order_type: Optional[str] = None, customer_id: Optional[int] = None,
                       start_date: Optional[str] = None, end_date: Optional[str] = None,
-                      shipping_status: Optional[str] = None,
+                      shipping_status: Optional[str] = None, account_set_id: Optional[int] = None,
                       offset: int = 0, limit: int = 100, user: User = Depends(get_current_user)):
     limit = min(limit, 1000)
     query = Order.all()
@@ -191,6 +191,8 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
     if shipping_status:
         query = query.filter(shipping_status=shipping_status)
+    if account_set_id:
+        query = query.filter(account_set_id=account_set_id)
 
     total = await query.count()
     orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse", "creator", "related_order", "salesperson")
@@ -212,6 +214,7 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
             "related_order_no": o.related_order.order_no if o.related_order else None,
             "related_order_id": o.related_order_id,
             "shipping_status": o.shipping_status,
+            "account_set_id": o.account_set_id,
         }
         if has_finance:
             item["total_cost"] = float(o.total_cost)
@@ -583,7 +586,8 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         payment_method=data.refund_payment_method or "cash",
                         source="REFUND", is_confirmed=False,
                         remark=f"取消订单 {order.order_no} 退款",
-                        creator=user
+                        creator=user,
+                        account_set_id=order.account_set_id
                     )
 
             if order.order_type == "CREDIT":

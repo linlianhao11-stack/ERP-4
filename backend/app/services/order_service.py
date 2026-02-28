@@ -314,7 +314,8 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
                 amount=Decimal(str(actual_pay)),
                 payment_method=data.payment_method or "cash",
                 source="CASH", is_confirmed=False,
-                remark=f"现款销售 {order_no}", creator=user
+                remark=f"现款销售 {order_no}", creator=user,
+                account_set_id=order.account_set_id
             )
 
     return credit_used

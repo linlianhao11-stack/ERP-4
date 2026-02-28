@@ -14,6 +14,10 @@
               <option value="CONSIGN_SETTLE">寄售结算</option>
               <option value="RETURN">退货</option>
             </select>
+            <select v-if="accountSets.length" v-model="orderFilter.account_set_id" @change="loadOrders" class="input w-auto text-sm" style="flex-shrink:0">
+              <option value="">全部账套</option>
+              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
             <!-- Desktop date inputs -->
             <input v-model="orderFilter.start" @change="loadOrders" type="date" class="input w-auto text-sm hidden md:block">
             <input v-model="orderFilter.end" @change="loadOrders" type="date" class="input w-auto text-sm hidden md:block">
@@ -469,6 +473,7 @@ import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
 import { useSort } from '../../composables/useSort'
 import { getAllOrders, exportOrders, getUnpaidOrders, createPayment } from '../../api/finance'
+import { getAccountSets } from '../../api/accounting'
 import { getOrder, cancelOrder, cancelPreview } from '../../api/orders'
 import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../utils/constants'
 import StatusBadge from '../common/StatusBadge.vue'
@@ -500,7 +505,8 @@ const financeCustomerId = ref('')
 const orderDatePreset = ref('')
 
 // Order filter
-const orderFilter = reactive({ type: '', start: '', end: '', search: '' })
+const orderFilter = reactive({ type: '', start: '', end: '', search: '', account_set_id: '' })
+const accountSets = ref([])
 
 // Data lists
 const allOrders = ref([])
@@ -600,6 +606,7 @@ const loadOrders = async () => {
     if (orderFilter.start) params.start_date = orderFilter.start
     if (orderFilter.end) params.end_date = orderFilter.end
     if (orderFilter.search) params.search = orderFilter.search
+    if (orderFilter.account_set_id) params.account_set_id = orderFilter.account_set_id
     const { data } = await getAllOrders(params)
     allOrders.value = data.items || data
   } catch (e) {
@@ -861,7 +868,8 @@ const refresh = (tabName) => {
 
 defineExpose({ refresh, viewOrder })
 
-onMounted(() => {
+onMounted(async () => {
+  try { const res = await getAccountSets(); accountSets.value = res.data || [] } catch {}
   if (props.tab === 'orders') loadOrders()
   else if (props.tab === 'unpaid') loadUnpaid()
 })

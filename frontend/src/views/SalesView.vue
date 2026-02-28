@@ -389,7 +389,8 @@
               <option :value="null">不指定</option>
               <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <div class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+            <div v-if="orderConfirm.account_set_id" class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+            <div v-else class="text-xs text-[#ff9500] mt-1">未选择财务账套，发货后将不会自动生成财务单据（应收单/出库单/发票）</div>
           </div>
 
           <!-- Remark -->

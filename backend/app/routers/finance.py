@@ -30,6 +30,7 @@ async def get_all_orders(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
+    account_set_id: Optional[int] = None,
     offset: int = 0,
     limit: int = 200,
     user: User = Depends(require_permission("finance"))
@@ -39,6 +40,8 @@ async def get_all_orders(
     query = Order.all()
     if order_type:
         query = query.filter(order_type=order_type)
+    if account_set_id:
+        query = query.filter(account_set_id=account_set_id)
     if start_date:
         query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
     if end_date:
@@ -290,7 +293,8 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
             source="CREDIT",
             is_confirmed=False,
             remark=data.remark,
-            creator=user
+            creator=user,
+            account_set_id=orders[0].account_set_id if orders else None
         )
 
         remaining = Decimal(str(data.amount))

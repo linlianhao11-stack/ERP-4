@@ -34,6 +34,7 @@ async def list_purchase_orders(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
+    account_set_id: Optional[int] = None,
     offset: int = 0,
     limit: int = 200,
     user: User = Depends(require_permission("purchase", "purchase_approve", "purchase_pay", "purchase_receive"))
@@ -47,6 +48,8 @@ async def list_purchase_orders(
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
     if search:
         query = query.filter(Q(po_no__icontains=search) | Q(supplier__name__icontains=search))
+    if account_set_id:
+        query = query.filter(account_set_id=account_set_id)
     limit = min(limit, 1000)
     total = await query.count()
     orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related(
@@ -66,6 +69,7 @@ async def list_purchase_orders(
         "paid_at": o.paid_at.isoformat() if o.paid_at else None,
         "payment_method": o.payment_method,
         "created_at": o.created_at.isoformat(),
+        "account_set_id": o.account_set_id,
     } for o in orders], "total": total}
 
 
