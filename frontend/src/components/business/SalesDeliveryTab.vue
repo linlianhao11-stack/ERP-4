@@ -39,7 +39,10 @@
             <td class="text-right">{{ d.sales_total }}</td>
             <td class="font-mono text-[12px]">{{ d.voucher_no || '-' }}</td>
             <td @click.stop>
-              <button @click="handleDownloadPdf(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">PDF</button>
+              <div class="flex gap-1">
+                <button @click="viewDetail(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
+                <button @click="handleDownloadPdf(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#f0e6fa] text-[#7d2ae8]">PDF</button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -51,12 +54,60 @@
       <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
+
+    <!-- 详情弹窗 -->
+    <Transition name="fade">
+      <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
+        <div class="modal" style="max-width: 650px">
+          <div class="modal-header">
+            <h3>出库单详情</h3>
+            <button @click="showDetail = false" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <template v-else-if="detail">
+              <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-4">
+                <div><span class="text-[#86868b]">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
+                <div><span class="text-[#86868b]">日期：</span>{{ detail.bill_date }}</div>
+                <div><span class="text-[#86868b]">客户：</span>{{ detail.customer_name }}</div>
+                <div><span class="text-[#86868b]">仓库：</span>{{ detail.warehouse_name || '-' }}</div>
+                <div><span class="text-[#86868b]">成本合计：</span><span class="font-medium">{{ detail.total_cost }}</span></div>
+                <div><span class="text-[#86868b]">销售合计：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
+                <div><span class="text-[#86868b]">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
+                <div><span class="text-[#86868b]">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
+              </div>
+              <div v-if="detail.items && detail.items.length">
+                <div class="text-[12px] font-semibold text-[#86868b] uppercase tracking-wider mb-2">商品明细</div>
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>商品</th><th class="text-right">数量</th><th class="text-right">成本价</th><th class="text-right">销售价</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="it in detail.items" :key="it.id">
+                        <td>{{ it.product_name }}</td>
+                        <td class="text-right">{{ it.quantity }}</td>
+                        <td class="text-right">{{ it.cost_price }}</td>
+                        <td class="text-right">{{ it.sale_price }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button @click="showDetail = false" class="btn btn-secondary btn-sm">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { getSalesDeliveries, getSalesDeliveryPdf, batchSalesDeliveryPdf } from '../../api/accounting'
+import { getSalesDeliveries, getSalesDelivery, getSalesDeliveryPdf, batchSalesDeliveryPdf } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import api from '../../api/index'
@@ -71,6 +122,23 @@ const pageSize = 50
 const filters = ref({ customer_id: '', date_from: '', date_to: '' })
 const customers = ref([])
 const selectedIds = ref([])
+const showDetail = ref(false)
+const detail = ref(null)
+const detailLoading = ref(false)
+
+async function viewDetail(d) {
+  showDetail.value = true
+  detailLoading.value = true
+  try {
+    const res = await getSalesDelivery(d.id)
+    detail.value = res.data
+  } catch (e) {
+    appStore.showToast('加载详情失败', 'error')
+    showDetail.value = false
+  } finally {
+    detailLoading.value = false
+  }
+}
 
 const allSelected = computed(() => items.value.length > 0 && selectedIds.value.length === items.value.length)
 

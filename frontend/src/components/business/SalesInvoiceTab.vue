@@ -48,6 +48,7 @@
             <td class="font-mono text-[12px]">{{ inv.voucher_no || '-' }}</td>
             <td @click.stop>
               <div class="flex gap-1">
+                <button @click="viewDetail(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
                 <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8f8ee] text-[#248a3d]">确认</button>
                 <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">作废</button>
               </div>
@@ -62,6 +63,96 @@
       <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
+
+    <!-- 发票详情弹窗 -->
+    <Transition name="fade">
+      <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
+        <div class="modal" style="max-width: 700px">
+          <div class="modal-header">
+            <h3>销项发票详情</h3>
+            <button @click="showDetail = false" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <template v-else-if="detail">
+              <!-- 查看模式 -->
+              <template v-if="!editing">
+                <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-4">
+                  <div><span class="text-[#86868b]">发票号：</span><span class="font-mono">{{ detail.invoice_no }}</span></div>
+                  <div><span class="text-[#86868b]">日期：</span>{{ detail.invoice_date }}</div>
+                  <div><span class="text-[#86868b]">客户：</span>{{ detail.customer_name }}</div>
+                  <div><span class="text-[#86868b]">类型：</span>{{ detail.invoice_type === 'special' ? '专票' : '普票' }}</div>
+                  <div><span class="text-[#86868b]">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
+                  <div><span class="text-[#86868b]">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
+                  <div><span class="text-[#86868b]">关联应收单：</span>{{ detail.receivable_bill_no || '-' }}</div>
+                  <div><span class="text-[#86868b]">备注：</span>{{ detail.remark || '-' }}</div>
+                </div>
+                <div class="bg-[#f5f5f7] rounded-xl p-3 mb-3">
+                  <div class="grid grid-cols-3 gap-2 text-[13px]">
+                    <div>不含税：<span class="font-medium">{{ detail.amount_without_tax }}</span></div>
+                    <div>税额：<span class="font-medium">{{ detail.tax_amount }}</span></div>
+                    <div>价税合计：<span class="font-medium">{{ detail.total_amount }}</span></div>
+                  </div>
+                </div>
+                <div v-if="detail.items && detail.items.length" class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>品名</th><th class="text-right">数量</th><th class="text-right">单价</th><th class="text-right">税率(%)</th><th class="text-right">不含税金额</th><th class="text-right">税额</th><th class="text-right">金额</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="it in detail.items" :key="it.id">
+                        <td>{{ it.product_name }}</td>
+                        <td class="text-right">{{ it.quantity }}</td>
+                        <td class="text-right">{{ it.unit_price }}</td>
+                        <td class="text-right">{{ it.tax_rate }}</td>
+                        <td class="text-right">{{ it.amount_without_tax }}</td>
+                        <td class="text-right">{{ it.tax_amount }}</td>
+                        <td class="text-right">{{ it.amount }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+              <!-- 编辑模式 -->
+              <template v-else>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                  <div><label class="label">发票类型</label><select v-model="editForm.invoice_type" class="form-input"><option value="special">专票</option><option value="normal">普票</option></select></div>
+                  <div><label class="label">日期</label><input v-model="editForm.invoice_date" type="date" class="form-input" /></div>
+                  <div class="col-span-2"><label class="label">备注</label><input v-model="editForm.remark" class="form-input" /></div>
+                </div>
+                <div class="table-wrapper mb-3">
+                  <table class="data-table">
+                    <thead><tr><th>品名</th><th>数量</th><th>单价</th><th>税率(%)</th><th class="text-right">金额</th><th class="text-right">税额</th><th></th></tr></thead>
+                    <tbody>
+                      <tr v-for="(row, idx) in editForm.items" :key="idx">
+                        <td><input v-model="row.product_name" class="form-input w-full text-[12px]" /></td>
+                        <td><input v-model.number="row.quantity" type="number" step="1" min="1" class="form-input w-20 text-[12px]" /></td>
+                        <td><input v-model.number="row.unit_price" type="number" step="0.01" class="form-input w-24 text-[12px]" /></td>
+                        <td><input v-model.number="row.tax_rate" type="number" step="0.01" class="form-input w-20 text-[12px]" /></td>
+                        <td class="text-right text-[12px]">{{ editRowAmount(row) }}</td>
+                        <td class="text-right text-[12px]">{{ editRowTax(row) }}</td>
+                        <td><button @click="editForm.items.length > 1 && editForm.items.splice(idx, 1)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">&times;</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <button @click="editForm.items.push({ product_name: '', quantity: 1, unit_price: 0, tax_rate: 13 })" class="text-[12px] text-[#0071e3] font-medium">+ 添加行</button>
+              </template>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <template v-if="detail && !editing">
+              <button v-if="detail.status === 'draft'" @click="startEdit" class="btn btn-primary btn-sm">编辑</button>
+            </template>
+            <template v-if="editing">
+              <button @click="editing = false" class="btn btn-secondary btn-sm">取消编辑</button>
+              <button @click="handleEditSave" :disabled="editSubmitting" class="btn btn-primary btn-sm">保存</button>
+            </template>
+            <button v-if="!editing" @click="showDetail = false" class="btn btn-secondary btn-sm">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 从应收单推送弹窗 -->
     <Transition name="fade">
@@ -129,7 +220,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { getInvoices, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills } from '../../api/accounting'
+import { getInvoices, getInvoice, updateInvoice, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import api from '../../api/index'
@@ -145,6 +236,60 @@ const filters = ref({ status: '', customer_id: '', date_from: '', date_to: '' })
 const customers = ref([])
 const showPush = ref(false)
 const submitting = ref(false)
+const showDetail = ref(false)
+const detail = ref(null)
+const detailLoading = ref(false)
+const editing = ref(false)
+const editForm = ref({ invoice_type: '', invoice_date: '', remark: '', items: [] })
+const editSubmitting = ref(false)
+
+async function viewDetail(inv) {
+  showDetail.value = true
+  detailLoading.value = true
+  editing.value = false
+  try {
+    const res = await getInvoice(inv.id)
+    detail.value = res.data
+  } catch (e) {
+    appStore.showToast('加载详情失败', 'error')
+    showDetail.value = false
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function startEdit() {
+  if (!detail.value) return
+  editForm.value = {
+    invoice_type: detail.value.invoice_type,
+    invoice_date: detail.value.invoice_date,
+    remark: detail.value.remark || '',
+    items: (detail.value.items || []).map(it => ({
+      product_name: it.product_name,
+      quantity: it.quantity,
+      unit_price: parseFloat(it.unit_price || it.amount_without_tax / it.quantity || 0),
+      tax_rate: parseFloat(it.tax_rate || 13),
+    })),
+  }
+  editing.value = true
+}
+
+const editRowAmount = (r) => ((r.quantity || 0) * (r.unit_price || 0)).toFixed(2)
+const editRowTax = (r) => ((r.quantity || 0) * (r.unit_price || 0) * ((r.tax_rate || 0) / 100)).toFixed(2)
+
+async function handleEditSave() {
+  editSubmitting.value = true
+  try {
+    await updateInvoice(detail.value.id, editForm.value)
+    appStore.showToast('更新成功', 'success')
+    showDetail.value = false
+    loadList()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '更新失败', 'error')
+  } finally {
+    editSubmitting.value = false
+  }
+}
 const receivableBills = ref([])
 const selectedReceivable = ref(null)
 

@@ -42,7 +42,10 @@
             <td class="font-mono text-[12px]">{{ b.voucher_no || '-' }}</td>
             <td class="font-mono text-[12px]">{{ b.order_no || '-' }}</td>
             <td @click.stop>
-              <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">取消</button>
+              <div class="flex gap-1">
+                <button @click="viewDetail(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
+                <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">取消</button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -54,6 +57,39 @@
       <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
+
+    <!-- 详情弹窗 -->
+    <Transition name="fade">
+      <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
+        <div class="modal" style="max-width: 500px">
+          <div class="modal-header">
+            <h3>应收单详情</h3>
+            <button @click="showDetail = false" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <template v-else-if="detail">
+              <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                <div><span class="text-[#86868b]">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
+                <div><span class="text-[#86868b]">日期：</span>{{ detail.bill_date }}</div>
+                <div><span class="text-[#86868b]">客户：</span>{{ detail.customer_name }}</div>
+                <div><span class="text-[#86868b]">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
+                <div><span class="text-[#86868b]">应收金额：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
+                <div><span class="text-[#86868b]">已收金额：</span>{{ detail.received_amount }}</div>
+                <div><span class="text-[#86868b]">未收金额：</span>{{ detail.unreceived_amount }}</div>
+                <div><span class="text-[#86868b]">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
+                <div><span class="text-[#86868b]">来源订单：</span>{{ detail.order_no || '-' }}</div>
+                <div><span class="text-[#86868b]">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
+                <div class="col-span-2"><span class="text-[#86868b]">备注：</span>{{ detail.remark || '-' }}</div>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button @click="showDetail = false" class="btn btn-secondary btn-sm">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 新增弹窗 -->
     <Transition name="fade">
@@ -98,7 +134,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { getReceivableBills, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
+import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
@@ -117,6 +153,23 @@ const showCreate = ref(false)
 const submitting = ref(false)
 const customers = ref([])
 const form = ref({ customer_id: '', bill_date: new Date().toISOString().slice(0, 10), total_amount: '', remark: '' })
+const showDetail = ref(false)
+const detail = ref(null)
+const detailLoading = ref(false)
+
+async function viewDetail(b) {
+  showDetail.value = true
+  detailLoading.value = true
+  try {
+    const res = await getReceivableBill(b.id)
+    detail.value = res.data
+  } catch (e) {
+    appStore.showToast('加载详情失败', 'error')
+    showDetail.value = false
+  } finally {
+    detailLoading.value = false
+  }
+}
 
 const statusName = (s) => ({ pending: '待收款', partial: '部分收款', completed: '已收齐', cancelled: '已取消' }[s] || s)
 const statusBadge = (s) => ({ pending: 'badge badge-yellow', partial: 'badge badge-orange', completed: 'badge badge-green', cancelled: 'badge badge-gray' }[s] || 'badge')
