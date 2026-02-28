@@ -28,6 +28,8 @@
       <span @click="tab = 'vouchers'" :class="['tab', tab === 'vouchers' ? 'active' : '']">凭证管理</span>
       <span @click="tab = 'accounts'" :class="['tab', tab === 'accounts' ? 'active' : '']">科目管理</span>
       <span @click="tab = 'periods'" :class="['tab', tab === 'periods' ? 'active' : '']">会计期间</span>
+      <span @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</span>
+      <span @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</span>
     </div>
 
     <!-- No account set selected -->
@@ -40,6 +42,8 @@
       <VoucherPanel v-if="tab === 'vouchers'" />
       <ChartOfAccountsPanel v-if="tab === 'accounts'" />
       <AccountingPeriodsPanel v-if="tab === 'periods'" />
+      <ReceivablePanel v-if="tab === 'receivables'" />
+      <PayablePanel v-if="tab === 'payables'" />
     </template>
   </div>
 </template>
@@ -50,6 +54,8 @@ import { useAccountingStore } from '../stores/accounting'
 import VoucherPanel from '../components/business/VoucherPanel.vue'
 import ChartOfAccountsPanel from '../components/business/ChartOfAccountsPanel.vue'
 import AccountingPeriodsPanel from '../components/business/AccountingPeriodsPanel.vue'
+import ReceivablePanel from '../components/business/ReceivablePanel.vue'
+import PayablePanel from '../components/business/PayablePanel.vue'
 
 const accountingStore = useAccountingStore()
 const tab = ref('vouchers')
