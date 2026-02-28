@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, Package, ShoppingBag,
-  ArrowLeftRight, Truck, Wallet, Users, Settings
+  ArrowLeftRight, Truck, Wallet, Users, Settings, BookOpen
 } from 'lucide-vue-next'
 
 export const iconMap = {
@@ -12,6 +12,7 @@ export const iconMap = {
   logistics: Truck,
   finance: Wallet,
   customers: Users,
+  accounting: BookOpen,
   settings: Settings
 }
 
@@ -23,6 +24,7 @@ export const menuItems = [
   { key: 'consignment', name: '寄售', perm: 'consignment' },
   { key: 'logistics', name: '物流', perm: 'logistics' },
   { key: 'finance', name: '财务', perm: 'finance' },
+  { key: 'accounting', name: '会计', perm: 'accounting_view' },
   { key: 'customers', name: '客户', perm: 'customer' },
   { key: 'settings', name: '设置', perm: '_any' }
 ]
@@ -51,7 +53,12 @@ export const allPermissions = [
   { key: 'finance', name: '财务查看' },
   { key: 'finance_confirm', name: '确认收款' },
   { key: 'logs', name: '出入库日志' },
-  { key: 'settings', name: '系统设置' }
+  { key: 'settings', name: '系统设置' },
+  { key: 'accounting_view', name: '会计查看' },
+  { key: 'accounting_edit', name: '会计录入' },
+  { key: 'accounting_approve', name: '凭证审核' },
+  { key: 'accounting_post', name: '凭证过账' },
+  { key: 'period_end', name: '期末处理' },
 ]
 
 export const orderTypeNames = {
