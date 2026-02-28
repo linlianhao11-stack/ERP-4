@@ -20,7 +20,8 @@
         <option value="approved">已审核</option>
         <option value="posted">已过账</option>
       </select>
-      <button v-if="hasPermission('accounting_edit')" @click="openCreateForm" class="btn btn-primary btn-sm ml-auto">新增凭证</button>
+      <button v-if="selectedIds.length > 0" @click="handleBatchPdf" class="btn btn-secondary btn-sm ml-auto">批量打印({{ selectedIds.length }})</button>
+      <button v-if="hasPermission('accounting_edit')" @click="openCreateForm" class="btn btn-primary btn-sm" :class="{ 'ml-auto': selectedIds.length === 0 }">新增凭证</button>
     </div>
 
     <!-- 凭证列表 -->
@@ -28,6 +29,7 @@
       <table class="w-full">
         <thead>
           <tr>
+            <th class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0"></th>
             <th>凭证号</th>
             <th>日期</th>
             <th>摘要</th>
@@ -39,6 +41,7 @@
         </thead>
         <tbody>
           <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer">
+            <td @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds"></td>
             <td class="font-medium">{{ v.voucher_no }}</td>
             <td>{{ v.voucher_date }}</td>
             <td>{{ v.summary || '-' }}</td>
@@ -53,11 +56,12 @@
                 <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#f3eef8] text-[#8944ab] hover:bg-[#e8ddf2] transition-colors">过账</button>
                 <button v-if="v.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#fff3e0] text-[#c93400] hover:bg-[#ffe6c7] transition-colors">反过账</button>
                 <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors">删除</button>
+                <button @click="handlePrintPdf(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#f0f0f0] text-[#333] hover:bg-[#e0e0e0] transition-colors">打印</button>
               </div>
             </td>
           </tr>
           <tr v-if="vouchers.length === 0">
-            <td colspan="7" class="text-center text-[#86868b] py-8">暂无凭证</td>
+            <td colspan="8" class="text-center text-[#86868b] py-8">暂无凭证</td>
           </tr>
         </tbody>
       </table>
@@ -178,7 +182,7 @@ import { useAppStore } from '../../stores/app'
 import {
   getVouchers, getVoucher, createVoucher, updateVoucher,
   deleteVoucher, submitVoucher, approveVoucher, rejectVoucher,
-  postVoucher, unpostVoucher
+  postVoucher, unpostVoucher, getVoucherPdf, batchVoucherPdf
 } from '../../api/accounting'
 
 const accountingStore = useAccountingStore()
@@ -195,6 +199,8 @@ const isCreating = ref(false)
 const isEditing = ref(false)
 const detailVoucher = ref(null)
 const leafAccounts = ref([])
+
+const selectedIds = ref([])
 
 const filters = ref({ period_name: '', voucher_type: '', status: '' })
 
@@ -368,6 +374,34 @@ const handleDelete = async (v) => {
   catch (e) { appStore.showToast(e.response?.data?.detail || '删除失败', 'error') }
 }
 
-watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
+const toggleSelectAll = (e) => {
+  selectedIds.value = e.target.checked ? vouchers.value.map(v => v.id) : []
+}
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const handlePrintPdf = async (v) => {
+  try {
+    const res = await getVoucherPdf(v.id)
+    downloadBlob(new Blob([res.data], { type: 'application/pdf' }), `${v.voucher_no}.pdf`)
+  } catch (e) { appStore.showToast('下载PDF失败', 'error') }
+}
+
+const handleBatchPdf = async () => {
+  if (!selectedIds.value.length) return
+  try {
+    const res = await batchVoucherPdf(selectedIds.value)
+    downloadBlob(new Blob([res.data], { type: 'application/pdf' }), 'vouchers_batch.pdf')
+  } catch (e) { appStore.showToast('批量下载失败', 'error') }
+}
+
+watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; selectedIds.value = []; loadList() })
 onMounted(loadList)
 </script>
