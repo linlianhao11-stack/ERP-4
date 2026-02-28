@@ -13,6 +13,7 @@ class Payment(models.Model):
     confirmed_by = fields.ForeignKeyField("models.User", related_name="confirmed_payments", null=True, on_delete=fields.SET_NULL)
     confirmed_at = fields.DatetimeField(null=True)
     remark = fields.TextField(null=True)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="payments", null=True, on_delete=fields.SET_NULL)
     creator = fields.ForeignKeyField("models.User", related_name="payments", null=True, on_delete=fields.SET_NULL)
     created_at = fields.DatetimeField(auto_now_add=True)
 

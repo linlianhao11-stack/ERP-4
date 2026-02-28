@@ -13,6 +13,8 @@ from app.models.shipment import Shipment, ShipmentItem
 from app.models.operation_log import OperationLog
 from app.models.salesperson import Salesperson
 from app.models.system_setting import SystemSetting
+from app.models.accounting import AccountSet, ChartOfAccount, AccountingPeriod
+from app.models.voucher import Voucher, VoucherEntry
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
@@ -20,4 +22,5 @@ __all__ = [
     "PaymentMethod", "DisbursementMethod", "OperationLog", "Supplier", "PurchaseOrder", "PurchaseOrderItem",
     "RebateLog", "SnConfig", "SnCode", "Shipment",
     "ShipmentItem", "SystemSetting",
+    "AccountSet", "ChartOfAccount", "AccountingPeriod", "Voucher", "VoucherEntry",
 ]

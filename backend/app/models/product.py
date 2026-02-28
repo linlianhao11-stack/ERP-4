@@ -11,6 +11,7 @@ class Product(models.Model):
     cost_price = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit = fields.CharField(max_length=20, default="个")
     description = fields.TextField(null=True)
+    tax_rate = fields.DecimalField(max_digits=5, decimal_places=2, default=13.00)
     is_active = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)

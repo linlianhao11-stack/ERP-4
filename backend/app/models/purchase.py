@@ -26,6 +26,7 @@ class PurchaseOrder(models.Model):
     credit_used = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     returned_by = fields.ForeignKeyField("models.User", related_name="returned_pos", null=True, on_delete=fields.SET_NULL)
     returned_at = fields.DatetimeField(null=True)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="purchase_orders", null=True, on_delete=fields.SET_NULL)
 
     class Meta:
         table = "purchase_orders"

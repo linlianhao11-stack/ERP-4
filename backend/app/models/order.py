@@ -19,6 +19,7 @@ class Order(models.Model):
     salesperson = fields.ForeignKeyField("models.Salesperson", related_name="orders", null=True, on_delete=fields.SET_NULL)
     creator = fields.ForeignKeyField("models.User", related_name="orders", null=True, on_delete=fields.SET_NULL)
     shipping_status = fields.CharField(max_length=20, default="pending")
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="orders", null=True, on_delete=fields.SET_NULL)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
