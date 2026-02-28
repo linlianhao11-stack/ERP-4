@@ -1,5 +1,57 @@
 # 迭代记录
 
+## v4.12.0 — 业财一体化会计模块：阶段1-3（2026-02-28）
+
+> 新增完整的会计模块，涵盖多账套管理、科目体系、凭证管理、账簿查询、应收应付管理，与现有业务流程自动衔接。
+
+### 阶段1：基础设施
+
+| # | 类别 | 内容 |
+|---|------|------|
+| 1 | 模型 | 新增 AccountSet（账套）、ChartOfAccount（科目）、AccountingPeriod（会计期间）模型 |
+| 2 | 模型 | 改造 Voucher/VoucherEntry 支持凭证字（记/收/付/转）+ 账套隔离 + 辅助核算 |
+| 3 | 服务 | accounting_init.py：32 个预置贸易企业标准科目自动初始化 |
+| 4 | 路由 | 4 个新 Router：account_sets/chart_of_accounts/accounting_periods/vouchers |
+| 5 | 迁移 | migrate_accounting_phase1()：新表 + 索引 + 5 个会计权限 |
+| 6 | 前端 | AccountingView（账套切换/管理弹窗）+ VoucherPanel + ChartOfAccountsPanel + AccountingPeriodsPanel |
+| 7 | 前端 | accounting store + API 层 + 路由/权限/菜单注册 |
+
+### 阶段2：账簿查询
+
+| # | 类别 | 内容 |
+|---|------|------|
+| 1 | 服务 | ledger_service.py：总分类账/明细账/余额表 3 个查询函数 |
+| 2 | 服务 | ledger_export.py：3 个 Excel 导出函数（openpyxl） |
+| 3 | 路由 | ledgers.py：6 个端点（3 查询 + 3 导出） |
+| 4 | 前端 | LedgerPanel + GeneralLedgerTab + DetailLedgerTab + TrialBalanceTab |
+| 5 | 测试 | 10 个账簿查询测试用例 |
+
+### 阶段3：应收应付管理（AR/AP）
+
+| # | 类别 | 内容 |
+|---|------|------|
+| 1 | 模型 | 7 个新模型：ReceivableBill/ReceiptBill/ReceiptRefundBill/ReceivableWriteOff/PayableBill/DisbursementBill/DisbursementRefundBill |
+| 2 | Schema | 7 个 Pydantic Create 请求模型 |
+| 3 | 服务 | ar_service.py（6函数）+ ap_service.py（5函数）：创建+确认+期末凭证生成 |
+| 4 | 路由 | receivables.py（14端点）+ payables.py（11端点） |
+| 5 | 钩子 | 发货完成→应收单、退货→红字应收、采购收货→应付单、采购付款→付款单 |
+| 6 | 迁移 | 7 表 + 10 索引 + 6 个 AR/AP 权限（accounting_ar/ap_view/edit/confirm） |
+| 7 | 前端 | ReceivablePanel（4子Tab）+ PayablePanel（3子Tab）= 9 个新 Vue 组件 |
+| 8 | 前端 | 24 个 API 函数 + AccountingView 新增应收/应付 Tab |
+| 9 | 测试 | 20 个测试用例（10 模型 + 10 服务），全量 45 个测试通过 |
+
+### UI 修复与美化
+
+| # | 内容 |
+|---|------|
+| 1 | 账套管理弹窗（无账套引导卡片 → 管理弹窗列表态/表单态） |
+| 2 | 科目编辑复用新增 modal（编码/类别/方向 disabled） |
+| 3 | 凭证反过账按钮 + 确认弹窗 |
+| 4 | 订单/采购单自动带入仓库默认账套 |
+| 5 | CSS 类名统一修复 + 操作按钮彩色药丸化 + 表格对齐 |
+
+---
+
 ## v4.11.0 — 第四轮全量审查：安全加固+数据一致性+前端精度（2026-02-25）
 
 > 第四轮全量代码审查（8 路并行代理），共完成 31 项修复，覆盖后端安全、数据一致性、前端金额精度、DevOps 优化。

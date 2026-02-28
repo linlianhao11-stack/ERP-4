@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.11.0
+# 轻量级 ERP 系统 v4.12.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售等核心业务流程。
 
@@ -31,7 +31,7 @@ erp-4/
 ├── backend/
 │   ├── main.py                 # FastAPI 入口，lifespan 管理
 │   ├── requirements.txt        # Python 依赖
-│   ├── tests/                  # pytest 测试（认证、密码策略）
+│   ├── tests/                  # pytest 测试（45 个用例：认证/会计/账簿/应收应付）
 │   ├── pytest.ini              # pytest 配置
 │   ├── app/
 │   │   ├── config.py           # 全局配置（环境变量 + 默认值）
@@ -40,10 +40,10 @@ erp-4/
 │   │   ├── exceptions.py       # 全局异常处理器
 │   │   ├── migrations.py       # 启动时幂等初始化默认数据
 │   │   ├── auth/               # JWT 签发 & 权限校验（含 token 版本机制）
-│   │   ├── models/             # 数据模型（25 个）
-│   │   ├── routers/            # API 路由（含通用 CRUD 工厂）
-│   │   ├── schemas/            # Pydantic 请求/响应模型
-│   │   ├── services/           # 业务逻辑层
+│   │   ├── models/             # 数据模型（32 个）
+│   │   ├── routers/            # API 路由（30 个模块，含通用 CRUD 工厂）
+│   │   ├── schemas/            # Pydantic 请求/响应模型（20 个文件）
+│   │   ├── services/           # 业务逻辑层（10 个服务）
 │   │   └── utils/              # 工具函数（订单号生成、UTC 时间处理）
 │   ├── backups/                # 数据库备份目录
 │   └── static/                 # 前端构建产物（生产环境由后端托管）
@@ -56,9 +56,9 @@ erp-4/
         ├── main.js             # Vue 应用入口
         ├── App.vue             # 根组件
         ├── router/             # 路由定义
-        ├── api/                # 后端 API 调用封装（14 个模块）
-        ├── stores/             # Pinia 状态管理（8 个 store）
-        ├── views/              # 页面视图（11 个）
+        ├── api/                # 后端 API 调用封装（19 个模块）
+        ├── stores/             # Pinia 状态管理（9 个 store）
+        ├── views/              # 页面视图（12 个）
         ├── components/         # 组件（layout / business / common）
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
         │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
@@ -78,12 +78,13 @@ erp-4/
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
 | 物流管理 | `/logistics` | 发货确认、拆单发货、包裹商品明细、SN码记录、快递100对接 |
 | 财务管理 | `/finance` | 收款、对账、凭证（记账凭证）、返利管理 |
+| 会计管理 | `/accounting` | 多账套、科目体系、记账凭证、账簿查询、应收应付管理 |
 | 客户管理 | `/customers` | 客户信息、余额、返利、欠款 |
 | 系统设置 | `/settings` | 用户、仓库、仓位、供应商、销售员、收款方式、品牌 |
 
 ## 数据模型
 
-核心模型共 25 个：
+核心模型共 32 个：
 
 - **用户与权限**: User
 - **商品**: Product, ProductBrand
@@ -92,6 +93,8 @@ erp-4/
 - **销售**: Customer, Salesperson, Order, OrderItem
 - **采购**: Supplier, PurchaseOrder, PurchaseOrderItem
 - **财务**: Payment, PaymentOrder, PaymentMethod, Voucher, VoucherEntry, RebateLog
+- **会计**: AccountSet, ChartOfAccount, AccountingPeriod
+- **应收应付**: ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff, PayableBill, DisbursementBill, DisbursementRefundBill
 - **物流**: Shipment, ShipmentItem
 - **系统**: OperationLog, SystemSetting
 
@@ -193,6 +196,17 @@ npm run build
 | `purchase_pay` | 采购付款 |
 | `purchase_receive` | 采购收货 |
 | `logs` | 操作日志查看 |
+| `accounting_view` | 会计查看 |
+| `accounting_edit` | 会计编辑（凭证/科目） |
+| `accounting_approve` | 凭证审核 |
+| `accounting_post` | 凭证过账 |
+| `period_end` | 期末处理 |
+| `accounting_ar_view` | 应收查看 |
+| `accounting_ar_edit` | 应收编辑 |
+| `accounting_ar_confirm` | 应收确认 |
+| `accounting_ap_view` | 应付查看 |
+| `accounting_ap_edit` | 应付编辑 |
+| `accounting_ap_confirm` | 应付确认 |
 | `admin` | 系统管理 |
 
 `admin` 角色自动拥有全部权限。
