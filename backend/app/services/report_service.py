@@ -10,7 +10,9 @@ from app.logger import get_logger
 logger = get_logger("report_service")
 
 
-def _dec_str(d: Decimal) -> str:
+def _dec_str(d) -> str:
+    if not isinstance(d, Decimal):
+        d = Decimal(str(d))
     return format(d.normalize(), 'f')
 
 

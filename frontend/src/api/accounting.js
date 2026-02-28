@@ -117,3 +117,28 @@ export const cancelInvoice = (id) => api.post(`/invoices/${id}/cancel`)
 // ========== 凭证 PDF ==========
 export const getVoucherPdf = (id) => api.get(`/vouchers/${id}/pdf`, { responseType: 'blob' })
 export const batchVoucherPdf = (ids) => api.post('/vouchers/batch-pdf', { ids }, { responseType: 'blob' })
+
+// ========== 期末处理 ==========
+export const previewCarryForward = (accountSetId, periodName) =>
+  api.post('/period-end/carry-forward/preview', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+export const executeCarryForward = (accountSetId, periodName) =>
+  api.post('/period-end/carry-forward', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+export const closeCheck = (accountSetId, periodName) =>
+  api.post('/period-end/close-check', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+export const closePeriod = (accountSetId, periodName) =>
+  api.post('/period-end/close', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+export const reopenPeriod = (accountSetId, periodName) =>
+  api.post('/period-end/reopen', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+export const yearClose = (accountSetId, year) =>
+  api.post('/period-end/year-close', null, { params: { account_set_id: accountSetId, year } })
+
+// ========== 财务报表 ==========
+export const getBalanceSheet = (params) => api.get('/financial-reports/balance-sheet', { params })
+export const getIncomeStatement = (params) => api.get('/financial-reports/income-statement', { params })
+export const getCashFlow = (params) => api.get('/financial-reports/cash-flow', { params })
+export const exportBalanceSheet = (params) =>
+  api.get('/financial-reports/balance-sheet/export', { params, responseType: 'blob' })
+export const exportIncomeStatement = (params) =>
+  api.get('/financial-reports/income-statement/export', { params, responseType: 'blob' })
+export const exportCashFlow = (params) =>
+  api.get('/financial-reports/cash-flow/export', { params, responseType: 'blob' })

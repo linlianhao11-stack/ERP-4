@@ -20,6 +20,7 @@ async def run_migrations():
     await migrate_accounting_phase1()
     await migrate_accounting_phase3()
     await migrate_accounting_phase4()
+    await migrate_accounting_phase5()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -580,3 +581,16 @@ async def migrate_accounting_phase4():
         pass
 
     logger.info("阶段4迁移完成：出入库单+发票表 + 索引 + 1407科目")
+
+
+async def migrate_accounting_phase5():
+    """阶段5迁移：确保 period_end 权限（幂等）"""
+    admin = await User.filter(username="admin").first()
+    if admin:
+        current = admin.permissions or []
+        # period_end 权限应该在 phase1 已添加，这里只是确认
+        if "period_end" not in current:
+            admin.permissions = current + ["period_end"]
+            await admin.save()
+            logger.info("admin 用户补充 period_end 权限")
+    logger.info("阶段5迁移完成")
