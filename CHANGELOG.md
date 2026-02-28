@@ -1,5 +1,45 @@
 # 迭代记录
 
+## v4.13.0 — 业财一体化会计模块：阶段4-5 + UI补丁（2026-02-28）
+
+> 完成发票管理、出入库单、PDF套打、期末处理、三张财务报表、Excel/PDF导出，以及6个详情弹窗补全。至此五阶段全部完成，79个后端测试通过。
+
+### 阶段4：发票 + 出入库单 + PDF套打
+
+| # | 类别 | 内容 |
+|---|------|------|
+| 1 | 模型 | 6 个新模型：Invoice/InvoiceItem + SalesDeliveryBill/SalesDeliveryItem + PurchaseReceiptBill/PurchaseReceiptItem |
+| 2 | 路由 | invoices.py（7端点）+ sales_delivery.py（4端点）+ purchase_receipt.py（4端点） |
+| 3 | 服务 | pdf_print.py：3种PDF模板（凭证/出库单/入库单），reportlab 24×14cm |
+| 4 | 钩子 | 发货完成→出库单+凭证(借1407/贷1405)、采购收货→入库单+凭证(借1405+借222101/贷2202) |
+| 5 | 前端 | InvoicePanel(2子Tab：销项/进项) + SalesDeliveryTab + PurchaseReceiptTab |
+| 6 | 测试 | 18 个新测试（4模型 + 14服务），全量 63 个通过 |
+
+### 阶段5：期末处理 + 财务报表
+
+| # | 类别 | 内容 |
+|---|------|------|
+| 1 | 服务 | period_end_service.py：损益结转(预览+执行) + 结账检查(5项) + 结账 + 反结账 + 年度结转(4103→4104) |
+| 2 | 服务 | report_service.py：资产负债表 + 利润表(本期+本年累计) + 现金流量表(简易直接法) |
+| 3 | 服务 | report_export.py：3张报表 × 2格式(Excel+PDF) = 6个导出函数 |
+| 4 | 路由 | period_end.py（6端点：预览/执行/检查/结账/反结账/年度结转）+ financial_reports.py（6端点：3查询+3导出） |
+| 5 | 迁移 | admin 用户添加 period_end 权限 |
+| 6 | 前端 | PeriodEndPanel（期间状态+损益结转+结账检查+年度结转+反结账+期间历史）|
+| 7 | 前端 | FinancialReportPanel（期间选择+3子Tab+导出） + BalanceSheetTab + IncomeStatementTab + CashFlowTab |
+| 8 | 前端 | AccountingView 新增"期末处理"和"财务报表" 2个Tab |
+| 9 | 测试 | 16 个新测试（9期末 + 7报表），全量 79 个通过 |
+
+### UI补丁：详情弹窗 + API对接补全
+
+| # | 内容 |
+|---|------|
+| 1 | ReceivablePanel/PayablePanel 新增"批量生成凭证"按钮（接入 generateArVouchers/generateApVouchers） |
+| 2 | ReceivableBillsTab/PayableBillsTab 新增"查看"详情弹窗 |
+| 3 | SalesDeliveryTab/PurchaseReceiptTab 新增"查看"详情弹窗（含商品明细表） |
+| 4 | SalesInvoiceTab/PurchaseInvoiceTab 新增"查看"详情弹窗 + 草稿发票编辑功能（updateInvoice） |
+
+---
+
 ## v4.12.0 — 业财一体化会计模块：阶段1-3（2026-02-28）
 
 > 新增完整的会计模块，涵盖多账套管理、科目体系、凭证管理、账簿查询、应收应付管理，与现有业务流程自动衔接。
