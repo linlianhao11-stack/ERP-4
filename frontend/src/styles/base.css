@@ -139,6 +139,14 @@
   .modal-body {
     padding: 20px 24px;
   }
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #e8e8ed;
+  }
 
   /* Buttons */
   .btn {
@@ -420,6 +428,12 @@
     color: #86868b;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+  }
+  .table-container table th,
+  .table-container table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #e8e8ed;
+    text-align: left;
   }
   .table-container table td {
     font-size: 14px;

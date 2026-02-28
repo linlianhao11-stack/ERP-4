@@ -8,6 +8,7 @@ class WarehouseCreate(BaseModel):
 class WarehouseUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     is_default: Optional[bool] = None
+    account_set_id: Optional[int] = None
 
 class LocationCreate(BaseModel):
     warehouse_id: int

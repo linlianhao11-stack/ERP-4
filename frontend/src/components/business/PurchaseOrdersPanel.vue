@@ -109,6 +109,14 @@
               <option v-for="loc in poTargetLocations" :key="loc.id" :value="loc.id">{{ loc.code }}{{ loc.name ? ' - ' + loc.name : '' }}</option>
             </select>
           </div>
+          <div v-if="accountSets.length">
+            <label class="label">财务账套</label>
+            <select v-model="poForm.account_set_id" class="input">
+              <option :value="null">不指定</option>
+              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <div class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+          </div>
 
           <!-- Items -->
           <div class="border-t pt-3">
@@ -485,6 +493,7 @@ import {
   receivePurchaseOrder,
   returnPurchaseOrder
 } from '../../api/purchase'
+import { getAccountSets } from '../../api/accounting'
 import { checkSnRequired } from '../../api/sn'
 import { parseSnCodes } from '../../utils/helpers'
 import api from '../../api/index'
@@ -507,6 +516,9 @@ const purchaseDateStart = ref('')
 const purchaseDateEnd = ref('')
 const purchaseSearch = ref('')
 
+// Account sets (for PO create dropdown)
+const accountSets = ref([])
+
 // Suppliers (for PO create dropdown)
 const suppliers = ref([])
 
@@ -521,7 +533,8 @@ const showReturnModal = ref(false)
 const poForm = reactive({
   supplier_id: '', target_warehouse_id: '', target_location_id: '',
   remark: '', items: [], use_rebate: false, supplier_rebate_balance: 0,
-  use_credit: false, supplier_credit_balance: 0, credit_amount: 0
+  use_credit: false, supplier_credit_balance: 0, credit_amount: 0,
+  account_set_id: null
 })
 const poSupplierSearch = ref('')
 const poSupplierDropdown = ref(false)
@@ -575,8 +588,15 @@ const getReceiveLocations = (warehouseId) => {
   return warehousesStore.getLocationsByWarehouse(warehouseId)
 }
 
-// Reset location when warehouse changes
-watch(() => poForm.target_warehouse_id, () => { poForm.target_location_id = '' })
+// Reset location and auto-fill account_set when warehouse changes
+watch(() => poForm.target_warehouse_id, (whId) => {
+  poForm.target_location_id = ''
+  if (whId) {
+    const wh = warehouses.value.find(w => w.id === parseInt(whId))
+    if (wh?.account_set_id) poForm.account_set_id = wh.account_set_id
+    else poForm.account_set_id = null
+  }
+})
 
 // Data loading
 let _poSearchTimer = null
@@ -686,9 +706,10 @@ const saveProduct = async () => {
 }
 
 const openNewPO = () => {
+  const defaultWh = warehouses.value.find(w => w.is_default)
   Object.assign(poForm, {
     supplier_id: '',
-    target_warehouse_id: warehouses.value.find(w => w.is_default)?.id || '',
+    target_warehouse_id: defaultWh?.id || '',
     target_location_id: '',
     remark: '',
     items: [],
@@ -696,7 +717,8 @@ const openNewPO = () => {
     supplier_rebate_balance: 0,
     use_credit: false,
     supplier_credit_balance: 0,
-    credit_amount: 0
+    credit_amount: 0,
+    account_set_id: defaultWh?.account_set_id || null
   })
   poSupplierSearch.value = ''
   poAddItem()
@@ -756,6 +778,7 @@ const savePurchaseOrder = async () => {
       remark: poForm.remark || null,
       rebate_amount: totalRebate > 0 ? totalRebate : null,
       credit_amount: creditAmount > 0 ? creditAmount : null,
+      account_set_id: poForm.account_set_id || null,
       items: validItems.map(i => ({
         product_id: parseInt(i.product_id),
         quantity: parseInt(i.quantity),
@@ -1040,12 +1063,16 @@ const confirmReturn = async () => {
 
 defineExpose({ refresh: loadPurchaseOrders, viewPurchaseOrder, openPurchaseReceive })
 
-onMounted(() => {
+onMounted(async () => {
   loadPurchaseOrders()
   loadSuppliers()
   productsStore.loadProducts()
   warehousesStore.loadWarehouses()
   warehousesStore.loadLocations()
+  try {
+    const { data } = await getAccountSets()
+    accountSets.value = data
+  } catch (e) { /* ignore */ }
 })
 
 onUnmounted(() => clearTimeout(_poSearchTimer))

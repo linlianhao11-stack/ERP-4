@@ -19,6 +19,7 @@ class PurchaseOrderCreate(BaseModel):
     items: List[PurchaseOrderItemRequest] = Field(min_length=1)
     rebate_amount: Optional[Decimal] = Field(default=None, ge=0)
     credit_amount: Optional[Decimal] = Field(default=None, ge=0)
+    account_set_id: Optional[int] = None
 
 class PurchaseReturnItemRequest(BaseModel):
     item_id: int

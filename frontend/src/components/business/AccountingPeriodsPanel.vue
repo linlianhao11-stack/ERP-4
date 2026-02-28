@@ -3,15 +3,15 @@
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-[15px] font-semibold text-[#1d1d1f]">会计期间</h3>
       <div class="flex items-center gap-2">
-        <select v-model="selectedYear" class="form-input w-28">
+        <select v-model="selectedYear" class="input input-sm w-28">
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}年</option>
         </select>
         <button v-if="hasPermission('period_end')" @click="handleInitYear" class="btn btn-secondary btn-sm" :disabled="submitting">初始化年度期间</button>
       </div>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full">
         <thead>
           <tr>
             <th>期间</th>

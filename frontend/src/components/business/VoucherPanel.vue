@@ -2,18 +2,18 @@
   <div>
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.period_name" class="form-input w-32" @change="loadList">
+      <select v-model="filters.period_name" class="input input-sm w-32" @change="loadList">
         <option value="">全部期间</option>
         <option v-for="p in periodOptions" :key="p" :value="p">{{ p }}</option>
       </select>
-      <select v-model="filters.voucher_type" class="form-input w-24" @change="loadList">
+      <select v-model="filters.voucher_type" class="input input-sm w-24" @change="loadList">
         <option value="">全部</option>
         <option value="记">记</option>
         <option value="收">收</option>
         <option value="付">付</option>
         <option value="转">转</option>
       </select>
-      <select v-model="filters.status" class="form-input w-28" @change="loadList">
+      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
         <option value="">全部状态</option>
         <option value="draft">草稿</option>
         <option value="pending">待审核</option>
@@ -24,8 +24,8 @@
     </div>
 
     <!-- 凭证列表 -->
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full">
         <thead>
           <tr>
             <th>凭证号</th>
@@ -46,12 +46,13 @@
             <td class="text-right">{{ formatAmount(v.total_credit) }}</td>
             <td><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
             <td @click.stop>
-              <div class="flex gap-1">
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="text-[12px] text-blue-600">提交</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="text-[12px] text-green-600">审核</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleReject(v)" class="text-[12px] text-orange-600">驳回</button>
-                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="text-[12px] text-purple-600">过账</button>
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="text-[12px] text-red-500">删除</button>
+              <div class="flex gap-1.5">
+                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f4fd] text-[#0062cc] hover:bg-[#d0e8fa] transition-colors">提交</button>
+                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f8ee] text-[#248a3d] hover:bg-[#d0f0dc] transition-colors">审核</button>
+                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleReject(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#fff3e0] text-[#c93400] hover:bg-[#ffe6c7] transition-colors">驳回</button>
+                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#f3eef8] text-[#8944ab] hover:bg-[#e8ddf2] transition-colors">过账</button>
+                <button v-if="v.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#fff3e0] text-[#c93400] hover:bg-[#ffe6c7] transition-colors">反过账</button>
+                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors">删除</button>
               </div>
             </td>
           </tr>
@@ -80,8 +81,8 @@
           <div class="modal-body">
             <div class="grid grid-cols-3 gap-3 mb-4">
               <div>
-                <label class="form-label">凭证字</label>
-                <select v-model="editForm.voucher_type" class="form-input" :disabled="!isCreating">
+                <label class="label">凭证字</label>
+                <select v-model="editForm.voucher_type" class="input text-sm" :disabled="!isCreating">
                   <option value="记">记</option>
                   <option value="收">收</option>
                   <option value="付">付</option>
@@ -89,21 +90,21 @@
                 </select>
               </div>
               <div>
-                <label class="form-label">凭证日期</label>
-                <input type="date" v-model="editForm.voucher_date" class="form-input" :disabled="!isEditing && !isCreating">
+                <label class="label">凭证日期</label>
+                <input type="date" v-model="editForm.voucher_date" class="input text-sm" :disabled="!isEditing && !isCreating">
               </div>
               <div>
-                <label class="form-label">附件张数</label>
-                <input type="number" v-model.number="editForm.attachment_count" class="form-input" min="0" :disabled="!isEditing && !isCreating">
+                <label class="label">附件张数</label>
+                <input type="number" v-model.number="editForm.attachment_count" class="input text-sm" min="0" :disabled="!isEditing && !isCreating">
               </div>
             </div>
             <div class="mb-4">
-              <label class="form-label">摘要</label>
-              <input v-model="editForm.summary" class="form-input" :disabled="!isEditing && !isCreating">
+              <label class="label">摘要</label>
+              <input v-model="editForm.summary" class="input text-sm" :disabled="!isEditing && !isCreating">
             </div>
 
-            <div class="table-wrapper">
-              <table class="data-table text-[13px]">
+            <div class="table-container">
+              <table class="w-full text-[13px]">
                 <thead>
                   <tr>
                     <th class="w-8">#</th>
@@ -118,21 +119,21 @@
                   <tr v-for="(entry, idx) in editForm.entries" :key="idx">
                     <td>{{ idx + 1 }}</td>
                     <td>
-                      <select v-if="isEditing || isCreating" v-model="entry.account_id" class="form-input text-[12px]">
+                      <select v-if="isEditing || isCreating" v-model="entry.account_id" class="input text-xs">
                         <option v-for="a in leafAccounts" :key="a.id" :value="a.id">{{ a.code }} {{ a.name }}</option>
                       </select>
                       <span v-else>{{ entry.account_code }} {{ entry.account_name }}</span>
                     </td>
                     <td>
-                      <input v-if="isEditing || isCreating" v-model="entry.summary" class="form-input text-[12px]">
+                      <input v-if="isEditing || isCreating" v-model="entry.summary" class="input text-xs">
                       <span v-else>{{ entry.summary }}</span>
                     </td>
                     <td>
-                      <input v-if="isEditing || isCreating" type="number" v-model.number="entry.debit_amount" class="form-input text-right text-[12px]" min="0" step="0.01">
+                      <input v-if="isEditing || isCreating" type="number" v-model.number="entry.debit_amount" class="input text-right text-xs" min="0" step="0.01">
                       <span v-else class="text-right block">{{ formatAmount(entry.debit_amount) }}</span>
                     </td>
                     <td>
-                      <input v-if="isEditing || isCreating" type="number" v-model.number="entry.credit_amount" class="form-input text-right text-[12px]" min="0" step="0.01">
+                      <input v-if="isEditing || isCreating" type="number" v-model.number="entry.credit_amount" class="input text-right text-xs" min="0" step="0.01">
                       <span v-else class="text-right block">{{ formatAmount(entry.credit_amount) }}</span>
                     </td>
                     <td v-if="isEditing || isCreating">
@@ -160,6 +161,7 @@
             <button @click="showDetail = false" class="btn btn-secondary">{{ (isEditing || isCreating) ? '取消' : '关闭' }}</button>
             <button v-if="isCreating" @click="handleCreate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">保存</button>
             <button v-if="isEditing" @click="handleUpdate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">保存</button>
+            <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(detailVoucher)" class="btn btn-warning">反过账</button>
             <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'draft' && hasPermission('accounting_edit')" @click="startEdit" class="btn btn-primary">编辑</button>
           </div>
         </div>
@@ -176,7 +178,7 @@ import { useAppStore } from '../../stores/app'
 import {
   getVouchers, getVoucher, createVoucher, updateVoucher,
   deleteVoucher, submitVoucher, approveVoucher, rejectVoucher,
-  postVoucher
+  postVoucher, unpostVoucher
 } from '../../api/accounting'
 
 const accountingStore = useAccountingStore()
@@ -350,6 +352,15 @@ const handleReject = async (v) => {
 const handlePost = async (v) => {
   try { await postVoucher(v.id); appStore.showToast('过账成功', 'success'); await loadList() }
   catch (e) { appStore.showToast(e.response?.data?.detail || '过账失败', 'error') }
+}
+const handleUnpost = async (v) => {
+  if (!confirm(`确定反过账凭证 ${v.voucher_no}？反过账后凭证将回到已审核状态。`)) return
+  try {
+    await unpostVoucher(v.id)
+    appStore.showToast('反过账成功', 'success')
+    showDetail.value = false
+    await loadList()
+  } catch (e) { appStore.showToast(e.response?.data?.detail || '反过账失败', 'error') }
 }
 const handleDelete = async (v) => {
   if (!confirm(`确定删除凭证 ${v.voucher_no}？`)) return

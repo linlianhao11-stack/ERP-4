@@ -35,6 +35,20 @@ export const rejectVoucher = (id) => api.post(`/vouchers/${id}/reject`)
 export const postVoucher = (id) => api.post(`/vouchers/${id}/post`)
 export const unpostVoucher = (id) => api.post(`/vouchers/${id}/unpost`)
 
+// === 账簿查询 ===
+export const getGeneralLedger = (params) =>
+  api.get('/ledgers/general-ledger', { params })
+export const getDetailLedger = (params) =>
+  api.get('/ledgers/detail-ledger', { params })
+export const getTrialBalance = (params) =>
+  api.get('/ledgers/trial-balance', { params })
+export const exportGeneralLedger = (params) =>
+  api.get('/ledgers/general-ledger/export', { params, responseType: 'blob' })
+export const exportDetailLedger = (params) =>
+  api.get('/ledgers/detail-ledger/export', { params, responseType: 'blob' })
+export const exportTrialBalance = (params) =>
+  api.get('/ledgers/trial-balance/export', { params, responseType: 'blob' })
+
 // === 应收管理 ===
 export const getReceivableBills = (params) => api.get('/receivables/receivable-bills', { params })
 export const getReceivableBill = (id) => api.get(`/receivables/receivable-bills/${id}`)

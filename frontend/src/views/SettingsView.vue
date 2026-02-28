@@ -22,6 +22,7 @@
                 <span class="text-xs text-[#86868b]">{{ expandedWarehouse === w.id ? '▼' : '▶' }}</span>
                 <span class="font-medium text-sm">{{ w.name }}</span>
                 <span v-if="w.is_default" class="text-xs text-[#0071e3] bg-[#e8f4fd] px-1.5 py-0.5 rounded">(默认)</span>
+                <span v-if="w.account_set_name" class="text-xs text-white bg-[#0071e3] px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
                 <span class="text-xs text-[#86868b]">{{ (w.locations || []).length }} 个仓位</span>
               </div>
               <div class="flex gap-2" @click.stop>
@@ -265,6 +266,13 @@
         <form @submit.prevent="saveWarehouse" class="space-y-3 p-4">
           <div><label class="label">仓库名称 *</label><input v-model="warehouseForm.name" class="input" required placeholder="请输入新名称"></div>
           <div><label class="flex items-center"><input type="checkbox" v-model="warehouseForm.is_default" class="mr-2">设为默认仓库</label></div>
+          <div v-if="accountSets.length">
+            <label class="label">关联账套</label>
+            <select v-model="warehouseForm.account_set_id" class="input">
+              <option :value="null">不关联</option>
+              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
           <div class="flex gap-3 pt-3">
             <button type="button" @click="showWarehouseModal = false" class="btn btn-secondary flex-1">取消</button>
             <button type="submit" class="btn btn-primary flex-1">保存</button>
@@ -392,6 +400,7 @@ import {
 } from '../api/settings'
 import { createSalesperson, updateSalesperson, deleteSalesperson as deleteSalespersonApi } from '../api/salespersons'
 import { createSnConfig, deleteSnConfig as deleteSnConfigApi } from '../api/sn'
+import { getAccountSets } from '../api/accounting'
 import { getOpLogs } from '../api/settings'
 import { allPermissions } from '../utils/constants'
 import { usePermission } from '../composables/usePermission'
@@ -413,6 +422,9 @@ const opLogs = computed(() => settingsStore.opLogs)
 const snConfigs = computed(() => settingsStore.snConfigs)
 const productBrands = computed(() => settingsStore.productBrands)
 
+// Account sets for warehouse association
+const accountSets = ref([])
+
 // Tab state
 const settingsTab = ref('general')
 
@@ -422,7 +434,7 @@ const pwdForm = reactive({ old_password: '', new_password: '', confirm_password:
 // Warehouse
 const newWarehouseName = ref('')
 const showWarehouseModal = ref(false)
-const warehouseForm = reactive({ id: null, name: '', is_default: false })
+const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null })
 
 // Location
 const newLocationInputs = ref({})
@@ -502,7 +514,7 @@ const handleChangePassword = async () => {
 
 // === Warehouses ===
 const editWarehouse = (w) => {
-  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default })
+  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null })
   showWarehouseModal.value = true
 }
 
@@ -514,7 +526,7 @@ const saveWarehouse = async () => {
   if (appStore.submitting) return
   appStore.submitting = true
   try {
-    await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default })
+    await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
     appStore.showToast('保存成功')
     showWarehouseModal.value = false
     warehousesStore.loadWarehouses()
@@ -933,5 +945,9 @@ onMounted(async () => {
     settingsStore.loadUsers()
     settingsStore.loadBackups()
   }
+  try {
+    const { data } = await getAccountSets()
+    accountSets.value = data
+  } catch (e) { /* ignore */ }
 })
 </script>

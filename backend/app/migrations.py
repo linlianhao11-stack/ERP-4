@@ -392,7 +392,21 @@ async def migrate_order_updated_at():
 
 async def migrate_accounting_phase1():
     """阶段1财务基础设施迁移：现有表新增字段 + 会计索引（幂等）"""
+    from tortoise import Tortoise
     conn = connections.get("default")
+
+    # ── 凭证表结构升级（旧表→新表）──
+    # 检测旧版 vouchers 表（有 company_name 列 = 旧表结构）
+    v_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'vouchers'"
+    )
+    v_col_names = [c["name"] for c in v_cols]
+    if "company_name" in v_col_names or ("account_set_id" not in v_col_names and v_cols):
+        logger.info("迁移: 检测到旧版 vouchers 表结构，重建为新版")
+        await conn.execute_query("DROP TABLE IF EXISTS voucher_entries CASCADE")
+        await conn.execute_query("DROP TABLE IF EXISTS vouchers CASCADE")
+        await Tortoise.generate_schemas(safe=True)
+        logger.info("迁移: vouchers / voucher_entries 表已重建")
 
     # Warehouse: account_set_id
     wh_cols = await conn.execute_query_dict(
@@ -463,6 +477,20 @@ async def migrate_accounting_phase1():
             await conn.execute_query(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
         except Exception as e:
             logger.warning(f"创建索引 {name} 失败（可忽略）: {e}")
+
+    # 更新默认管理员的权限列表（添加会计权限）
+    try:
+        admin = await User.filter(username="admin", role="admin").first()
+        if admin:
+            existing_perms = admin.permissions or []
+            new_perms = ["accounting_view", "accounting_edit", "accounting_approve", "accounting_post", "period_end"]
+            added = [p for p in new_perms if p not in existing_perms]
+            if added:
+                admin.permissions = existing_perms + added
+                await admin.save()
+                logger.info(f"管理员权限已更新，添加: {added}")
+    except Exception as e:
+        logger.warning(f"更新管理员权限失败（可忽略）: {e}")
 
     logger.info("阶段1财务迁移完成")
 

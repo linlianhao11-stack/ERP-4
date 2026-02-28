@@ -2,11 +2,11 @@
   <div>
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-[15px] font-semibold text-[#1d1d1f]">会计科目</h3>
-      <button v-if="hasPermission('accounting_edit')" @click="showAddForm = true" class="btn btn-primary btn-sm">新增子科目</button>
+      <button v-if="hasPermission('accounting_edit')" @click="openAddForm" class="btn btn-primary btn-sm">新增子科目</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full">
         <thead>
           <tr>
             <th>科目编码</th>
@@ -20,7 +20,7 @@
         </thead>
         <tbody>
           <tr v-for="a in accounts" :key="a.id">
-            <td><span :style="{ paddingLeft: (a.level - 1) * 20 + 'px' }">{{ a.code }}</span></td>
+            <td>{{ a.code }}</td>
             <td>{{ a.name }}</td>
             <td><span :class="categoryBadge(a.category)">{{ categoryName(a.category) }}</span></td>
             <td>{{ a.direction === 'debit' ? '借' : '贷' }}</td>
@@ -30,38 +30,41 @@
               <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
             </td>
             <td v-if="hasPermission('accounting_edit')">
-              <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="text-[12px] text-red-500 hover:text-red-700">停用</button>
+              <div class="flex gap-1">
+                <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f4fd] text-[#0062cc] hover:bg-[#d0e8fa] transition-colors">编辑</button>
+                <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors">停用</button>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- 新增子科目弹窗 -->
+    <!-- 新增/编辑科目弹窗 -->
     <Transition name="fade">
       <div v-if="showAddForm" class="modal-backdrop" @click.self="showAddForm = false">
         <div class="modal" style="max-width: 480px">
           <div class="modal-header">
-            <h3>新增子科目</h3>
+            <h3>{{ isEditMode ? '编辑科目' : '新增子科目' }}</h3>
             <button @click="showAddForm = false" class="modal-close">&times;</button>
           </div>
           <div class="modal-body space-y-3">
             <div>
-              <label class="form-label">上级科目编码</label>
-              <input v-model="form.parent_code" class="form-input" placeholder="如 1002">
+              <label class="label">上级科目编码</label>
+              <input v-model="form.parent_code" class="input text-sm" placeholder="如 1002" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
             </div>
             <div>
-              <label class="form-label">科目编码</label>
-              <input v-model="form.code" class="form-input" placeholder="如 100201">
+              <label class="label">科目编码</label>
+              <input v-model="form.code" class="input text-sm" placeholder="如 100201" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
             </div>
             <div>
-              <label class="form-label">科目名称</label>
-              <input v-model="form.name" class="form-input" placeholder="如 工商银行">
+              <label class="label">科目名称</label>
+              <input v-model="form.name" class="input text-sm" placeholder="如 工商银行">
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="form-label">类别</label>
-                <select v-model="form.category" class="form-input">
+                <label class="label">类别</label>
+                <select v-model="form.category" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
                   <option value="asset">资产</option>
                   <option value="liability">负债</option>
                   <option value="equity">权益</option>
@@ -70,8 +73,8 @@
                 </select>
               </div>
               <div>
-                <label class="form-label">余额方向</label>
-                <select v-model="form.direction" class="form-input">
+                <label class="label">余额方向</label>
+                <select v-model="form.direction" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
                   <option value="debit">借</option>
                   <option value="credit">贷</option>
                 </select>
@@ -88,7 +91,7 @@
           </div>
           <div class="modal-footer">
             <button @click="showAddForm = false" class="btn btn-secondary">取消</button>
-            <button @click="handleAdd" class="btn btn-primary" :disabled="submitting">确定</button>
+            <button @click="isEditMode ? handleEdit() : handleAdd()" class="btn btn-primary" :disabled="submitting">确定</button>
           </div>
         </div>
       </div>
@@ -101,7 +104,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { usePermission } from '../../composables/usePermission'
 import { useAppStore } from '../../stores/app'
-import { createChartOfAccount, deleteChartOfAccount } from '../../api/accounting'
+import { createChartOfAccount, updateChartOfAccount, deleteChartOfAccount } from '../../api/accounting'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
@@ -110,6 +113,8 @@ const { hasPermission } = usePermission()
 const accounts = ref([])
 const showAddForm = ref(false)
 const submitting = ref(false)
+const isEditMode = ref(false)
+const editingAccountId = ref(null)
 const form = ref({
   parent_code: '', code: '', name: '',
   category: 'asset', direction: 'debit',
@@ -124,6 +129,50 @@ const categoryBadge = (c) => categoryBadges[c] || 'badge'
 const loadAccounts = async () => {
   await accountingStore.loadChartOfAccounts()
   accounts.value = accountingStore.chartOfAccounts
+}
+
+const openAddForm = () => {
+  isEditMode.value = false
+  editingAccountId.value = null
+  form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false }
+  showAddForm.value = true
+}
+
+const openEditAccount = (a) => {
+  isEditMode.value = true
+  editingAccountId.value = a.id
+  form.value = {
+    parent_code: a.parent_code || '',
+    code: a.code,
+    name: a.name,
+    category: a.category,
+    direction: a.direction,
+    aux_customer: a.aux_customer || false,
+    aux_supplier: a.aux_supplier || false,
+  }
+  showAddForm.value = true
+}
+
+const handleEdit = async () => {
+  if (!form.value.name) {
+    appStore.showToast('请填写科目名称', 'error')
+    return
+  }
+  submitting.value = true
+  try {
+    await updateChartOfAccount(editingAccountId.value, {
+      name: form.value.name,
+      aux_customer: form.value.aux_customer,
+      aux_supplier: form.value.aux_supplier,
+    })
+    appStore.showToast('更新成功', 'success')
+    showAddForm.value = false
+    await loadAccounts()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '更新失败', 'error')
+  } finally {
+    submitting.value = false
+  }
 }
 
 const handleAdd = async () => {

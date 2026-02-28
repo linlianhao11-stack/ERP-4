@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
-from app.models import User, Warehouse, Location, WarehouseStock
+from app.models import User, Warehouse, Location, WarehouseStock, AccountSet
 from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
 
 router = APIRouter(prefix="/api/warehouses", tags=["仓库管理"])
@@ -20,12 +20,21 @@ async def list_warehouses(include_virtual: bool = False, user: User = Depends(ge
     for loc in all_locs:
         locs_by_wh.setdefault(loc.warehouse_id, []).append(loc)
 
+    # 批量查询账套名称（避免 N+1）
+    as_ids = list(set(w.account_set_id for w in warehouses if w.account_set_id))
+    as_map = {}
+    if as_ids:
+        for a in await AccountSet.filter(id__in=as_ids):
+            as_map[a.id] = a.name
+
     result = []
     for w in warehouses:
         locs = locs_by_wh.get(w.id, [])
         result.append({
             "id": w.id, "name": w.name, "is_default": w.is_default,
             "is_virtual": w.is_virtual, "customer_id": w.customer_id,
+            "account_set_id": w.account_set_id,
+            "account_set_name": as_map.get(w.account_set_id) if w.account_set_id else None,
             "locations": [{"id": loc.id, "code": loc.code, "name": loc.name} for loc in locs]
         })
     return result

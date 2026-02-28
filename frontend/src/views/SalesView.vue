@@ -382,6 +382,16 @@
             </select>
           </div>
 
+          <!-- Account set -->
+          <div v-if="accountSets.length" class="mb-4">
+            <label class="label">财务账套（可选）</label>
+            <select v-model="orderConfirm.account_set_id" class="input text-sm">
+              <option :value="null">不指定</option>
+              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <div class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+          </div>
+
           <!-- Remark -->
           <div class="mb-4">
             <label class="label">订单备注（可选）</label>
@@ -414,6 +424,7 @@ import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
 import { getOrders, getOrder, createOrder } from '../api/orders'
 import { getWarehouses } from '../api/warehouses'
+import { getAccountSets } from '../api/accounting'
 import { fuzzyMatchAny } from '../utils/helpers'
 import { orderTypeNames, orderTypeBadges } from '../utils/constants'
 
@@ -436,6 +447,7 @@ const salespersons = computed(() => settingsStore.salespersons)
 const paymentMethods = computed(() => settingsStore.paymentMethods)
 
 // ---------- Local state ----------
+const accountSets = ref([])
 const productSearch = ref('')
 const showVirtualStock = ref(false)
 const virtualWarehouses = ref([])
@@ -469,7 +481,8 @@ const orderConfirm = ref({
   rebate_balance: 0,
   salesperson_id: '',
   remark: '',
-  payment_method: 'cash'
+  payment_method: 'cash',
+  account_set_id: null
 })
 
 // ---------- Computed ----------
@@ -767,6 +780,13 @@ const submitOrder = () => {
   const sp = salespersons.value.find(s => s.id === parseInt(saleForm.salesperson_id))
   const rebateBalance = customer?.rebate_balance || 0
 
+  // Auto-detect account_set from the first cart item's warehouse
+  let autoAccountSetId = null
+  if (cart.value.length > 0 && cart.value[0].warehouse_id) {
+    const firstWarehouse = warehouses.value.find(w => w.id === parseInt(cart.value[0].warehouse_id))
+    if (firstWarehouse?.account_set_id) autoAccountSetId = firstWarehouse.account_set_id
+  }
+
   orderConfirm.value = {
     items: cart.value.map(i => {
       const warehouse = warehouses.value.find(w => w.id === parseInt(i.warehouse_id))
@@ -790,7 +810,8 @@ const submitOrder = () => {
     salesperson_id: saleForm.salesperson_id || '',
     salesperson_name: sp?.name || '',
     remark: '',
-    payment_method: 'cash'
+    payment_method: 'cash',
+    account_set_id: autoAccountSetId
   }
 
   appStore.openModal('order_confirm', '确认提交订单')
@@ -837,7 +858,8 @@ const confirmSubmitOrder = async () => {
         location_id: i.location_id ? parseInt(i.location_id) : null,
         rebate_amount: useRebate && orderConfirm.value.items[idx]?.rebate_amount ? orderConfirm.value.items[idx].rebate_amount : null
       })),
-      remark: orderConfirm.value.remark || null
+      remark: orderConfirm.value.remark || null,
+      account_set_id: orderConfirm.value.account_set_id || null
     })
 
     let msg = '订单创建成功'
@@ -891,13 +913,17 @@ watch(() => saleForm.order_type, (newType, oldType) => {
 })
 
 // ---------- Init ----------
-onMounted(() => {
+onMounted(async () => {
   if (!products.value.length) productsStore.loadProducts()
   if (!warehouses.value.length) warehousesStore.loadWarehouses()
   if (!locations.value.length) warehousesStore.loadLocations()
   if (!customers.value.length) customersStore.loadCustomers()
   if (!salespersons.value.length) settingsStore.loadSalespersons()
   if (!paymentMethods.value.length) settingsStore.loadPaymentMethods()
+  try {
+    const { data } = await getAccountSets()
+    accountSets.value = data
+  } catch (e) { /* ignore */ }
 })
 
 onUnmounted(() => {

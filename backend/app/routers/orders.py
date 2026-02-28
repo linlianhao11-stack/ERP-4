@@ -40,7 +40,12 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             # 1. 校验关联实体
             customer, warehouse, salesperson, consignment_wh = await validate_order_entities(data)
 
-            # 2. 创建订单主记录
+            # 2. resolve account_set: 优先用 data.account_set_id，其次 warehouse.account_set_id
+            account_set_id = data.account_set_id
+            if not account_set_id and warehouse:
+                account_set_id = warehouse.account_set_id
+
+            # 3. 创建订单主记录
             is_cleared = data.order_type == "CASH" or (data.order_type == "RETURN" and data.refunded)
             shipping_status = "pending" if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT"] else "completed"
             order = await Order.create(
@@ -50,10 +55,11 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 refunded=data.refunded if data.order_type == "RETURN" else False,
                 remark=data.remark, salesperson=salesperson,
                 creator=user, is_cleared=is_cleared,
-                shipping_status=shipping_status
+                shipping_status=shipping_status,
+                account_set_id=account_set_id
             )
 
-            # 3. 创建订单行 + 库存处理
+            # 4. 创建订单行 + 库存处理
             # 批量预加载实体，避免 N+1 查询
             _product_ids = list(set(i.product_id for i in data.items))
             _warehouse_ids = list(set(

@@ -160,12 +160,19 @@ async def create_purchase_order(data: PurchaseOrderCreate, user: User = Depends(
         raise HTTPException(status_code=404, detail="供应商不存在")
 
     po_no = generate_order_no("PO")
+    # resolve account_set: 优先用 data.account_set_id，其次 warehouse.account_set_id
+    account_set_id = data.account_set_id
+    if not account_set_id and data.target_warehouse_id:
+        wh = await Warehouse.filter(id=data.target_warehouse_id).first()
+        if wh:
+            account_set_id = wh.account_set_id
     async with transactions.in_transaction():
         po = await PurchaseOrder.create(
             po_no=po_no, supplier=supplier, status="pending_review",
             target_warehouse_id=data.target_warehouse_id,
             target_location_id=data.target_location_id,
-            remark=data.remark, creator=user
+            remark=data.remark, creator=user,
+            account_set_id=account_set_id
         )
         total = Decimal("0")
         total_rebate = Decimal("0")

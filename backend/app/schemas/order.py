@@ -23,6 +23,7 @@ class OrderCreate(BaseModel):
     items: List[OrderItemRequest] = Field(min_length=1, max_length=100)
     remark: Optional[str] = Field(None, max_length=2000)
     rebate_amount: Optional[Decimal] = Field(default=None, ge=0)
+    account_set_id: Optional[int] = None
 
 class CancelItemAllocation(BaseModel):
     order_item_id: int
