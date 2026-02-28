@@ -4,10 +4,12 @@
       <span @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应付单</span>
       <span @click="sub = 'disbursements'" :class="['tab', sub === 'disbursements' ? 'active' : '']">付款单</span>
       <span @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">付款退款</span>
+      <span @click="sub = 'receipt'" :class="['tab', sub === 'receipt' ? 'active' : '']">入库单</span>
     </div>
     <PayableBillsTab v-if="sub === 'bills'" />
     <DisbursementBillsTab v-if="sub === 'disbursements'" />
     <DisbursementRefundBillsTab v-if="sub === 'refunds'" />
+    <PurchaseReceiptTab v-if="sub === 'receipt'" />
   </div>
 </template>
 
@@ -16,6 +18,7 @@ import { ref } from 'vue'
 import PayableBillsTab from './PayableBillsTab.vue'
 import DisbursementBillsTab from './DisbursementBillsTab.vue'
 import DisbursementRefundBillsTab from './DisbursementRefundBillsTab.vue'
+import PurchaseReceiptTab from './PurchaseReceiptTab.vue'
 
 const sub = ref('bills')
 </script>

@@ -93,3 +93,27 @@ export const confirmDisbursementRefundBill = (id) => api.post(`/payables/disburs
 
 export const generateApVouchers = (accountSetId, periodName) =>
   api.post('/payables/generate-ap-vouchers', null, { params: { account_set_id: accountSetId, period_name: periodName } })
+
+// ========== 出入库单 ==========
+export const getSalesDeliveries = (params) => api.get('/sales-delivery', { params })
+export const getSalesDelivery = (id) => api.get(`/sales-delivery/${id}`)
+export const getSalesDeliveryPdf = (id) => api.get(`/sales-delivery/${id}/pdf`, { responseType: 'blob' })
+export const batchSalesDeliveryPdf = (ids) => api.post('/sales-delivery/batch-pdf', { ids }, { responseType: 'blob' })
+
+export const getPurchaseReceipts = (params) => api.get('/purchase-receipt', { params })
+export const getPurchaseReceipt = (id) => api.get(`/purchase-receipt/${id}`)
+export const getPurchaseReceiptPdf = (id) => api.get(`/purchase-receipt/${id}/pdf`, { responseType: 'blob' })
+export const batchPurchaseReceiptPdf = (ids) => api.post('/purchase-receipt/batch-pdf', { ids }, { responseType: 'blob' })
+
+// ========== 发票管理 ==========
+export const getInvoices = (params) => api.get('/invoices', { params })
+export const getInvoice = (id) => api.get(`/invoices/${id}`)
+export const pushInvoiceFromReceivable = (data) => api.post('/invoices/from-receivable', data)
+export const createInputInvoice = (data) => api.post('/invoices', data)
+export const updateInvoice = (id, data) => api.put(`/invoices/${id}`, data)
+export const confirmInvoice = (id) => api.post(`/invoices/${id}/confirm`)
+export const cancelInvoice = (id) => api.post(`/invoices/${id}/cancel`)
+
+// ========== 凭证 PDF ==========
+export const getVoucherPdf = (id) => api.get(`/vouchers/${id}/pdf`, { responseType: 'blob' })
+export const batchVoucherPdf = (ids) => api.post('/vouchers/batch-pdf', { ids }, { responseType: 'blob' })
