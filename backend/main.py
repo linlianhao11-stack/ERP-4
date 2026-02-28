@@ -24,7 +24,8 @@ from app.routers import (
     settings, sn, product_brands, disbursement_methods,
     account_sets, chart_of_accounts, accounting_periods, vouchers,
     receivables, payables,
-    ledgers
+    ledgers,
+    sales_delivery, purchase_receipt, invoices,
 )
 
 
@@ -126,6 +127,9 @@ app.include_router(vouchers.router)
 app.include_router(receivables.router)
 app.include_router(payables.router)
 app.include_router(ledgers.router)
+app.include_router(sales_delivery.router)
+app.include_router(purchase_receipt.router)
+app.include_router(invoices.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
