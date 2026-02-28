@@ -34,6 +34,7 @@
       <span @click="tab = 'ledgers'" :class="['tab', tab === 'ledgers' ? 'active' : '']">账簿查询</span>
       <span @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</span>
       <span @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</span>
+      <span @click="tab = 'invoices'" :class="['tab', tab === 'invoices' ? 'active' : '']">发票管理</span>
     </div>
 
     <!-- 首次进入引导卡片（无账套） -->
@@ -59,6 +60,7 @@
       <LedgerPanel v-if="tab === 'ledgers'" />
       <ReceivablePanel v-if="tab === 'receivables'" />
       <PayablePanel v-if="tab === 'payables'" />
+      <InvoicePanel v-if="tab === 'invoices'" />
     </template>
 
     <!-- 账套管理弹窗 -->
@@ -207,6 +209,7 @@ import AccountingPeriodsPanel from '../components/business/AccountingPeriodsPane
 import LedgerPanel from '../components/business/LedgerPanel.vue'
 import ReceivablePanel from '../components/business/ReceivablePanel.vue'
 import PayablePanel from '../components/business/PayablePanel.vue'
+import InvoicePanel from '../components/business/InvoicePanel.vue'
 
 const accountingStore = useAccountingStore()
 const authStore = useAuthStore()
