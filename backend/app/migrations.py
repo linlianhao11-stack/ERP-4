@@ -78,6 +78,9 @@ async def run_migrations():
     # 性能索引
     await migrate_add_indexes()
 
+    # 供应商返利按账套隔离
+    await migrate_supplier_account_balance()
+
     logger.info("数据库初始化完成")
 
 
@@ -594,3 +597,74 @@ async def migrate_accounting_phase5():
             await admin.save()
             logger.info("admin 用户补充 period_end 权限")
     logger.info("阶段5迁移完成")
+
+
+async def migrate_supplier_account_balance():
+    """供应商返利按账套隔离迁移：新表 + RebateLog 新列 + 数据迁移 + 预置科目（幂等）"""
+    from tortoise import Tortoise
+    await Tortoise.generate_schemas(safe=True)
+
+    conn = connections.get("default")
+
+    # RebateLog 增加 account_set_id 列
+    rl_cols = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'rebate_logs'"
+    )
+    if "account_set_id" not in [c["name"] for c in rl_cols]:
+        await conn.execute_query(
+            "ALTER TABLE rebate_logs ADD COLUMN IF NOT EXISTS account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL"
+        )
+        logger.info("迁移: rebate_logs 表添加 account_set_id 列")
+
+    # 索引
+    sab_indexes = [
+        ("idx_supplier_account_balances_supplier", "supplier_account_balances", "supplier_id"),
+        ("idx_supplier_account_balances_account_set", "supplier_account_balances", "account_set_id"),
+        ("idx_rebate_logs_account_set", "rebate_logs", "account_set_id"),
+    ]
+    for name, table, columns in sab_indexes:
+        try:
+            await conn.execute_query(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+        except Exception as e:
+            logger.warning(f"创建索引 {name} 失败（可忽略）: {e}")
+
+    # 迁移现有余额数据到第一个活跃账套
+    from app.models.accounting import AccountSet, ChartOfAccount
+    from app.models.supplier_balance import SupplierAccountBalance
+
+    first_set = await AccountSet.filter(is_active=True).order_by("id").first()
+    if first_set:
+        # 查找有非零余额的供应商
+        rows = await conn.execute_query_dict(
+            "SELECT id, name, rebate_balance, credit_balance FROM suppliers "
+            "WHERE (rebate_balance > 0 OR credit_balance > 0)"
+        )
+        for row in rows:
+            exists = await SupplierAccountBalance.filter(
+                supplier_id=row["id"], account_set_id=first_set.id
+            ).exists()
+            if not exists:
+                await SupplierAccountBalance.create(
+                    supplier_id=row["id"],
+                    account_set_id=first_set.id,
+                    rebate_balance=row["rebate_balance"],
+                    credit_balance=row["credit_balance"],
+                )
+                logger.info(f"迁移: 供应商 {row['name']} 余额已迁移到账套 {first_set.name}")
+
+    # 确保凭证所需科目存在
+    for aset in await AccountSet.all():
+        if not await ChartOfAccount.filter(account_set_id=aset.id, code="5401").exists():
+            await ChartOfAccount.create(
+                account_set_id=aset.id, code="5401", name="主营业务成本",
+                level=1, category="cost", direction="debit", is_leaf=True
+            )
+            logger.info(f"账套 {aset.name} 创建科目 5401 主营业务成本")
+        if not await ChartOfAccount.filter(account_set_id=aset.id, code="2221").exists():
+            await ChartOfAccount.create(
+                account_set_id=aset.id, code="2221", name="应交税费",
+                level=1, category="liability", direction="credit", is_leaf=True
+            )
+            logger.info(f"账套 {aset.name} 创建科目 2221 应交税费")
+
+    logger.info("供应商返利账套隔离迁移完成")

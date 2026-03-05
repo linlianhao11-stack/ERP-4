@@ -11,6 +11,7 @@ class RebateLog(models.Model):
     reference_type = fields.CharField(max_length=30, null=True)
     reference_id = fields.IntField(null=True)
     remark = fields.TextField(null=True)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="rebate_logs", null=True, on_delete=fields.SET_NULL)
     creator = fields.ForeignKeyField("models.User", related_name="rebate_logs", on_delete=fields.RESTRICT)
     created_at = fields.DatetimeField(auto_now_add=True)
 
