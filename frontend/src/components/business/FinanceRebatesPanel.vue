@@ -1,10 +1,14 @@
 <template>
   <div class="card">
-    <div class="p-3 border-b flex items-center gap-2">
+    <div class="p-3 border-b flex items-center gap-2 flex-wrap">
       <span @click="rebateTab = 'customer'; loadRebateSummaryData('customer')" :class="['tab', rebateTab === 'customer' ? 'active' : '']">客户返利</span>
       <span @click="rebateTab = 'supplier'; loadRebateSummaryData('supplier')" :class="['tab', rebateTab === 'supplier' ? 'active' : '']">供应商返利</span>
+      <!-- 账套选择器（仅供应商tab） -->
+      <select v-if="rebateTab === 'supplier' && accountSets.length" v-model="selectedAccountSetId" class="input text-sm w-40 ml-2" @change="loadRebateSummaryData('supplier')">
+        <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
       <div class="flex-1"></div>
-      <button v-if="hasPermission('finance')" @click="openRebateChargeNew()" class="btn btn-primary btn-sm text-xs">新增充值</button>
+      <button v-if="hasPermission('finance_rebate')" @click="openRebateChargeNew()" class="btn btn-primary btn-sm text-xs">新增充值</button>
     </div>
     <!-- Desktop table -->
     <div class="hidden md:block overflow-x-auto table-container">
@@ -13,6 +17,7 @@
           <tr>
             <th class="px-3 py-2 text-left">{{ rebateTab === 'customer' ? '客户' : '供应商' }}名称</th>
             <th class="px-3 py-2 text-right">返利余额</th>
+            <th v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right">在账资金</th>
             <th class="px-3 py-2 text-center">操作</th>
           </tr>
         </thead>
@@ -20,8 +25,9 @@
           <tr v-for="item in rebateSummary" :key="item.id">
             <td class="px-3 py-2 font-medium">{{ item.name }}</td>
             <td class="px-3 py-2 text-right"><span :class="item.rebate_balance > 0 ? 'text-[#34c759] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.rebate_balance) }}</span></td>
+            <td v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right"><span :class="(item.credit_balance || 0) > 0 ? 'text-[#0071e3] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.credit_balance || 0) }}</span></td>
             <td class="px-3 py-2 text-center">
-              <button v-if="hasPermission('finance')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="text-xs text-[#0071e3] hover:underline mr-3">充值</button>
+              <button v-if="hasPermission('finance_rebate')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="text-xs text-[#0071e3] hover:underline mr-3">充值</button>
               <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="text-xs text-[#0071e3] hover:underline">明细</button>
             </td>
           </tr>
@@ -34,10 +40,13 @@
       <div v-for="item in rebateSummary" :key="item.id" class="p-3 bg-[#f5f5f7] rounded-lg">
         <div class="flex justify-between items-center mb-2">
           <span class="font-medium">{{ item.name }}</span>
-          <span :class="item.rebate_balance > 0 ? 'text-[#34c759] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.rebate_balance) }}</span>
+          <div class="text-right">
+            <div :class="item.rebate_balance > 0 ? 'text-[#34c759] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.rebate_balance) }}</div>
+            <div v-if="rebateTab === 'supplier' && (item.credit_balance || 0) > 0" class="text-xs text-[#0071e3]">在账: ¥{{ fmt(item.credit_balance) }}</div>
+          </div>
         </div>
         <div class="flex gap-2">
-          <button v-if="hasPermission('finance')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="btn btn-sm btn-primary text-xs flex-1">充值</button>
+          <button v-if="hasPermission('finance_rebate')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="btn btn-sm btn-primary text-xs flex-1">充值</button>
           <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="btn btn-sm btn-secondary text-xs flex-1">明细</button>
         </div>
       </div>
@@ -105,8 +114,8 @@
               <tbody class="divide-y">
                 <tr v-for="log in rebateLogs" :key="log.id">
                   <td class="px-2 py-1 text-xs text-[#86868b]">{{ fmtDate(log.created_at) }}</td>
-                  <td class="px-2 py-1 text-center"><span :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'" class="text-xs font-semibold">{{ log.type === 'charge' ? '充值' : log.type === 'refund' ? '退回' : log.type === 'use' ? '使用' : (log.type || '未知') }}</span></td>
-                  <td class="px-2 py-1 text-right font-semibold" :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ log.type === 'charge' || log.type === 'refund' ? '+' : '-' }}¥{{ fmt(log.amount) }}</td>
+                  <td class="px-2 py-1 text-center"><span :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'" class="text-xs font-semibold">{{ rebateTypeLabel(log.type) }}</span></td>
+                  <td class="px-2 py-1 text-right font-semibold" :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ log.type === 'charge' || log.type === 'refund' ? '+' : '-' }}¥{{ fmt(Math.abs(log.amount)) }}</td>
                   <td class="px-2 py-1 text-right">¥{{ fmt(log.balance_after) }}</td>
                   <td class="px-2 py-1 text-xs text-[#86868b]">{{ log.remark || '-' }}</td>
                 </tr>
@@ -124,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useAppStore } from '../../stores/app'
 import { useCustomersStore } from '../../stores/customers'
 import { useFormat } from '../../composables/useFormat'
@@ -132,6 +141,10 @@ import { usePermission } from '../../composables/usePermission'
 import { getRebateSummary, chargeRebate, getRebateLogs } from '../../api/rebates'
 
 const { hasPermission } = usePermission()
+
+const props = defineProps({
+  accountSets: { type: Array, default: () => [] }
+})
 
 const appStore = useAppStore()
 const customersStore = useCustomersStore()
@@ -141,6 +154,7 @@ const rebateTab = ref('customer')
 const submitting = ref(false)
 const rebateSummary = ref([])
 const rebateLogs = ref([])
+const selectedAccountSetId = ref(null)
 
 const showRebateChargeModal = ref(false)
 const showRebateDetailModal = ref(false)
@@ -155,9 +169,25 @@ const rebateChargeForm = reactive({
   remark: ''
 })
 
+const rebateTypeLabel = (type) => {
+  const map = { charge: '充值', refund: '退回', use: '使用', credit_charge: '退货转入', credit_use: '在账抵扣', credit_refund: '在账退款' }
+  return map[type] || type || '未知'
+}
+
+// 初始化默认账套
+watch(() => props.accountSets, (sets) => {
+  if (sets.length && !selectedAccountSetId.value) {
+    selectedAccountSetId.value = sets[0].id
+  }
+}, { immediate: true })
+
 const loadRebateSummaryData = async (targetType) => {
   try {
-    const { data } = await getRebateSummary({ target_type: targetType || rebateTab.value })
+    const params = { target_type: targetType || rebateTab.value }
+    if ((targetType || rebateTab.value) === 'supplier' && selectedAccountSetId.value) {
+      params.account_set_id = selectedAccountSetId.value
+    }
+    const { data } = await getRebateSummary(params)
     rebateSummary.value = data
   } catch (e) {
     console.error(e)
@@ -202,15 +232,23 @@ const handleChargeRebate = async () => {
     appStore.showToast('请输入充值金额', 'error')
     return
   }
+  if (rebateChargeForm.target_type === 'supplier' && !selectedAccountSetId.value) {
+    appStore.showToast('请先选择账套', 'error')
+    return
+  }
   if (submitting.value) return
   submitting.value = true
   try {
-    await chargeRebate({
+    const payload = {
       target_type: rebateChargeForm.target_type,
       target_id: rebateChargeForm.target_id,
       amount: rebateChargeForm.amount,
       remark: rebateChargeForm.remark || null
-    })
+    }
+    if (rebateChargeForm.target_type === 'supplier') {
+      payload.account_set_id = selectedAccountSetId.value
+    }
+    await chargeRebate(payload)
     appStore.showToast('充值成功')
     showRebateChargeModal.value = false
     loadRebateSummaryData(rebateChargeForm.target_type)
@@ -226,7 +264,11 @@ const viewRebateDetail = async (targetType, targetId, name) => {
   try {
     const item = rebateSummary.value.find(x => x.id === targetId)
     rebateDetailTarget.value = { name: name, balance: item?.rebate_balance || 0 }
-    const { data } = await getRebateLogs({ target_type: targetType, target_id: targetId })
+    const params = { target_type: targetType, target_id: targetId }
+    if (targetType === 'supplier' && selectedAccountSetId.value) {
+      params.account_set_id = selectedAccountSetId.value
+    }
+    const { data } = await getRebateLogs(params)
     rebateLogs.value = data
     showRebateDetailModal.value = true
   } catch (e) {

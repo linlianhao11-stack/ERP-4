@@ -4,8 +4,8 @@
     <div class="flex flex-wrap gap-2 mb-3 border-b pb-2">
       <span @click="financeTab = 'orders'" :class="['tab', financeTab === 'orders' ? 'active' : '']">订单明细</span>
       <span @click="financeTab = 'unpaid'" :class="['tab', financeTab === 'unpaid' ? 'active' : '']">欠款明细</span>
-      <span @click="financeTab = 'payments'" :class="['tab', financeTab === 'payments' ? 'active' : '']">应收管理</span>
-      <span v-if="hasPermission('purchase_pay')" @click="financeTab = 'payables'" :class="['tab', financeTab === 'payables' ? 'active' : '']">应付管理</span>
+      <span @click="financeTab = 'payments'" :class="['tab', financeTab === 'payments' ? 'active' : '']">收款管理</span>
+      <span v-if="hasPermission('purchase_pay') || hasPermission('finance_pay')" @click="financeTab = 'payables'" :class="['tab', financeTab === 'payables' ? 'active' : '']">付款管理</span>
       <span @click="financeTab = 'logs'" :class="['tab', financeTab === 'logs' ? 'active' : '']">出入库日志</span>
       <span @click="financeTab = 'rebates'" :class="['tab', financeTab === 'rebates' ? 'active' : '']">返利管理</span>
     </div>
@@ -30,6 +30,7 @@
     />
     <FinanceRebatesPanel
       v-if="financeTab === 'rebates'"
+      :accountSets="accountingStore.accountSets"
     />
   </div>
 </template>
@@ -38,6 +39,7 @@
 import { ref, nextTick, watch, onMounted } from 'vue'
 import { useCustomersStore } from '../stores/customers'
 import { useSettingsStore } from '../stores/settings'
+import { useAccountingStore } from '../stores/accounting'
 import { usePermission } from '../composables/usePermission'
 import FinanceOrdersPanel from '../components/business/FinanceOrdersPanel.vue'
 import FinancePaymentsPanel from '../components/business/FinancePaymentsPanel.vue'
@@ -47,6 +49,7 @@ import FinanceRebatesPanel from '../components/business/FinanceRebatesPanel.vue'
 
 const customersStore = useCustomersStore()
 const settingsStore = useSettingsStore()
+const accountingStore = useAccountingStore()
 const { hasPermission } = usePermission()
 
 const financeTab = ref('orders')
@@ -78,5 +81,6 @@ onMounted(() => {
   customersStore.loadCustomers()
   settingsStore.loadPaymentMethods()
   settingsStore.loadDisbursementMethods()
+  accountingStore.loadAccountSets()
 })
 </script>
