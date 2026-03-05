@@ -640,31 +640,37 @@ async def migrate_supplier_account_balance():
             "WHERE (rebate_balance > 0 OR credit_balance > 0)"
         )
         for row in rows:
-            exists = await SupplierAccountBalance.filter(
-                supplier_id=row["id"], account_set_id=first_set.id
-            ).exists()
-            if not exists:
-                await SupplierAccountBalance.create(
-                    supplier_id=row["id"],
-                    account_set_id=first_set.id,
-                    rebate_balance=row["rebate_balance"],
-                    credit_balance=row["credit_balance"],
-                )
+            result = await conn.execute_query(
+                "INSERT INTO supplier_account_balances (supplier_id, account_set_id, rebate_balance, credit_balance) "
+                "VALUES ($1, $2, $3, $4) ON CONFLICT (supplier_id, account_set_id) DO NOTHING",
+                [row["id"], first_set.id, row["rebate_balance"], row["credit_balance"]]
+            )
+            if result[0] > 0:
                 logger.info(f"迁移: 供应商 {row['name']} 余额已迁移到账套 {first_set.name}")
 
-    # 确保凭证所需科目存在
+    # 确保凭证所需科目存在（ON CONFLICT 防竞态）
     for aset in await AccountSet.all():
-        if not await ChartOfAccount.filter(account_set_id=aset.id, code="5401").exists():
-            await ChartOfAccount.create(
-                account_set_id=aset.id, code="5401", name="主营业务成本",
-                level=1, category="cost", direction="debit", is_leaf=True
+        try:
+            result = await conn.execute_query(
+                "INSERT INTO chart_of_accounts (account_set_id, code, name, level, category, direction, is_leaf) "
+                "VALUES ($1, '5401', '主营业务成本', 1, 'cost', 'debit', TRUE) "
+                "ON CONFLICT (account_set_id, code) DO NOTHING",
+                [aset.id]
             )
-            logger.info(f"账套 {aset.name} 创建科目 5401 主营业务成本")
-        if not await ChartOfAccount.filter(account_set_id=aset.id, code="2221").exists():
-            await ChartOfAccount.create(
-                account_set_id=aset.id, code="2221", name="应交税费",
-                level=1, category="liability", direction="credit", is_leaf=True
+            if result[0] > 0:
+                logger.info(f"账套 {aset.name} 创建科目 5401 主营业务成本")
+        except Exception as e:
+            logger.warning(f"创建科目 5401 失败（可忽略）: {e}")
+        try:
+            result = await conn.execute_query(
+                "INSERT INTO chart_of_accounts (account_set_id, code, name, level, category, direction, is_leaf) "
+                "VALUES ($1, '2221', '应交税费', 1, 'liability', 'credit', TRUE) "
+                "ON CONFLICT (account_set_id, code) DO NOTHING",
+                [aset.id]
             )
-            logger.info(f"账套 {aset.name} 创建科目 2221 应交税费")
+            if result[0] > 0:
+                logger.info(f"账套 {aset.name} 创建科目 2221 应交税费")
+        except Exception as e:
+            logger.warning(f"创建科目 2221 失败（可忽略）: {e}")
 
     logger.info("供应商返利账套隔离迁移完成")
