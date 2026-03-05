@@ -12,6 +12,7 @@ from app.models import (
     Order, OrderItem, WarehouseStock, StockLog, Payment,
     RebateLog
 )
+from app.models.customer_balance import CustomerAccountBalance
 from app.services.stock_service import (
     get_or_create_consignment_warehouse, update_weighted_entry_date,
     get_product_weighted_cost
@@ -226,10 +227,7 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
 
 
 async def process_rebate_deduction(data, customer, order, order_no, user):
-    """
-    处理返利扣减。若订单使用了返利，校验余额并扣减。
-    返回 total_rebate 金额。
-    """
+    """处理返利扣减。若订单使用了返利，校验余额并扣减。"""
     total_rebate = sum(
         Decimal(str(it.rebate_amount)) if it.rebate_amount else Decimal("0")
         for it in data.items
@@ -237,20 +235,29 @@ async def process_rebate_deduction(data, customer, order, order_no, user):
     if total_rebate > 0 and data.order_type != "RETURN":
         if not customer:
             raise HTTPException(status_code=400, detail="使用返利需要选择客户")
-        customer = await Customer.filter(id=customer.id).select_for_update().first()
-        if customer.rebate_balance < total_rebate:
+        account_set_id = getattr(order, 'account_set_id', None)
+        if not account_set_id:
+            raise HTTPException(status_code=400, detail="使用返利需要指定账套")
+        bal = await CustomerAccountBalance.filter(
+            customer_id=customer.id, account_set_id=account_set_id
+        ).select_for_update().first()
+        current_balance = bal.rebate_balance if bal else Decimal("0")
+        if current_balance < total_rebate:
             raise HTTPException(status_code=400,
-                detail=f"客户返利余额不足，可用 ¥{float(customer.rebate_balance):.2f}，"
+                detail=f"客户返利余额不足，可用 ¥{float(current_balance):.2f}，"
                        f"需要 ¥{float(total_rebate):.2f}")
-        await Customer.filter(id=customer.id).update(rebate_balance=F('rebate_balance') - total_rebate)
-        await customer.refresh_from_db()
+        await CustomerAccountBalance.filter(id=bal.id).update(
+            rebate_balance=F('rebate_balance') - total_rebate
+        )
+        await bal.refresh_from_db()
         order.rebate_used = total_rebate
         rebate_remark = f"[返利抵扣] 使用返利 ¥{float(total_rebate):.2f}"
         order.remark = f"{order.remark}\n{rebate_remark}" if order.remark else rebate_remark
         await RebateLog.create(
             target_type="customer", target_id=customer.id,
             type="use", amount=total_rebate,
-            balance_after=customer.rebate_balance,
+            balance_after=bal.rebate_balance,
+            account_set_id=account_set_id,
             reference_type="ORDER", reference_id=order.id,
             remark=f"销售订单 {order_no} 使用返利", creator=user
         )
@@ -306,12 +313,12 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
 
     # CASH 订单创建收款记录
     if data.order_type == "CASH" and customer:
-        actual_pay = abs(float(total_amount)) - float(credit_used)
+        actual_pay = abs(Decimal(str(total_amount))) - Decimal(str(credit_used))
         if actual_pay > 0:
             pay_no = generate_order_no("PAY")
             await Payment.create(
                 payment_no=pay_no, customer=customer, order=order,
-                amount=Decimal(str(actual_pay)),
+                amount=actual_pay,
                 payment_method=data.payment_method or "cash",
                 source="CASH", is_confirmed=False,
                 remark=f"现款销售 {order_no}", creator=user,
