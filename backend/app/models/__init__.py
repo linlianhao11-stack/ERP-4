@@ -24,6 +24,7 @@ from app.models.delivery import (
 )
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.supplier_balance import SupplierAccountBalance
+from app.models.customer_balance import CustomerAccountBalance
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
@@ -37,4 +38,5 @@ __all__ = [
     "SalesDeliveryBill", "SalesDeliveryItem", "PurchaseReceiptBill", "PurchaseReceiptItem",
     "Invoice", "InvoiceItem",
     "SupplierAccountBalance",
+    "CustomerAccountBalance",
 ]
