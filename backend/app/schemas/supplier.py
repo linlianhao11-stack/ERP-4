@@ -13,4 +13,5 @@ class SupplierRequest(BaseModel):
 
 class CreditRefundRequest(BaseModel):
     amount: Decimal = Field(gt=0)
+    account_set_id: Optional[int] = None
     remark: Optional[str] = None

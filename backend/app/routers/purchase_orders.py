@@ -12,18 +12,22 @@ from tortoise.expressions import F
 from tortoise.queryset import Q
 
 from app.auth.dependencies import require_permission
+from app.logger import get_logger
 from app.utils.csv import csv_safe
 from app.models import (
     User, Product, Warehouse, Location, Supplier,
-    PurchaseOrder, PurchaseOrderItem, WarehouseStock, StockLog, RebateLog
+    PurchaseOrder, PurchaseOrderItem, WarehouseStock, StockLog, RebateLog, SnConfig
 )
+from app.models.supplier_balance import SupplierAccountBalance
 from app.schemas.purchase import PurchaseOrderCreate, PurchaseReturnRequest, ReceiveRequest, PurchasePayRequest
 from app.services.operation_log_service import log_operation
 from app.services.stock_service import update_weighted_entry_date, get_product_weighted_cost
-from app.services.sn_service import check_sn_required, validate_and_add_sn_codes
+from app.services.sn_service import validate_and_add_sn_codes
 from app.utils.generators import generate_order_no
 from app.utils.time import now
 from app.utils.errors import parse_date
+
+logger = get_logger("purchase_orders")
 
 router = APIRouter(prefix="/api/purchase-orders", tags=["采购管理"])
 
@@ -91,7 +95,7 @@ async def export_purchase_orders(
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
     if search:
         query = query.filter(Q(po_no__icontains=search) | Q(supplier__name__icontains=search))
-    orders = await query.order_by("-created_at").select_related(
+    orders = await query.order_by("-created_at").limit(10000).select_related(
         "supplier", "creator", "paid_by", "reviewed_by", "target_warehouse", "target_location")
 
     status_names = {
@@ -206,38 +210,48 @@ async def create_purchase_order(data: PurchaseOrderCreate, user: User = Depends(
             )
             total += amount
         if total_rebate > 0:
-            # Use select_for_update to prevent TOCTOU on supplier rebate balance
-            supplier = await Supplier.filter(id=supplier.id).select_for_update().first()
-            if supplier.rebate_balance < total_rebate:
-                raise HTTPException(status_code=400, detail=f"供应商返利余额不足，可用 ¥{float(supplier.rebate_balance):.2f}，需要 ¥{float(total_rebate):.2f}")
-            await Supplier.filter(id=supplier.id).update(rebate_balance=F('rebate_balance') - total_rebate)
-            await supplier.refresh_from_db()
+            if not account_set_id:
+                raise HTTPException(status_code=400, detail="使用返利抵扣时必须选择财务账套")
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=supplier.id, account_set_id=account_set_id
+            ).select_for_update().first()
+            if not bal or bal.rebate_balance < total_rebate:
+                available = float(bal.rebate_balance) if bal else 0
+                raise HTTPException(status_code=400, detail=f"供应商返利余额不足，可用 ¥{available:.2f}，需要 ¥{float(total_rebate):.2f}")
+            await SupplierAccountBalance.filter(id=bal.id).update(rebate_balance=F('rebate_balance') - total_rebate)
+            await bal.refresh_from_db()
             po.rebate_used = total_rebate
             rebate_remark = f"[返利抵扣] 使用返利 ¥{float(total_rebate):.2f}"
             po.remark = f"{po.remark}\n{rebate_remark}" if po.remark else rebate_remark
             await RebateLog.create(
                 target_type="supplier", target_id=supplier.id,
                 type="use", amount=total_rebate,
-                balance_after=supplier.rebate_balance,
+                balance_after=bal.rebate_balance,
+                account_set_id=account_set_id,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"采购单 {po_no} 使用返利", creator=user
             )
         # 在账资金抵扣
         credit_amount = Decimal(str(data.credit_amount)) if data.credit_amount else Decimal("0")
         if credit_amount > 0:
-            # Use select_for_update to prevent TOCTOU on supplier credit balance
-            supplier = await Supplier.filter(id=supplier.id).select_for_update().first()
-            if supplier.credit_balance < credit_amount:
-                raise HTTPException(status_code=400, detail=f"供应商在账资金不足，可用 ¥{float(supplier.credit_balance):.2f}，需要 ¥{float(credit_amount):.2f}")
-            await Supplier.filter(id=supplier.id).update(credit_balance=F('credit_balance') - credit_amount)
-            await supplier.refresh_from_db()
+            if not account_set_id:
+                raise HTTPException(status_code=400, detail="使用在账资金时必须选择财务账套")
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=supplier.id, account_set_id=account_set_id
+            ).select_for_update().first()
+            if not bal or bal.credit_balance < credit_amount:
+                available = float(bal.credit_balance) if bal else 0
+                raise HTTPException(status_code=400, detail=f"供应商在账资金不足，可用 ¥{available:.2f}，需要 ¥{float(credit_amount):.2f}")
+            await SupplierAccountBalance.filter(id=bal.id).update(credit_balance=F('credit_balance') - credit_amount)
+            await bal.refresh_from_db()
             po.credit_used = credit_amount
             credit_remark = f"[在账资金抵扣] 使用在账资金 ¥{float(credit_amount):.2f}"
             po.remark = f"{po.remark}\n{credit_remark}" if po.remark else credit_remark
             await RebateLog.create(
                 target_type="supplier", target_id=supplier.id,
                 type="credit_use", amount=-credit_amount,
-                balance_after=supplier.credit_balance,
+                balance_after=bal.credit_balance,
+                account_set_id=account_set_id,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"采购单 {po_no} 使用在账资金", creator=user
             )
@@ -341,72 +355,91 @@ async def get_purchase_order(po_id: int, user: User = Depends(require_permission
 
 
 @router.post("/{po_id}/pay")
-async def confirm_purchase_payment(po_id: int, data: PurchasePayRequest = PurchasePayRequest(), user: User = Depends(require_permission("purchase_pay"))):
-    po = await PurchaseOrder.filter(id=po_id).select_related("supplier").first()
-    if not po:
-        raise HTTPException(status_code=404, detail="采购订单不存在")
-    if po.status != "pending":
-        raise HTTPException(status_code=400, detail="该采购单不是待付款状态")
-    po.status = "paid"
-    po.payment_method = data.payment_method
-    po.paid_by = user
-    po.paid_at = now()
-    await po.save()
+async def confirm_purchase_payment(po_id: int, data: PurchasePayRequest = PurchasePayRequest(), user: User = Depends(require_permission("purchase_pay", "finance_pay"))):
+    async with transactions.in_transaction():
+        po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
+        if not po:
+            raise HTTPException(status_code=404, detail="采购订单不存在")
+        if po.status != "pending":
+            raise HTTPException(status_code=400, detail="该采购单不是待付款状态")
+        await po.fetch_related("supplier")
+        po.status = "paid"
+        po.payment_method = data.payment_method
+        po.paid_by = user
+        po.paid_at = now()
+        await po.save()
 
-    # 钩子：采购付款 → 自动生成付款单
-    if getattr(po, "account_set_id", None):
-        try:
-            from app.services.ap_service import create_disbursement_for_po_payment
-            from app.models.ar_ap import PayableBill
-            payable = await PayableBill.filter(
-                account_set_id=po.account_set_id, purchase_order_id=po.id
-            ).first()
-            await create_disbursement_for_po_payment(
-                account_set_id=po.account_set_id,
-                supplier_id=po.supplier_id,
-                payable_bill=payable,
-                amount=po.total_amount,
-                disbursement_method=data.payment_method or "对公转账",
-                creator=user,
-            )
-        except Exception as e:
-            from app.logger import get_logger as _gl
-            _gl("purchase_orders").warning(f"自动生成付款单失败: {e}")
+        # 钩子：采购付款 → 自动生成付款单 + 含返利凭证
+        if getattr(po, "account_set_id", None):
+            disbursement_bill = None
+            try:
+                from app.services.ap_service import create_disbursement_for_po_payment
+                from app.models.ar_ap import PayableBill
+                payable = await PayableBill.filter(
+                    account_set_id=po.account_set_id, purchase_order_id=po.id
+                ).first()
+                disbursement_bill = await create_disbursement_for_po_payment(
+                    account_set_id=po.account_set_id,
+                    supplier_id=po.supplier_id,
+                    payable_bill=payable,
+                    amount=po.total_amount,
+                    disbursement_method=data.payment_method or "对公转账",
+                    creator=user,
+                )
+            except Exception as e:
+                logger.warning(f"自动生成付款单失败: {e}")
 
-    await log_operation(user, "PURCHASE_PAY", "PURCHASE_ORDER", po.id,
-        f"确认付款 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
+            # 含返利的凭证生成
+            if po.rebate_used and po.rebate_used > 0:
+                try:
+                    from app.services.ap_service import create_rebate_payment_voucher
+                    await create_rebate_payment_voucher(
+                        account_set_id=po.account_set_id,
+                        po=po,
+                        disbursement_bill=disbursement_bill,
+                        creator=user,
+                    )
+                except Exception as e:
+                    logger.warning(f"生成返利凭证失败: {e}")
+
+        await log_operation(user, "PURCHASE_PAY", "PURCHASE_ORDER", po.id,
+            f"确认付款 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
     return {"message": "付款确认成功"}
 
 
 @router.post("/{po_id}/approve")
 async def approve_purchase_order(po_id: int, user: User = Depends(require_permission("purchase_approve"))):
-    po = await PurchaseOrder.filter(id=po_id).select_related("supplier").first()
-    if not po:
-        raise HTTPException(status_code=404, detail="采购订单不存在")
-    if po.status != "pending_review":
-        raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
-    po.status = "pending"
-    po.reviewed_by = user
-    po.reviewed_at = now()
-    await po.save()
-    await log_operation(user, "PURCHASE_APPROVE", "PURCHASE_ORDER", po.id,
-        f"审核通过采购单 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
+    async with transactions.in_transaction():
+        po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
+        if not po:
+            raise HTTPException(status_code=404, detail="采购订单不存在")
+        if po.status != "pending_review":
+            raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
+        await po.fetch_related("supplier")
+        po.status = "pending"
+        po.reviewed_by = user
+        po.reviewed_at = now()
+        await po.save()
+        await log_operation(user, "PURCHASE_APPROVE", "PURCHASE_ORDER", po.id,
+            f"审核通过采购单 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
     return {"message": "审核通过"}
 
 
 @router.post("/{po_id}/reject")
 async def reject_purchase_order(po_id: int, user: User = Depends(require_permission("purchase_approve"))):
-    po = await PurchaseOrder.filter(id=po_id).select_related("supplier").first()
-    if not po:
-        raise HTTPException(status_code=404, detail="采购订单不存在")
-    if po.status != "pending_review":
-        raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
-    po.status = "rejected"
-    po.reviewed_by = user
-    po.reviewed_at = now()
-    await po.save()
-    await log_operation(user, "PURCHASE_REJECT", "PURCHASE_ORDER", po.id,
-        f"拒绝采购单 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
+    async with transactions.in_transaction():
+        po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
+        if not po:
+            raise HTTPException(status_code=404, detail="采购订单不存在")
+        if po.status != "pending_review":
+            raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
+        await po.fetch_related("supplier")
+        po.status = "rejected"
+        po.reviewed_by = user
+        po.reviewed_at = now()
+        await po.save()
+        await log_operation(user, "PURCHASE_REJECT", "PURCHASE_ORDER", po.id,
+            f"拒绝采购单 {po.po_no}，供应商 {po.supplier.name}，金额 ¥{float(po.total_amount):.2f}")
     return {"message": "已拒绝"}
 
 
@@ -421,24 +454,46 @@ async def cancel_purchase_order(po_id: int, user: User = Depends(require_permiss
         # Load supplier relation
         await po.fetch_related("supplier")
         # 退还返利
-        if po.rebate_used and po.rebate_used > 0:
-            await Supplier.filter(id=po.supplier_id).update(rebate_balance=F('rebate_balance') + po.rebate_used)
-            supplier = await Supplier.filter(id=po.supplier_id).first()
+        if po.rebate_used and po.rebate_used > 0 and po.account_set_id:
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=po.supplier_id, account_set_id=po.account_set_id
+            ).first()
+            if not bal:
+                bal = await SupplierAccountBalance.create(
+                    supplier_id=po.supplier_id, account_set_id=po.account_set_id,
+                    rebate_balance=0, credit_balance=0
+                )
+            await SupplierAccountBalance.filter(id=bal.id).update(
+                rebate_balance=F('rebate_balance') + po.rebate_used
+            )
+            await bal.refresh_from_db()
             await RebateLog.create(
                 target_type="supplier", target_id=po.supplier_id,
                 type="refund", amount=po.rebate_used,
-                balance_after=supplier.rebate_balance,
+                balance_after=bal.rebate_balance,
+                account_set_id=po.account_set_id,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"取消采购单 {po.po_no} 退还返利", creator=user
             )
         # 退还在账资金
-        if po.credit_used and po.credit_used > 0:
-            await Supplier.filter(id=po.supplier_id).update(credit_balance=F('credit_balance') + po.credit_used)
-            supplier = await Supplier.filter(id=po.supplier_id).first()
+        if po.credit_used and po.credit_used > 0 and po.account_set_id:
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=po.supplier_id, account_set_id=po.account_set_id
+            ).first()
+            if not bal:
+                bal = await SupplierAccountBalance.create(
+                    supplier_id=po.supplier_id, account_set_id=po.account_set_id,
+                    rebate_balance=0, credit_balance=0
+                )
+            await SupplierAccountBalance.filter(id=bal.id).update(
+                credit_balance=F('credit_balance') + po.credit_used
+            )
+            await bal.refresh_from_db()
             await RebateLog.create(
                 target_type="supplier", target_id=po.supplier_id,
                 type="credit_refund", amount=po.credit_used,
-                balance_after=supplier.credit_balance,
+                balance_after=bal.credit_balance,
+                account_set_id=po.account_set_id,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"取消采购单 {po.po_no} 退还在账资金", creator=user
             )
@@ -460,10 +515,41 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
 
     async with transactions.in_transaction():
         received_details = []
+
+        # --- 批量预加载只读数据，消除 N+1 ---
+        item_ids = [r.item_id for r in data.items if r.receive_quantity > 0]
+        pois = await PurchaseOrderItem.filter(id__in=item_ids, purchase_order_id=po.id).select_related("product").all()
+        poi_map = {p.id: p for p in pois}
+
+        # 收集所有需要的仓库/仓位 ID
+        wh_ids = set()
+        loc_ids = set()
         for recv_item in data.items:
             if recv_item.receive_quantity <= 0:
                 continue
-            poi = await PurchaseOrderItem.filter(id=recv_item.item_id, purchase_order_id=po.id).select_related("product").first()
+            poi = poi_map.get(recv_item.item_id)
+            if poi:
+                wh_id = recv_item.warehouse_id or poi.target_warehouse_id or po.target_warehouse_id
+                loc_id = recv_item.location_id or poi.target_location_id or po.target_location_id
+                if wh_id:
+                    wh_ids.add(wh_id)
+                if loc_id:
+                    loc_ids.add(loc_id)
+
+        warehouses = await Warehouse.filter(id__in=list(wh_ids), is_active=True, is_virtual=False).all() if wh_ids else []
+        wh_map = {w.id: w for w in warehouses}
+        locations = await Location.filter(id__in=list(loc_ids), is_active=True).all() if loc_ids else []
+        loc_map = {l.id: l for l in locations}
+
+        # 批量预加载 SN 配置
+        sn_configs = await SnConfig.filter(warehouse_id__in=list(wh_ids), is_active=True).all() if wh_ids else []
+        sn_config_set = {(sc.warehouse_id, sc.brand) for sc in sn_configs}
+        # --- 预加载结束 ---
+
+        for recv_item in data.items:
+            if recv_item.receive_quantity <= 0:
+                continue
+            poi = poi_map.get(recv_item.item_id)
             if not poi:
                 raise HTTPException(status_code=404, detail=f"采购明细 {recv_item.item_id} 不存在")
             pending = poi.quantity - poi.received_quantity
@@ -475,10 +561,10 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             if not wh_id or not loc_id:
                 raise HTTPException(status_code=400, detail=f"{poi.product.name} 缺少目标仓库或仓位")
 
-            warehouse = await Warehouse.filter(id=wh_id, is_active=True, is_virtual=False).first()
+            warehouse = wh_map.get(wh_id)
             if not warehouse:
                 raise HTTPException(status_code=404, detail="目标仓库不存在")
-            location = await Location.filter(id=loc_id, is_active=True).first()
+            location = loc_map.get(loc_id)
             if not location:
                 raise HTTPException(status_code=404, detail="目标仓位不存在")
             if location.warehouse_id != wh_id:
@@ -487,7 +573,9 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             # 成本价 = 实际付款金额(已扣返利) / 数量，反映真实资金成本
             cost_price = poi.amount / poi.quantity if poi.quantity > 0 else poi.tax_inclusive_price
 
-            sn_required = await check_sn_required(wh_id, poi.product_id)
+            # SN 检查：用预加载的 sn_config_set 替代逐条查询
+            product_brand = poi.product.brand if poi.product else None
+            sn_required = bool(product_brand and (wh_id, product_brand) in sn_config_set)
             if sn_required and not recv_item.sn_codes:
                 raise HTTPException(status_code=400, detail=f"{poi.product.name} 已启用SN管理，收货时必须填写SN码")
             if sn_required and recv_item.sn_codes:
@@ -531,23 +619,27 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             po.status = "partial"
         await po.save()
 
-        # 钩子：采购收货 → 自动生成应付单
+        # 钩子：采购收货 → 自动生成/更新应付单
         if getattr(po, "account_set_id", None):
             try:
                 from app.services.ap_service import create_payable_bill
                 from app.models.ar_ap import PayableBill as PB
-                exists = await PB.filter(
-                    account_set_id=po.account_set_id, purchase_order_id=po.id
-                ).exists()
-                if not exists:
-                    received_items = await PurchaseOrderItem.filter(
-                        purchase_order_id=po.id, received_quantity__gt=0
-                    ).all()
-                    received_total = sum(
-                        (it.amount / it.quantity * it.received_quantity).quantize(Decimal("0.01"))
-                        for it in received_items if it.quantity > 0
-                    )
-                    if received_total > 0:
+                received_items = await PurchaseOrderItem.filter(
+                    purchase_order_id=po.id, received_quantity__gt=0
+                ).all()
+                received_total = sum(
+                    (it.amount / it.quantity * it.received_quantity).quantize(Decimal("0.01"))
+                    for it in received_items if it.quantity > 0
+                )
+                if received_total > 0:
+                    exists_pb = await PB.filter(
+                        account_set_id=po.account_set_id, purchase_order_id=po.id
+                    ).first()
+                    if exists_pb:
+                        exists_pb.total_amount = received_total
+                        exists_pb.unpaid_amount = received_total - exists_pb.paid_amount
+                        await exists_pb.save()
+                    else:
                         await create_payable_bill(
                             account_set_id=po.account_set_id,
                             supplier_id=po.supplier_id,
@@ -557,8 +649,8 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
                             creator=user,
                         )
             except Exception as e:
-                from app.logger import get_logger as _gl
-                _gl("purchase_orders").warning(f"自动生成应付单失败: {e}")
+                logger.error(f"自动生成应付单失败: {e}")
+                raise HTTPException(status_code=500, detail=f"收货成功但财务单据生成失败: {e}")
 
             # 钩子：采购收货 → 自动生成入库单
             try:
@@ -593,8 +685,7 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
                             creator=user,
                         )
             except Exception as e:
-                from app.logger import get_logger as _gl2
-                _gl2("purchase_orders").warning(f"自动生成入库单失败: {e}")
+                logger.warning(f"自动生成入库单失败: {e}")
 
         await log_operation(user, "PURCHASE_RECEIVE", "PURCHASE_ORDER", po.id,
             f"采购收货 {po.po_no}，{', '.join(received_details)}，状态→{po.status}")
@@ -679,14 +770,24 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
         await po.save()
 
         # 未退款时增加供应商在账资金
-        if not data.is_refunded:
-            supplier = po.supplier
-            await Supplier.filter(id=supplier.id).update(credit_balance=F('credit_balance') + total_return_amount)
-            await supplier.refresh_from_db()
+        if not data.is_refunded and po.account_set_id:
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=po.supplier_id, account_set_id=po.account_set_id
+            ).first()
+            if not bal:
+                bal = await SupplierAccountBalance.create(
+                    supplier_id=po.supplier_id, account_set_id=po.account_set_id,
+                    rebate_balance=0, credit_balance=0
+                )
+            await SupplierAccountBalance.filter(id=bal.id).update(
+                credit_balance=F('credit_balance') + total_return_amount
+            )
+            await bal.refresh_from_db()
             await RebateLog.create(
-                target_type="supplier", target_id=supplier.id,
+                target_type="supplier", target_id=po.supplier_id,
                 type="credit_charge", amount=total_return_amount,
-                balance_after=supplier.credit_balance,
+                balance_after=bal.credit_balance,
+                account_set_id=po.account_set_id,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"采购退货 {po.po_no}，退货金额 ¥{float(total_return_amount):.2f} 转为在账资金",
                 creator=user

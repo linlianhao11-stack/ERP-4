@@ -5,6 +5,7 @@ from tortoise.expressions import F
 
 from app.auth.dependencies import require_permission
 from app.models import User, Customer, Supplier, RebateLog
+from app.models.supplier_balance import SupplierAccountBalance
 from app.schemas.rebate import RebateChargeRequest
 from app.services.operation_log_service import log_operation
 
@@ -12,22 +13,35 @@ router = APIRouter(prefix="/api/rebates", tags=["返利管理"])
 
 
 @router.get("/summary")
-async def get_rebate_summary(target_type: str, user: User = Depends(require_permission("finance"))):
+async def get_rebate_summary(target_type: str, account_set_id: int = None, user: User = Depends(require_permission("finance"))):
     """返利汇总"""
     if target_type == "customer":
         items = await Customer.filter(is_active=True).order_by("name")
         return [{"id": c.id, "name": c.name, "rebate_balance": float(c.rebate_balance)} for c in items]
     elif target_type == "supplier":
-        items = await Supplier.filter(is_active=True).order_by("-created_at")
-        return [{"id": s.id, "name": s.name, "rebate_balance": float(s.rebate_balance)} for s in items]
+        if not account_set_id:
+            raise HTTPException(status_code=400, detail="供应商返利需要指定账套")
+        balances = await SupplierAccountBalance.filter(
+            account_set_id=account_set_id
+        ).all()
+        balance_map = {b.supplier_id: b for b in balances}
+        suppliers = await Supplier.filter(is_active=True).order_by("-created_at")
+        return [{
+            "id": s.id, "name": s.name,
+            "rebate_balance": float(balance_map[s.id].rebate_balance) if s.id in balance_map else 0,
+            "credit_balance": float(balance_map[s.id].credit_balance) if s.id in balance_map else 0,
+        } for s in suppliers]
     else:
         raise HTTPException(status_code=400, detail="target_type 必须是 customer 或 supplier")
 
 
 @router.get("/logs")
-async def get_rebate_logs(target_type: str, target_id: int, user: User = Depends(require_permission("finance"))):
+async def get_rebate_logs(target_type: str, target_id: int, account_set_id: int = None, user: User = Depends(require_permission("finance"))):
     """返利流水明细"""
-    logs = await RebateLog.filter(target_type=target_type, target_id=target_id).order_by("-created_at").select_related("creator")
+    query = RebateLog.filter(target_type=target_type, target_id=target_id)
+    if account_set_id:
+        query = query.filter(account_set_id=account_set_id)
+    logs = await query.order_by("-created_at").select_related("creator")
     return [{
         "id": l.id, "type": l.type, "amount": float(l.amount),
         "balance_after": float(l.balance_after),
@@ -39,7 +53,7 @@ async def get_rebate_logs(target_type: str, target_id: int, user: User = Depends
 
 
 @router.post("/charge")
-async def charge_rebate(data: RebateChargeRequest, user: User = Depends(require_permission("finance"))):
+async def charge_rebate(data: RebateChargeRequest, user: User = Depends(require_permission("finance_rebate"))):
     """返利充值"""
     if data.amount <= 0:
         raise HTTPException(status_code=400, detail="充值金额必须大于0")
@@ -51,22 +65,39 @@ async def charge_rebate(data: RebateChargeRequest, user: User = Depends(require_
             await Customer.filter(id=data.target_id).update(rebate_balance=F('rebate_balance') + data.amount)
             await target.refresh_from_db()
             target_name = target.name
+            balance_after = target.rebate_balance
+            account_set_id = None
         elif data.target_type == "supplier":
+            if not data.account_set_id:
+                raise HTTPException(status_code=400, detail="供应商返利充值需要指定账套")
             target = await Supplier.filter(id=data.target_id, is_active=True).first()
             if not target:
                 raise HTTPException(status_code=404, detail="供应商不存在")
-            await Supplier.filter(id=data.target_id).update(rebate_balance=F('rebate_balance') + data.amount)
-            await target.refresh_from_db()
             target_name = target.name
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=data.target_id, account_set_id=data.account_set_id
+            ).first()
+            if not bal:
+                bal = await SupplierAccountBalance.create(
+                    supplier_id=data.target_id, account_set_id=data.account_set_id,
+                    rebate_balance=0, credit_balance=0
+                )
+            await SupplierAccountBalance.filter(id=bal.id).update(
+                rebate_balance=F('rebate_balance') + data.amount
+            )
+            await bal.refresh_from_db()
+            balance_after = bal.rebate_balance
+            account_set_id = data.account_set_id
         else:
             raise HTTPException(status_code=400, detail="target_type 必须是 customer 或 supplier")
 
         await RebateLog.create(
             target_type=data.target_type, target_id=data.target_id,
             type="charge", amount=data.amount,
-            balance_after=target.rebate_balance,
+            balance_after=balance_after,
+            account_set_id=account_set_id,
             remark=data.remark, creator=user
         )
         await log_operation(user, "REBATE_CHARGE", data.target_type.upper(), data.target_id,
-            f"返利充值 {target_name} ¥{float(data.amount):.2f}，余额 ¥{float(target.rebate_balance):.2f}")
-    return {"message": "充值成功", "balance": float(target.rebate_balance)}
+            f"返利充值 {target_name} ¥{float(data.amount):.2f}，余额 ¥{float(balance_after):.2f}")
+    return {"message": "充值成功", "balance": float(balance_after)}

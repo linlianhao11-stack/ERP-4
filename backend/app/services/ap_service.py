@@ -1,6 +1,7 @@
 """应付服务层"""
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from tortoise import transactions
@@ -52,29 +53,28 @@ async def create_disbursement_for_po_payment(
     disbursement_method: str,
     creator=None,
 ) -> DisbursementBill:
-    db = await DisbursementBill.create(
-        bill_no=generate_order_no("FK"),
-        account_set_id=account_set_id,
-        supplier_id=supplier_id,
-        payable_bill=payable_bill,
-        disbursement_date=date.today(),
-        amount=amount,
-        disbursement_method=disbursement_method,
-        status="confirmed",
-        confirmed_by=creator,
-        confirmed_at=datetime.now(timezone.utc),
-        creator=creator,
-    )
+    async with transactions.in_transaction():
+        db = await DisbursementBill.create(
+            bill_no=generate_order_no("FK"),
+            account_set_id=account_set_id,
+            supplier_id=supplier_id,
+            payable_bill=payable_bill,
+            disbursement_date=date.today(),
+            amount=amount,
+            disbursement_method=disbursement_method,
+            status="confirmed",
+            confirmed_by=creator,
+            confirmed_at=datetime.now(timezone.utc),
+            creator=creator,
+        )
 
-    # 更新关联应付单
-    if payable_bill:
-        payable_bill.paid_amount += amount
-        payable_bill.unpaid_amount = payable_bill.total_amount - payable_bill.paid_amount
-        if payable_bill.unpaid_amount <= 0:
-            payable_bill.status = "completed"
-        else:
-            payable_bill.status = "partial"
-        await payable_bill.save()
+        # 更新关联应付单（加锁防止并发）
+        if payable_bill:
+            pb = await PayableBill.filter(id=payable_bill.id).select_for_update().first()
+            pb.paid_amount += amount
+            pb.unpaid_amount = pb.total_amount - pb.paid_amount
+            pb.status = "completed" if pb.unpaid_amount <= 0 else "partial"
+            await pb.save()
 
     logger.info(f"创建付款单: {db.bill_no}, 金额: {amount}")
     return db
@@ -135,19 +135,7 @@ async def confirm_disbursement_refund(refund_id: int, user) -> DisbursementRefun
     return refund
 
 
-async def _next_voucher_no(account_set_id: int, voucher_type: str, period_name: str) -> str:
-    account_set = await AccountSet.filter(id=account_set_id).first()
-    prefix = f"{account_set.code}-{voucher_type}-{period_name.replace('-', '')}-"
-    last = await Voucher.filter(
-        account_set_id=account_set_id,
-        voucher_type=voucher_type,
-        period_name=period_name,
-    ).order_by("-voucher_no").first()
-    if last and last.voucher_no.startswith(prefix):
-        seq = int(last.voucher_no[len(prefix):]) + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:03d}"
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
 async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> list:
@@ -156,6 +144,11 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
     ).first()
     if not period:
         raise ValueError(f"会计期间 {period_name} 不存在")
+
+    # 根据年月计算期间起止日期
+    period_start = date(period.year, period.month, 1)
+    _, last_day = calendar.monthrange(period.year, period.month)
+    period_end = date(period.year, period.month, last_day)
 
     bank_account = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1002", is_active=True
@@ -168,9 +161,10 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
 
     vouchers = []
 
-    # 付款单 → 借 应付账款2202，贷 银行存款1002
+    # 付款单 → 借 应付账款2202，贷 银行存款1002（仅处理当前期间）
     disbursements = await DisbursementBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        disbursement_date__gte=period_start, disbursement_date__lte=period_end,
     ).all()
     for d in disbursements:
         async with transactions.in_transaction():
@@ -209,9 +203,10 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
             await d.save()
             vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款单 {d.bill_no}"})
 
-    # 付款退款单 → 借 银行存款1002，贷 应付账款2202
+    # 付款退款单 → 借 银行存款1002，贷 应付账款2202（仅处理当前期间）
     refunds = await DisbursementRefundBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        refund_date__gte=period_start, refund_date__lte=period_end,
     ).all()
     for rf in refunds:
         async with transactions.in_transaction():
@@ -252,3 +247,102 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
 
     logger.info(f"AP凭证生成完成: {len(vouchers)} 张")
     return vouchers
+
+
+async def create_rebate_payment_voucher(
+    account_set_id: int,
+    po,
+    disbursement_bill,
+    creator,
+):
+    """采购付款时生成含返利分录的凭证
+
+    凭证分录：
+    借：应付账款           total_amount + rebate_used（原始应付）
+    借：主营业务成本        -(rebate_used / 1.13)（负数红冲）
+    借：应交税费           -(rebate_used - rebate_used / 1.13)（负数红冲）
+    贷：银行存款           total_amount（实付金额）
+    """
+    if not po.rebate_used or po.rebate_used <= 0:
+        return None
+
+    rebate = po.rebate_used
+    total_with_rebate = po.total_amount + rebate
+    actual_paid = po.total_amount
+
+    rebate_excl_tax = (rebate / Decimal("1.13")).quantize(Decimal("0.01"))
+    rebate_tax = rebate - rebate_excl_tax
+
+    ap_account = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="2202", is_active=True
+    ).first()
+    bank_account = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="1002", is_active=True
+    ).first()
+    cost_account = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="5401", is_active=True
+    ).first()
+    tax_account = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="2221", is_active=True
+    ).first()
+
+    if not all([ap_account, bank_account, cost_account, tax_account]):
+        logger.warning("缺少凭证科目(2202/1002/5401/2221)，跳过返利凭证生成")
+        return None
+
+    today = date.today()
+    period_name = f"{today.year}-{today.month:02d}"
+
+    async with transactions.in_transaction():
+        vno = await _next_voucher_no(account_set_id, "付", period_name)
+        v = await Voucher.create(
+            account_set_id=account_set_id,
+            voucher_type="付",
+            voucher_no=vno,
+            period_name=period_name,
+            voucher_date=today,
+            summary=f"采购付款(含返利) {po.po_no}",
+            total_debit=actual_paid,
+            total_credit=actual_paid,
+            status="draft",
+            creator=creator,
+            source_type="purchase_payment",
+            source_bill_id=po.id,
+        )
+        await VoucherEntry.create(
+            voucher=v, line_no=1,
+            account_id=ap_account.id,
+            summary=f"采购付款 {po.po_no}",
+            debit_amount=total_with_rebate,
+            credit_amount=Decimal("0"),
+            aux_supplier_id=po.supplier_id,
+        )
+        await VoucherEntry.create(
+            voucher=v, line_no=2,
+            account_id=cost_account.id,
+            summary=f"采购返利红冲 {po.po_no}",
+            debit_amount=-rebate_excl_tax,
+            credit_amount=Decimal("0"),
+        )
+        await VoucherEntry.create(
+            voucher=v, line_no=3,
+            account_id=tax_account.id,
+            summary=f"采购返利税金红冲 {po.po_no}",
+            debit_amount=-rebate_tax,
+            credit_amount=Decimal("0"),
+        )
+        await VoucherEntry.create(
+            voucher=v, line_no=4,
+            account_id=bank_account.id,
+            summary=f"采购付款 {po.po_no}",
+            debit_amount=Decimal("0"),
+            credit_amount=actual_paid,
+        )
+
+        if disbursement_bill:
+            disbursement_bill.voucher = v
+            disbursement_bill.voucher_no = vno
+            await disbursement_bill.save()
+
+    logger.info(f"生成采购付款凭证(含返利): {vno}, 应付={total_with_rebate}, 返利={rebate}, 实付={actual_paid}")
+    return v

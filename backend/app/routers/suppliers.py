@@ -9,6 +9,7 @@ from tortoise.expressions import F
 
 from app.auth.dependencies import require_permission
 from app.models import User, Supplier, PurchaseOrder, RebateLog
+from app.models.supplier_balance import SupplierAccountBalance
 from app.schemas.supplier import SupplierRequest, CreditRefundRequest
 from app.services.operation_log_service import log_operation
 
@@ -16,12 +17,21 @@ router = APIRouter(prefix="/api/suppliers", tags=["供应商管理"])
 
 
 @router.get("")
-async def list_suppliers(user: User = Depends(require_permission("purchase"))):
+async def list_suppliers(account_set_id: Optional[int] = None, user: User = Depends(require_permission("purchase"))):
     suppliers = await Supplier.filter(is_active=True).order_by("-created_at")
+
+    # 如果指定账套，从 SupplierAccountBalance 读取余额
+    balance_map = {}
+    if account_set_id:
+        balances = await SupplierAccountBalance.filter(account_set_id=account_set_id).all()
+        balance_map = {b.supplier_id: b for b in balances}
+
     return [{"id": s.id, "name": s.name, "contact_person": s.contact_person, "phone": s.phone,
              "tax_id": s.tax_id, "bank_account": s.bank_account, "bank_name": s.bank_name,
-             "address": s.address, "rebate_balance": float(s.rebate_balance),
-             "credit_balance": float(s.credit_balance), "created_at": s.created_at.isoformat()} for s in suppliers]
+             "address": s.address,
+             "rebate_balance": float(balance_map[s.id].rebate_balance) if s.id in balance_map else (0 if account_set_id else float(s.rebate_balance)),
+             "credit_balance": float(balance_map[s.id].credit_balance) if s.id in balance_map else (0 if account_set_id else float(s.credit_balance)),
+             "created_at": s.created_at.isoformat()} for s in suppliers]
 
 
 @router.post("")
@@ -47,7 +57,13 @@ async def delete_supplier(supplier_id: int, user: User = Depends(require_permiss
     s = await Supplier.filter(id=supplier_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="供应商不存在")
-    if s.rebate_balance != 0 or s.credit_balance != 0:
+    # 检查是否有任何账套下的未结清余额
+    from tortoise.queryset import Q
+    has_balance = await SupplierAccountBalance.filter(
+        Q(rebate_balance__gt=0) | Q(credit_balance__gt=0),
+        supplier_id=supplier_id
+    ).exists()
+    if has_balance:
         raise HTTPException(status_code=400, detail="供应商有未结清返利或在账资金，无法删除")
     pending_count = await PurchaseOrder.filter(
         supplier_id=supplier_id, status__in=["pending_review", "pending", "paid", "partial"]
@@ -63,11 +79,26 @@ async def delete_supplier(supplier_id: int, user: User = Depends(require_permiss
 async def get_supplier_transactions(
     supplier_id: int,
     month: Optional[str] = None,
+    account_set_id: Optional[int] = None,
     user: User = Depends(require_permission("purchase"))
 ):
     supplier = await Supplier.filter(id=supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="供应商不存在")
+
+    # 按账套读取余额
+    rebate_balance = 0
+    credit_balance = 0
+    if account_set_id:
+        bal = await SupplierAccountBalance.filter(
+            supplier_id=supplier_id, account_set_id=account_set_id
+        ).first()
+        if bal:
+            rebate_balance = float(bal.rebate_balance)
+            credit_balance = float(bal.credit_balance)
+    else:
+        rebate_balance = float(supplier.rebate_balance)
+        credit_balance = float(supplier.credit_balance)
 
     # 采购记录查询
     po_query = PurchaseOrder.filter(supplier_id=supplier_id)
@@ -85,7 +116,7 @@ async def get_supplier_transactions(
 
     orders = await po_query.order_by("-created_at").select_related("creator")
 
-    # 统计（使用数据库聚合）
+    # 统计
     from tortoise.functions import Count, Sum, Coalesce
     stats_result = await PurchaseOrder.filter(supplier_id=supplier_id).annotate(
         total_count=Count("id"),
@@ -94,8 +125,7 @@ async def get_supplier_transactions(
     total_count = stats_result[0]["total_count"] if stats_result else 0
     total_amount = float(stats_result[0]["total_amount"]) if stats_result else 0
 
-    completed_result = await PurchaseOrder.filter(supplier_id=supplier_id, status="completed").count()
-    completed_count = completed_result
+    completed_count = await PurchaseOrder.filter(supplier_id=supplier_id, status="completed").count()
 
     returned_result = await PurchaseOrder.filter(supplier_id=supplier_id, status="returned").annotate(
         cnt=Count("id"),
@@ -105,12 +135,14 @@ async def get_supplier_transactions(
     returned_amount = float(returned_result[0]["amt"]) if returned_result else 0
 
     # 在账资金流水
-    credit_logs = await RebateLog.filter(
+    credit_log_query = RebateLog.filter(
         target_type="supplier", target_id=supplier_id,
         type__in=["credit_charge", "credit_use", "credit_refund"]
-    ).order_by("-created_at").select_related("creator")
+    )
+    if account_set_id:
+        credit_log_query = credit_log_query.filter(account_set_id=account_set_id)
+    credit_logs = await credit_log_query.order_by("-created_at").select_related("creator")
 
-    # 使用数据库聚合获取月份列表（避免拉取全量日期数据）
     from tortoise import connections
     conn = connections.get("default")
     month_rows = await conn.execute_query_dict(
@@ -124,8 +156,8 @@ async def get_supplier_transactions(
             "id": supplier.id, "name": supplier.name,
             "contact_person": supplier.contact_person,
             "phone": supplier.phone,
-            "rebate_balance": float(supplier.rebate_balance),
-            "credit_balance": float(supplier.credit_balance),
+            "rebate_balance": rebate_balance,
+            "credit_balance": credit_balance,
         },
         "stats": {
             "total_count": total_count,
@@ -160,26 +192,44 @@ async def refund_supplier_credit(
     user: User = Depends(require_permission("purchase"))
 ):
     amount = Decimal(str(data.amount))
+    account_set_id = getattr(data, 'account_set_id', None)
 
     async with transactions.in_transaction():
-        supplier = await Supplier.filter(id=supplier_id).select_for_update().first()
+        supplier = await Supplier.filter(id=supplier_id).first()
         if not supplier:
             raise HTTPException(status_code=404, detail="供应商不存在")
-        if amount > supplier.credit_balance:
-            raise HTTPException(status_code=400, detail=f"退款金额超过在账资金余额（可用: ¥{float(supplier.credit_balance):.2f}）")
 
-        await Supplier.filter(id=supplier_id).update(credit_balance=F('credit_balance') - amount)
-        await supplier.refresh_from_db()
+        if account_set_id:
+            bal = await SupplierAccountBalance.filter(
+                supplier_id=supplier_id, account_set_id=account_set_id
+            ).select_for_update().first()
+            if not bal or amount > bal.credit_balance:
+                available = float(bal.credit_balance) if bal else 0
+                raise HTTPException(status_code=400, detail=f"退款金额超过在账资金余额（可用: ¥{available:.2f}）")
+            await SupplierAccountBalance.filter(id=bal.id).update(
+                credit_balance=F('credit_balance') - amount
+            )
+            await bal.refresh_from_db()
+            balance_after = bal.credit_balance
+        else:
+            # 兼容旧逻辑
+            supplier = await Supplier.filter(id=supplier_id).select_for_update().first()
+            if amount > supplier.credit_balance:
+                raise HTTPException(status_code=400, detail=f"退款金额超过在账资金余额（可用: ¥{float(supplier.credit_balance):.2f}）")
+            await Supplier.filter(id=supplier_id).update(credit_balance=F('credit_balance') - amount)
+            await supplier.refresh_from_db()
+            balance_after = supplier.credit_balance
 
         await RebateLog.create(
             target_type="supplier", target_id=supplier_id,
             type="credit_refund", amount=-amount,
-            balance_after=supplier.credit_balance,
+            balance_after=balance_after,
+            account_set_id=account_set_id,
             remark=data.remark or f"在账资金退款 ¥{float(amount):.2f}",
             creator=user
         )
 
         await log_operation(user, "CREDIT_REFUND", "SUPPLIER", supplier_id,
-            f"供应商 {supplier.name} 在账资金退款 ¥{float(amount):.2f}，余额 ¥{float(supplier.credit_balance):.2f}")
+            f"供应商 {supplier.name} 在账资金退款 ¥{float(amount):.2f}，余额 ¥{float(balance_after):.2f}")
 
-    return {"message": "退款成功", "credit_balance": float(supplier.credit_balance)}
+    return {"message": "退款成功", "credit_balance": float(balance_after)}
