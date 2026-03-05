@@ -6,6 +6,7 @@ from tortoise.expressions import F
 from app.auth.dependencies import require_permission
 from app.models import User, Customer, Supplier, RebateLog
 from app.models.supplier_balance import SupplierAccountBalance
+from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.rebate import RebateChargeRequest
 from app.services.operation_log_service import log_operation
 
@@ -16,8 +17,17 @@ router = APIRouter(prefix="/api/rebates", tags=["返利管理"])
 async def get_rebate_summary(target_type: str, account_set_id: int = None, user: User = Depends(require_permission("finance"))):
     """返利汇总"""
     if target_type == "customer":
-        items = await Customer.filter(is_active=True).order_by("name")
-        return [{"id": c.id, "name": c.name, "rebate_balance": float(c.rebate_balance)} for c in items]
+        if not account_set_id:
+            raise HTTPException(status_code=400, detail="客户返利需要指定账套")
+        balances = await CustomerAccountBalance.filter(
+            account_set_id=account_set_id
+        ).all()
+        balance_map = {b.customer_id: b for b in balances}
+        customers = await Customer.filter(is_active=True).order_by("name")
+        return [{
+            "id": c.id, "name": c.name,
+            "rebate_balance": float(balance_map[c.id].rebate_balance) if c.id in balance_map else 0,
+        } for c in customers]
     elif target_type == "supplier":
         if not account_set_id:
             raise HTTPException(status_code=400, detail="供应商返利需要指定账套")
@@ -59,14 +69,26 @@ async def charge_rebate(data: RebateChargeRequest, user: User = Depends(require_
         raise HTTPException(status_code=400, detail="充值金额必须大于0")
     async with transactions.in_transaction():
         if data.target_type == "customer":
+            if not data.account_set_id:
+                raise HTTPException(status_code=400, detail="客户返利充值需要指定账套")
             target = await Customer.filter(id=data.target_id, is_active=True).first()
             if not target:
                 raise HTTPException(status_code=404, detail="客户不存在")
-            await Customer.filter(id=data.target_id).update(rebate_balance=F('rebate_balance') + data.amount)
-            await target.refresh_from_db()
             target_name = target.name
-            balance_after = target.rebate_balance
-            account_set_id = None
+            bal = await CustomerAccountBalance.filter(
+                customer_id=data.target_id, account_set_id=data.account_set_id
+            ).first()
+            if not bal:
+                bal = await CustomerAccountBalance.create(
+                    customer_id=data.target_id, account_set_id=data.account_set_id,
+                    rebate_balance=0
+                )
+            await CustomerAccountBalance.filter(id=bal.id).update(
+                rebate_balance=F('rebate_balance') + data.amount
+            )
+            await bal.refresh_from_db()
+            balance_after = bal.rebate_balance
+            account_set_id = data.account_set_id
         elif data.target_type == "supplier":
             if not data.account_set_id:
                 raise HTTPException(status_code=400, detail="供应商返利充值需要指定账套")
