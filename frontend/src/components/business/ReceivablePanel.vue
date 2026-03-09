@@ -41,7 +41,7 @@ const handleGenerateVouchers = async () => {
     appStore.showToast('请先选择账套和期间', 'error')
     return
   }
-  if (!confirm(`确认为当前期间 ${period} 批量生成应收凭证？`)) return
+  if (!await appStore.customConfirm('确认操作', `确认为当前期间 ${period} 批量生成应收凭证？`)) return
   generating.value = true
   try {
     const { data } = await generateArVouchers(setId, period)

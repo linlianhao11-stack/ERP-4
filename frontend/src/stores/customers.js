@@ -19,7 +19,7 @@ export const useCustomersStore = defineStore('customers', () => {
     error.value = null
     try {
       const { data } = await getCustomers()
-      customers.value = data
+      customers.value = data.items || data
       _loaded.value = true
     } catch (e) {
       error.value = '客户数据加载失败'

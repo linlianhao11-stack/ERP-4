@@ -186,7 +186,7 @@ const getDisbursementMethodName = (m) => {
 const loadPurchaseOrdersData = async () => {
   try {
     const { data } = await getPurchaseOrders({})
-    purchaseOrders.value = data
+    purchaseOrders.value = data.items || data
   } catch (e) {
     console.error(e)
     appStore.showToast(e.response?.data?.detail || '加载数据失败', 'error')

@@ -20,7 +20,7 @@ export const useAccountingStore = defineStore('accounting', () => {
       if (!currentAccountSetId.value && data.length > 0) {
         currentAccountSetId.value = data[0].id
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('加载失败', e) }
   }
 
   function setCurrentAccountSet(id) {
@@ -34,7 +34,7 @@ export const useAccountingStore = defineStore('accounting', () => {
     try {
       const { data } = await getChartOfAccounts(currentAccountSetId.value)
       chartOfAccounts.value = data
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('加载失败', e) }
   }
 
   async function loadPeriods(year) {
@@ -42,7 +42,7 @@ export const useAccountingStore = defineStore('accounting', () => {
     try {
       const { data } = await getAccountingPeriods(currentAccountSetId.value, year)
       periods.value = data
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('加载失败', e) }
   }
 
   return {

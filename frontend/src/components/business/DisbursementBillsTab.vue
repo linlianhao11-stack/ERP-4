@@ -160,7 +160,7 @@ async function handleCreate() {
 }
 
 async function confirmBill(b) {
-  if (!confirm(`确认付款单 ${b.bill_no}？`)) return
+  if (!await appStore.customConfirm('确认操作', `确认付款单 ${b.bill_no}？`)) return
   try {
     await confirmDisbursementBill(b.id)
     appStore.showToast('确认成功', 'success')

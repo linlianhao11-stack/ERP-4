@@ -402,7 +402,7 @@ async function handlePush() {
 }
 
 async function handleConfirm(inv) {
-  if (!confirm(`确认发票 ${inv.invoice_no}？`)) return
+  if (!await appStore.customConfirm('确认操作', `确认发票 ${inv.invoice_no}？`)) return
   try {
     await confirmInvoice(inv.id)
     appStore.showToast('确认成功', 'success')
@@ -413,7 +413,7 @@ async function handleConfirm(inv) {
 }
 
 async function handleCancel(inv) {
-  if (!confirm(`确认作废发票 ${inv.invoice_no}？此操作不可撤回。`)) return
+  if (!await appStore.customConfirm('作废确认', `确认作废发票 ${inv.invoice_no}？此操作不可撤回。`)) return
   try {
     await cancelInvoice(inv.id)
     appStore.showToast('已作废', 'success')

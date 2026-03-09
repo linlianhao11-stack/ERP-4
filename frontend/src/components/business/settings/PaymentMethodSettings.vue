@@ -1,0 +1,233 @@
+<!--
+  收款方式与付款方式管理组件
+  功能：收款方式（PaymentMethod）的增删改、付款方式（DisbursementMethod）的增删改
+  从 SettingsView.vue 财务设置标签页提取
+-->
+<template>
+  <div>
+    <!-- 收款方式管理 -->
+    <div class="grid md:grid-cols-2 gap-5">
+      <div class="card p-4">
+        <h3 class="font-semibold mb-3 text-sm">收款方式管理</h3>
+        <div class="text-xs text-[#86868b] mb-3">管理收款时可选的付款方式，修改后全局生效</div>
+        <div class="space-y-2 mb-3">
+          <div v-for="m in paymentMethods" :key="m.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
+            <!-- 编辑模式 -->
+            <div v-if="editingPayMethodId === m.id" class="flex items-center gap-2 flex-1">
+              <input v-model="editingPayMethodName" class="input text-sm flex-1" @keyup.enter="saveEditPaymentMethod" @keyup.escape="cancelEditPaymentMethod">
+              <button @click="saveEditPaymentMethod" class="text-[#248a3d] text-xs font-medium">保存</button>
+              <button @click="cancelEditPaymentMethod" class="text-[#86868b] text-xs">取消</button>
+            </div>
+            <!-- 展示模式 -->
+            <template v-else>
+              <div>
+                <span class="font-medium">{{ m.name }}</span>
+                <span class="text-xs text-[#86868b] ml-1">({{ m.code }})</span>
+              </div>
+              <div>
+                <button @click="editPaymentMethod(m)" class="text-[#0071e3] text-xs mr-2">编辑</button>
+                <button @click="handleDeletePaymentMethod(m.id)" class="text-[#ff3b30] text-xs">删除</button>
+              </div>
+            </template>
+          </div>
+          <div v-if="!paymentMethods.length" class="text-[#86868b] text-center py-2 text-sm">暂无收款方式</div>
+        </div>
+        <!-- 新增收款方式 -->
+        <form @submit.prevent="handleCreatePaymentMethod" class="flex gap-2">
+          <input v-model="newPayMethodCode" class="input flex-1 text-sm" placeholder="编码(如 bank_abc)">
+          <input v-model="newPayMethodName" class="input flex-1 text-sm" placeholder="显示名称">
+          <button type="submit" class="btn btn-primary btn-sm">添加</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 付款方式管理 -->
+    <div class="grid md:grid-cols-2 gap-5 mt-5">
+      <div class="card p-4">
+        <h3 class="font-semibold mb-3 text-sm">付款方式管理</h3>
+        <div class="text-xs text-[#86868b] mb-3">管理向供应商付款时可选的付款方式，修改后全局生效</div>
+        <div class="space-y-2 mb-3">
+          <div v-for="m in disbursementMethods" :key="m.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
+            <!-- 编辑模式 -->
+            <div v-if="editingDisbMethodId === m.id" class="flex items-center gap-2 flex-1">
+              <input v-model="editingDisbMethodName" class="input text-sm flex-1" @keyup.enter="saveEditDisbursementMethod" @keyup.escape="cancelEditDisbursementMethod">
+              <button @click="saveEditDisbursementMethod" class="text-[#248a3d] text-xs font-medium">保存</button>
+              <button @click="cancelEditDisbursementMethod" class="text-[#86868b] text-xs">取消</button>
+            </div>
+            <!-- 展示模式 -->
+            <template v-else>
+              <div>
+                <span class="font-medium">{{ m.name }}</span>
+                <span class="text-xs text-[#86868b] ml-1">({{ m.code }})</span>
+              </div>
+              <div>
+                <button @click="editDisbursementMethod(m)" class="text-[#0071e3] text-xs mr-2">编辑</button>
+                <button @click="handleDeleteDisbursementMethod(m.id)" class="text-[#ff3b30] text-xs">删除</button>
+              </div>
+            </template>
+          </div>
+          <div v-if="!disbursementMethods.length" class="text-[#86868b] text-center py-2 text-sm">暂无付款方式</div>
+        </div>
+        <!-- 新增付款方式 -->
+        <form @submit.prevent="handleCreateDisbursementMethod" class="flex gap-2">
+          <input v-model="newDisbMethodCode" class="input flex-1 text-sm" placeholder="编码(如 bank_abc)">
+          <input v-model="newDisbMethodName" class="input flex-1 text-sm" placeholder="显示名称">
+          <button type="submit" class="btn btn-primary btn-sm">添加</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+/**
+ * 收款方式与付款方式管理
+ * 包含：收款方式CRUD、付款方式(付供应商)CRUD
+ */
+import { ref, computed, onMounted } from 'vue'
+import { useAppStore } from '../../../stores/app'
+import { useSettingsStore } from '../../../stores/settings'
+import {
+  createPaymentMethod, updatePaymentMethod, deletePaymentMethod as deletePaymentMethodApi,
+  createDisbursementMethod, updateDisbursementMethod, deleteDisbursementMethod as deleteDisbursementMethodApi
+} from '../../../api/settings'
+
+const emit = defineEmits(['data-changed'])
+
+const appStore = useAppStore()
+const settingsStore = useSettingsStore()
+const paymentMethods = computed(() => settingsStore.paymentMethods)
+const disbursementMethods = computed(() => settingsStore.disbursementMethods)
+
+// === 收款方式状态 ===
+const newPayMethodCode = ref('')
+const newPayMethodName = ref('')
+const editingPayMethodId = ref(null)
+const editingPayMethodName = ref('')
+
+// === 付款方式状态 ===
+const newDisbMethodCode = ref('')
+const newDisbMethodName = ref('')
+const editingDisbMethodId = ref(null)
+const editingDisbMethodName = ref('')
+
+// === 收款方式操作 ===
+const editPaymentMethod = (m) => {
+  editingPayMethodId.value = m.id
+  editingPayMethodName.value = m.name
+}
+
+const saveEditPaymentMethod = async () => {
+  if (!editingPayMethodName.value.trim()) {
+    appStore.showToast('名称不能为空', 'error')
+    return
+  }
+  try {
+    await updatePaymentMethod(editingPayMethodId.value, { name: editingPayMethodName.value.trim() })
+    appStore.showToast('修改成功')
+    editingPayMethodId.value = null
+    editingPayMethodName.value = ''
+    settingsStore.loadPaymentMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '修改失败', 'error')
+  }
+}
+
+const cancelEditPaymentMethod = () => {
+  editingPayMethodId.value = null
+  editingPayMethodName.value = ''
+}
+
+const handleCreatePaymentMethod = async () => {
+  if (!newPayMethodCode.value.trim() || !newPayMethodName.value.trim()) {
+    appStore.showToast('请填写编码和名称', 'error')
+    return
+  }
+  try {
+    await createPaymentMethod({ code: newPayMethodCode.value.trim(), name: newPayMethodName.value.trim() })
+    appStore.showToast('创建成功')
+    newPayMethodCode.value = ''
+    newPayMethodName.value = ''
+    settingsStore.loadPaymentMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '创建失败', 'error')
+  }
+}
+
+const handleDeletePaymentMethod = async (id) => {
+  if (!await appStore.customConfirm('删除确认', '确定删除该收款方式？')) return
+  try {
+    await deletePaymentMethodApi(id)
+    appStore.showToast('已删除')
+    settingsStore.loadPaymentMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
+  }
+}
+
+// === 付款方式操作 ===
+const editDisbursementMethod = (m) => {
+  editingDisbMethodId.value = m.id
+  editingDisbMethodName.value = m.name
+}
+
+const saveEditDisbursementMethod = async () => {
+  if (!editingDisbMethodName.value.trim()) {
+    appStore.showToast('名称不能为空', 'error')
+    return
+  }
+  try {
+    await updateDisbursementMethod(editingDisbMethodId.value, { name: editingDisbMethodName.value.trim() })
+    appStore.showToast('修改成功')
+    editingDisbMethodId.value = null
+    editingDisbMethodName.value = ''
+    settingsStore.loadDisbursementMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '修改失败', 'error')
+  }
+}
+
+const cancelEditDisbursementMethod = () => {
+  editingDisbMethodId.value = null
+  editingDisbMethodName.value = ''
+}
+
+const handleCreateDisbursementMethod = async () => {
+  if (!newDisbMethodCode.value.trim() || !newDisbMethodName.value.trim()) {
+    appStore.showToast('编码和名称不能为空', 'error')
+    return
+  }
+  try {
+    await createDisbursementMethod({ code: newDisbMethodCode.value.trim(), name: newDisbMethodName.value.trim() })
+    appStore.showToast('添加成功')
+    newDisbMethodCode.value = ''
+    newDisbMethodName.value = ''
+    settingsStore.loadDisbursementMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '添加失败', 'error')
+  }
+}
+
+const handleDeleteDisbursementMethod = async (id) => {
+  if (!await appStore.customConfirm('删除确认', '确定删除该付款方式？')) return
+  try {
+    await deleteDisbursementMethodApi(id)
+    appStore.showToast('已删除')
+    settingsStore.loadDisbursementMethods()
+    emit('data-changed')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
+  }
+}
+
+// 组件挂载时加载数据
+onMounted(() => {
+  settingsStore.loadPaymentMethods()
+  settingsStore.loadDisbursementMethods()
+})
+</script>

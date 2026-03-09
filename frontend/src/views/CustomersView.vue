@@ -275,6 +275,31 @@
             </div>
           </div>
 
+          <!-- 物流信息与SN码 -->
+          <div v-if="orderDetail.shipments?.length" class="mb-4">
+            <div class="font-semibold text-sm mb-2">物流信息 ({{ orderDetail.shipments.length }})</div>
+            <div v-for="sh in orderDetail.shipments" :key="sh.id" class="p-3 bg-[#e8f4fd] rounded-lg mb-2">
+              <div class="flex justify-between items-center mb-1">
+                <div class="text-sm">{{ sh.carrier_name || '未填写' }} <span v-if="sh.tracking_no" class="font-mono text-xs">{{ sh.tracking_no }}</span></div>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-[#f5f5f7] text-[#6e6e73]">{{ sh.status_text }}</span>
+              </div>
+              <div v-if="sh.items?.length" class="mt-1.5 space-y-1">
+                <div v-for="(si, idx) in sh.items" :key="idx" class="text-xs">
+                  <span class="text-[#6e6e73]">{{ si.product_name }} × {{ si.quantity }}</span>
+                  <div v-if="si.sn_codes" class="mt-0.5 p-1.5 bg-[#e8f8ee] rounded">
+                    <span class="text-[#86868b] font-semibold">SN码:</span>
+                    <span v-for="sn in parseSN(si.sn_codes)" :key="sn" class="text-[#34c759] font-mono ml-1">{{ sn }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="sh.sn_code" class="mt-1 p-1.5 bg-[#e8f8ee] rounded">
+                <span class="text-xs text-[#86868b] font-semibold">SN码:</span>
+                <span class="text-xs text-[#34c759] font-mono ml-1">{{ sh.sn_code }}</span>
+              </div>
+              <div v-if="sh.last_info" class="text-xs text-[#86868b] mt-1">{{ sh.last_info }}</div>
+            </div>
+          </div>
+
           <!-- Items table -->
           <div class="font-semibold mb-2 text-sm">商品明细</div>
           <div class="overflow-x-auto">
@@ -314,7 +339,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, watch } from 'vue'
+import { ref, computed, reactive, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
 import { useCustomersStore } from '../stores/customers'
@@ -330,6 +355,17 @@ const customersStore = useCustomersStore()
 const settingsStore = useSettingsStore()
 const { fmt, fmtDate, formatBalance, getBalanceLabel, getBalanceClass } = useFormat()
 const { hasPermission } = usePermission()
+
+/** 解析 SN 码 JSON 字符串为数组 */
+const parseSN = (raw) => {
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return raw.split(',').map(s => s.trim()).filter(Boolean) }
+}
+
+onMounted(() => {
+  customersStore.loadCustomers()
+  settingsStore.loadPaymentMethods()
+})
 
 const getPaymentMethodName = (code) => {
   const m = settingsStore.paymentMethods.find(pm => pm.code === code)

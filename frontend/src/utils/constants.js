@@ -52,6 +52,8 @@ export const allPermissions = [
   { key: 'customer', name: '客户管理' },
   { key: 'finance', name: '财务查看' },
   { key: 'finance_confirm', name: '确认收款' },
+  { key: 'finance_pay', name: '确认付款' },
+  { key: 'finance_rebate', name: '返利管理' },
   { key: 'logs', name: '出入库日志' },
   { key: 'settings', name: '系统设置' },
   { key: 'accounting_view', name: '会计查看' },
@@ -82,6 +84,8 @@ export const permissionGroups = [
   { label: '物流管理', icon: 'logistics', main: 'logistics', children: [] },
   { label: '财务管理', icon: 'finance', main: 'finance', children: [
     { key: 'finance_confirm', name: '确认收款' },
+    { key: 'finance_pay', name: '确认付款' },
+    { key: 'finance_rebate', name: '返利管理' },
   ]},
   { label: '会计管理', icon: 'accounting', main: 'accounting_view', children: [
     { key: 'accounting_edit', name: '会计录入' },

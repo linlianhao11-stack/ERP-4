@@ -1,14 +1,14 @@
 <template>
   <div class="guide-page">
     <div class="guide-header">
-      <h1 class="text-2xl font-bold mb-1">轻量级ERP系统 v4.8 使用手册</h1>
-      <p class="text-[#86868b] text-sm">完整功能指南</p>
+      <h1 class="text-2xl font-bold mb-1">轻量级ERP系统 v4.15 使用手册</h1>
+      <p class="text-[#86868b] text-sm">完整功能指南 · 业财一体化</p>
     </div>
 
     <!-- Table of Contents -->
     <div class="card p-4 mb-5">
       <h2 class="font-semibold mb-3 text-sm">目录</h2>
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
         <button
           v-for="sec in sections"
           :key="sec.key"
@@ -24,20 +24,23 @@
       <h2 class="text-lg font-bold mb-4">系统概述</h2>
 
       <h3 class="font-semibold mt-4 mb-2">系统简介</h3>
-      <p class="text-sm text-[#6e6e73] mb-4">本系统是一套轻量级的企业资源管理系统（ERP），专为中小型贸易公司设计，支持多仓库管理、库存进销存、寄售业务、客户账期、财务管理等核心功能。</p>
+      <p class="text-sm text-[#6e6e73] mb-4">本系统是一套轻量级的企业资源管理系统（ERP），专为中小型贸易/批发企业设计，覆盖销售、采购、库存、财务、会计、物流、寄售等核心业务流程，内置完整的业财一体化财务会计模块。</p>
 
       <h3 class="font-semibold mt-4 mb-2">核心功能模块</h3>
       <div class="overflow-x-auto mb-4">
         <table class="guide-table w-full text-sm">
           <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">模块</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">功能说明</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">适用人员</th></tr></thead>
           <tbody class="divide-y">
-            <tr><td class="px-3 py-2"><span class="badge badge-blue">首页</span></td><td class="px-3 py-2">查看销售概况、库存预警、待办事项等关键数据</td><td class="px-3 py-2">所有人员</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-green">销售</span></td><td class="px-3 py-2">创建销售订单、退货单、寄售结算单等</td><td class="px-3 py-2">销售人员</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-purple">库存</span></td><td class="px-3 py-2">查看库存、入库、调拨、导入导出库存数据</td><td class="px-3 py-2">仓管人员</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-yellow">寄售</span></td><td class="px-3 py-2">管理寄售客户的库存、结算和退货</td><td class="px-3 py-2">销售/财务</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-red">财务</span></td><td class="px-3 py-2">订单明细、收款记录、出入库日志、账款管理</td><td class="px-3 py-2">财务人员</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-blue">客户</span></td><td class="px-3 py-2">客户信息管理、交易明细、欠款查询</td><td class="px-3 py-2">销售/财务</td></tr>
-            <tr><td class="px-3 py-2"><span class="badge badge-purple">设置</span></td><td class="px-3 py-2">仓库管理、仓位管理、用户权限管理</td><td class="px-3 py-2">管理员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-blue">首页</span></td><td class="px-3 py-2">销售概况、库存预警、畅销商品、经营概览</td><td class="px-3 py-2">所有人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-green">销售</span></td><td class="px-3 py-2">现款/账期/寄售/退货订单、购物车开单</td><td class="px-3 py-2">销售人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-purple">库存</span></td><td class="px-3 py-2">多仓库多仓位管理、入库/调拨/盘点、SN码管理、Excel导入导出</td><td class="px-3 py-2">仓管人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-orange">采购</span></td><td class="px-3 py-2">采购订单全流程（下单→审核→付款→收货→退货）、供应商管理</td><td class="px-3 py-2">采购人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-yellow">寄售</span></td><td class="px-3 py-2">寄售调拨、寄售结算、寄售退货</td><td class="px-3 py-2">销售/财务</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-blue">物流</span></td><td class="px-3 py-2">多批次发货、快递100实时追踪、SN码绑定</td><td class="px-3 py-2">物流/销售</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-red">财务</span></td><td class="px-3 py-2">收款管理、欠款明细、返利管理（客户/供应商双向）</td><td class="px-3 py-2">财务人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-green">会计</span></td><td class="px-3 py-2">多账套、凭证管理、账簿查询、应收应付、发票、出入库单、期末处理、财务报表</td><td class="px-3 py-2">会计人员</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-blue">客户</span></td><td class="px-3 py-2">客户档案、交易明细、余额/返利/欠款管理</td><td class="px-3 py-2">销售/财务</td></tr>
+            <tr><td class="px-3 py-2"><span class="badge badge-purple">设置</span></td><td class="px-3 py-2">用户管理、权限配置、仓库仓位、收付款方式、备份管理</td><td class="px-3 py-2">管理员</td></tr>
           </tbody>
         </table>
       </div>
@@ -57,17 +60,21 @@
       </div>
 
       <h3 class="font-semibold mt-4 mb-2">权限说明</h3>
+      <p class="text-sm text-[#6e6e73] mb-2">系统角色分为 <strong>管理员</strong>（拥有全部权限）和 <strong>普通用户</strong>（按需分配），共 28 个细粒度权限，分 10 个权限组。管理员可在「设置 → 权限管理」中为每个用户独立配置。</p>
       <div class="overflow-x-auto">
         <table class="guide-table w-full text-sm">
-          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">权限</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">可访问的功能</th></tr></thead>
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">权限组</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">可访问的功能</th></tr></thead>
           <tbody class="divide-y">
             <tr><td class="px-3 py-2">首页</td><td class="px-3 py-2">查看仪表盘数据统计</td></tr>
-            <tr><td class="px-3 py-2">销售</td><td class="px-3 py-2">创建销售订单、寄售管理、客户管理</td></tr>
-            <tr><td class="px-3 py-2">查看库存</td><td class="px-3 py-2">查看库存列表和库存详情</td></tr>
-            <tr><td class="px-3 py-2">编辑库存</td><td class="px-3 py-2">入库、调拨、导入导出、商品管理</td></tr>
-            <tr><td class="px-3 py-2">财务</td><td class="px-3 py-2">查看订单明细、收款、出入库日志</td></tr>
-            <tr><td class="px-3 py-2">日志</td><td class="px-3 py-2">查看系统操作日志</td></tr>
-            <tr><td class="px-3 py-2">管理员</td><td class="px-3 py-2">用户管理、系统设置</td></tr>
+            <tr><td class="px-3 py-2">销售管理</td><td class="px-3 py-2">创建销售订单、寄售管理</td></tr>
+            <tr><td class="px-3 py-2">库存管理</td><td class="px-3 py-2">查看库存 + 库存操作（入库/调拨/盘点/商品管理）</td></tr>
+            <tr><td class="px-3 py-2">采购管理</td><td class="px-3 py-2">采购下单 + 审核 + 付款 + 收货（四个子权限独立控制）</td></tr>
+            <tr><td class="px-3 py-2">寄售管理</td><td class="px-3 py-2">寄售调拨、结算、退货</td></tr>
+            <tr><td class="px-3 py-2">物流管理</td><td class="px-3 py-2">发货、物流追踪</td></tr>
+            <tr><td class="px-3 py-2">财务管理</td><td class="px-3 py-2">收款管理 + 确认收款（子权限独立控制）</td></tr>
+            <tr><td class="px-3 py-2">会计管理</td><td class="px-3 py-2">查看 + 录入 + 审核 + 过账 + 期末处理 + 应收（查看/编辑/确认）+ 应付（查看/编辑/确认）共 11 个子权限</td></tr>
+            <tr><td class="px-3 py-2">客户管理</td><td class="px-3 py-2">客户档案维护、交易明细查询</td></tr>
+            <tr><td class="px-3 py-2">系统设置</td><td class="px-3 py-2">系统配置 + 操作日志 + 系统管理（用户/备份/账套）</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,25 +170,11 @@
         <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>输入调拨数量</strong><br><span class="text-[#6e6e73]">输入要调拨的数量，不能超过源仓位可用库存</span></div></div>
       </div>
 
-      <h3 class="font-semibold mt-4 mb-2">导入库存</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>下载模板</strong><br><span class="text-[#6e6e73]">点击「导入」按钮，在弹窗中点击「下载模板」获取标准导入模板</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>填写数据</strong><br><span class="text-[#6e6e73]">按模板格式填写商品信息和库存数据</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>上传文件</strong><br><span class="text-[#6e6e73]">点击「选择文件」上传填写好的Excel文件</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>预览确认</strong><br><span class="text-[#6e6e73]">系统会显示导入预览，检查数据无误后点击「确认导入」</span></div></div>
-      </div>
-
-      <div class="bg-[#fff8e1] border border-[#ffe082] rounded p-3 mb-4 text-sm text-[#ff9f0a]">
-        <strong>导入注意事项</strong><br>
-        <ul class="list-disc list-inside mt-1 space-y-0.5">
-          <li>SKU相同的商品会自动合并库存，并重新计算加权成本</li>
-          <li>仓库和仓位会自动创建（如果不存在）</li>
-          <li>请确保Excel格式正确，必填字段不能为空</li>
-        </ul>
-      </div>
-
-      <h3 class="font-semibold mt-4 mb-2">导出库存</h3>
-      <p class="text-sm text-[#6e6e73]">点击「导出」按钮可将当前库存导出为CSV文件，可用于盘点或数据备份。支持按仓库筛选后导出。</p>
+      <h3 class="font-semibold mt-4 mb-2">导入/导出</h3>
+      <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
+        <li><strong>导入商品</strong> — 点击「导入」→ 下载模板 → 填写数据 → 上传预览 → 确认导入。SKU 相同自动合并，仓库仓位自动创建</li>
+        <li><strong>导出库存</strong> — 点击「导出」将当前库存导出为 CSV 文件，支持按仓库筛选</li>
+      </ul>
     </div>
 
     <!-- Purchase -->
@@ -200,35 +193,27 @@
         </table>
       </div>
 
-      <h3 class="font-semibold mt-4 mb-2">新建采购订单</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>选择供应商</strong><br><span class="text-[#6e6e73]">输入供应商名称模糊搜索，从下拉列表选择</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>添加商品</strong><br><span class="text-[#6e6e73]">输入SKU/名称/品牌模糊搜索商品，选择后自动填充价格。如商品未建档，点击"新建商品"快速创建</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>填写数量和价格</strong><br><span class="text-[#6e6e73]">输入含税单价和数量，系统自动计算不含税单价和金额</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>提交订单</strong><br><span class="text-[#6e6e73]">确认信息后提交，订单状态为"待付款"</span></div></div>
-      </div>
-
       <h3 class="font-semibold mt-4 mb-2">采购状态流转</h3>
       <div class="overflow-x-auto mb-4">
         <table class="guide-table w-full text-sm">
           <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">状态</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">说明</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">操作</th></tr></thead>
           <tbody class="divide-y">
-            <tr><td class="px-3 py-2">待付款</td><td class="px-3 py-2">采购订单已创建</td><td class="px-3 py-2">财务在应付管理中"确认"付款，或"取消"采购单</td></tr>
+            <tr><td class="px-3 py-2">待审核</td><td class="px-3 py-2">采购订单已创建</td><td class="px-3 py-2">有审核权限的人员审核通过或拒绝</td></tr>
+            <tr><td class="px-3 py-2">待付款</td><td class="px-3 py-2">审核通过</td><td class="px-3 py-2">财务确认付款或取消</td></tr>
             <tr><td class="px-3 py-2">在途</td><td class="px-3 py-2">已确认付款</td><td class="px-3 py-2">仓库在采购收货中收货入库</td></tr>
             <tr><td class="px-3 py-2">部分到货</td><td class="px-3 py-2">已收部分商品</td><td class="px-3 py-2">继续收货</td></tr>
-            <tr><td class="px-3 py-2">已完成</td><td class="px-3 py-2">全部商品收货完成</td><td class="px-3 py-2">-</td></tr>
-            <tr><td class="px-3 py-2">已取消</td><td class="px-3 py-2">采购单被取消</td><td class="px-3 py-2">-</td></tr>
+            <tr><td class="px-3 py-2">已完成</td><td class="px-3 py-2">全部商品收货完成</td><td class="px-3 py-2">—</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 text-sm text-[#0071e3]">
-        <strong>注意事项</strong><br>
+        <strong>业财联动</strong><br>
         <ul class="list-disc list-inside mt-1 space-y-0.5">
-          <li>供应商和商品选择均支持模糊搜索，输入关键字即可快速定位</li>
-          <li>采购收货会自动更新库存数量和加权平均成本</li>
-          <li>只有待付款状态的采购单才能取消</li>
-          <li>付款确认和取消操作在财务页面的应付管理中进行</li>
+          <li>采购付款自动生成应付单和付款单（会计模块）</li>
+          <li>采购收货自动生成入库单和入库凭证（借：库存商品/进项税额，贷：应付账款）</li>
+          <li>收货入库自动更新库存数量和加权平均成本</li>
+          <li>使用供应商返利抵扣时，成本价按实际付款金额计算</li>
         </ul>
       </div>
     </div>
@@ -253,24 +238,12 @@
         </table>
       </div>
 
-      <h3 class="font-semibold mt-4 mb-2">寄售调拨（发货给客户）</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>进入销售页面</strong><br><span class="text-[#6e6e73]">选择订单类型为「寄售调拨」</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>选择客户</strong><br><span class="text-[#6e6e73]">选择要寄售的客户</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>添加商品</strong><br><span class="text-[#6e6e73]">添加要寄售的商品，选择出库仓位</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>提交订单</strong><br><span class="text-[#6e6e73]">确认后商品从仓库转入该客户的寄售库存</span></div></div>
-      </div>
-
-      <h3 class="font-semibold mt-4 mb-2">寄售结算</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>进入销售页面</strong><br><span class="text-[#6e6e73]">选择订单类型为「寄售结算」，或从寄售详情点击「去结算」</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>选择客户</strong><br><span class="text-[#6e6e73]">选择要结算的寄售客户</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>选择结算商品</strong><br><span class="text-[#6e6e73]">选择已售出需要结算的商品和数量</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>提交结算</strong><br><span class="text-[#6e6e73]">确认后减少客户寄售库存，生成应收账款</span></div></div>
-      </div>
-
-      <h3 class="font-semibold mt-4 mb-2">寄售退货</h3>
-      <p class="text-sm text-[#6e6e73]">将客户处未售出的寄售商品退回仓库：在寄售详情页面点击「寄售退货」，选择退货商品和入库仓位即可。</p>
+      <h3 class="font-semibold mt-4 mb-2">寄售业务流程</h3>
+      <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
+        <li><strong>寄售调拨</strong> — 在销售页面选择「寄售调拨」类型，选择客户和商品，提交后库存从仓库转入客户的寄售仓</li>
+        <li><strong>寄售结算</strong> — 在销售页面选择「寄售结算」，或从寄售详情点击「去结算」，选择已售出的商品和数量</li>
+        <li><strong>寄售退货</strong> — 在寄售详情页面点击「寄售退货」，选择退货商品和入库仓位</li>
+      </ul>
     </div>
 
     <!-- Logistics -->
@@ -294,36 +267,18 @@
         </table>
       </div>
 
-      <h3 class="font-semibold mt-4 mb-2">添加物流信息</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>进入物流详情</strong><br><span class="text-[#6e6e73]">在物流列表中点击某个订单，进入物流详情页</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>添加物流单</strong><br><span class="text-[#6e6e73]">点击「+ 添加物流单」按钮，选择快递公司并填写快递单号</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>填写手机号（部分快递）</strong><br><span class="text-[#6e6e73]">顺丰、顺丰快运、中通等需要填写收/寄件人手机号后四位才能查询物流</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>保存</strong><br><span class="text-[#6e6e73]">点击「添加」完成，系统会自动查询并更新物流状态</span></div></div>
-      </div>
-
       <h3 class="font-semibold mt-4 mb-2">常用操作</h3>
       <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
-        <li><strong>一个订单多个包裹</strong> - 可为同一订单添加多个物流单号，适合分包发货的场景</li>
-        <li><strong>复制单号</strong> - 点击「复制」按钮可一键复制快递单号，方便发给客户</li>
-        <li><strong>复制全部单号</strong> - 在物流详情中可一次性复制该订单下所有快递单号</li>
-        <li><strong>编辑/删除</strong> - 在物流详情中可修改快递公司、单号，或删除错误的物流单</li>
-        <li><strong>刷新物流</strong> - 点击刷新按钮可手动查询最新的物流轨迹</li>
-      </ul>
-
-      <h3 class="font-semibold mt-4 mb-2">筛选与搜索</h3>
-      <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
-        <li><strong>状态筛选</strong> - 点击页面顶部的状态标签（全部/待发货/已发货/在途/已签收/异常）快速过滤</li>
-        <li><strong>搜索</strong> - 支持按订单号、快递单号、客户名称搜索</li>
+        <li><strong>添加物流单</strong> — 进入物流详情 → 点击「+ 添加物流单」→ 选择快递公司 → 填写快递单号和手机号（顺丰等需要）→ 保存</li>
+        <li><strong>一个订单多个包裹</strong> — 可为同一订单添加多个物流单号，适合分包发货</li>
+        <li><strong>复制单号</strong> — 点击复制按钮可一键复制快递单号</li>
+        <li><strong>刷新物流</strong> — 手动查询最新的物流轨迹</li>
+        <li><strong>筛选搜索</strong> — 按状态标签过滤，或按订单号/快递单号/客户名称搜索</li>
       </ul>
 
       <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 text-sm text-[#0071e3]">
         <strong>物流自动更新</strong><br>
-        <ul class="list-disc list-inside mt-1 space-y-0.5">
-          <li>系统对接快递100接口，添加快递单号后会自动查询物流轨迹</li>
-          <li>物流状态会根据快递100的推送自动更新（揽收 -> 在途 -> 签收）</li>
-          <li>如遇物流信息未更新，可手动点击刷新按钮查询最新状态</li>
-        </ul>
+        系统对接快递100接口，添加快递单号后自动查询物流轨迹，状态根据快递100推送自动更新。
       </div>
     </div>
 
@@ -336,58 +291,130 @@
         <table class="guide-table w-full text-sm">
           <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">标签</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">功能</th></tr></thead>
           <tbody class="divide-y">
-            <tr><td class="px-3 py-2">订单明细</td><td class="px-3 py-2">查看所有订单详细信息，支持筛选/搜索/导出，收款按钮在导出Excel前</td></tr>
-            <tr><td class="px-3 py-2">欠款明细</td><td class="px-3 py-2">未结清的账期订单，桌面端表格视图，点击查看订单详情</td></tr>
-            <tr><td class="px-3 py-2">应收管理</td><td class="px-3 py-2">收款记录流水，桌面端表格视图，显示关联订单号，点击查看详情</td></tr>
-            <tr><td class="px-3 py-2">应付管理</td><td class="px-3 py-2">采购应付款管理，支持确认付款/取消采购单，点击查看采购详情</td></tr>
-            <tr><td class="px-3 py-2">出入库日志</td><td class="px-3 py-2">所有库存变动记录，支持按类型筛选</td></tr>
-            <tr><td class="px-3 py-2">返利管理</td><td class="px-3 py-2">客户/供应商返利余额管理，充值、查看明细、订单抵扣</td></tr>
+            <tr><td class="px-3 py-2">订单明细</td><td class="px-3 py-2">查看所有订单信息，支持筛选/搜索/导出/收款</td></tr>
+            <tr><td class="px-3 py-2">欠款明细</td><td class="px-3 py-2">未结清的账期订单列表</td></tr>
+            <tr><td class="px-3 py-2">应收管理</td><td class="px-3 py-2">收款记录流水，关联订单号</td></tr>
+            <tr><td class="px-3 py-2">应付管理</td><td class="px-3 py-2">采购应付款，确认付款/取消采购单</td></tr>
+            <tr><td class="px-3 py-2">出入库日志</td><td class="px-3 py-2">所有库存变动记录</td></tr>
+            <tr><td class="px-3 py-2">返利管理</td><td class="px-3 py-2">客户/供应商返利余额管理</td></tr>
           </tbody>
         </table>
       </div>
 
       <h3 class="font-semibold mt-4 mb-2">收款操作</h3>
       <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>进入订单明细</strong><br><span class="text-[#6e6e73]">在订单明细Tab中点击"收款"按钮</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>选择客户和订单</strong><br><span class="text-[#6e6e73]">选择客户后勾选要收款的订单，可以选择多个</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>输入收款金额</strong><br><span class="text-[#6e6e73]">输入本次收款金额，可以少于订单总额（部分收款）</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>选择收款方式</strong><br><span class="text-[#6e6e73]">选择现金、银行转账、微信、支付宝等</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">5</div><div class="text-sm"><strong>确认收款</strong><br><span class="text-[#6e6e73]">点击确认完成收款，系统自动更新订单状态</span></div></div>
-      </div>
-
-      <h3 class="font-semibold mt-4 mb-2">应付管理操作</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>查看待付款</strong><br><span class="text-[#6e6e73]">应付管理Tab显示所有待付款和已取消的采购单</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>确认付款</strong><br><span class="text-[#6e6e73]">点击"确认"按钮确认已付款，采购单进入在途状态</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>取消采购单</strong><br><span class="text-[#6e6e73]">如采购出现问题，点击"取消"按钮取消该采购单</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>进入订单明细</strong><br><span class="text-[#6e6e73]">点击「收款」按钮</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>选择客户和订单</strong><br><span class="text-[#6e6e73]">选择客户后勾选要收款的订单，可多选</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>输入金额和方式</strong><br><span class="text-[#6e6e73]">输入收款金额（可部分收款），选择收款方式</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>确认收款</strong><br><span class="text-[#6e6e73]">确认后系统自动更新订单状态，同时生成会计模块的应收单和收款单</span></div></div>
       </div>
 
       <h3 class="font-semibold mt-4 mb-2">返利管理</h3>
-      <div class="space-y-3 mb-4">
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>充值返利</strong><br><span class="text-[#6e6e73]">进入返利管理Tab，切换客户/供应商，点击"新增充值"或行内"充值"按钮，输入金额和备注</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>销售使用返利</strong><br><span class="text-[#6e6e73]">创建销售订单确认时，勾选"使用返利"，逐行输入每个商品的返利金额，系统自动减少订单总额</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>采购使用返利</strong><br><span class="text-[#6e6e73]">创建采购订单时，勾选"使用返利"，逐行输入返利金额，收货入库成本自动按返利后金额计算</span></div></div>
-        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>查看明细</strong><br><span class="text-[#6e6e73]">点击"明细"按钮查看充值和使用的完整流水记录</span></div></div>
-      </div>
-
-      <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 mb-4 text-sm text-[#0071e3]">
+      <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 text-sm text-[#0071e3]">
         <strong>返利规则</strong><br>
         <ul class="list-disc list-inside mt-1 space-y-0.5">
           <li>返利精确到每个商品行，用户手动输入每行返利金额</li>
           <li>返利总额不能超过可用余额，每行返利不能超过行金额</li>
           <li>销售返利：降低订单行金额，影响毛利计算</li>
           <li>采购返利：降低入库成本（有效单价 = 返利后行金额 / 数量）</li>
-          <li>使用返利的订单备注中会自动记录返利详情</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Accounting -->
+    <div v-if="guideSection === 'accounting'" class="guide-section">
+      <h2 class="text-lg font-bold mb-4">会计管理</h2>
+
+      <p class="text-sm text-[#6e6e73] mb-4">会计模块是系统的业财一体化核心，包含 10 个功能标签页，覆盖从日常记账到期末报表的完整会计循环。</p>
+
+      <h3 class="font-semibold mt-4 mb-2">功能标签页</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">标签</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">功能说明</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">所需权限</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-3 py-2">凭证管理</td><td class="px-3 py-2">创建/编辑/审核/过账记账凭证，支持 PDF 套打</td><td class="px-3 py-2">查看/录入/审核/过账</td></tr>
+            <tr><td class="px-3 py-2">科目管理</td><td class="px-3 py-2">查看和维护会计科目表（预置 32 个标准科目，支持 4 级）</td><td class="px-3 py-2">查看/录入</td></tr>
+            <tr><td class="px-3 py-2">会计期间</td><td class="px-3 py-2">管理月度会计期间，支持按年批量初始化</td><td class="px-3 py-2">期末处理</td></tr>
+            <tr><td class="px-3 py-2">账簿查询</td><td class="px-3 py-2">总分类账、明细分类账、科目余额表，支持 Excel 导出</td><td class="px-3 py-2">查看</td></tr>
+            <tr><td class="px-3 py-2">应收管理</td><td class="px-3 py-2">应收单、收款单、收款退款单、应收核销，批量生成凭证</td><td class="px-3 py-2">应收查看/编辑/确认</td></tr>
+            <tr><td class="px-3 py-2">应付管理</td><td class="px-3 py-2">应付单、付款单、付款退款单，批量生成凭证</td><td class="px-3 py-2">应付查看/编辑/确认</td></tr>
+            <tr><td class="px-3 py-2">发票管理</td><td class="px-3 py-2">销项发票（从应收单推送）、进项发票，确认后自动生成凭证</td><td class="px-3 py-2">查看/录入/审核</td></tr>
+            <tr><td class="px-3 py-2">出入库单</td><td class="px-3 py-2">销售出库单和采购入库单（业务自动生成），支持 PDF 套打</td><td class="px-3 py-2">查看</td></tr>
+            <tr><td class="px-3 py-2">期末处理</td><td class="px-3 py-2">损益结转、结账检查、期末结账/反结账、年度结转</td><td class="px-3 py-2">期末处理</td></tr>
+            <tr><td class="px-3 py-2">财务报表</td><td class="px-3 py-2">资产负债表、利润表、现金流量表，支持 Excel/PDF 导出</td><td class="px-3 py-2">查看</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">凭证状态流转</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">状态</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">说明</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">操作</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-3 py-2">草稿</td><td class="px-3 py-2">凭证创建或退回后</td><td class="px-3 py-2">编辑、删除、提交</td></tr>
+            <tr><td class="px-3 py-2">已提交</td><td class="px-3 py-2">等待审核</td><td class="px-3 py-2">审核通过、退回</td></tr>
+            <tr><td class="px-3 py-2">已审核</td><td class="px-3 py-2">审核通过待过账</td><td class="px-3 py-2">过账</td></tr>
+            <tr><td class="px-3 py-2">已过账</td><td class="px-3 py-2">正式入账</td><td class="px-3 py-2">反过账（需权限）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">科目体系</h3>
+      <p class="text-sm text-[#6e6e73] mb-2">系统预置 32 个标准会计科目，支持最多 4 级科目体系：</p>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">科目类别</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">主要科目</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-3 py-2">资产类</td><td class="px-3 py-2">银行存款(1002)、应收账款(1122)、库存商品(1405)、发出商品(1407)</td></tr>
+            <tr><td class="px-3 py-2">负债类</td><td class="px-3 py-2">应付账款(2202)、预收账款(2203)、应交税费(2221)</td></tr>
+            <tr><td class="px-3 py-2">权益类</td><td class="px-3 py-2">实收资本(4001)、本年利润(4103)、利润分配(4104)</td></tr>
+            <tr><td class="px-3 py-2">损益类</td><td class="px-3 py-2">主营业务收入(6001)、主营业务成本(6401)、管理费用(6602)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">业财联动说明</h3>
+      <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 mb-4 text-sm text-[#0071e3]">
+        <strong>自动生成的单据和凭证</strong><br>
+        <ul class="list-disc list-inside mt-1 space-y-0.5">
+          <li><strong>销售发货</strong> → 自动生成销售出库单 + 出库凭证（借：发出商品，贷：库存商品）</li>
+          <li><strong>采购收货</strong> → 自动生成入库单 + 入库凭证（借：库存商品/进项税额，贷：应付账款）</li>
+          <li><strong>收款确认</strong> → 自动生成应收单和收款单</li>
+          <li><strong>采购付款</strong> → 自动生成应付单和付款单</li>
+          <li><strong>发票确认</strong> → 自动生成发票凭证（含收入/税额/成本分录）</li>
+          <li><strong>期末批量生成</strong> → 一键为当期已确认的收款单/付款单生成记账凭证</li>
         </ul>
       </div>
 
-      <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 text-sm text-[#0071e3]">
-        <strong>收款规则</strong><br>
+      <h3 class="font-semibold mt-4 mb-2">期末处理流程</h3>
+      <div class="space-y-3 mb-4">
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>检查凭证</strong><br><span class="text-[#6e6e73]">确保当期所有凭证已过账，所有收付款单据已确认</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>批量生成凭证</strong><br><span class="text-[#6e6e73]">在应收/应付标签页点击「批量生成凭证」，为已确认的单据自动生成记账凭证</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>损益结转</strong><br><span class="text-[#6e6e73]">点击「预览结转」查看本期损益，确认无误后执行结转（自动生成转字凭证）</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>结账检查</strong><br><span class="text-[#6e6e73]">系统自动检查 5 项：未过账凭证、未确认单据、借贷平衡等</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">5</div><div class="text-sm"><strong>期末结账</strong><br><span class="text-[#6e6e73]">所有检查通过后执行结账，锁定当期数据</span></div></div>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">财务报表</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">报表</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">说明</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">导出格式</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-3 py-2">资产负债表</td><td class="px-3 py-2">反映企业某一时点的资产、负债和所有者权益</td><td class="px-3 py-2">Excel / PDF</td></tr>
+            <tr><td class="px-3 py-2">利润表</td><td class="px-3 py-2">反映企业一定期间的收入、成本和利润（本期 + 本年累计）</td><td class="px-3 py-2">Excel / PDF</td></tr>
+            <tr><td class="px-3 py-2">现金流量表</td><td class="px-3 py-2">反映企业现金流入和流出（简易直接法）</td><td class="px-3 py-2">Excel / PDF</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-[#fff8e1] border border-[#ffe082] rounded p-3 text-sm text-[#ff9f0a]">
+        <strong>注意事项</strong><br>
         <ul class="list-disc list-inside mt-1 space-y-0.5">
-          <li>收款金额会按照订单顺序自动分配</li>
-          <li>当某订单已付金额等于订单金额时，订单自动标记为「已结清」</li>
-          <li>收款记录会永久保存</li>
-          <li>订单详情中会显示每笔收款的具体付款方式和确认状态</li>
+          <li>首次使用需要在「设置 → 账套管理」中创建账套，系统会自动初始化 32 个标准科目</li>
+          <li>凭证的借贷金额必须平衡才能保存</li>
+          <li>已过账的凭证需要先反过账才能修改</li>
+          <li>结账后如需修改，需先反结账</li>
+          <li>年末 12 月结账时建议先执行年度结转（本年利润 → 利润分配）</li>
         </ul>
       </div>
     </div>
@@ -410,26 +437,13 @@
         </table>
       </div>
 
-      <h3 class="font-semibold mt-4 mb-2">新增客户</h3>
-      <div class="overflow-x-auto mb-4">
-        <table class="guide-table w-full text-sm">
-          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">字段</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">是否必填</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">说明</th></tr></thead>
-          <tbody class="divide-y">
-            <tr><td class="px-3 py-2">客户名称</td><td class="px-3 py-2">必填</td><td class="px-3 py-2">客户的公司或个人名称</td></tr>
-            <tr><td class="px-3 py-2">联系人</td><td class="px-3 py-2">选填</td><td class="px-3 py-2">主要联系人</td></tr>
-            <tr><td class="px-3 py-2">电话</td><td class="px-3 py-2">选填</td><td class="px-3 py-2">联系电话</td></tr>
-            <tr><td class="px-3 py-2">地址</td><td class="px-3 py-2">选填</td><td class="px-3 py-2">详细地址</td></tr>
-          </tbody>
-        </table>
-      </div>
-
       <h3 class="font-semibold mt-4 mb-2">客户交易明细</h3>
       <p class="text-sm text-[#6e6e73] mb-2">点击客户名称可查看该客户的交易详情：</p>
       <ul class="text-sm text-[#6e6e73] space-y-2 list-disc list-inside">
-        <li><strong>交易统计</strong> - 显示各类型订单的数量和金额汇总</li>
-        <li><strong>类型筛选</strong> - 可按订单类型筛选查看（点击统计卡片快速筛选）</li>
-        <li><strong>月份筛选</strong> - 可按月份筛选查看交易记录</li>
-        <li><strong>订单详情</strong> - 点击订单号查看详情，左上角返回按钮可返回</li>
+        <li><strong>交易统计</strong> — 各类型订单的数量和金额汇总</li>
+        <li><strong>类型筛选</strong> — 按订单类型筛选（点击统计卡片快速筛选）</li>
+        <li><strong>月份筛选</strong> — 按月份查看交易记录</li>
+        <li><strong>订单详情</strong> — 点击订单号查看完整详情</li>
       </ul>
     </div>
 
@@ -437,36 +451,21 @@
     <div v-if="guideSection === 'settings'" class="guide-section">
       <h2 class="text-lg font-bold mb-4">系统设置</h2>
 
-      <h3 class="font-semibold mt-4 mb-2">仓库管理</h3>
-      <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
-        <li><strong>新增仓库</strong> - 输入仓库名称后点击「创建」</li>
-        <li><strong>编辑仓库</strong> - 点击仓库名称可修改名称</li>
-        <li><strong>设为默认</strong> - 设置默认仓库，入库时自动选中</li>
-        <li><strong>删除仓库</strong> - 只能删除没有库存的仓库</li>
-      </ul>
-
-      <h3 class="font-semibold mt-4 mb-2">仓位管理</h3>
-      <ul class="text-sm text-[#6e6e73] space-y-2 mb-4 list-disc list-inside">
-        <li><strong>新增仓位</strong> - 输入仓位编码（如 A-01、B-02）后点击「创建」</li>
-        <li><strong>编辑仓位</strong> - 点击仓位可修改编码和名称</li>
-        <li><strong>删除仓位</strong> - 只能删除没有库存的仓位</li>
-      </ul>
-
-      <div class="bg-[#e8f4fd] border border-[#b3d7f5] rounded p-3 mb-4 text-sm text-[#0071e3]">
-        <strong>仓位编码建议</strong><br>
-        建议使用有规律的编码方式，如：A-01、A-02（A区1号、2号货架）或 1F-A、1F-B（1楼A区、B区）
-      </div>
-
-      <h3 class="font-semibold mt-4 mb-2">用户管理</h3>
+      <h3 class="font-semibold mt-4 mb-2">设置标签页</h3>
       <div class="overflow-x-auto mb-4">
         <table class="guide-table w-full text-sm">
-          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">字段</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">说明</th></tr></thead>
+          <thead><tr><th class="px-3 py-2 text-left bg-[#f5f5f7]">标签</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">功能</th><th class="px-3 py-2 text-left bg-[#f5f5f7]">权限要求</th></tr></thead>
           <tbody class="divide-y">
-            <tr><td class="px-3 py-2">用户名</td><td class="px-3 py-2">登录账号，创建后不可修改</td></tr>
-            <tr><td class="px-3 py-2">显示名称</td><td class="px-3 py-2">系统中显示的名称</td></tr>
-            <tr><td class="px-3 py-2">密码</td><td class="px-3 py-2">登录密码，建议使用复杂密码</td></tr>
-            <tr><td class="px-3 py-2">角色</td><td class="px-3 py-2">admin（管理员）或 user（普通用户）</td></tr>
-            <tr><td class="px-3 py-2">权限</td><td class="px-3 py-2">勾选该用户可以访问的功能模块</td></tr>
+            <tr><td class="px-3 py-2">仓库管理</td><td class="px-3 py-2">新增/编辑/删除仓库，设置默认仓库和关联账套</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">仓位管理</td><td class="px-3 py-2">按仓库管理仓位编码（如 A-01、B-02）</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">收款方式</td><td class="px-3 py-2">管理销售收款方式（现金、银行转账、微信等）</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">付款方式</td><td class="px-3 py-2">管理采购付款方式</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">销售员</td><td class="px-3 py-2">管理销售员列表</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">用户管理</td><td class="px-3 py-2">创建用户、修改密码、启用/禁用账号</td><td class="px-3 py-2">管理员</td></tr>
+            <tr><td class="px-3 py-2">权限管理</td><td class="px-3 py-2">为每个用户配置细粒度权限（iOS 风格开关矩阵）</td><td class="px-3 py-2">管理员</td></tr>
+            <tr><td class="px-3 py-2">操作日志</td><td class="px-3 py-2">查看系统操作审计日志</td><td class="px-3 py-2">日志权限</td></tr>
+            <tr><td class="px-3 py-2">SN 码配置</td><td class="px-3 py-2">按仓库+品牌启用 SN 码管理</td><td class="px-3 py-2">系统设置</td></tr>
+            <tr><td class="px-3 py-2">备份管理</td><td class="px-3 py-2">手动/自动备份、恢复、下载、删除</td><td class="px-3 py-2">管理员</td></tr>
           </tbody>
         </table>
       </div>
@@ -477,6 +476,7 @@
           <li>定期更换密码，避免使用简单密码</li>
           <li>为不同岗位的员工分配最小必要权限</li>
           <li>员工离职后及时禁用其账号</li>
+          <li>定期检查备份是否正常执行</li>
         </ul>
       </div>
     </div>
@@ -488,11 +488,11 @@
       <div class="space-y-4">
         <div class="card p-4">
           <h4 class="font-semibold text-sm mb-1">Q: 忘记密码怎么办？</h4>
-          <p class="text-sm text-[#6e6e73]">A: 请联系系统管理员重置密码。管理员可以在「设置 -> 用户管理」中编辑用户并设置新密码。</p>
+          <p class="text-sm text-[#6e6e73]">A: 请联系系统管理员重置密码。管理员可以在「设置 → 用户管理」中编辑用户并设置新密码。</p>
         </div>
         <div class="card p-4">
           <h4 class="font-semibold text-sm mb-1">Q: 库存数量显示负数怎么办？</h4>
-          <p class="text-sm text-[#6e6e73]">A: 正常情况下不应该出现负库存。请检查是否有重复出库的订单，联系管理员通过入库操作修正库存。</p>
+          <p class="text-sm text-[#6e6e73]">A: 正常情况下不应该出现负库存。请检查是否有重复出库的订单，联系管理员通过库存调整或入库操作修正。</p>
         </div>
         <div class="card p-4">
           <h4 class="font-semibold text-sm mb-1">Q: 订单提交后发现错误怎么办？</h4>
@@ -504,18 +504,26 @@
         </div>
         <div class="card p-4">
           <h4 class="font-semibold text-sm mb-1">Q: 如何备份数据？</h4>
-          <p class="text-sm text-[#6e6e73]">A: 系统数据存储在 data/erp.db 文件中。建议定期复制该文件到安全位置，或使用「导出」功能导出重要数据。</p>
+          <p class="text-sm text-[#6e6e73]">A: 系统使用 PostgreSQL 数据库，支持自动和手动备份。在「设置 → 备份管理」中可以手动创建备份、下载备份文件或恢复历史备份。系统默认每日凌晨 3 点自动备份，保留 30 天。</p>
         </div>
         <div class="card p-4">
           <h4 class="font-semibold text-sm mb-1">Q: 如何获取初始账号？</h4>
-          <p class="text-sm text-[#6e6e73]">A: 请联系系统管理员获取初始账号和密码。首次登录后请尽快修改默认密码！</p>
+          <p class="text-sm text-[#6e6e73]">A: 请联系系统管理员获取初始账号和密码。首次登录后系统会强制要求修改密码。</p>
+        </div>
+        <div class="card p-4">
+          <h4 class="font-semibold text-sm mb-1">Q: 凭证借贷不平衡怎么办？</h4>
+          <p class="text-sm text-[#6e6e73]">A: 系统要求凭证的借方合计和贷方合计必须相等才能保存。请检查每一行分录的金额是否正确。业务自动生成的凭证（出入库、发票确认等）会自动保证借贷平衡。</p>
+        </div>
+        <div class="card p-4">
+          <h4 class="font-semibold text-sm mb-1">Q: 期末结账失败怎么办？</h4>
+          <p class="text-sm text-[#6e6e73]">A: 结账前系统会执行 5 项检查（未过账凭证、未确认单据等），任一项未通过都不能结账。请根据检查结果逐项处理后重试。</p>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="mt-8 pt-4 border-t border-[#d2d2d7] text-center text-xs text-[#86868b]">
-      <p>轻量级ERP系统 v4.8 使用手册 | 如有疑问，请联系系统管理员</p>
+      <p>轻量级ERP系统 v4.15 使用手册 | 如有疑问，请联系系统管理员</p>
     </div>
   </div>
 </template>
@@ -533,6 +541,7 @@ const sections = [
   { key: 'consignment', label: '寄售管理' },
   { key: 'logistics', label: '物流管理' },
   { key: 'finance', label: '财务管理' },
+  { key: 'accounting', label: '会计管理' },
   { key: 'customers', label: '客户管理' },
   { key: 'settings', label: '系统设置' },
   { key: 'faq', label: '常见问题' },

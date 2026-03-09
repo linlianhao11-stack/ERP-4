@@ -195,7 +195,7 @@ const handleAdd = async () => {
 }
 
 const deactivateAccount = async (account) => {
-  if (!confirm(`确定停用科目 ${account.code} ${account.name}？`)) return
+  if (!await appStore.customConfirm('停用确认', `确定停用科目 ${account.code} ${account.name}？`)) return
   try {
     await deleteChartOfAccount(account.id)
     appStore.showToast('已停用', 'success')

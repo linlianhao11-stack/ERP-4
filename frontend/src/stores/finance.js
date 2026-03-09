@@ -20,7 +20,7 @@ export const useFinanceStore = defineStore('finance', () => {
       if (orderFilter.end) params.end_date = orderFilter.end
       if (orderFilter.search) params.search = orderFilter.search
       const { data } = await getAllOrders(params)
-      allOrders.value = data
+      allOrders.value = data.items || data
     } catch (e) {
       console.error('加载订单失败', e)
     }

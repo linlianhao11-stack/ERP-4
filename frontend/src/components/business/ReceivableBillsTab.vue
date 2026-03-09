@@ -208,7 +208,7 @@ async function handleCreate() {
 }
 
 async function cancelBill(b) {
-  if (!confirm(`确认取消应收单 ${b.bill_no}？`)) return
+  if (!await appStore.customConfirm('作废确认', `确认取消应收单 ${b.bill_no}？`)) return
   try {
     await cancelReceivableBill(b.id)
     appStore.showToast('已取消', 'success')

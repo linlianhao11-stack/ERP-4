@@ -348,19 +348,22 @@ const handleSubmit = async (v) => {
   catch (e) { appStore.showToast(e.response?.data?.detail || '提交失败', 'error') }
 }
 const handleApprove = async (v) => {
+  if (!await appStore.customConfirm('审核确认', `确定审核通过凭证 ${v.voucher_no}？`)) return
   try { await approveVoucher(v.id); appStore.showToast('审核通过', 'success'); await loadList() }
   catch (e) { appStore.showToast(e.response?.data?.detail || '审核失败', 'error') }
 }
 const handleReject = async (v) => {
+  if (!await appStore.customConfirm('驳回确认', `确定驳回凭证 ${v.voucher_no}？驳回后凭证将回到草稿状态。`)) return
   try { await rejectVoucher(v.id); appStore.showToast('已驳回', 'success'); await loadList() }
   catch (e) { appStore.showToast(e.response?.data?.detail || '驳回失败', 'error') }
 }
 const handlePost = async (v) => {
+  if (!await appStore.customConfirm('过账确认', `确定过账凭证 ${v.voucher_no}？过账后将影响账簿数据。`)) return
   try { await postVoucher(v.id); appStore.showToast('过账成功', 'success'); await loadList() }
   catch (e) { appStore.showToast(e.response?.data?.detail || '过账失败', 'error') }
 }
 const handleUnpost = async (v) => {
-  if (!confirm(`确定反过账凭证 ${v.voucher_no}？反过账后凭证将回到已审核状态。`)) return
+  if (!await appStore.customConfirm('确认操作', `确定反过账凭证 ${v.voucher_no}？反过账后凭证将回到已审核状态。`)) return
   try {
     await unpostVoucher(v.id)
     appStore.showToast('反过账成功', 'success')
@@ -369,7 +372,7 @@ const handleUnpost = async (v) => {
   } catch (e) { appStore.showToast(e.response?.data?.detail || '反过账失败', 'error') }
 }
 const handleDelete = async (v) => {
-  if (!confirm(`确定删除凭证 ${v.voucher_no}？`)) return
+  if (!await appStore.customConfirm('删除确认', `确定删除凭证 ${v.voucher_no}？`)) return
   try { await deleteVoucher(v.id); appStore.showToast('删除成功', 'success'); await loadList() }
   catch (e) { appStore.showToast(e.response?.data?.detail || '删除失败', 'error') }
 }
