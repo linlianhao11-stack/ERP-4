@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Customer, Order, OrderItem
+from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.customer import CustomerCreate
 from app.utils.query_helpers import paginated_query
 
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/api/customers", tags=["客户管理"])
 
 
 @router.get("")
-async def list_customers(keyword: Optional[str] = None, limit: int = 200, offset: int = 0, user: User = Depends(get_current_user)):
+async def list_customers(keyword: Optional[str] = None, limit: int = 200, offset: int = 0, user: User = Depends(require_permission("customer", "sales", "finance"))):
     customers, total = await paginated_query(
         Customer, filters={"is_active": True}, keyword=keyword,
         keyword_fields=["name", "phone"], order_by="name", offset=offset, limit=limit
@@ -39,7 +40,10 @@ async def delete_customer(customer_id: int, user: User = Depends(require_permiss
     c = await Customer.filter(id=customer_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="客户不存在")
-    if c.balance != 0 or c.rebate_balance != 0:
+    has_account_balance = await CustomerAccountBalance.filter(
+        customer_id=customer_id, rebate_balance__gt=0
+    ).exists()
+    if c.balance != 0 or c.rebate_balance != 0 or has_account_balance:
         raise HTTPException(status_code=400, detail="客户有未结清款项或返利余额，无法删除")
     # Check for associated orders before deletion
     order_count = await Order.filter(customer_id=customer_id).count()
@@ -51,7 +55,7 @@ async def delete_customer(customer_id: int, user: User = Depends(require_permiss
 
 
 @router.get("/{customer_id}/transactions")
-async def get_customer_transactions(customer_id: int, year: Optional[int] = None, month: Optional[int] = None, user: User = Depends(get_current_user)):
+async def get_customer_transactions(customer_id: int, year: Optional[int] = None, month: Optional[int] = None, user: User = Depends(require_permission("customer", "finance"))):
     customer = await Customer.filter(id=customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")

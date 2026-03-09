@@ -241,10 +241,12 @@ async def process_rebate_deduction(data, customer, order, order_no, user):
         bal = await CustomerAccountBalance.filter(
             customer_id=customer.id, account_set_id=account_set_id
         ).select_for_update().first()
-        current_balance = bal.rebate_balance if bal else Decimal("0")
-        if current_balance < total_rebate:
+        if not bal:
             raise HTTPException(status_code=400,
-                detail=f"客户返利余额不足，可用 ¥{float(current_balance):.2f}，"
+                detail=f"客户返利余额不足，可用 ¥0.00，需要 ¥{float(total_rebate):.2f}")
+        if bal.rebate_balance < total_rebate:
+            raise HTTPException(status_code=400,
+                detail=f"客户返利余额不足，可用 ¥{float(bal.rebate_balance):.2f}，"
                        f"需要 ¥{float(total_rebate):.2f}")
         await CustomerAccountBalance.filter(id=bal.id).update(
             rebate_balance=F('rebate_balance') - total_rebate
