@@ -35,3 +35,15 @@ backups/
 
 # Worktrees
 .worktrees/
+
+# 文档/二进制文件
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.docx
+*.doc
+*.xlsx
+*.xls
+调研报告/
