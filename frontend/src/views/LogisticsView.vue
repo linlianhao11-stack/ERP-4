@@ -3,27 +3,27 @@
     <!-- 状态筛选 Tabs -->
     <div class="flex flex-wrap gap-1 mb-3">
       <span
-        @click="shipmentFilter.status = ''; loadShipments()"
+        @click="shipmentFilter.status = ''; resetPage(); loadShipments()"
         :class="['tab', !shipmentFilter.status ? 'active' : '']"
       >全部</span>
       <span
-        @click="shipmentFilter.status = 'pending'; loadShipments()"
+        @click="shipmentFilter.status = 'pending'; resetPage(); loadShipments()"
         :class="['tab', shipmentFilter.status === 'pending' ? 'active' : '']"
       >待发货</span>
       <span
-        @click="shipmentFilter.status = 'shipped'; loadShipments()"
+        @click="shipmentFilter.status = 'shipped'; resetPage(); loadShipments()"
         :class="['tab', shipmentFilter.status === 'shipped' ? 'active' : '']"
       >已发货</span>
       <span
-        @click="shipmentFilter.status = 'in_transit'; loadShipments()"
+        @click="shipmentFilter.status = 'in_transit'; resetPage(); loadShipments()"
         :class="['tab', shipmentFilter.status === 'in_transit' ? 'active' : '']"
       >在途</span>
       <span
-        @click="shipmentFilter.status = 'signed'; loadShipments()"
+        @click="shipmentFilter.status = 'signed'; resetPage(); loadShipments()"
         :class="['tab', shipmentFilter.status === 'signed' ? 'active' : '']"
       >已签收</span>
       <span
-        @click="shipmentFilter.status = 'problem'; loadShipments()"
+        @click="shipmentFilter.status = 'problem'; resetPage(); loadShipments()"
         :class="['tab', shipmentFilter.status === 'problem' ? 'active' : '']"
       >异常</span>
     </div>
@@ -119,7 +119,7 @@
               </td>
               <td v-if="isColumnVisible('shipped_at')" class="p-3 text-xs text-secondary whitespace-nowrap">{{ s.created_at ? fmtDate(s.created_at) : '-' }}</td>
               <td v-if="isColumnVisible('status')" class="p-3">
-                <span :class="['text-xs px-2 py-1 rounded-full', getShipmentStatusBadge(s.status)]">{{ s.status_text }}</span>
+                <span :class="['text-xs px-2 py-1 rounded-full', getShipmentStatusBadge(s.status)]">{{ getShipmentStatusName(s.status, s.status_text) }}</span>
               </td>
               <td v-if="isColumnVisible('last_info')" class="p-3 text-xs text-secondary max-w-[200px] truncate" :title="s.last_info">{{ s.last_info || '-' }}</td>
               <td v-if="isColumnVisible('actions')" class="p-3" @click.stop>
@@ -150,7 +150,7 @@
           </span>
           <div class="flex gap-1">
             <span :class="getShippingBadge(s.shipping_status)" class="text-xs">{{ getShippingName(s.shipping_status) }}</span>
-            <span :class="['text-xs px-2 py-0.5 rounded-full', getShipmentStatusBadge(s.status)]">{{ s.status_text }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded-full', getShipmentStatusBadge(s.status)]">{{ getShipmentStatusName(s.status, s.status_text) }}</span>
           </div>
         </div>
         <div class="flex justify-between items-center mb-1.5">
@@ -175,6 +175,12 @@
       </div>
       <div v-if="!shipments.length" class="card p-6 text-center text-muted text-sm">暂无物流记录</div>
     </div>
+    <!-- 分页 -->
+    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
+      <button @click="prevPage(); loadShipments()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
+      <button @click="nextPage(); loadShipments()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
+    </div>
 
     <!-- 物流详情弹窗 -->
     <ShipmentDetailModal
@@ -196,7 +202,7 @@ import { ref } from 'vue'
 import { useFormat } from '../composables/useFormat'
 import { useShipment } from '../composables/useShipment'
 import { useAppStore } from '../stores/app'
-import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../utils/constants'
+import { orderTypeNames, orderTypeBadges, shipmentStatusNames, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../utils/constants'
 import ShipmentDetailModal from '../components/business/logistics/ShipmentDetailModal.vue'
 
 const appStore = useAppStore()
@@ -216,7 +222,8 @@ const {
   isColumnVisible,
   toggleSort,
   loadShipments,
-  debouncedLoadShipments
+  debouncedLoadShipments,
+  page, totalPages, hasPagination, resetPage, prevPage, nextPage
 } = useShipment()
 
 // ---- 弹窗控制 ----
@@ -234,6 +241,7 @@ const viewShipment = (orderId) => {
 const getOrderTypeName = (type) => orderTypeNames[type] || type
 const getOrderTypeBadge = (type) => orderTypeBadges[type] || 'badge badge-gray'
 const getShipmentStatusBadge = (status) => shipmentStatusBadges[status] || 'bg-elevated text-secondary'
+const getShipmentStatusName = (status, fallback) => shipmentStatusNames[status] || fallback || status || '-'
 const getShippingName = (status) => shippingStatusNames[status] || status || '-'
 const getShippingBadge = (status) => shippingStatusBadges[status] || 'badge badge-gray'
 

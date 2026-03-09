@@ -105,4 +105,17 @@ api.interceptors.response.use(
   }
 )
 
+// GET 请求去重：同一 URL + params 的并发 GET 共享同一个 Promise
+const _pendingGets = new Map()
+const _originalGet = api.get.bind(api)
+api.get = function dedupGet(url, config = {}) {
+  if (config.responseType) return _originalGet(url, config)
+  const paramStr = config.params ? JSON.stringify(config.params) : ''
+  const key = `${url}:${paramStr}`
+  if (_pendingGets.has(key)) return _pendingGets.get(key)
+  const promise = _originalGet(url, config).finally(() => _pendingGets.delete(key))
+  _pendingGets.set(key, promise)
+  return promise
+}
+
 export default api

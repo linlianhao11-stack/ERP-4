@@ -8,6 +8,7 @@ import {
   orderTypeBadges, orderTypeNames,
   logTypeBadges, logTypeNames,
   purchaseStatusBadges, purchaseStatusNames,
+  shipmentStatusBadges, shipmentStatusNames,
   shippingStatusBadges, shippingStatusNames
 } from '../../utils/constants'
 
@@ -31,6 +32,7 @@ const badgeMap = {
   orderType: orderTypeBadges,
   logType: logTypeBadges,
   purchaseStatus: purchaseStatusBadges,
+  shipmentStatus: shipmentStatusBadges,
   shippingStatus: shippingStatusBadges
 }
 
@@ -38,6 +40,7 @@ const nameMap = {
   orderType: orderTypeNames,
   logType: logTypeNames,
   purchaseStatus: purchaseStatusNames,
+  shipmentStatus: shipmentStatusNames,
   shippingStatus: shippingStatusNames
 }
 

@@ -1,18 +1,20 @@
 <template>
   <div>
     <div class="flex items-center gap-2 mb-3 border-b pb-2">
-      <span @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应付单</span>
-      <span @click="sub = 'disbursements'" :class="['tab', sub === 'disbursements' ? 'active' : '']">付款单</span>
-      <span @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">付款退款</span>
-      <span @click="sub = 'receipt'" :class="['tab', sub === 'receipt' ? 'active' : '']">入库单</span>
+      <button role="tab" :aria-selected="sub === 'bills'" @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应付单</button>
+      <button role="tab" :aria-selected="sub === 'disbursements'" @click="sub = 'disbursements'" :class="['tab', sub === 'disbursements' ? 'active' : '']">付款单</button>
+      <button role="tab" :aria-selected="sub === 'refunds'" @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">付款退款</button>
+      <button role="tab" :aria-selected="sub === 'receipt'" @click="sub = 'receipt'" :class="['tab', sub === 'receipt' ? 'active' : '']">入库单</button>
       <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">
         {{ generating ? '生成中...' : '批量生成凭证' }}
       </button>
     </div>
-    <PayableBillsTab v-if="sub === 'bills'" />
-    <DisbursementBillsTab v-if="sub === 'disbursements'" />
-    <DisbursementRefundBillsTab v-if="sub === 'refunds'" />
-    <PurchaseReceiptTab v-if="sub === 'receipt'" />
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <PayableBillsTab v-if="sub === 'bills'" key="bills" />
+      <DisbursementBillsTab v-else-if="sub === 'disbursements'" key="disbursements" />
+      <DisbursementRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" />
+      <PurchaseReceiptTab v-else-if="sub === 'receipt'" key="receipt" />
+    </Transition>
   </div>
 </template>
 

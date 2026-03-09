@@ -15,6 +15,19 @@ export default defineConfig({
   build: {
     outDir: '../backend/static',
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-charts': ['chart.js'],
+          'vendor-icons': ['lucide-vue-next'],
+          'vendor-http': ['axios'],
+        }
+      }
+    }
+  },
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : []
   }
 })

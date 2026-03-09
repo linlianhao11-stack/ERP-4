@@ -1,54 +1,76 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-canvas">
-    <div class="w-full max-w-[400px]">
-      <!-- Logo & Brand -->
-      <div class="text-center mb-10">
-        <div class="w-14 h-14 bg-foreground rounded-[16px] mx-auto mb-5 flex items-center justify-center shadow-lg text-canvas">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/></svg>
+  <div class="login-page">
+    <!-- 左侧品牌区（背景图 + 文案） -->
+    <div class="login-brand">
+      <div class="login-brand-content">
+        <div class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/></svg>
         </div>
-        <h1 class="text-[22px] font-semibold text-foreground tracking-tight">ERP System</h1>
-        <p class="text-[13px] text-muted mt-1">企业资源管理平台</p>
+        <h1 class="brand-headline">精准掌控<br>每一笔账</h1>
+        <p class="brand-tagline">面向中小贸易企业的一体化资源管理平台。销售、库存、财务、会计，一处搞定。</p>
+        <div class="brand-stats">
+          <div><div class="stat-val">38</div><div class="stat-label">核心数据表</div></div>
+          <div><div class="stat-val">12</div><div class="stat-label">业务模块</div></div>
+          <div><div class="stat-val">5</div><div class="stat-label">财务报表</div></div>
+        </div>
       </div>
+    </div>
 
-      <!-- Card -->
-      <div class="bg-surface rounded-[20px] border border-line shadow-sm p-8">
+    <!-- 右侧表单区 -->
+    <div class="login-form-panel">
+      <div class="login-form-inner">
+        <img src="/logo.png" alt="CHEERIN 启领科技" class="login-logo">
+        <h2 class="form-greeting">欢迎回来</h2>
+        <p class="form-subtitle">登录以继续访问您的工作台</p>
+
         <!-- 强制改密表单 -->
-        <form v-if="showChangePwd" @submit.prevent="doChangePassword" class="space-y-5">
+        <form v-if="showChangePwd" @submit.prevent="doChangePassword" class="space-y-4">
           <div class="flex items-start gap-3 p-3.5 bg-warning-subtle rounded-xl border border-warning">
             <Lock :size="16" :stroke-width="1.5" class="text-warning mt-0.5 shrink-0" />
             <span class="text-[13px] text-foreground leading-relaxed">首次登录，请修改默认密码后继续使用</span>
           </div>
           <div>
-            <label class="label">新密码</label>
-            <input v-model="pwdForm.new_password" type="password" class="input" placeholder="请输入新密码（至少6位）">
+            <label class="label" for="new-pwd">新密码</label>
+            <div class="input-with-icon">
+              <Lock :size="16" :stroke-width="1.5" class="input-icon-el" />
+              <input id="new-pwd" v-model="pwdForm.new_password" type="password" class="input input-icon-pad" placeholder="请输入新密码（至少6位）">
+            </div>
           </div>
           <div>
-            <label class="label">确认新密码</label>
-            <input v-model="pwdForm.confirm_password" type="password" class="input" placeholder="请再次输入新密码">
+            <label class="label" for="confirm-pwd">确认新密码</label>
+            <div class="input-with-icon">
+              <Lock :size="16" :stroke-width="1.5" class="input-icon-el" />
+              <input id="confirm-pwd" v-model="pwdForm.confirm_password" type="password" class="input input-icon-pad" placeholder="请再次输入新密码">
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary w-full h-11 text-[15px]" :disabled="loading">
+          <button type="submit" class="login-btn" :disabled="loading">
             {{ loading ? '修改中...' : '修改密码并进入系统' }}
           </button>
         </form>
 
         <!-- 登录表单 -->
-        <form v-else @submit.prevent="doLogin" class="space-y-5">
+        <form v-else @submit.prevent="doLogin" class="space-y-4">
           <div>
-            <label class="label">用户名</label>
-            <input v-model="form.username" class="input" placeholder="请输入用户名" autofocus>
+            <label class="label" for="username">用户名</label>
+            <div class="input-with-icon">
+              <User :size="16" :stroke-width="1.5" class="input-icon-el" />
+              <input id="username" v-model="form.username" class="input input-icon-pad" placeholder="请输入用户名" autofocus>
+            </div>
           </div>
           <div>
-            <label class="label">密码</label>
-            <input v-model="form.password" type="password" class="input" placeholder="请输入密码">
+            <label class="label" for="password">密码</label>
+            <div class="input-with-icon">
+              <Lock :size="16" :stroke-width="1.5" class="input-icon-el" />
+              <input id="password" v-model="form.password" type="password" class="input input-icon-pad" placeholder="请输入密码">
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary w-full h-11 text-[15px]" :disabled="loading">
+          <button type="submit" class="login-btn" :disabled="loading">
             {{ loading ? '登录中...' : '登录' }}
           </button>
         </form>
-      </div>
 
-      <!-- Footer -->
-      <p class="text-center text-[11px] text-muted mt-8">&copy; {{ new Date().getFullYear() }} ERP System</p>
+        <div class="login-footer-text">&copy; {{ new Date().getFullYear() }} 启领科技 · ERP System</div>
+      </div>
     </div>
   </div>
 </template>
@@ -59,7 +81,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import { login, changePassword } from '../api/auth'
-import { Lock } from 'lucide-vue-next'
+import { Lock, User } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -132,3 +154,195 @@ const doChangePassword = async () => {
   }
 }
 </script>
+
+<style scoped>
+.login-page {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* === 左侧品牌区 === */
+.login-brand {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: oklch(0.10 0.02 250);
+  display: none;
+}
+@media (min-width: 768px) {
+  .login-brand { display: flex; }
+}
+.login-brand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1400&q=85");
+  background-size: cover;
+  background-position: center 40%;
+  filter: saturate(0.3) brightness(0.9);
+}
+.login-brand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    oklch(0.06 0.03 250 / 0.70) 0%,
+    oklch(0.08 0.02 250 / 0.45) 40%,
+    oklch(0.06 0.02 250 / 0.60) 70%,
+    oklch(0.05 0.02 250 / 0.85) 100%
+  );
+}
+.login-brand-content {
+  position: relative;
+  z-index: 1;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 480px;
+}
+.brand-mark {
+  width: 40px; height: 40px;
+  border: 2px solid oklch(0.93 0 0 / 0.3);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 32px;
+  color: oklch(0.95 0 0);
+  backdrop-filter: blur(8px);
+  background: oklch(1 0 0 / 0.08);
+}
+.brand-headline {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin-bottom: 12px;
+  color: oklch(0.97 0 0);
+  text-shadow: 0 2px 16px oklch(0 0 0 / 0.3);
+}
+.brand-tagline {
+  font-size: 14px;
+  color: oklch(0.70 0.008 250);
+  line-height: 1.6;
+  max-width: 280px;
+}
+.brand-stats {
+  display: flex;
+  gap: 32px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid oklch(0.95 0 0 / 0.12);
+}
+.stat-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+.stat-label {
+  font-size: 11px;
+  color: oklch(0.55 0.008 250);
+  margin-top: 2px;
+}
+
+/* === 右侧表单区 === */
+.login-form-panel {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  background: var(--surface);
+  box-shadow: -8px 0 32px oklch(0 0 0 / 0.08);
+}
+@media (max-width: 767px) {
+  .login-form-panel {
+    max-width: 100%;
+    box-shadow: none;
+  }
+}
+.login-form-inner {
+  width: 100%;
+  max-width: 340px;
+}
+.login-logo {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  margin-bottom: 20px;
+}
+.form-greeting {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+  text-align: left;
+}
+.form-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+/* 带图标的输入框 */
+.input-with-icon {
+  position: relative;
+}
+.input-icon-el {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.input-icon-pad {
+  padding-left: 40px !important;
+}
+
+/* 登录按钮 */
+.login-btn {
+  width: 100%;
+  height: 46px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  transition: all 0.2s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  margin-top: 8px;
+}
+.login-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px var(--primary-ring);
+}
+.login-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.login-footer-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+</style>

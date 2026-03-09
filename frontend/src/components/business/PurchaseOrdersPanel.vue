@@ -2,7 +2,7 @@
   <div>
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="purchaseStatusFilter" @change="loadPurchaseOrders" class="input text-sm" style="width:120px">
+      <select v-model="purchaseStatusFilter" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:120px">
         <option value="">全部状态</option>
         <option value="pending_review">待审核</option>
         <option value="pending">待付款</option>
@@ -12,12 +12,12 @@
         <option value="returned">已退货</option>
         <option value="rejected">已拒绝</option>
       </select>
-      <select v-if="accountSets.length" v-model="purchaseAccountSetFilter" @change="loadPurchaseOrders" class="input text-sm" style="width:120px">
+      <select v-if="accountSets.length" v-model="purchaseAccountSetFilter" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:120px">
         <option value="">全部账套</option>
         <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
       </select>
-      <input type="date" v-model="purchaseDateStart" @change="loadPurchaseOrders" class="input text-sm" style="width:130px">
-      <input type="date" v-model="purchaseDateEnd" @change="loadPurchaseOrders" class="input text-sm" style="width:130px">
+      <input type="date" v-model="purchaseDateStart" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:130px">
+      <input type="date" v-model="purchaseDateEnd" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:130px">
       <input v-model="purchaseSearch" @input="debouncedLoad" class="input text-sm flex-1" placeholder="搜索单号/供应商..." style="min-width:120px">
       <button v-if="hasPermission('stock_edit')" @click="formRef?.openProductModal()" class="btn btn-success btn-sm">新建商品</button>
       <button @click="showPOCreateModal = true" class="btn btn-primary btn-sm" v-if="hasPermission('purchase')">新建采购单</button>
@@ -75,6 +75,12 @@
       </div>
       <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无采购订单</div>
     </div>
+    <!-- 分页 -->
+    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
+      <button @click="prevPage(); loadPurchaseOrders()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
+      <button @click="nextPage(); loadPurchaseOrders()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
+    </div>
 
     <!-- 新建采购单弹窗（子组件） -->
     <PurchaseOrderForm
@@ -120,7 +126,8 @@ const warehousesStore = useWarehousesStore()
 const {
   purchaseOrders, purchaseStatusFilter, purchaseAccountSetFilter,
   purchaseDateStart, purchaseDateEnd, purchaseSearch,
-  loadPurchaseOrders, debouncedLoad, handleExport
+  loadPurchaseOrders, debouncedLoad, handleExport,
+  page, totalPages, hasPagination, resetPage, prevPage, nextPage
 } = usePurchaseOrder()
 
 // 财务账套列表

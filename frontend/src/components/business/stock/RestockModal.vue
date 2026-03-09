@@ -9,7 +9,7 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">入库</h3>
-          <button @click="close" class="text-muted text-xl">&times;</button>
+          <button @click="close" class="modal-close">&times;</button>
         </div>
         <!-- 表单 -->
         <div class="p-4">

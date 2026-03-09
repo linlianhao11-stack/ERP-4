@@ -1,56 +1,45 @@
 <template>
   <div>
     <!-- Header -->
-    <div class="mb-6">
-      <h2 class="text-[20px] font-semibold text-foreground tracking-tight">数据概览</h2>
+    <div class="mb-7">
+      <h2 class="text-[22px] font-bold text-foreground tracking-tight">数据概览</h2>
       <p class="text-[13px] text-muted mt-0.5">{{ settingsStore.companyName || 'ERP System' }}</p>
     </div>
 
-    <!-- KPI Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="card p-5">
-        <div class="flex items-center gap-2.5 mb-3">
-          <div class="w-8 h-8 rounded-[10px] bg-info-subtle flex items-center justify-center">
+    <!-- Asymmetric KPI Grid -->
+    <div class="kpi-grid mb-6">
+      <!-- Hero KPI: 今日销售 -->
+      <div class="card kpi-hero">
+        <div>
+          <div class="flex items-center gap-2 text-[13px] font-medium text-secondary">
             <TrendingUp :size="16" :stroke-width="1.5" class="text-primary" />
+            今日销售额
           </div>
-          <span class="text-[12px] font-medium text-muted">今日销售</span>
+          <div class="text-[36px] font-bold text-foreground tracking-tighter font-mono mt-3">¥{{ fmt(dashboard.today_sales) }}</div>
         </div>
-        <div class="text-[22px] font-semibold text-foreground tracking-tight">¥{{ fmt(dashboard.today_sales) }}</div>
       </div>
 
-      <div v-if="hasPermission('finance')" class="card p-5">
-        <div class="flex items-center gap-2.5 mb-3">
-          <div class="w-8 h-8 rounded-[10px] bg-success-subtle flex items-center justify-center">
-            <CircleDollarSign :size="16" :stroke-width="1.5" class="text-success" />
-          </div>
-          <span class="text-[12px] font-medium text-muted">今日毛利</span>
-        </div>
-        <div class="text-[22px] font-semibold text-foreground tracking-tight">¥{{ fmt(dashboard.today_profit) }}</div>
+      <!-- Secondary KPIs -->
+      <div v-if="hasPermission('finance')" class="card kpi-secondary">
+        <div class="text-[12px] font-medium text-muted mb-2">今日毛利</div>
+        <div class="text-[20px] font-semibold text-success-emphasis tracking-tight font-mono">¥{{ fmt(dashboard.today_profit) }}</div>
       </div>
-
-      <div v-if="hasPermission('finance')" class="card p-5">
-        <div class="flex items-center gap-2.5 mb-3">
-          <div class="w-8 h-8 rounded-[10px] bg-purple-subtle flex items-center justify-center">
-            <Package :size="16" :stroke-width="1.5" class="text-purple-emphasis" />
-          </div>
-          <span class="text-[12px] font-medium text-muted">库存总值</span>
-        </div>
-        <div class="text-[22px] font-semibold text-foreground tracking-tight">¥{{ fmt(dashboard.stock_value) }}</div>
+      <div class="card kpi-secondary">
+        <div class="text-[12px] font-medium text-muted mb-2">应收账款</div>
+        <div class="text-[20px] font-semibold text-warning-emphasis tracking-tight font-mono">¥{{ fmt(dashboard.total_receivable) }}</div>
       </div>
-
-      <div class="card p-5">
-        <div class="flex items-center gap-2.5 mb-3">
-          <div class="w-8 h-8 rounded-[10px] bg-orange-subtle flex items-center justify-center">
-            <Receipt :size="16" :stroke-width="1.5" class="text-warning" />
-          </div>
-          <span class="text-[12px] font-medium text-muted">应收账款</span>
-        </div>
-        <div class="text-[22px] font-semibold text-foreground tracking-tight">¥{{ fmt(dashboard.total_receivable) }}</div>
+      <div class="card kpi-secondary">
+        <div class="text-[12px] font-medium text-muted mb-2">今日发货</div>
+        <div class="text-[20px] font-semibold text-info tracking-tight font-mono">{{ dashboard.today_shipments }} <span class="text-[13px] font-normal text-muted">单</span></div>
+      </div>
+      <div v-if="hasPermission('finance')" class="card kpi-secondary">
+        <div class="text-[12px] font-medium text-muted mb-2">库存总值</div>
+        <div class="text-[20px] font-semibold text-foreground tracking-tight font-mono">¥{{ fmt(dashboard.stock_value) }}</div>
       </div>
     </div>
 
     <!-- Sales Trend + Todo Panel -->
-    <div class="grid md:grid-cols-[1fr_320px] gap-5 mb-5">
+    <div class="grid md:grid-cols-[1fr_340px] gap-5 mb-5">
       <!-- 销售趋势 -->
       <div class="card overflow-hidden">
         <div class="flex items-center justify-between px-5 py-3.5 border-b border-line">
@@ -92,7 +81,8 @@
           </router-link>
           <div v-if="!todoItems.length" class="flex flex-col items-center justify-center py-12 text-muted">
             <CheckCircle :size="32" :stroke-width="1" class="mb-2 opacity-40" />
-            <span class="text-[13px]">暂无待办</span>
+            <span class="text-[14px] font-medium mb-1">全部处理完毕</span>
+            <span class="text-[12px]">新的待办事项会自动出现在这里</span>
           </div>
         </div>
       </div>
@@ -175,7 +165,7 @@ const { hasPermission } = usePermission()
 
 const dashboard = ref({
   today_sales: 0, today_profit: 0, stock_value: 0,
-  total_receivable: 0, inventory_age: {}, top_products: []
+  total_receivable: 0, today_shipments: 0, inventory_age: {}, top_products: []
 })
 const recentOrders = ref([])
 const trendDays = ref(30)
@@ -224,18 +214,26 @@ const loadRecentOrders = async () => {
   } catch (e) { /* silent */ }
 }
 
-// --- Chart ---
+// --- Chart (dark-mode aware) ---
 const getChartColors = () => {
   const style = getComputedStyle(document.documentElement)
   const primary = style.getPropertyValue('--primary').trim() || '#4878c8'
-  return { primary }
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+  return {
+    primary,
+    tickColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+    gridColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    tooltipBg: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)',
+    tooltipText: isDark ? '#111' : '#fff',
+    fillColor: isDark ? 'rgba(100,160,240,0.10)' : 'rgba(72,120,200,0.08)',
+  }
 }
 
 const renderChart = () => {
   if (!chartCanvas.value) return
   if (chartInstance) chartInstance.destroy()
 
-  const { primary } = getChartColors()
+  const colors = getChartColors()
   const labels = trendData.value.map(d => {
     const parts = d.date.split('-')
     return `${parts[1]}/${parts[2]}`
@@ -248,13 +246,13 @@ const renderChart = () => {
       labels,
       datasets: [{
         data: values,
-        borderColor: primary,
-        backgroundColor: primary.includes('oklch') ? 'rgba(72, 120, 200, 0.08)' : primary + '14',
+        borderColor: colors.primary,
+        backgroundColor: colors.fillColor,
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4,
-        pointHoverBackgroundColor: primary,
-        pointHoverBorderColor: '#fff',
+        pointHoverBackgroundColor: colors.primary,
+        pointHoverBorderColor: colors.tooltipText,
         pointHoverBorderWidth: 2,
         tension: 0.35,
         fill: true,
@@ -267,7 +265,9 @@ const renderChart = () => {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(0,0,0,0.8)',
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
           titleFont: { size: 12 },
           bodyFont: { size: 13, weight: 600 },
           padding: { x: 10, y: 6 },
@@ -280,13 +280,13 @@ const renderChart = () => {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { font: { size: 11 }, color: '#999', maxRotation: 0, autoSkipPadding: 20 },
+          ticks: { font: { size: 11 }, color: colors.tickColor, maxRotation: 0, autoSkipPadding: 20 },
           border: { display: false }
         },
         y: {
-          grid: { color: 'rgba(0,0,0,0.04)' },
+          grid: { color: colors.gridColor },
           ticks: {
-            font: { size: 11 }, color: '#999',
+            font: { size: 11 }, color: colors.tickColor,
             callback: (v) => v >= 10000 ? (v / 10000).toFixed(0) + 'w' : v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v
           },
           border: { display: false },
@@ -319,3 +319,34 @@ onUnmounted(() => {
   if (chartInstance) chartInstance.destroy()
 })
 </script>
+
+<style scoped>
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+}
+.kpi-hero {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  grid-column: 1 / -1;
+}
+@media (min-width: 768px) {
+  .kpi-hero {
+    grid-row: 1 / 3;
+    grid-column: 1;
+    min-height: 180px;
+  }
+}
+.kpi-secondary {
+  padding: 20px;
+}
+</style>

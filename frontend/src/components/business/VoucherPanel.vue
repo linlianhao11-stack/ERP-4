@@ -29,7 +29,7 @@
       <table class="w-full">
         <thead>
           <tr>
-            <th class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0"></th>
+            <th class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
             <th>凭证号</th>
             <th>日期</th>
             <th>摘要</th>
@@ -41,27 +41,41 @@
         </thead>
         <tbody>
           <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer">
-            <td @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds"></td>
-            <td class="font-medium">{{ v.voucher_no }}</td>
+            <td @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
+            <td class="font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
             <td>{{ v.voucher_date }}</td>
             <td>{{ v.summary || '-' }}</td>
             <td class="text-right">{{ formatAmount(v.total_debit) }}</td>
             <td class="text-right">{{ formatAmount(v.total_credit) }}</td>
             <td><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
             <td @click.stop>
-              <div class="flex gap-1.5">
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">提交</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-success-subtle text-success-emphasis hover:bg-success-subtle transition-colors">审核</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleReject(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-orange-subtle text-orange-emphasis hover:bg-orange-subtle transition-colors">驳回</button>
-                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">过账</button>
-                <button v-if="v.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-orange-subtle text-orange-emphasis hover:bg-orange-subtle transition-colors">反过账</button>
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">删除</button>
-                <button @click="handlePrintPdf(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-elevated text-foreground hover:bg-surface-hover transition-colors">打印</button>
+              <div class="flex items-center gap-1.5 justify-end">
+                <!-- 主操作按钮（外露） -->
+                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px">提交</button>
+                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--success-subtle);color:var(--success-emphasis);border:none">审核</button>
+                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--purple-subtle);color:var(--purple-emphasis);border:none">过账</button>
+                <!-- 更多操作下拉 -->
+                <div class="voucher-action-menu" v-if="getSecondaryActions(v).length > 0">
+                  <button @click.stop="toggleActionMenu(v.id)" class="voucher-action-trigger">
+                    ··· <span class="text-[10px]">▾</span>
+                  </button>
+                  <div v-if="openMenuId === v.id" class="voucher-action-dropdown">
+                    <button v-for="act in getSecondaryActions(v)" :key="act.label" @click="act.handler(v); openMenuId = null" :class="{ 'voucher-action-danger': act.danger }">
+                      {{ act.label }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </td>
           </tr>
           <tr v-if="vouchers.length === 0">
-            <td colspan="8" class="text-center text-muted py-8">暂无凭证</td>
+            <td colspan="8">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无凭证</p>
+                <p class="text-xs text-muted">点击「新增凭证」按钮创建凭证</p>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -77,16 +91,16 @@
     <!-- 凭证详情/编辑弹窗 -->
     <Transition name="fade">
       <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
-        <div class="modal" style="max-width: 800px">
+        <div class="modal max-w-3xl">
           <div class="modal-header">
             <h3>{{ isEditing ? '编辑凭证' : (isCreating ? '新增凭证' : '凭证详情') }}</h3>
-            <button @click="showDetail = false" class="modal-close">&times;</button>
+            <button @click="showDetail = false" class="modal-close" aria-label="关闭">&times;</button>
           </div>
           <div class="modal-body">
             <div class="grid grid-cols-3 gap-3 mb-4">
               <div>
-                <label class="label">凭证字</label>
-                <select v-model="editForm.voucher_type" class="input text-sm" :disabled="!isCreating">
+                <label for="vc-voucher-type" class="label">凭证字</label>
+                <select id="vc-voucher-type" v-model="editForm.voucher_type" class="input text-sm" :disabled="!isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isCreating }">
                   <option value="记">记</option>
                   <option value="收">收</option>
                   <option value="付">付</option>
@@ -94,17 +108,17 @@
                 </select>
               </div>
               <div>
-                <label class="label">凭证日期</label>
-                <input type="date" v-model="editForm.voucher_date" class="input text-sm" :disabled="!isEditing && !isCreating">
+                <label for="vc-voucher-date" class="label">凭证日期</label>
+                <input id="vc-voucher-date" type="date" v-model="editForm.voucher_date" class="input text-sm" :disabled="!isEditing && !isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isEditing && !isCreating }">
               </div>
               <div>
-                <label class="label">附件张数</label>
-                <input type="number" v-model.number="editForm.attachment_count" class="input text-sm" min="0" :disabled="!isEditing && !isCreating">
+                <label for="vc-attachment-count" class="label">附件张数</label>
+                <input id="vc-attachment-count" type="number" v-model.number="editForm.attachment_count" class="input text-sm" min="0" :disabled="!isEditing && !isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isEditing && !isCreating }">
               </div>
             </div>
             <div class="mb-4">
-              <label class="label">摘要</label>
-              <input v-model="editForm.summary" class="input text-sm" :disabled="!isEditing && !isCreating">
+              <label for="vc-summary" class="label">摘要</label>
+              <input id="vc-summary" v-model="editForm.summary" class="input text-sm" :disabled="!isEditing && !isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isEditing && !isCreating }">
             </div>
 
             <div class="table-container">
@@ -163,8 +177,8 @@
           </div>
           <div class="modal-footer">
             <button @click="showDetail = false" class="btn btn-secondary">{{ (isEditing || isCreating) ? '取消' : '关闭' }}</button>
-            <button v-if="isCreating" @click="handleCreate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">保存</button>
-            <button v-if="isEditing" @click="handleUpdate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">保存</button>
+            <button v-if="isCreating" @click="handleCreate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
+            <button v-if="isEditing" @click="handleUpdate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
             <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(detailVoucher)" class="btn btn-warning">反过账</button>
             <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'draft' && hasPermission('accounting_edit')" @click="startEdit" class="btn btn-primary">编辑</button>
           </div>
@@ -175,10 +189,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { usePermission } from '../../composables/usePermission'
 import { useAppStore } from '../../stores/app'
+import { useFormat } from '../../composables/useFormat'
 import {
   getVouchers, getVoucher, createVoucher, updateVoucher,
   deleteVoucher, submitVoucher, approveVoucher, rejectVoucher,
@@ -188,6 +203,7 @@ import {
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
+const { fmtMoney } = useFormat()
 
 const vouchers = ref([])
 const total = ref(0)
@@ -201,6 +217,26 @@ const detailVoucher = ref(null)
 const leafAccounts = ref([])
 
 const selectedIds = ref([])
+const openMenuId = ref(null)
+
+const toggleActionMenu = (id) => {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
+
+const getSecondaryActions = (v) => {
+  const actions = []
+  if (v.status === 'pending' && hasPermission('accounting_approve')) {
+    actions.push({ label: '驳回', handler: handleReject })
+  }
+  if (v.status === 'posted' && hasPermission('accounting_post')) {
+    actions.push({ label: '反过账', handler: handleUnpost })
+  }
+  actions.push({ label: '打印', handler: handlePrintPdf })
+  if (v.status === 'draft' && hasPermission('accounting_edit')) {
+    actions.push({ label: '删除', handler: handleDelete, danger: true })
+  }
+  return actions
+}
 
 const filters = ref({ period_name: '', voucher_type: '', status: '' })
 
@@ -233,7 +269,7 @@ const statusBadge = (s) => statusBadgeMap[s] || 'badge'
 
 const formatAmount = (v) => {
   const n = parseFloat(v)
-  return isNaN(n) || n === 0 ? '' : n.toFixed(2)
+  return isNaN(n) || n === 0 ? '' : fmtMoney(n)
 }
 
 const addEntry = () => {
@@ -405,6 +441,82 @@ const handleBatchPdf = async () => {
   } catch (e) { appStore.showToast('批量下载失败', 'error') }
 }
 
+// 点击外部关闭下拉菜单
+const closeMenuOnOutsideClick = (e) => {
+  if (openMenuId.value !== null && !e.target.closest('.voucher-action-menu')) {
+    openMenuId.value = null
+  }
+}
+
 watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; selectedIds.value = []; loadList() })
-onMounted(loadList)
+onMounted(() => {
+  loadList()
+  document.addEventListener('click', closeMenuOnOutsideClick)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', closeMenuOnOutsideClick)
+})
 </script>
+
+<style scoped>
+.voucher-action-menu {
+  position: relative;
+  display: inline-block;
+}
+.voucher-action-trigger {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+  min-height: 28px;
+}
+.voucher-action-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--elevated);
+}
+.voucher-action-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  min-width: 120px;
+  padding: 4px;
+  z-index: 50;
+}
+.voucher-action-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 6px;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.1s;
+}
+.voucher-action-dropdown button:hover {
+  background: var(--elevated);
+}
+.voucher-action-danger {
+  color: var(--error-emphasis) !important;
+}
+.voucher-action-danger:hover {
+  background: var(--error-subtle) !important;
+}
+</style>

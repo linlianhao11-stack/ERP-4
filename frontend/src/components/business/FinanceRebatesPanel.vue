@@ -58,7 +58,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">{{ rebateChargeForm.target_id ? '返利充值' : (rebateChargeForm.target_type === 'customer' ? '客户返利充值' : '供应商返利充值') }}</h3>
-          <button @click="showRebateChargeModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showRebateChargeModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body space-y-4">
           <!-- 弹窗内账套选择 -->
@@ -100,7 +100,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">返利明细 - {{ rebateDetailTarget?.name }}</h3>
-          <button @click="showRebateDetailModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showRebateDetailModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body space-y-4">
           <div class="p-3 bg-elevated rounded-lg text-sm">

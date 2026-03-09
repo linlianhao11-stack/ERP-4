@@ -1,20 +1,20 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.customer_id" class="form-input w-36" @change="loadList">
+      <select v-model="filters.customer_id" class="input input-sm w-36" @change="loadList">
         <option value="">全部客户</option>
         <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
-      <input v-model="filters.date_from" type="date" class="form-input w-36" @change="loadList" placeholder="开始日期" />
-      <input v-model="filters.date_to" type="date" class="form-input w-36" @change="loadList" placeholder="结束日期" />
+      <input v-model="filters.date_from" type="date" class="input input-sm w-36" @change="loadList" placeholder="开始日期" />
+      <input v-model="filters.date_to" type="date" class="input input-sm w-36" @change="loadList" placeholder="结束日期" />
       <button v-if="selectedIds.length" @click="handleBatchPdf" class="btn btn-secondary btn-sm ml-auto">批量下载PDF ({{ selectedIds.length }})</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full text-[13px]">
         <thead>
           <tr>
-            <th class="w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" /></th>
+            <th class="w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" aria-label="全选" /></th>
             <th>单号</th>
             <th>日期</th>
             <th>客户</th>
@@ -27,21 +27,27 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="9">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无出库单数据</p>
+                <p class="text-xs text-muted">出库单数据由销售订单发货时自动生成</p>
+              </div>
+            </td>
           </tr>
           <tr v-for="d in items" :key="d.id">
-            <td><input type="checkbox" :value="d.id" v-model="selectedIds" /></td>
-            <td class="font-mono text-[12px]">{{ d.delivery_no || d.bill_no }}</td>
+            <td><input type="checkbox" :value="d.id" v-model="selectedIds" aria-label="选择此行" /></td>
+            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.delivery_no || d.bill_no">{{ d.delivery_no || d.bill_no }}</span></td>
             <td>{{ d.delivery_date || d.bill_date }}</td>
             <td>{{ d.customer_name }}</td>
             <td>{{ d.warehouse_name }}</td>
-            <td class="text-right">{{ d.cost_total }}</td>
-            <td class="text-right">{{ d.sales_total }}</td>
-            <td class="font-mono text-[12px]">{{ d.voucher_no || '-' }}</td>
+            <td class="text-right">{{ fmtMoney(d.cost_total) }}</td>
+            <td class="text-right">{{ fmtMoney(d.sales_total) }}</td>
+            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.voucher_no">{{ d.voucher_no || '-' }}</span></td>
             <td @click.stop>
               <div class="flex gap-1">
-                <button @click="viewDetail(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-info-subtle text-primary-active">查看</button>
-                <button @click="handleDownloadPdf(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-purple-subtle text-purple-emphasis">PDF</button>
+                <button @click="viewDetail(d)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
+                <button @click="handleDownloadPdf(d)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">PDF</button>
               </div>
             </td>
           </tr>
@@ -58,7 +64,7 @@
     <!-- 详情弹窗 -->
     <Transition name="fade">
       <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
-        <div class="modal" style="max-width: 650px">
+        <div class="modal max-w-2xl">
           <div class="modal-header">
             <h3>出库单详情</h3>
             <button @click="showDetail = false" class="modal-close">&times;</button>
@@ -71,15 +77,15 @@
                 <div><span class="text-muted">日期：</span>{{ detail.bill_date }}</div>
                 <div><span class="text-muted">客户：</span>{{ detail.customer_name }}</div>
                 <div><span class="text-muted">仓库：</span>{{ detail.warehouse_name || '-' }}</div>
-                <div><span class="text-muted">成本合计：</span><span class="font-medium">{{ detail.total_cost }}</span></div>
-                <div><span class="text-muted">销售合计：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
+                <div><span class="text-muted">成本合计：</span><span class="font-medium">{{ fmtMoney(detail.total_cost) }}</span></div>
+                <div><span class="text-muted">销售合计：</span><span class="font-medium">{{ fmtMoney(detail.total_amount) }}</span></div>
                 <div><span class="text-muted">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
                 <div><span class="text-muted">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
               </div>
               <div v-if="detail.items && detail.items.length">
                 <div class="text-[12px] font-semibold text-muted uppercase tracking-wider mb-2">商品明细</div>
-                <div class="table-wrapper">
-                  <table class="data-table">
+                <div class="table-container">
+                  <table class="w-full text-[13px]">
                     <thead>
                       <tr><th>商品</th><th class="text-right">数量</th><th class="text-right">成本价</th><th class="text-right">销售价</th></tr>
                     </thead>
@@ -87,8 +93,8 @@
                       <tr v-for="it in detail.items" :key="it.id">
                         <td>{{ it.product_name }}</td>
                         <td class="text-right">{{ it.quantity }}</td>
-                        <td class="text-right">{{ it.cost_price }}</td>
-                        <td class="text-right">{{ it.sale_price }}</td>
+                        <td class="text-right">{{ fmtMoney(it.cost_price) }}</td>
+                        <td class="text-right">{{ fmtMoney(it.sale_price) }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -110,10 +116,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getSalesDeliveries, getSalesDelivery, getSalesDeliveryPdf, batchSalesDeliveryPdf } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
+import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
+const { fmtMoney } = useFormat()
 
 const items = ref([])
 const total = ref(0)

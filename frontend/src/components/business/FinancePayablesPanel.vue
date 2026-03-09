@@ -76,7 +76,7 @@
       <div class="modal-content" style="max-width:400px">
         <div class="modal-header">
           <h3 class="font-semibold">确认付款</h3>
-          <button @click="showPayablePayModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showPayablePayModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body space-y-4">
           <div class="p-3 bg-elevated rounded-lg text-sm">
@@ -103,7 +103,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">采购订单详情</h3>
-          <button @click="showPurchaseDetailModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showPurchaseDetailModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body" v-if="purchaseOrderDetail">
           <div class="mb-4 p-3 bg-elevated rounded-lg">

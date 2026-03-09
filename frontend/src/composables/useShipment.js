@@ -4,11 +4,13 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useSort } from './useSort'
+import { usePagination } from './usePagination'
 import { getShipments, getCarriers } from '../api/logistics'
 
 export function useShipment() {
   // ---- 排序 ----
   const { sortState: shipmentSort, toggleSort, genericSort } = useSort()
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
 
   // ---- 列表数据 ----
   const shipments = ref([])
@@ -22,17 +24,19 @@ export function useShipment() {
   /** 带 300ms 防抖的列表加载 */
   const debouncedLoadShipments = () => {
     clearTimeout(_searchTimer)
+    resetPage()
     _searchTimer = setTimeout(loadShipments, 300)
   }
 
   /** 加载物流列表 */
   const loadShipments = async () => {
     try {
-      const params = {}
+      const params = { ...paginationParams.value }
       if (shipmentFilter.status) params.status = shipmentFilter.status
       if (shipmentFilter.search) params.search = shipmentFilter.search
       const { data } = await getShipments(params)
       shipments.value = data.items || data
+      total.value = data.total ?? 0
     } catch (e) {
       console.error(e)
     }
@@ -141,6 +145,8 @@ export function useShipment() {
     isColumnVisible,
     // 排序
     toggleSort,
+    // 分页
+    page, totalPages, hasPagination, resetPage, prevPage, nextPage,
     // 数据加载
     loadShipments,
     debouncedLoadShipments,

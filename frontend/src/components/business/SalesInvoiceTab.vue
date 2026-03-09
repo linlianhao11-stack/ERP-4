@@ -1,23 +1,23 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="form-input w-28" @change="loadList">
+      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
         <option value="">全部状态</option>
         <option value="draft">草稿</option>
         <option value="confirmed">已确认</option>
         <option value="cancelled">已作废</option>
       </select>
-      <select v-model="filters.customer_id" class="form-input w-36" @change="loadList">
+      <select v-model="filters.customer_id" class="input input-sm w-36" @change="loadList">
         <option value="">全部客户</option>
         <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
-      <input v-model="filters.date_from" type="date" class="form-input w-36" @change="loadList" placeholder="开始日期" />
-      <input v-model="filters.date_to" type="date" class="form-input w-36" @change="loadList" placeholder="结束日期" />
+      <input v-model="filters.date_from" type="date" class="input input-sm w-36" @change="loadList" placeholder="开始日期" />
+      <input v-model="filters.date_to" type="date" class="input input-sm w-36" @change="loadList" placeholder="结束日期" />
       <button @click="openPushModal" class="btn btn-primary btn-sm ml-auto">从应收单推送</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full text-[13px]">
         <thead>
           <tr>
             <th>发票号</th>
@@ -34,23 +34,29 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="10" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="10">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无销项发票</p>
+                <p class="text-xs text-muted">点击「从应收单推送」按钮创建发票</p>
+              </div>
+            </td>
           </tr>
           <tr v-for="inv in items" :key="inv.id">
-            <td class="font-mono text-[12px]">{{ inv.invoice_no }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="inv.invoice_no">{{ inv.invoice_no }}</td>
             <td>{{ inv.invoice_date }}</td>
             <td>{{ inv.customer_name || inv.counterparty_name }}</td>
             <td><span :class="inv.invoice_type === 'special' ? 'badge badge-blue' : 'badge badge-gray'">{{ inv.invoice_type === 'special' ? '专票' : '普票' }}</span></td>
-            <td class="text-right">{{ inv.amount_without_tax }}</td>
-            <td class="text-right">{{ inv.tax_amount }}</td>
-            <td class="text-right">{{ inv.total_amount }}</td>
+            <td class="text-right">{{ fmtMoney(inv.amount_without_tax) }}</td>
+            <td class="text-right">{{ fmtMoney(inv.tax_amount) }}</td>
+            <td class="text-right">{{ fmtMoney(inv.total_amount) }}</td>
             <td><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
-            <td class="font-mono text-[12px]">{{ inv.voucher_no || '-' }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="inv.voucher_no || ''">{{ inv.voucher_no || '-' }}</td>
             <td @click.stop>
               <div class="flex gap-1">
-                <button @click="viewDetail(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-info-subtle text-primary-active">查看</button>
-                <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
-                <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-error-subtle text-error">作废</button>
+                <button @click="viewDetail(inv)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
+                <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
+                <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">作废</button>
               </div>
             </td>
           </tr>
@@ -67,7 +73,7 @@
     <!-- 发票详情弹窗 -->
     <Transition name="fade">
       <div v-if="showDetail" class="modal-backdrop" @click.self="showDetail = false">
-        <div class="modal" style="max-width: 700px">
+        <div class="modal max-w-2xl">
           <div class="modal-header">
             <h3>销项发票详情</h3>
             <button @click="showDetail = false" class="modal-close">&times;</button>
@@ -89,13 +95,13 @@
                 </div>
                 <div class="bg-elevated rounded-xl p-3 mb-3">
                   <div class="grid grid-cols-3 gap-2 text-[13px]">
-                    <div>不含税：<span class="font-medium">{{ detail.amount_without_tax }}</span></div>
-                    <div>税额：<span class="font-medium">{{ detail.tax_amount }}</span></div>
-                    <div>价税合计：<span class="font-medium">{{ detail.total_amount }}</span></div>
+                    <div>不含税：<span class="font-medium">{{ fmtMoney(detail.amount_without_tax) }}</span></div>
+                    <div>税额：<span class="font-medium">{{ fmtMoney(detail.tax_amount) }}</span></div>
+                    <div>价税合计：<span class="font-medium">{{ fmtMoney(detail.total_amount) }}</span></div>
                   </div>
                 </div>
-                <div v-if="detail.items && detail.items.length" class="table-wrapper">
-                  <table class="data-table">
+                <div v-if="detail.items && detail.items.length" class="table-container">
+                  <table class="w-full text-[13px]">
                     <thead>
                       <tr><th>品名</th><th class="text-right">数量</th><th class="text-right">单价</th><th class="text-right">税率(%)</th><th class="text-right">不含税金额</th><th class="text-right">税额</th><th class="text-right">金额</th></tr>
                     </thead>
@@ -103,11 +109,11 @@
                       <tr v-for="it in detail.items" :key="it.id">
                         <td>{{ it.product_name }}</td>
                         <td class="text-right">{{ it.quantity }}</td>
-                        <td class="text-right">{{ it.unit_price }}</td>
+                        <td class="text-right">{{ fmtMoney(it.unit_price) }}</td>
                         <td class="text-right">{{ it.tax_rate }}</td>
-                        <td class="text-right">{{ it.amount_without_tax }}</td>
-                        <td class="text-right">{{ it.tax_amount }}</td>
-                        <td class="text-right">{{ it.amount }}</td>
+                        <td class="text-right">{{ fmtMoney(it.amount_without_tax) }}</td>
+                        <td class="text-right">{{ fmtMoney(it.tax_amount) }}</td>
+                        <td class="text-right">{{ fmtMoney(it.amount) }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -116,22 +122,22 @@
               <!-- 编辑模式 -->
               <template v-else>
                 <div class="grid grid-cols-2 gap-3 mb-4">
-                  <div><label class="label">发票类型</label><select v-model="editForm.invoice_type" class="form-input"><option value="special">专票</option><option value="normal">普票</option></select></div>
-                  <div><label class="label">日期</label><input v-model="editForm.invoice_date" type="date" class="form-input" /></div>
-                  <div class="col-span-2"><label class="label">备注</label><input v-model="editForm.remark" class="form-input" /></div>
+                  <div><label for="si-edit-invoice-type" class="label">发票类型</label><select id="si-edit-invoice-type" v-model="editForm.invoice_type" class="input text-sm"><option value="special">专票</option><option value="normal">普票</option></select></div>
+                  <div><label for="si-edit-invoice-date" class="label">日期</label><input id="si-edit-invoice-date" v-model="editForm.invoice_date" type="date" class="input text-sm" /></div>
+                  <div class="col-span-2"><label for="si-edit-remark" class="label">备注</label><input id="si-edit-remark" v-model="editForm.remark" class="input text-sm" /></div>
                 </div>
-                <div class="table-wrapper mb-3">
-                  <table class="data-table">
+                <div class="table-container mb-3">
+                  <table class="w-full text-[13px]">
                     <thead><tr><th>品名</th><th>数量</th><th>单价</th><th>税率(%)</th><th class="text-right">金额</th><th class="text-right">税额</th><th></th></tr></thead>
                     <tbody>
                       <tr v-for="(row, idx) in editForm.items" :key="idx">
-                        <td><input v-model="row.product_name" class="form-input w-full text-[12px]" /></td>
-                        <td><input v-model.number="row.quantity" type="number" step="1" min="1" class="form-input w-20 text-[12px]" /></td>
-                        <td><input v-model.number="row.unit_price" type="number" step="0.01" class="form-input w-24 text-[12px]" /></td>
-                        <td><input v-model.number="row.tax_rate" type="number" step="0.01" class="form-input w-20 text-[12px]" /></td>
+                        <td><input v-model="row.product_name" class="input w-full text-[12px]" /></td>
+                        <td><input v-model.number="row.quantity" type="number" step="1" min="1" class="input w-20 text-[12px]" /></td>
+                        <td><input v-model.number="row.unit_price" type="number" step="0.01" class="input w-24 text-[12px]" /></td>
+                        <td><input v-model.number="row.tax_rate" type="number" step="0.01" class="input w-20 text-[12px]" /></td>
                         <td class="text-right text-[12px]">{{ editRowAmount(row) }}</td>
                         <td class="text-right text-[12px]">{{ editRowTax(row) }}</td>
-                        <td><button @click="editForm.items.length > 1 && editForm.items.splice(idx, 1)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-error-subtle text-error">&times;</button></td>
+                        <td><button @click="editForm.items.length > 1 && editForm.items.splice(idx, 1)" class="text-[12px] px-1.5 py-0.5 rounded-md bg-error-subtle text-error-emphasis font-medium">&times;</button></td>
                       </tr>
                     </tbody>
                   </table>
@@ -146,7 +152,7 @@
             </template>
             <template v-if="editing">
               <button @click="editing = false" class="btn btn-secondary btn-sm">取消编辑</button>
-              <button @click="handleEditSave" :disabled="editSubmitting" class="btn btn-primary btn-sm">保存</button>
+              <button @click="handleEditSave" :disabled="editSubmitting" class="btn btn-primary btn-sm">{{ editSubmitting ? '保存中...' : '保存' }}</button>
             </template>
             <button v-if="!editing" @click="showDetail = false" class="btn btn-secondary btn-sm">关闭</button>
           </div>
@@ -157,7 +163,7 @@
     <!-- 从应收单推送弹窗 -->
     <Transition name="fade">
       <div v-if="showPush" class="modal-backdrop" @click.self="showPush = false">
-        <div class="modal" style="max-width: 700px">
+        <div class="modal max-w-2xl">
           <div class="modal-header">
             <h3>从应收单推送销项发票</h3>
             <button @click="showPush = false" class="modal-close">&times;</button>
@@ -165,8 +171,8 @@
           <div class="modal-body">
             <!-- 选择应收单 -->
             <div class="mb-4">
-              <label class="label mb-1">选择已完成的应收单</label>
-              <select v-model="pushForm.receivable_bill_id" class="form-input w-full" @change="onReceivableBillSelect">
+              <label for="si-receivable-bill" class="label mb-1">选择已完成的应收单</label>
+              <select id="si-receivable-bill" v-model="pushForm.receivable_bill_id" class="input text-sm w-full" @change="onReceivableBillSelect">
                 <option value="">请选择</option>
                 <option v-for="rb in receivableBills" :key="rb.id" :value="rb.id">
                   {{ rb.bill_no }} - {{ rb.customer_name }} - {{ rb.total_amount }}
@@ -177,23 +183,23 @@
             <template v-if="pushForm.receivable_bill_id">
               <div class="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label class="label">发票类型</label>
-                  <select v-model="pushForm.invoice_type" class="form-input">
+                  <label for="si-push-invoice-type" class="label">发票类型</label>
+                  <select id="si-push-invoice-type" v-model="pushForm.invoice_type" class="input text-sm">
                     <option value="special">增值税专用发票</option>
                     <option value="normal">增值税普通发票</option>
                   </select>
                 </div>
                 <div>
-                  <label class="label">发票日期</label>
-                  <input v-model="pushForm.invoice_date" type="date" class="form-input" />
+                  <label for="si-push-invoice-date" class="label">发票日期</label>
+                  <input id="si-push-invoice-date" v-model="pushForm.invoice_date" type="date" class="input text-sm" />
                 </div>
                 <div>
-                  <label class="label">税率 (%)</label>
-                  <input v-model.number="pushForm.tax_rate" type="number" step="0.01" min="0" max="100" class="form-input" />
+                  <label for="si-push-tax-rate" class="label">税率 (%)</label>
+                  <input id="si-push-tax-rate" v-model.number="pushForm.tax_rate" type="number" step="0.01" min="0" max="100" class="input text-sm" />
                 </div>
                 <div>
-                  <label class="label">备注</label>
-                  <input v-model="pushForm.remark" class="form-input" />
+                  <label for="si-push-remark" class="label">备注</label>
+                  <input id="si-push-remark" v-model="pushForm.remark" class="input text-sm" />
                 </div>
               </div>
 
@@ -201,16 +207,16 @@
               <div v-if="selectedReceivable" class="bg-elevated rounded-xl p-3 mb-3">
                 <div class="text-[12px] font-semibold text-muted mb-2">发票金额预览</div>
                 <div class="grid grid-cols-3 gap-2 text-[13px]">
-                  <div>不含税金额: <span class="font-medium">{{ previewAmountWithoutTax }}</span></div>
-                  <div>税额: <span class="font-medium">{{ previewTaxAmount }}</span></div>
-                  <div>价税合计: <span class="font-medium">{{ selectedReceivable.total_amount }}</span></div>
+                  <div>不含税金额: <span class="font-medium">{{ fmtMoney(previewAmountWithoutTax) }}</span></div>
+                  <div>税额: <span class="font-medium">{{ fmtMoney(previewTaxAmount) }}</span></div>
+                  <div>价税合计: <span class="font-medium">{{ fmtMoney(selectedReceivable.total_amount) }}</span></div>
                 </div>
               </div>
             </template>
           </div>
           <div class="modal-footer">
             <button @click="showPush = false" class="btn btn-secondary btn-sm">取消</button>
-            <button @click="handlePush" :disabled="submitting || !pushForm.receivable_bill_id" class="btn btn-primary btn-sm">确认推送</button>
+            <button @click="handlePush" :disabled="submitting || !pushForm.receivable_bill_id" class="btn btn-primary btn-sm">{{ submitting ? '推送中...' : '确认推送' }}</button>
           </div>
         </div>
       </div>
@@ -223,10 +229,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getInvoices, getInvoice, updateInvoice, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
+import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
+const { fmtMoney } = useFormat()
 
 const items = ref([])
 const total = ref(0)

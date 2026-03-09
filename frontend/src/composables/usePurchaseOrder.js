@@ -5,9 +5,11 @@
 import { ref, onUnmounted } from 'vue'
 import { getPurchaseOrders, exportPurchaseOrders as exportPurchaseOrdersApi } from '../api/purchase'
 import { useAppStore } from '../stores/app'
+import { usePagination } from './usePagination'
 
 export function usePurchaseOrder() {
   const appStore = useAppStore()
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
 
   // 列表数据
   const purchaseOrders = ref([])
@@ -25,13 +27,14 @@ export function usePurchaseOrder() {
   /** 防抖加载采购订单（用于搜索输入） */
   const debouncedLoad = () => {
     clearTimeout(_poSearchTimer)
+    resetPage()
     _poSearchTimer = setTimeout(loadPurchaseOrders, 300)
   }
 
   /** 根据当前筛选条件加载采购订单列表 */
   const loadPurchaseOrders = async () => {
     try {
-      const params = {}
+      const params = { ...paginationParams.value }
       if (purchaseStatusFilter.value) params.status = purchaseStatusFilter.value
       if (purchaseDateStart.value) params.start_date = purchaseDateStart.value
       if (purchaseDateEnd.value) params.end_date = purchaseDateEnd.value
@@ -39,6 +42,7 @@ export function usePurchaseOrder() {
       if (purchaseAccountSetFilter.value) params.account_set_id = purchaseAccountSetFilter.value
       const { data } = await getPurchaseOrders(params)
       purchaseOrders.value = data.items || data
+      total.value = data.total ?? 0
     } catch (e) {
       console.error(e)
     }
@@ -74,6 +78,8 @@ export function usePurchaseOrder() {
 
   return {
     purchaseOrders,
+    // 分页
+    page, pageSize, total, totalPages, hasPagination, resetPage, prevPage, nextPage,
     purchaseStatusFilter,
     purchaseAccountSetFilter,
     purchaseDateStart,

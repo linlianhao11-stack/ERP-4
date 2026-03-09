@@ -15,36 +15,38 @@
       <span v-if="hasPermission('admin')" @click="settingsTab = 'permissions'" :class="['tab', settingsTab === 'permissions' ? 'active' : '']">权限管理</span>
     </div>
 
-    <!-- 常规设置标签页 -->
-    <div v-if="settingsTab === 'general'" class="grid md:grid-cols-2 gap-5">
-      <WarehouseSettings
-        v-if="hasPermission('settings') || hasPermission('stock_edit')"
-        @data-changed="onDataChanged" />
-      <SalespersonSettings
-        v-if="hasPermission('settings') || hasPermission('sales')"
-        @data-changed="onDataChanged" />
-      <UserSettings
-        @data-changed="onDataChanged"
-        @go-to-permissions="handleGoToPermissions" />
-    </div>
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <!-- 常规设置标签页 -->
+      <div v-if="settingsTab === 'general'" key="general" class="grid md:grid-cols-2 gap-5">
+        <WarehouseSettings
+          v-if="hasPermission('settings') || hasPermission('stock_edit')"
+          @data-changed="onDataChanged" />
+        <SalespersonSettings
+          v-if="hasPermission('settings') || hasPermission('sales')"
+          @data-changed="onDataChanged" />
+        <UserSettings
+          @data-changed="onDataChanged"
+          @go-to-permissions="handleGoToPermissions" />
+      </div>
 
-    <!-- 财务设置标签页 -->
-    <div v-if="settingsTab === 'finance'">
-      <PaymentMethodSettings @data-changed="onDataChanged" />
-    </div>
+      <!-- 财务设置标签页 -->
+      <div v-else-if="settingsTab === 'finance'" key="finance">
+        <PaymentMethodSettings @data-changed="onDataChanged" />
+      </div>
 
-    <!-- 系统日志标签页 -->
-    <div v-if="settingsTab === 'logs'">
-      <LogsSettings />
-    </div>
+      <!-- 系统日志标签页 -->
+      <div v-else-if="settingsTab === 'logs'" key="logs">
+        <LogsSettings />
+      </div>
 
-    <!-- 权限管理标签页 -->
-    <div v-if="settingsTab === 'permissions'">
-      <PermissionSettings
-        ref="permissionSettingsRef"
-        :initial-user-id="permInitialUserId"
-        @data-changed="onDataChanged" />
-    </div>
+      <!-- 权限管理标签页 -->
+      <div v-else-if="settingsTab === 'permissions'" key="permissions">
+        <PermissionSettings
+          ref="permissionSettingsRef"
+          :initial-user-id="permInitialUserId"
+          @data-changed="onDataChanged" />
+      </div>
+    </Transition>
   </div>
 </template>
 

@@ -40,7 +40,7 @@ async def list_purchase_receipts(
             "supplier_id": b.supplier_id,
             "supplier_name": b.supplier.name if b.supplier else None,
             "purchase_order_id": b.purchase_order_id,
-            "purchase_order_no": b.purchase_order.order_no if b.purchase_order else None,
+            "purchase_order_no": b.purchase_order.po_no if b.purchase_order else None,
             "warehouse_id": b.warehouse_id,
             "bill_date": str(b.bill_date),
             "total_amount": str(b.total_amount),

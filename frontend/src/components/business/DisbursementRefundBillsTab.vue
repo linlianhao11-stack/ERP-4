@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="form-input w-28" @change="loadList">
+      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
         <option value="">全部状态</option>
         <option value="draft">草稿</option>
         <option value="confirmed">已确认</option>
@@ -9,8 +9,8 @@
       <button v-if="hasPermission('accounting_ap_edit')" @click="openCreate" class="btn btn-primary btn-sm ml-auto">新增退款单</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full text-[13px]">
         <thead>
           <tr>
             <th>单号</th>
@@ -26,19 +26,25 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="9">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无付款退款数据</p>
+                <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
+              </div>
+            </td>
           </tr>
           <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px]">{{ b.bill_no }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.bill_no">{{ b.bill_no }}</td>
             <td>{{ b.refund_date }}</td>
             <td>{{ b.supplier_name }}</td>
-            <td class="text-right">{{ b.amount }}</td>
-            <td class="font-mono text-[12px]">{{ b.original_disbursement_no || '-' }}</td>
-            <td class="max-w-[120px] truncate">{{ b.reason || '-' }}</td>
+            <td class="text-right">{{ fmtMoney(b.amount) }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.original_disbursement_no">{{ b.original_disbursement_no || '-' }}</td>
+            <td class="max-w-32 truncate">{{ b.reason || '-' }}</td>
             <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-            <td class="font-mono text-[12px]">{{ b.voucher_no || '-' }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.voucher_no">{{ b.voucher_no || '-' }}</td>
             <td @click.stop>
-              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
+              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">确认</button>
             </td>
           </tr>
         </tbody>
@@ -54,7 +60,7 @@
     <!-- 新增弹窗 -->
     <Transition name="fade">
       <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false">
-        <div class="modal" style="max-width: 500px">
+        <div class="modal max-w-lg">
           <div class="modal-header">
             <h3>新增付款退款单</h3>
             <button @click="showCreate = false" class="modal-close">&times;</button>
@@ -62,37 +68,37 @@
           <div class="modal-body">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="form-label">供应商</label>
-                <select v-model="form.supplier_id" class="form-input">
+                <label class="label" for="ap-dref-supplier">供应商</label>
+                <select id="ap-dref-supplier" v-model="form.supplier_id" class="input text-sm">
                   <option value="">请选择</option>
                   <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">退款日期</label>
-                <input v-model="form.refund_date" type="date" class="form-input" />
+                <label class="label" for="ap-dref-date">退款日期</label>
+                <input id="ap-dref-date" v-model="form.refund_date" type="date" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">原付款单ID</label>
-                <input v-model="form.original_disbursement_id" type="number" class="form-input" />
+                <label class="label" for="ap-dref-original-id">原付款单ID</label>
+                <input id="ap-dref-original-id" v-model="form.original_disbursement_id" type="number" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">退款金额</label>
-                <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+                <label class="label" for="ap-dref-amount">退款金额</label>
+                <input id="ap-dref-amount" v-model="form.amount" type="number" step="0.01" class="input text-sm" />
               </div>
               <div class="col-span-2">
-                <label class="form-label">退款原因</label>
-                <input v-model="form.reason" class="form-input" />
+                <label class="label" for="ap-dref-reason">退款原因</label>
+                <input id="ap-dref-reason" v-model="form.reason" class="input text-sm" />
               </div>
               <div class="col-span-2">
-                <label class="form-label">备注</label>
-                <input v-model="form.remark" class="form-input" />
+                <label class="label" for="ap-dref-remark">备注</label>
+                <input id="ap-dref-remark" v-model="form.remark" class="input text-sm" />
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button @click="showCreate = false" class="btn btn-secondary btn-sm">取消</button>
-            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">保存</button>
+            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">{{ submitting ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -106,11 +112,13 @@ import { getDisbursementRefundBills, createDisbursementRefundBill, confirmDisbur
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
+import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
+const { fmtMoney } = useFormat()
 
 const items = ref([])
 const total = ref(0)

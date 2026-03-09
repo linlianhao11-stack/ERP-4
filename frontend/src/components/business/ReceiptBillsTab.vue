@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="form-input w-28" @change="loadList">
+      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
         <option value="">全部状态</option>
         <option value="draft">草稿</option>
         <option value="confirmed">已确认</option>
@@ -9,8 +9,8 @@
       <button v-if="hasPermission('accounting_ar_edit')" @click="openCreate" class="btn btn-primary btn-sm ml-auto">新增收款单</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full text-[13px]">
         <thead>
           <tr>
             <th>单号</th>
@@ -26,19 +26,25 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="9">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无收款单数据</p>
+                <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
+              </div>
+            </td>
           </tr>
           <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px]">{{ b.bill_no }}</td>
+            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span></td>
             <td>{{ b.receipt_date }}</td>
             <td>{{ b.customer_name }}</td>
-            <td class="text-right">{{ b.amount }}</td>
+            <td class="text-right">{{ fmtMoney(b.amount) }}</td>
             <td>{{ b.payment_method }}</td>
             <td>{{ b.is_advance ? '是' : '否' }}</td>
             <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-            <td class="font-mono text-[12px]">{{ b.voucher_no || '-' }}</td>
+            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
             <td @click.stop>
-              <button v-if="b.status === 'draft' && hasPermission('accounting_ar_confirm')" @click="confirmBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
+              <button v-if="b.status === 'draft' && hasPermission('accounting_ar_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
             </td>
           </tr>
         </tbody>
@@ -54,7 +60,7 @@
     <!-- 新增弹窗 -->
     <Transition name="fade">
       <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false">
-        <div class="modal" style="max-width: 500px">
+        <div class="modal max-w-lg">
           <div class="modal-header">
             <h3>新增收款单</h3>
             <button @click="showCreate = false" class="modal-close">&times;</button>
@@ -62,42 +68,42 @@
           <div class="modal-body">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="form-label">客户</label>
-                <select v-model="form.customer_id" class="form-input">
+                <label class="label" for="ar-rcpt-customer">客户</label>
+                <select id="ar-rcpt-customer" v-model="form.customer_id" class="input text-sm">
                   <option value="">请选择</option>
                   <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">收款日期</label>
-                <input v-model="form.receipt_date" type="date" class="form-input" />
+                <label class="label" for="ar-rcpt-date">收款日期</label>
+                <input id="ar-rcpt-date" v-model="form.receipt_date" type="date" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">金额</label>
-                <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+                <label class="label" for="ar-rcpt-amount">金额</label>
+                <input id="ar-rcpt-amount" v-model="form.amount" type="number" step="0.01" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">收款方式</label>
-                <input v-model="form.payment_method" class="form-input" placeholder="如：银行转账" />
+                <label class="label" for="ar-rcpt-payment-method">收款方式</label>
+                <input id="ar-rcpt-payment-method" v-model="form.payment_method" class="input text-sm" placeholder="如：银行转账" />
               </div>
               <div>
-                <label class="form-label">关联应收单ID</label>
-                <input v-model="form.receivable_bill_id" type="number" class="form-input" placeholder="可选" />
+                <label class="label" for="ar-rcpt-receivable-bill-id">关联应收单ID</label>
+                <input id="ar-rcpt-receivable-bill-id" v-model="form.receivable_bill_id" type="number" class="input text-sm" placeholder="可选" />
               </div>
               <div class="flex items-end gap-2">
-                <label class="flex items-center gap-1 text-[13px]">
-                  <input type="checkbox" v-model="form.is_advance" /> 预收款
+                <label class="flex items-center gap-1 text-[13px]" for="ar-rcpt-is-advance">
+                  <input id="ar-rcpt-is-advance" type="checkbox" v-model="form.is_advance" aria-label="预收款" /> 预收款
                 </label>
               </div>
               <div class="col-span-2">
-                <label class="form-label">备注</label>
-                <input v-model="form.remark" class="form-input" />
+                <label class="label" for="ar-rcpt-remark">备注</label>
+                <input id="ar-rcpt-remark" v-model="form.remark" class="input text-sm" />
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button @click="showCreate = false" class="btn btn-secondary btn-sm">取消</button>
-            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">保存</button>
+            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">{{ submitting ? '提交中...' : '确定' }}</button>
           </div>
         </div>
       </div>
@@ -111,11 +117,13 @@ import { getReceiptBills, createReceiptBill, confirmReceiptBill } from '../../ap
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
+import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
+const { fmtMoney } = useFormat()
 
 const items = ref([])
 const total = ref(0)
@@ -147,6 +155,7 @@ function openCreate() {
 }
 
 async function handleCreate() {
+  if (submitting.value) return
   if (!form.value.customer_id || !form.value.amount || !form.value.payment_method) {
     appStore.showToast('请填写客户、金额和收款方式', 'error')
     return

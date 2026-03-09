@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="form-input w-28" @change="loadList">
+      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
         <option value="">全部状态</option>
         <option value="draft">草稿</option>
         <option value="confirmed">已确认</option>
@@ -9,8 +9,8 @@
       <button v-if="hasPermission('accounting_ap_edit')" @click="openCreate" class="btn btn-primary btn-sm ml-auto">新增付款单</button>
     </div>
 
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="table-container">
+      <table class="w-full text-[13px]">
         <thead>
           <tr>
             <th>单号</th>
@@ -25,18 +25,24 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="8" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="8">
+              <div class="text-center py-12 text-muted">
+                <div class="text-3xl mb-3">📋</div>
+                <p class="text-sm font-medium mb-1">暂无付款单数据</p>
+                <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
+              </div>
+            </td>
           </tr>
           <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px]">{{ b.bill_no }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.bill_no">{{ b.bill_no }}</td>
             <td>{{ b.disbursement_date }}</td>
             <td>{{ b.supplier_name }}</td>
-            <td class="text-right">{{ b.amount }}</td>
+            <td class="text-right">{{ fmtMoney(b.amount) }}</td>
             <td>{{ b.disbursement_method }}</td>
             <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-            <td class="font-mono text-[12px]">{{ b.voucher_no || '-' }}</td>
+            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.voucher_no">{{ b.voucher_no || '-' }}</td>
             <td @click.stop>
-              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
+              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
             </td>
           </tr>
         </tbody>
@@ -52,7 +58,7 @@
     <!-- 新增弹窗 -->
     <Transition name="fade">
       <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false">
-        <div class="modal" style="max-width: 500px">
+        <div class="modal max-w-lg">
           <div class="modal-header">
             <h3>新增付款单</h3>
             <button @click="showCreate = false" class="modal-close">&times;</button>
@@ -60,37 +66,37 @@
           <div class="modal-body">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="form-label">供应商</label>
-                <select v-model="form.supplier_id" class="form-input">
+                <label class="label" for="ap-disb-supplier">供应商</label>
+                <select id="ap-disb-supplier" v-model="form.supplier_id" class="input text-sm">
                   <option value="">请选择</option>
                   <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">付款日期</label>
-                <input v-model="form.disbursement_date" type="date" class="form-input" />
+                <label class="label" for="ap-disb-date">付款日期</label>
+                <input id="ap-disb-date" v-model="form.disbursement_date" type="date" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">金额</label>
-                <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+                <label class="label" for="ap-disb-amount">金额</label>
+                <input id="ap-disb-amount" v-model="form.amount" type="number" step="0.01" class="input text-sm" />
               </div>
               <div>
-                <label class="form-label">付款方式</label>
-                <input v-model="form.disbursement_method" class="form-input" placeholder="如：银行转账" />
+                <label class="label" for="ap-disb-method">付款方式</label>
+                <input id="ap-disb-method" v-model="form.disbursement_method" class="input text-sm" placeholder="如：银行转账" />
               </div>
               <div>
-                <label class="form-label">关联应付单ID</label>
-                <input v-model="form.payable_bill_id" type="number" class="form-input" placeholder="可选" />
+                <label class="label" for="ap-disb-payable-id">关联应付单ID</label>
+                <input id="ap-disb-payable-id" v-model="form.payable_bill_id" type="number" class="input text-sm" placeholder="可选" />
               </div>
               <div class="col-span-2">
-                <label class="form-label">备注</label>
-                <input v-model="form.remark" class="form-input" />
+                <label class="label" for="ap-disb-remark">备注</label>
+                <input id="ap-disb-remark" v-model="form.remark" class="input text-sm" />
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button @click="showCreate = false" class="btn btn-secondary btn-sm">取消</button>
-            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">保存</button>
+            <button @click="handleCreate" :disabled="submitting" class="btn btn-primary btn-sm">{{ submitting ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -104,11 +110,13 @@ import { getDisbursementBills, createDisbursementBill, confirmDisbursementBill }
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
+import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
+const { fmtMoney } = useFormat()
 
 const items = ref([])
 const total = ref(0)

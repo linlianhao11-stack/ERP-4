@@ -1,22 +1,23 @@
 /**
  * 库存列表 composable
  * 提供库存页面的筛选、排序、搜索、导出等核心逻辑
+ * 使用服务端分页 + 搜索，不再全量加载商品
  */
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onUnmounted } from 'vue'
 import { useAppStore } from '../stores/app'
-import { useProductsStore } from '../stores/products'
 import { useWarehousesStore } from '../stores/warehouses'
+import { getProducts } from '../api/products'
 import { exportStock as apiExportStock } from '../api/stock'
 import { getWarehouses } from '../api/warehouses'
-import { fuzzyMatchAny } from '../utils/helpers'
+import { usePagination } from './usePagination'
 
 export function useStock() {
   const appStore = useAppStore()
-  const productsStore = useProductsStore()
   const warehousesStore = useWarehousesStore()
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
 
-  // 从 store 获取数据
-  const products = computed(() => productsStore.products)
+  // 本地商品数据（分页加载，非全量）
+  const stockProducts = ref([])
   const warehouses = computed(() => warehousesStore.warehouses)
   const locations = computed(() => warehousesStore.locations)
 
@@ -40,17 +41,10 @@ export function useStock() {
     }
   }
 
-  /** 按关键词过滤后的商品列表 */
-  const filteredProducts = computed(() => {
-    const kw = productSearch.value
-    if (!kw) return products.value
-    return products.value.filter(p => fuzzyMatchAny([p.sku, p.name, p.brand, p.category], kw))
-  })
-
   /** 展平并排序后的库存行（商品+库存位置） */
   const sortedStockRows = computed(() => {
     const rows = []
-    filteredProducts.value.forEach(p => {
+    stockProducts.value.forEach(p => {
       if (!p.stocks || !p.stocks.length) return
       const stocks = showVirtualStock.value ? p.stocks : p.stocks.filter(x => !x.is_virtual)
       stocks.forEach(s => { rows.push({ p, s }) })
@@ -77,13 +71,31 @@ export function useStock() {
 
   /** 是否存在有库存的商品（控制空状态展示） */
   const hasStockProducts = computed(() =>
-    filteredProducts.value.some(p => p.stocks && p.stocks.some(s => showVirtualStock.value || !s.is_virtual))
+    stockProducts.value.some(p => p.stocks && p.stocks.some(s => showVirtualStock.value || !s.is_virtual))
   )
 
-  /** 加载商品列表（可按仓库筛选） */
-  const loadProductsData = () => {
-    productsStore.loadProducts(stockWarehouseFilter.value || undefined)
+  /** 加载商品列表（服务端分页 + 搜索） */
+  const loadProductsData = async () => {
+    try {
+      const params = { ...paginationParams.value }
+      if (stockWarehouseFilter.value) params.warehouse_id = stockWarehouseFilter.value
+      if (productSearch.value) params.keyword = productSearch.value
+      const { data } = await getProducts(params)
+      stockProducts.value = data.items || data
+      total.value = data.total ?? 0
+    } catch (e) {
+      console.error(e)
+    }
   }
+
+  // 搜索防抖
+  let _searchTimer = null
+  const debouncedSearch = () => {
+    clearTimeout(_searchTimer)
+    resetPage()
+    _searchTimer = setTimeout(loadProductsData, 300)
+  }
+  onUnmounted(() => clearTimeout(_searchTimer))
 
   /** 加载寄售（虚拟）仓库列表 */
   const loadVirtualWarehouses = async () => {
@@ -127,7 +139,7 @@ export function useStock() {
 
   return {
     // 数据
-    products,
+    stockProducts,
     warehouses,
     locations,
     // 筛选
@@ -139,11 +151,13 @@ export function useStock() {
     stockSort,
     toggleStockSort,
     // 计算属性
-    filteredProducts,
     sortedStockRows,
     hasStockProducts,
+    // 分页
+    page, totalPages, hasPagination, resetPage, prevPage, nextPage,
     // 方法
     loadProductsData,
+    debouncedSearch,
     loadVirtualWarehouses,
     onToggleVirtualStock,
     handleExportStock,

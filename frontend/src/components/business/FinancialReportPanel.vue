@@ -18,14 +18,14 @@
 
     <!-- 子Tab -->
     <div class="flex gap-2 mb-3 border-b pb-2">
-      <span @click="sub = 'balance-sheet'" :class="['tab', sub === 'balance-sheet' ? 'active' : '']">资产负债表</span>
-      <span @click="sub = 'income'" :class="['tab', sub === 'income' ? 'active' : '']">利润表</span>
-      <span @click="sub = 'cash-flow'" :class="['tab', sub === 'cash-flow' ? 'active' : '']">现金流量表</span>
+      <button role="tab" :aria-selected="sub === 'balance-sheet'" @click="sub = 'balance-sheet'" :class="['tab', sub === 'balance-sheet' ? 'active' : '']">资产负债表</button>
+      <button role="tab" :aria-selected="sub === 'income'" @click="sub = 'income'" :class="['tab', sub === 'income' ? 'active' : '']">利润表</button>
+      <button role="tab" :aria-selected="sub === 'cash-flow'" @click="sub = 'cash-flow'" :class="['tab', sub === 'cash-flow' ? 'active' : '']">现金流量表</button>
 
       <!-- 导出按钮 -->
       <div class="ml-auto relative" v-if="hasData">
         <button @click="showExportMenu = !showExportMenu" class="btn btn-secondary btn-sm flex items-center gap-1">
-          导出 <span class="text-[10px]">&#9660;</span>
+          导出 <span class="text-[10px]" aria-hidden="true">&#9660;</span>
         </button>
         <div v-if="showExportMenu" class="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-line py-1 z-10 min-w-[120px]">
           <button @click="handleExport('excel')" class="w-full text-left px-3 py-1.5 text-[13px] hover:bg-elevated transition-colors">导出 Excel</button>
@@ -35,9 +35,11 @@
     </div>
 
     <!-- 报表内容 -->
-    <BalanceSheetTab v-if="sub === 'balance-sheet'" :data="balanceSheetData" />
-    <IncomeStatementTab v-if="sub === 'income'" :data="incomeData" />
-    <CashFlowTab v-if="sub === 'cash-flow'" :data="cashFlowData" />
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <BalanceSheetTab v-if="sub === 'balance-sheet'" key="balance-sheet" :data="balanceSheetData" />
+      <IncomeStatementTab v-else-if="sub === 'income'" key="income" :data="incomeData" />
+      <CashFlowTab v-else-if="sub === 'cash-flow'" key="cash-flow" :data="cashFlowData" />
+    </Transition>
   </div>
 </template>
 

@@ -55,7 +55,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">收款</h3>
-          <button @click="showPaymentModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showPaymentModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
           <form @submit.prevent="savePayment" class="space-y-3">

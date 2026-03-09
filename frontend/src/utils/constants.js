@@ -148,6 +148,14 @@ export const purchaseStatusBadges = {
   returned: 'badge badge-orange'
 }
 
+export const shipmentStatusNames = {
+  pending: '待发货',
+  shipped: '已发货',
+  in_transit: '运输中',
+  signed: '已签收',
+  problem: '异常'
+}
+
 export const shipmentStatusBadges = {
   pending: 'badge badge-gray',
   shipped: 'badge badge-blue',

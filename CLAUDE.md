@@ -9,6 +9,7 @@
 - **路由**: Vue Router 4
 
 ## 开发规范
+- Docker/容器管理统一通过 OrbStack，启动前先 `orb start`，不使用 Docker Desktop 或其他工具
 - 前端代码在 `frontend/src/`，构建输出到 `backend/static/`
 - 样式系统在 `frontend/src/styles/base.css`，使用 Tailwind `@layer` 组织
 - 组件使用 Vue 3 `<script setup>` 语法

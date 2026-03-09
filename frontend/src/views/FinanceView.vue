@@ -17,21 +17,27 @@
       ref="ordersPanel"
       @data-changed="onOrdersDataChanged"
     />
-    <FinancePaymentsPanel
-      v-if="financeTab === 'payments'"
-      ref="paymentsPanel"
-      @view-order="handleViewOrder"
-    />
-    <FinancePayablesPanel
-      v-if="financeTab === 'payables'"
-    />
-    <FinanceLogsPanel
-      v-if="financeTab === 'logs'"
-    />
-    <FinanceRebatesPanel
-      v-if="financeTab === 'rebates'"
-      :accountSets="accountingStore.accountSets"
-    />
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <FinancePaymentsPanel
+        v-if="financeTab === 'payments'"
+        key="payments"
+        ref="paymentsPanel"
+        @view-order="handleViewOrder"
+      />
+      <FinancePayablesPanel
+        v-else-if="financeTab === 'payables'"
+        key="payables"
+      />
+      <FinanceLogsPanel
+        v-else-if="financeTab === 'logs'"
+        key="logs"
+      />
+      <FinanceRebatesPanel
+        v-else-if="financeTab === 'rebates'"
+        key="rebates"
+        :accountSets="accountingStore.accountSets"
+      />
+    </Transition>
   </div>
 </template>
 

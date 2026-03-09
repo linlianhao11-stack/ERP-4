@@ -28,15 +28,15 @@
 
     <!-- Tab Navigation -->
     <div class="flex flex-wrap gap-2 mb-3 border-b pb-2">
-      <span @click="tab = 'vouchers'" :class="['tab', tab === 'vouchers' ? 'active' : '']">凭证管理</span>
-      <span @click="tab = 'accounts'" :class="['tab', tab === 'accounts' ? 'active' : '']">科目管理</span>
-      <span @click="tab = 'periods'" :class="['tab', tab === 'periods' ? 'active' : '']">会计期间</span>
-      <span @click="tab = 'ledgers'" :class="['tab', tab === 'ledgers' ? 'active' : '']">账簿查询</span>
-      <span @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</span>
-      <span @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</span>
-      <span @click="tab = 'invoices'" :class="['tab', tab === 'invoices' ? 'active' : '']">发票管理</span>
-      <span @click="tab = 'period-end'" :class="['tab', tab === 'period-end' ? 'active' : '']">期末处理</span>
-      <span @click="tab = 'reports'" :class="['tab', tab === 'reports' ? 'active' : '']">财务报表</span>
+      <button role="tab" :aria-selected="tab === 'vouchers'" @click="tab = 'vouchers'" :class="['tab', tab === 'vouchers' ? 'active' : '']">凭证管理</button>
+      <button role="tab" :aria-selected="tab === 'accounts'" @click="tab = 'accounts'" :class="['tab', tab === 'accounts' ? 'active' : '']">科目管理</button>
+      <button role="tab" :aria-selected="tab === 'periods'" @click="tab = 'periods'" :class="['tab', tab === 'periods' ? 'active' : '']">会计期间</button>
+      <button role="tab" :aria-selected="tab === 'ledgers'" @click="tab = 'ledgers'" :class="['tab', tab === 'ledgers' ? 'active' : '']">账簿查询</button>
+      <button role="tab" :aria-selected="tab === 'receivables'" @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</button>
+      <button role="tab" :aria-selected="tab === 'payables'" @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</button>
+      <button role="tab" :aria-selected="tab === 'invoices'" @click="tab = 'invoices'" :class="['tab', tab === 'invoices' ? 'active' : '']">发票管理</button>
+      <button role="tab" :aria-selected="tab === 'period-end'" @click="tab = 'period-end'" :class="['tab', tab === 'period-end' ? 'active' : '']">期末处理</button>
+      <button role="tab" :aria-selected="tab === 'reports'" @click="tab = 'reports'" :class="['tab', tab === 'reports' ? 'active' : '']">财务报表</button>
     </div>
 
     <!-- 首次进入引导卡片（无账套） -->
@@ -55,17 +55,9 @@
     </div>
 
     <!-- Panels -->
-    <template v-else>
-      <VoucherPanel v-if="tab === 'vouchers'" />
-      <ChartOfAccountsPanel v-if="tab === 'accounts'" />
-      <AccountingPeriodsPanel v-if="tab === 'periods'" />
-      <LedgerPanel v-if="tab === 'ledgers'" />
-      <ReceivablePanel v-if="tab === 'receivables'" />
-      <PayablePanel v-if="tab === 'payables'" />
-      <InvoicePanel v-if="tab === 'invoices'" />
-      <PeriodEndPanel v-if="tab === 'period-end'" />
-      <FinancialReportPanel v-if="tab === 'reports'" />
-    </template>
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }" v-if="accountingStore.currentAccountSetId">
+      <component :is="panelComponent" :key="tab" />
+    </Transition>
 
     <!-- 账套管理弹窗 -->
     <Transition name="fade">
@@ -223,6 +215,19 @@ const appStore = useAppStore()
 const tab = ref('vouchers')
 
 const isAdmin = computed(() => authStore.user?.role === 'admin')
+
+const panelMap = {
+  vouchers: VoucherPanel,
+  accounts: ChartOfAccountsPanel,
+  periods: AccountingPeriodsPanel,
+  ledgers: LedgerPanel,
+  receivables: ReceivablePanel,
+  payables: PayablePanel,
+  invoices: InvoicePanel,
+  'period-end': PeriodEndPanel,
+  reports: FinancialReportPanel,
+}
+const panelComponent = computed(() => panelMap[tab.value])
 const hasMultipleSets = computed(() => accountingStore.accountSets.length > 0)
 
 // 账套管理弹窗 state

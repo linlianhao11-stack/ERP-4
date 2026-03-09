@@ -79,7 +79,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="font-semibold">寄售详情 - {{ consignDetail.customer?.name }}</h3>
-            <button @click="closeDetailModal" class="text-muted hover:text-secondary">&times;</button>
+            <button @click="closeDetailModal" class="modal-close">&times;</button>
           </div>
           <div class="modal-body">
             <!-- Customer Info Header -->
@@ -198,7 +198,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="font-semibold">寄售退货 - {{ consignDetail.customer?.name }}</h3>
-            <button @click="closeReturnModal" class="text-muted hover:text-secondary">&times;</button>
+            <button @click="closeReturnModal" class="modal-close">&times;</button>
           </div>
           <div class="modal-body">
             <div class="mb-4 p-3 bg-error-subtle rounded-lg border border-error">

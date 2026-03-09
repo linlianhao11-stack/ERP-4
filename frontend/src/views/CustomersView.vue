@@ -7,8 +7,9 @@
       <button v-if="customerTab === 'manage'" @click="openCustomerModal" class="btn btn-primary btn-sm ml-auto">新增客户</button>
     </div>
 
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
     <!-- Transactions Tab -->
-    <div v-if="customerTab === 'transactions'">
+    <div v-if="customerTab === 'transactions'" key="transactions">
       <input v-model="customersStore.customerSearch" class="input mb-3 text-sm" placeholder="搜索客户...">
       <div class="card divide-y">
         <div
@@ -31,7 +32,7 @@
     </div>
 
     <!-- Manage Tab -->
-    <div v-if="customerTab === 'manage'">
+    <div v-else-if="customerTab === 'manage'" key="manage">
       <input v-model="customersStore.customerSearch" class="input mb-3 text-sm" placeholder="搜索客户...">
       <div class="card divide-y">
         <div
@@ -49,13 +50,14 @@
         <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
       </div>
     </div>
+    </Transition>
 
     <!-- Customer Form Modal -->
     <div v-if="modal.show && modal.type === 'customer'" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">{{ modal.title }}</h3>
-          <button @click="closeModal" class="text-muted text-xl">&times;</button>
+          <button @click="closeModal" class="modal-close">&times;</button>
         </div>
         <div class="p-4">
           <form @submit.prevent="saveCustomerHandler" class="space-y-3">
@@ -91,7 +93,7 @@
       <div class="modal">
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">{{ modal.title }}</h3>
-          <button @click="closeModal" class="text-muted text-xl">&times;</button>
+          <button @click="closeModal" class="modal-close">&times;</button>
         </div>
         <div class="p-4">
           <!-- Customer summary and filters -->
@@ -220,7 +222,7 @@
             <button v-if="previousModal" @click="goBackToPrevious" class="text-muted hover:text-primary text-xl" title="返回上一页">←</button>
             <h3 class="font-semibold">{{ modal.title }}</h3>
           </div>
-          <button @click="closeModal" class="text-muted text-xl">&times;</button>
+          <button @click="closeModal" class="modal-close">&times;</button>
         </div>
         <div class="p-4">
           <!-- Order header -->

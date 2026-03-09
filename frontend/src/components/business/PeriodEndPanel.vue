@@ -19,7 +19,7 @@
             {{ selectedPeriodObj.year }}年第{{ selectedPeriodObj.month }}期
           </div>
         </div>
-        <span :class="selectedPeriodObj.is_closed ? 'badge-red' : 'badge-green'">
+        <span :class="selectedPeriodObj.is_closed ? 'badge badge-red' : 'badge badge-green'">
           {{ selectedPeriodObj.is_closed ? '已结账' : '未结账' }}
         </span>
       </div>
@@ -217,7 +217,7 @@
               <td>{{ p.year }}</td>
               <td>{{ p.month }}</td>
               <td>
-                <span :class="p.is_closed ? 'badge-red' : 'badge-green'">
+                <span :class="p.is_closed ? 'badge badge-red' : 'badge badge-green'">
                   {{ p.is_closed ? '已结账' : '未结账' }}
                 </span>
               </td>

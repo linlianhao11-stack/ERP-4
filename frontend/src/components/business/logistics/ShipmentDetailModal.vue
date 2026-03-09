@@ -5,7 +5,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">物流详情</h3>
-          <button @click="close" class="text-muted hover:text-secondary">&times;</button>
+          <button @click="close" class="modal-close">&times;</button>
         </div>
         <div class="modal-body space-y-4" v-if="shipmentDetail">
           <!-- 订单信息区 -->
@@ -66,7 +66,7 @@
           >
             <div class="flex justify-between items-center mb-1">
               <div class="text-sm font-semibold">物流单 #{{ idx + 1 }}</div>
-              <span :class="['text-xs px-2 py-0.5 rounded-full', getShipmentStatusBadge(s.status)]">{{ s.status_text }}</span>
+              <span :class="['text-xs px-2 py-0.5 rounded-full', getShipmentStatusBadge(s.status)]">{{ getShipmentStatusName(s.status, s.status_text) }}</span>
             </div>
             <div v-if="s.tracking_no" class="text-sm mb-1">
               {{ s.carrier_name }} <span class="font-mono text-xs">{{ s.tracking_no }}</span>
@@ -271,7 +271,7 @@ import {
   updateSN,
   shipOrder
 } from '../../../api/logistics'
-import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
+import { orderTypeNames, orderTypeBadges, shipmentStatusNames, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import { parseSnCodes } from '../../../utils/helpers'
 
 const props = defineProps({
@@ -327,6 +327,7 @@ const canShip = computed(() => {
 const getOrderTypeName = (type) => orderTypeNames[type] || type
 const getOrderTypeBadge = (type) => orderTypeBadges[type] || 'badge badge-gray'
 const getShipmentStatusBadge = (status) => shipmentStatusBadges[status] || 'bg-elevated text-secondary'
+const getShipmentStatusName = (status, fallback) => shipmentStatusNames[status] || fallback || status || '-'
 const getShippingName = (status) => shippingStatusNames[status] || status || '-'
 const getShippingBadge = (status) => shippingStatusBadges[status] || 'badge badge-gray'
 

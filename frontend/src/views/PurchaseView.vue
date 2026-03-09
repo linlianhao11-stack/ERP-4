@@ -7,17 +7,21 @@
     ]" container-class="mb-4" />
 
     <!-- Panels -->
-    <PurchaseOrdersPanel
-      v-if="purchaseTab === 'orders'"
-      ref="ordersPanel"
-      @data-changed="onOrdersDataChanged"
-    />
-    <PurchaseSuppliersPanel
-      v-if="purchaseTab === 'suppliers'"
-      ref="suppliersPanel"
-      @view-order="handleViewOrder"
-      @data-changed="onSuppliersDataChanged"
-    />
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <PurchaseOrdersPanel
+        v-if="purchaseTab === 'orders'"
+        key="orders"
+        ref="ordersPanel"
+        @data-changed="onOrdersDataChanged"
+      />
+      <PurchaseSuppliersPanel
+        v-else-if="purchaseTab === 'suppliers'"
+        key="suppliers"
+        ref="suppliersPanel"
+        @view-order="handleViewOrder"
+        @data-changed="onSuppliersDataChanged"
+      />
+    </Transition>
   </div>
 </template>
 

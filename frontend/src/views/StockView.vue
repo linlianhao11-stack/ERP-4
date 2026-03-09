@@ -6,7 +6,7 @@
   <div>
     <!-- 工具栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-2">
-      <select v-model="stockWarehouseFilter" @change="loadProductsData" class="input text-sm" style="width:130px">
+      <select v-model="stockWarehouseFilter" @change="resetPage(); loadProductsData()" class="input text-sm" style="width:130px">
         <option value="">全部仓库</option>
         <option v-for="w in warehouses.filter(x => !x.is_virtual)" :key="w.id" :value="w.id">{{ w.name }}</option>
         <template v-if="showVirtualStock">
@@ -30,12 +30,12 @@
 
     <!-- 搜索框 -->
     <div class="mb-3">
-      <input v-model="productSearch" class="input text-sm" placeholder="搜索商品名称、SKU、品牌...">
+      <input v-model="productSearch" @input="debouncedSearch" class="input text-sm" placeholder="搜索商品名称、SKU、品牌...">
     </div>
 
     <!-- 移动端卡片视图 -->
     <div class="md:hidden space-y-2">
-      <template v-for="p in filteredProducts" :key="'m' + p.id">
+      <template v-for="p in stockProducts" :key="'m' + p.id">
         <div
           v-for="(s, idx) in (p.stocks?.length ? (showVirtualStock ? p.stocks : p.stocks.filter(x => !x.is_virtual)) : [])"
           :key="'m' + p.id + '-' + idx"
@@ -148,6 +148,12 @@
       </div>
       <div v-if="!hasStockProducts" class="p-8 text-center text-muted text-sm">暂无库存商品</div>
     </div>
+    <!-- 分页 -->
+    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
+      <button @click="prevPage(); loadProductsData()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
+      <button @click="nextPage(); loadProductsData()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
+    </div>
 
     <!-- 商品新增/编辑弹窗 -->
     <ProductFormModal
@@ -195,7 +201,6 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useProductsStore } from '../stores/products'
 import { useWarehousesStore } from '../stores/warehouses'
 import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
@@ -209,7 +214,6 @@ import ImportModal from '../components/business/stock/ImportModal.vue'
 import ImportPreviewModal from '../components/business/stock/ImportPreviewModal.vue'
 
 const router = useRouter()
-const productsStore = useProductsStore()
 const warehousesStore = useWarehousesStore()
 const { getAgeClass } = useFormat()
 const { hasPermission } = usePermission()
@@ -218,8 +222,9 @@ const { hasPermission } = usePermission()
 const {
   warehouses, stockWarehouseFilter, showVirtualStock, virtualWarehouses,
   productSearch, stockSort, toggleStockSort,
-  filteredProducts, sortedStockRows, hasStockProducts,
-  loadProductsData, onToggleVirtualStock, handleExportStock,
+  stockProducts, sortedStockRows, hasStockProducts,
+  loadProductsData, debouncedSearch, onToggleVirtualStock, handleExportStock,
+  page, totalPages, hasPagination, resetPage, prevPage, nextPage,
 } = useStock()
 
 // ---- 弹窗可见性 ----
@@ -243,7 +248,7 @@ const importPreviewData = ref({ total: 0, valid_count: 0, skip_count: 0, items: 
 
 // ---- 初始化 ----
 onMounted(() => {
-  productsStore.loadProducts()
+  loadProductsData()
   warehousesStore.loadWarehouses()
 })
 

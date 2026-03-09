@@ -1,6 +1,6 @@
 # AI_CONTEXT.md — ERP-4 技术架构索引
 
-> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-09 / v4.17.0
+> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-09 / v4.18.0
 
 ---
 
@@ -295,7 +295,7 @@ erp-4/
 │       │   └── products.js     # 产品列表缓存
 │       │
 │       ├── api/                # axios API 模块（19 个）
-│       │   ├── index.js        # axios 实例（30s 超时）、拦截器（401→登录、403→提示、5xx→重试）、POST/PUT/DELETE 防重复提交
+│       │   ├── index.js        # axios 实例（30s 超时）、拦截器（401→登录、403→提示、5xx→重试）、POST/PUT/DELETE 防重复提交、GET 请求去重（并发共享 Promise）
 │       │   ├── auth.js, customers.js, orders.js, finance.js
 │       │   ├── products.js, stock.js, purchase.js, warehouses.js
 │       │   ├── logistics.js, consignment.js, sn.js
@@ -304,18 +304,19 @@ erp-4/
 │       │   ├── accounting.js   # 账套/科目/期间/凭证/账簿/应收/应付/发票/出入库/期末/报表 共50+函数
 │       │   └── （每个文件导出命名函数，baseURL = '/api'）
 │       │
-│       ├── composables/        # Vue 组合式函数（11 个）
+│       ├── composables/        # Vue 组合式函数（12 个）
 │       │   ├── useApi.js       # AbortController 可取消请求（组件 unmount 自动 abort）
 │       │   ├── useFormat.js    # 金额/日期格式化
 │       │   ├── useIdleTimeout.js # 无操作自动登出
 │       │   ├── useModal.js     # 模态框状态管理
+│       │   ├── usePagination.js # 可复用分页逻辑（page/totalPages/hasPagination/paginationParams）
 │       │   ├── usePermission.js # 权限检查
 │       │   ├── useSort.js      # 表格排序
 │       │   ├── useTable.js     # 表格数据加载/分页
 │       │   ├── useSalesCart.js  # 165 行 — 购物车增删改算逻辑
-│       │   ├── usePurchaseOrder.js # 86 行 — 采购单列表加载/筛选/导出
-│       │   ├── useShipment.js  # 149 行 — 发货列表加载/排序/列配置
-│       │   └── useStock.js     # 151 行 — 库存列表加载/筛选/排序/导出
+│       │   ├── usePurchaseOrder.js # 采购单列表加载/筛选/导出/分页
+│       │   ├── useShipment.js  # 发货列表加载/排序/列配置/分页
+│       │   └── useStock.js     # 库存列表（独立 API 调用 + 服务端搜索 + 分页，不依赖 productsStore）
 │       │
 │       └── utils/
 │           └── constants.js    # 全局常量（菜单、权限、订单类型、状态映射、IDLE_TIMEOUT）

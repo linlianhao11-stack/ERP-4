@@ -7,7 +7,7 @@
       <div class="flex items-center gap-2 justify-between">
         <div class="flex items-center gap-1 flex-1 min-w-0">
           <!-- 订单类型下拉 -->
-          <select v-model="orderFilter.type" @change="loadOrders" class="input w-auto text-sm" style="flex-shrink:0">
+          <select v-model="orderFilter.type" @change="resetPage(); loadOrders()" class="input w-auto text-sm" style="flex-shrink:0">
             <option value="">全部类型</option>
             <option value="CASH">现款</option>
             <option value="CREDIT">账期</option>
@@ -16,13 +16,13 @@
             <option value="RETURN">退货</option>
           </select>
           <!-- 账套下拉 -->
-          <select v-if="accountSets.length" v-model="orderFilter.account_set_id" @change="loadOrders" class="input w-auto text-sm" style="flex-shrink:0">
+          <select v-if="accountSets.length" v-model="orderFilter.account_set_id" @change="resetPage(); loadOrders()" class="input w-auto text-sm" style="flex-shrink:0">
             <option value="">全部账套</option>
             <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
           <!-- 桌面端日期输入 -->
-          <input v-model="orderFilter.start" @change="loadOrders" type="date" class="input w-auto text-sm hidden md:block">
-          <input v-model="orderFilter.end" @change="loadOrders" type="date" class="input w-auto text-sm hidden md:block">
+          <input v-model="orderFilter.start" @change="resetPage(); loadOrders()" type="date" class="input w-auto text-sm hidden md:block">
+          <input v-model="orderFilter.end" @change="resetPage(); loadOrders()" type="date" class="input w-auto text-sm hidden md:block">
           <!-- 移动端日期预设 -->
           <div class="flex gap-1 md:hidden">
             <span @click="setOrderDatePreset('')" :class="['tab', !orderDatePreset ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">全部</span>
@@ -42,8 +42,8 @@
     </div>
     <!-- 移动端自定义日期展开 -->
     <div v-if="orderDatePreset === 'custom'" class="px-3 pb-3 flex gap-2 md:hidden">
-      <input v-model="orderFilter.start" @change="loadOrders" type="date" class="input input-sm flex-1">
-      <input v-model="orderFilter.end" @change="loadOrders" type="date" class="input input-sm flex-1">
+      <input v-model="orderFilter.start" @change="resetPage(); loadOrders()" type="date" class="input input-sm flex-1">
+      <input v-model="orderFilter.end" @change="resetPage(); loadOrders()" type="date" class="input input-sm flex-1">
     </div>
     <!-- 桌面端表格（11列，含排序） -->
     <div class="overflow-x-auto table-container hidden md:block">
@@ -105,6 +105,12 @@
       </div>
       <div v-if="!allOrders.length" class="p-6 text-center text-muted text-sm">暂无订单</div>
     </div>
+    <!-- 分页 -->
+    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3 border-t">
+      <button @click="prevPage(); loadOrders()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
+      <button @click="nextPage(); loadOrders()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
+    </div>
   </div>
 
   <!-- ============ 弹窗：订单详情 ============ -->
@@ -112,7 +118,7 @@
     <div class="modal-content" style="max-width:920px">
       <div class="modal-header">
         <h3 class="font-semibold">订单详情</h3>
-        <button @click="showOrderDetailModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+        <button @click="showOrderDetailModal = false" class="modal-close">&times;</button>
       </div>
       <div class="modal-body" v-if="orderDetail.order_no">
         <!-- 订单基本信息 -->
@@ -268,7 +274,7 @@
       <div class="modal-content" style="max-width:640px">
         <div class="modal-header">
           <h3 class="font-semibold">取消订单 {{ cancelPreviewData.order_no }}</h3>
-          <button @click="showCancelModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
+          <button @click="showCancelModal = false" class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
           <!-- 步骤指示器 -->
@@ -423,6 +429,7 @@ import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import { useSort } from '../../../composables/useSort'
+import { usePagination } from '../../../composables/usePagination'
 import { getAllOrders, exportOrders } from '../../../api/finance'
 import { getAccountSets } from '../../../api/accounting'
 import { getOrder, cancelOrder, cancelPreview } from '../../../api/orders'
@@ -449,6 +456,7 @@ const settingsStore = useSettingsStore()
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
 const { sortState: orderSort, toggleSort: toggleOrderSort, genericSort: genericSortOrder } = useSort()
+const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
 
 /** 解析 SN 码 JSON 字符串为数组 */
 const parseSN = (raw) => {
@@ -558,6 +566,7 @@ const setOrderDatePreset = (preset) => {
     orderFilter.start = ''
     orderFilter.end = ''
   }
+  resetPage()
   loadOrders()
 }
 
@@ -565,7 +574,7 @@ const setOrderDatePreset = (preset) => {
 /** 加载订单列表 */
 const loadOrders = async () => {
   try {
-    const params = {}
+    const params = { ...paginationParams.value }
     if (orderFilter.type) params.order_type = orderFilter.type
     if (orderFilter.start) params.start_date = orderFilter.start
     if (orderFilter.end) params.end_date = orderFilter.end
@@ -574,6 +583,7 @@ const loadOrders = async () => {
     if (props.tab === 'unpaid') params.unpaid_only = true
     const { data } = await getAllOrders(params)
     allOrders.value = data.items || data
+    total.value = data.total ?? 0
   } catch (e) {
     console.error('加载订单失败', e)
   }
@@ -581,7 +591,7 @@ const loadOrders = async () => {
 
 // Tab 切换时重新加载数据
 watch(() => props.tab, () => {
-  if (props.active) loadOrders()
+  if (props.active) { resetPage(); loadOrders() }
 })
 
 /** 防抖搜索定时器 */
@@ -589,6 +599,7 @@ let _searchTimer = null
 /** 搜索输入防抖300ms后加载 */
 const debouncedLoadOrders = () => {
   clearTimeout(_searchTimer)
+  resetPage()
   _searchTimer = setTimeout(loadOrders, 300)
 }
 onUnmounted(() => clearTimeout(_searchTimer))

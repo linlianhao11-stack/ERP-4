@@ -1,20 +1,22 @@
 <template>
   <div>
     <div class="flex items-center gap-2 mb-3 border-b pb-2">
-      <span @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应收单</span>
-      <span @click="sub = 'receipts'" :class="['tab', sub === 'receipts' ? 'active' : '']">收款单</span>
-      <span @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">收款退款</span>
-      <span @click="sub = 'writeoffs'" :class="['tab', sub === 'writeoffs' ? 'active' : '']">应收核销</span>
-      <span @click="sub = 'delivery'" :class="['tab', sub === 'delivery' ? 'active' : '']">出库单</span>
+      <button role="tab" :aria-selected="sub === 'bills'" @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应收单</button>
+      <button role="tab" :aria-selected="sub === 'receipts'" @click="sub = 'receipts'" :class="['tab', sub === 'receipts' ? 'active' : '']">收款单</button>
+      <button role="tab" :aria-selected="sub === 'refunds'" @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">收款退款</button>
+      <button role="tab" :aria-selected="sub === 'writeoffs'" @click="sub = 'writeoffs'" :class="['tab', sub === 'writeoffs' ? 'active' : '']">应收核销</button>
+      <button role="tab" :aria-selected="sub === 'delivery'" @click="sub = 'delivery'" :class="['tab', sub === 'delivery' ? 'active' : '']">出库单</button>
       <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">
         {{ generating ? '生成中...' : '批量生成凭证' }}
       </button>
     </div>
-    <ReceivableBillsTab v-if="sub === 'bills'" />
-    <ReceiptBillsTab v-if="sub === 'receipts'" />
-    <ReceiptRefundBillsTab v-if="sub === 'refunds'" />
-    <WriteOffBillsTab v-if="sub === 'writeoffs'" />
-    <SalesDeliveryTab v-if="sub === 'delivery'" />
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+      <ReceivableBillsTab v-if="sub === 'bills'" key="bills" />
+      <ReceiptBillsTab v-else-if="sub === 'receipts'" key="receipts" />
+      <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" />
+      <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" />
+      <SalesDeliveryTab v-else-if="sub === 'delivery'" key="delivery" />
+    </Transition>
   </div>
 </template>
 

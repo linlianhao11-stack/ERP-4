@@ -1,5 +1,52 @@
 # 迭代记录
 
+## v4.18.0 — 架构级性能优化：分页 + GET 去重 + 动画修复（2026-03-09）
+
+> 全部大表格接入服务端分页（每页50条），GET 请求去重防止并发重复加载，Tab/页面快速切换不再白屏。
+
+### 分页系统
+
+- **新建 `usePagination.js` composable** — 可复用分页逻辑，提供 `page/totalPages/hasPagination/paginationParams`，输出 `{ offset, limit }` 与后端接口匹配
+- **FinanceOrdersTab** — 订单明细表格接入分页，筛选/搜索/日期预设/Tab 切换自动回第1页
+- **PurchaseOrdersPanel** — 采购订单表格接入分页（composable 层集成）
+- **LogisticsView** — 物流列表接入分页，状态 Tab + 搜索联动
+- **StockView（最复杂）** — 脱离 productsStore 全量数据，改为独立 API 调用 + 服务端搜索 + 分页；productsStore 保留给 SalesCart 等组件使用
+
+### GET 请求去重
+
+- `api/index.js` 包装 `get` 方法，同一 URL+params 的并发 GET 共享同一个 Promise
+- blob/stream 请求（导出）不参与去重
+- `finally()` 自动清理 Map，无内存泄漏
+
+### 动画修复（快速切换白屏 Bug）
+
+- 所有 `<Transition name="slide-fade" mode="out-in">` 添加 `:duration="{ enter: 250, leave: 120 }"`，强制 Vue 在指定时间后结束过渡，防止快速切换时 leave 动画未完成导致空白
+- CSS 过渡时间恢复为可见值：进入 250ms / 离开 120ms（含 transform）
+- 移除 App.vue 的 router-view 过渡（页面级过渡与重组件挂载冲突）
+- 涉及 10 个 Tab 容器组件
+
+### 修改文件清单
+
+**新建：**
+- `frontend/src/composables/usePagination.js` — 分页 composable
+
+**前端核心：**
+- `frontend/src/api/index.js` — GET 请求去重
+- `frontend/src/styles/base.css` — slide-fade 过渡时间调整
+- `frontend/src/App.vue` — 移除 router-view 过渡
+
+**分页接入（composable + 视图）：**
+- `frontend/src/components/business/finance/FinanceOrdersTab.vue` — 分页 UI + 筛选联动
+- `frontend/src/composables/usePurchaseOrder.js` + `PurchaseOrdersPanel.vue` — 分页
+- `frontend/src/composables/useShipment.js` + `LogisticsView.vue` — 分页
+- `frontend/src/composables/useStock.js`（重写：独立 API + 服务端搜索）+ `StockView.vue` — 分页
+
+**动画修复（10 个 Tab 容器）：**
+- `AccountingView.vue`, `FinanceView.vue`, `CustomersView.vue`, `SettingsView.vue`, `PurchaseView.vue`
+- `ReceivablePanel.vue`, `PayablePanel.vue`, `InvoicePanel.vue`, `LedgerPanel.vue`, `FinancialReportPanel.vue`
+
+---
+
 ## v4.17.0 — UI 重构：Modern Industrial 设计系统（2026-03-09）
 
 > 全面重构前端 UI 系统，建立 OKLCH 色彩 Token 体系 + Tailwind 4 主题配置，支持亮/暗双模式切换，消灭 1,370 处硬编码色值。新增侧边栏待办角标和仪表盘待办面板。
