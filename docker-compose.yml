@@ -30,10 +30,10 @@ services:
     mem_limit: 512m
     cpus: 1.0
     ports:
-      - "127.0.0.1:8090:8090"
+      - "0.0.0.0:8090:8090"
     environment:
       DATABASE_URL: postgres://erp:${POSTGRES_PASSWORD:-erp123456}@db:5432/erp
-      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-secret-in-production}
+      SECRET_KEY: ${SECRET_KEY:?请在 .env 文件中设置 SECRET_KEY}
       TZ: Asia/Shanghai
     volumes:
       - ./backups:/app/backups

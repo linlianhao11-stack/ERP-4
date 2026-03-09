@@ -1,7 +1,9 @@
 """凭证管理 API"""
 from decimal import Decimal
 from datetime import datetime, timezone
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
@@ -11,24 +13,16 @@ from app.models.system_setting import SystemSetting
 from app.schemas.accounting import VoucherCreate, VoucherUpdate
 from app.logger import get_logger
 
+
+class BatchPdfRequest(BaseModel):
+    ids: List[int]
+
 logger = get_logger("vouchers")
 
 router = APIRouter(prefix="/api/vouchers", tags=["凭证管理"])
 
 
-async def _next_voucher_no(account_set_id: int, voucher_type: str, period_name: str) -> str:
-    account_set = await AccountSet.filter(id=account_set_id).first()
-    prefix = f"{account_set.code}-{voucher_type}-{period_name.replace('-', '')}-"
-    last = await Voucher.filter(
-        account_set_id=account_set_id,
-        voucher_type=voucher_type,
-        period_name=period_name
-    ).order_by("-voucher_no").first()
-    if last and last.voucher_no.startswith(prefix):
-        seq = int(last.voucher_no[len(prefix):]) + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:03d}"
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
 @router.get("")
@@ -70,9 +64,13 @@ async def list_vouchers(
 @router.get("/{voucher_id}")
 async def get_voucher(
     voucher_id: int,
+    account_set_id: int = Query(None),
     user: User = Depends(require_permission("accounting_view"))
 ):
-    v = await Voucher.filter(id=voucher_id).first()
+    q = {"id": voucher_id}
+    if account_set_id:
+        q["account_set_id"] = account_set_id
+    v = await Voucher.filter(**q).first()
     if not v:
         raise HTTPException(status_code=404, detail="凭证不存在")
     entries = await VoucherEntry.filter(voucher=v).order_by("line_no").prefetch_related("account")
@@ -370,10 +368,12 @@ async def get_voucher_pdf(
         "approved_by_name": v.approved_by.username if v.approved_by else "",
         "posted_by_name": v.posted_by.username if v.posted_by else "",
     }
-    # Get account names for entries
+    # 批量预加载科目（避免 N+1 查询）
+    acct_ids = {e.account_id for e in entries}
+    accounts = {a.id: a for a in await ChartOfAccount.filter(id__in=list(acct_ids)).all()} if acct_ids else {}
     entry_list = []
     for e in entries:
-        acct = await ChartOfAccount.filter(id=e.account_id).first()
+        acct = accounts.get(e.account_id)
         entry_list.append({
             "summary": e.summary,
             "account_name": f"{acct.code} {acct.name}" if acct else "",
@@ -382,17 +382,19 @@ async def get_voucher_pdf(
         })
     pdf_bytes = generate_voucher_pdf(voucher_dict, entry_list)
     import io
+    from urllib.parse import quote
     from fastapi.responses import StreamingResponse
+    safe_name = quote(f"{v.voucher_no}.pdf")
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={v.voucher_no}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}"}
     )
 
 
 @router.post("/batch-pdf")
 async def batch_voucher_pdf(
-    data: dict,
+    data: BatchPdfRequest,
     user: User = Depends(require_permission("accounting_view")),
 ):
     """批量凭证PDF下载"""
@@ -400,16 +402,32 @@ async def batch_voucher_pdf(
     import io
     from fastapi.responses import StreamingResponse
 
-    ids = data.get("ids", [])
+    ids = data.ids
     if not ids:
         raise HTTPException(status_code=400, detail="请选择凭证")
 
+    # 批量加载所有凭证及关联
+    vouchers = await Voucher.filter(id__in=ids).prefetch_related("creator", "approved_by", "posted_by").all()
+    voucher_map = {v.id: v for v in vouchers}
+
+    # 批量加载所有分录
+    all_entries = await VoucherEntry.filter(voucher_id__in=ids).order_by("voucher_id", "line_no").all()
+
+    # 批量加载所有科目
+    acct_ids = {e.account_id for e in all_entries}
+    accounts = {a.id: a for a in await ChartOfAccount.filter(id__in=list(acct_ids)).all()} if acct_ids else {}
+
+    # 按 voucher_id 分组
+    from collections import defaultdict
+    entries_by_voucher = defaultdict(list)
+    for e in all_entries:
+        entries_by_voucher[e.voucher_id].append(e)
+
     pdf_list = []
     for vid in ids:
-        v = await Voucher.filter(id=vid).prefetch_related("creator", "approved_by", "posted_by").first()
+        v = voucher_map.get(vid)
         if not v:
             continue
-        entries = await VoucherEntry.filter(voucher_id=v.id).order_by("line_no").all()
         voucher_dict = {
             "voucher_no": v.voucher_no,
             "voucher_date": str(v.voucher_date),
@@ -421,8 +439,8 @@ async def batch_voucher_pdf(
             "posted_by_name": v.posted_by.username if v.posted_by else "",
         }
         entry_list = []
-        for e in entries:
-            acct = await ChartOfAccount.filter(id=e.account_id).first()
+        for e in entries_by_voucher.get(vid, []):
+            acct = accounts.get(e.account_id)
             entry_list.append({
                 "summary": e.summary,
                 "account_name": f"{acct.code} {acct.name}" if acct else "",
@@ -435,8 +453,10 @@ async def batch_voucher_pdf(
         raise HTTPException(status_code=404, detail="未找到凭证")
 
     merged = merge_pdfs(pdf_list)
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     return StreamingResponse(
         io.BytesIO(merged),
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=vouchers_batch.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=vouchers_batch_{ts}.pdf"}
     )

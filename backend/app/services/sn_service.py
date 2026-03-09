@@ -46,8 +46,11 @@ async def validate_and_add_sn_codes(sn_codes: List[str], warehouse_id: int, prod
 
 
 async def validate_and_consume_sn_codes(sn_codes: List[str], shipment, user,
-                                         product_id: int = None, warehouse_id: int = None):
-    """验证并消费 SN 码（事务+行锁保证并发安全），可选校验产品和仓库归属"""
+                                         product_id: int = None, warehouse_id: int = None,
+                                         strict: bool = True):
+    """验证并消费 SN 码（事务+行锁保证并发安全），可选校验产品和仓库归属。
+    strict=False 时，SN码不在 sn_codes 表中则跳过（仅存文本），不报错。
+    """
     async with in_transaction():
         for sn in sn_codes:
             filters = {"sn_code": sn, "status": "in_stock"}
@@ -57,6 +60,8 @@ async def validate_and_consume_sn_codes(sn_codes: List[str], shipment, user,
                 filters["warehouse_id"] = warehouse_id
             sn_obj = await SnCode.filter(**filters).select_for_update().first()
             if not sn_obj:
+                if not strict:
+                    continue
                 detail = f"SN码不可用(不存在或已发货): {sn}"
                 if product_id or warehouse_id:
                     detail = f"SN码不可用(不存在、已发货或不属于当前商品/仓库): {sn}"

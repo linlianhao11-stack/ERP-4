@@ -1,6 +1,6 @@
-# 轻量级 ERP 系统 v4.13.0
+# 轻量级 ERP 系统 v4.15.0
 
-面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售等核心业务流程。
+面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
 ## 技术栈
 
@@ -31,7 +31,7 @@ erp-4/
 ├── backend/
 │   ├── main.py                 # FastAPI 入口，lifespan 管理
 │   ├── requirements.txt        # Python 依赖
-│   ├── tests/                  # pytest 测试（79 个用例：认证/会计/账簿/应收应付/发票/出入库/期末/报表）
+│   ├── tests/                  # pytest 测试（84 个用例：认证/会计/账簿/应收应付/发票/出入库/期末/报表/业务流程集成测试）
 │   ├── pytest.ini              # pytest 配置
 │   ├── app/
 │   │   ├── config.py           # 全局配置（环境变量 + 默认值）
@@ -40,10 +40,10 @@ erp-4/
 │   │   ├── exceptions.py       # 全局异常处理器
 │   │   ├── migrations.py       # 启动时幂等初始化默认数据
 │   │   ├── auth/               # JWT 签发 & 权限校验（含 token 版本机制）
-│   │   ├── models/             # 数据模型（38 个）
-│   │   ├── routers/            # API 路由（35 个模块，含通用 CRUD 工厂）
+│   │   ├── models/             # 数据模型（42 个）
+│   │   ├── routers/            # API 路由（35 个模块，192 个端点，含通用 CRUD 工厂）
 │   │   ├── schemas/            # Pydantic 请求/响应模型（23 个文件）
-│   │   ├── services/           # 业务逻辑层（15 个服务）
+│   │   ├── services/           # 业务逻辑层（17 个服务）
 │   │   └── utils/              # 工具函数（订单号生成、UTC 时间处理）
 │   ├── backups/                # 数据库备份目录
 │   └── static/                 # 前端构建产物（生产环境由后端托管）
@@ -77,14 +77,14 @@ erp-4/
 | 采购管理 | `/purchase` | 采购订单（创建→审核→付款→收货→退货）完整流程，供应商在账资金管理 |
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
 | 物流管理 | `/logistics` | 发货确认、拆单发货、包裹商品明细、SN码记录、快递100对接 |
-| 财务管理 | `/finance` | 收款、对账、凭证（记账凭证）、返利管理 |
-| 会计管理 | `/accounting` | 多账套、科目体系、记账凭证、账簿查询、应收应付管理、发票管理、出入库单、期末处理、财务报表 |
-| 客户管理 | `/customers` | 客户信息、余额、返利、欠款 |
-| 系统设置 | `/settings` | 用户、仓库、仓位、供应商、销售员、收款方式、品牌 |
+| 财务管理 | `/finance` | 收款、对账、欠款管理、返利管理（客户/供应商双向） |
+| 会计管理 | `/accounting` | 10 个标签页：多账套、科目体系（32 预置科目）、会计期间、凭证管理（四级状态机）、账簿查询（总分类/明细/余额表）、应收管理（应收单/收款单/退款单/核销）、应付管理（应付单/付款单/退款单）、发票管理（销项/进项）、出入库单（销售出库/采购入库 + PDF 套打）、期末处理（损益结转/结账/年度结转）、财务报表（资产负债表/利润表/现金流量表 + Excel/PDF 导出） |
+| 客户管理 | `/customers` | 客户信息、余额、返利、欠款、交易明细 |
+| 系统设置 | `/settings` | 用户管理、权限管理、仓库/仓位、销售员、收款/付款方式、SN 码配置、备份管理 |
 
 ## 数据模型
 
-核心模型共 38 个：
+核心模型共 42 个：
 
 - **用户与权限**: User
 - **商品**: Product, ProductBrand
@@ -92,10 +92,12 @@ erp-4/
 - **SN 管理**: SnConfig, SnCode
 - **销售**: Customer, Salesperson, Order, OrderItem
 - **采购**: Supplier, PurchaseOrder, PurchaseOrderItem
-- **财务**: Payment, PaymentOrder, PaymentMethod, Voucher, VoucherEntry, RebateLog
-- **会计**: AccountSet, ChartOfAccount, AccountingPeriod
-- **应收应付**: ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff, PayableBill, DisbursementBill, DisbursementRefundBill
-- **发票与出入库**: Invoice, InvoiceItem, SalesDeliveryBill, SalesDeliveryBillItem, PurchaseReceiptBill, PurchaseReceiptBillItem
+- **财务**: Payment, PaymentOrder, PaymentMethod, DisbursementMethod, RebateLog
+- **会计基础**: AccountSet, ChartOfAccount, AccountingPeriod, Voucher, VoucherEntry
+- **应收**: ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff
+- **应付**: PayableBill, DisbursementBill, DisbursementRefundBill
+- **发票**: Invoice, InvoiceItem
+- **出入库单**: SalesDeliveryBill, SalesDeliveryItem, PurchaseReceiptBill, PurchaseReceiptItem
 - **物流**: Shipment, ShipmentItem
 - **系统**: OperationLog, SystemSetting
 
@@ -119,7 +121,7 @@ erp-4/
 |------|--------|------|
 | `DATABASE_URL` | `postgres://erp:erp@localhost:5432/erp` | PostgreSQL 连接串 |
 | `POSTGRES_PASSWORD` | `erp123456` | PostgreSQL 密码（docker-compose 用） |
-| `SECRET_KEY` | 随机生成（每次重启变化） | JWT 签名密钥，**生产环境必须固定** |
+| `SECRET_KEY` | **必填，无默认值** | JWT 签名密钥，**必须在 .env 中设置** |
 | `BACKUP_KEEP_DAYS` | `30` | 自动备份保留天数 |
 | `BACKUP_HOUR` | `3` | 每日自动备份时间（24h） |
 | `KD100_KEY` | （空） | 快递100 API Key |
@@ -183,34 +185,39 @@ npm run build
 
 ## 权限体系
 
-系统采用基于权限列表的 RBAC 模型，用户角色为 `admin` 或 `user`：
+系统采用基于权限列表的 RBAC 模型，用户角色为 `admin`（管理员，自动拥有全部权限）或 `user`（普通用户，按需分配）。
 
-| 权限标识 | 说明 |
-|---------|------|
-| `dashboard` | 仪表盘 |
-| `sales` | 销售下单 |
-| `stock_view` | 库存查看 |
-| `stock_edit` | 库存操作（入库/调拨/盘点） |
-| `finance` | 财务管理 |
-| `purchase` | 采购下单 |
-| `purchase_approve` | 采购审核 |
-| `purchase_pay` | 采购付款 |
-| `purchase_receive` | 采购收货 |
-| `logs` | 操作日志查看 |
-| `accounting_view` | 会计查看 |
-| `accounting_edit` | 会计编辑（凭证/科目） |
-| `accounting_approve` | 凭证审核 |
-| `accounting_post` | 凭证过账 |
-| `period_end` | 期末处理 |
-| `accounting_ar_view` | 应收查看 |
-| `accounting_ar_edit` | 应收编辑 |
-| `accounting_ar_confirm` | 应收确认 |
-| `accounting_ap_view` | 应付查看 |
-| `accounting_ap_edit` | 应付编辑 |
-| `accounting_ap_confirm` | 应付确认 |
-| `admin` | 系统管理 |
+共 28 个权限码，分 10 个权限组：
 
-`admin` 角色自动拥有全部权限。
+| 权限组 | 权限标识 | 说明 |
+|--------|---------|------|
+| 首页 | `dashboard` | 仪表盘统计看板 |
+| 销售管理 | `sales` | 销售开单（现款/账期/退货） |
+| 库存管理 | `stock_view` | 查看库存列表和详情 |
+| | `stock_edit` | 入库、调拨、盘点、商品管理 |
+| 采购管理 | `purchase` | 采购下单 |
+| | `purchase_approve` | 采购订单审核 |
+| | `purchase_pay` | 采购付款确认 |
+| | `purchase_receive` | 采购收货入库 |
+| 寄售管理 | `consignment` | 寄售调拨/结算/退货 |
+| 物流管理 | `logistics` | 物流发货、快递追踪 |
+| 财务管理 | `finance` | 收款、对账、返利管理 |
+| | `finance_confirm` | 确认收款 |
+| 会计管理 | `accounting_view` | 会计查看（凭证/账簿/报表） |
+| | `accounting_edit` | 会计录入（凭证/科目编辑） |
+| | `accounting_approve` | 凭证审核 |
+| | `accounting_post` | 凭证过账 |
+| | `period_end` | 期末处理（结转/结账） |
+| | `accounting_ar_view` | 应收查看 |
+| | `accounting_ar_edit` | 应收编辑 |
+| | `accounting_ar_confirm` | 应收确认 |
+| | `accounting_ap_view` | 应付查看 |
+| | `accounting_ap_edit` | 应付编辑 |
+| | `accounting_ap_confirm` | 应付确认 |
+| 客户管理 | `customer` | 客户信息维护 |
+| 系统设置 | `settings` | 系统配置 |
+| | `logs` | 操作日志查看 |
+| | `admin` | 系统管理（用户/备份/账套） |
 
 ## 日志规范
 

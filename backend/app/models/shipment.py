@@ -18,6 +18,7 @@ class Shipment(models.Model):
 
     class Meta:
         table = "shipments"
+        indexes = (("order_id", "status"),)
 
 
 class ShipmentItem(models.Model):
@@ -31,3 +32,4 @@ class ShipmentItem(models.Model):
 
     class Meta:
         table = "shipment_items"
+        indexes = (("shipment_id",),)

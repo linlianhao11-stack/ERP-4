@@ -11,13 +11,13 @@ from tortoise.expressions import F
 from app.auth.dependencies import get_current_user, require_permission
 from app.config import CARRIER_LIST, KD100_KEY, KD100_CUSTOMER
 from app.models import (
-    User, Order, OrderItem, Shipment, ShipmentItem, SnCode, WarehouseStock, StockLog
+    User, Order, OrderItem, Shipment, ShipmentItem, SnCode, SnConfig, WarehouseStock, StockLog
 )
 from app.schemas.logistics import ShipmentUpdate, SNCodeUpdate, ShipRequest
 from app.services.logistics_service import (
     subscribe_kd100, refresh_shipment_tracking, parse_kd100_state
 )
-from app.services.sn_service import validate_and_consume_sn_codes, check_sn_required
+from app.services.sn_service import validate_and_consume_sn_codes
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
 from app.logger import get_logger
 
@@ -53,20 +53,23 @@ def _shipment_to_dict(s, tracking_info=None):
 
 
 @router.get("/carriers")
-async def get_carriers(user: User = Depends(get_current_user)):
+async def get_carriers(user: User = Depends(require_permission("logistics", "sales"))):
     return CARRIER_LIST
 
 
 @router.get("/pending-orders")
-async def list_pending_orders(user: User = Depends(get_current_user)):
+async def list_pending_orders(offset: int = 0, limit: int = 50, user: User = Depends(require_permission("logistics", "sales"))):
     """获取待发货/部分发货的订单列表"""
-    orders = await Order.filter(
+    limit = min(limit, 500)
+    base_query = Order.filter(
         shipping_status__in=["pending", "partial"],
         order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
-    ).order_by("-created_at").limit(200).select_related("customer", "warehouse")
+    )
+    total = await base_query.count()
+    orders = await base_query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse")
 
     if not orders:
-        return []
+        return {"items": [], "total": total}
 
     # 批量查询所有订单的 OrderItem（消除 N+1）
     order_ids = [o.id for o in orders]
@@ -98,11 +101,11 @@ async def list_pending_orders(user: User = Depends(get_current_user)):
                 "unit_price": float(i.unit_price)
             } for i in items]
         })
-    return result
+    return {"items": result, "total": total}
 
 
 @router.get("")
-async def list_shipments(status: Optional[str] = None, search: Optional[str] = None, shipping_status: Optional[str] = None, user: User = Depends(get_current_user)):
+async def list_shipments(status: Optional[str] = None, search: Optional[str] = None, shipping_status: Optional[str] = None, offset: int = 0, limit: int = 50, user: User = Depends(require_permission("logistics", "sales"))):
     """物流列表 - 按订单分组"""
     # 数据库级预筛选（减少加载量）
     query = Shipment.all()
@@ -239,16 +242,18 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
             })
 
     result.sort(key=lambda x: x["updated_at"], reverse=True)
-    return result[:200]
+    total = len(result)
+    limit = min(limit, 500)
+    return {"items": result[offset:offset + limit], "total": total}
 
 
 @router.get("/{order_id}")
-async def get_shipment_detail(order_id: int, user: User = Depends(get_current_user)):
+async def get_shipment_detail(order_id: int, user: User = Depends(require_permission("logistics", "sales"))):
     order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "salesperson").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
-    items = await OrderItem.filter(order_id=order_id).select_related("product")
+    items = await OrderItem.filter(order_id=order_id).select_related("product", "warehouse", "location")
     shipment_list = await Shipment.filter(order_id=order_id).order_by("id").all()
 
     # 批量查询 ShipmentItem（消除 N+1）
@@ -257,6 +262,15 @@ async def get_shipment_detail(order_id: int, user: User = Depends(get_current_us
     si_by_shipment = {}
     for si in all_si:
         si_by_shipment.setdefault(si.shipment_id, []).append(si)
+
+    # 批量预加载 SN 配置，判断每个商品是否需要 SN 码
+    wh_ids = set()
+    for i in items:
+        wh = i.warehouse if i.warehouse_id else order.warehouse
+        if wh:
+            wh_ids.add(wh.id)
+    sn_configs = await SnConfig.filter(warehouse_id__in=list(wh_ids), is_active=True).all() if wh_ids else []
+    sn_config_set = {(sc.warehouse_id, sc.brand) for sc in sn_configs}
 
     shipments_data = []
     for s in shipment_list:
@@ -270,6 +284,25 @@ async def get_shipment_detail(order_id: int, user: User = Depends(get_current_us
         } for si in si_list]
         shipments_data.append(sd)
 
+    items_data = []
+    for i in items:
+        wh = i.warehouse if i.warehouse_id else order.warehouse
+        product_brand = i.product.brand if i.product else None
+        sn_required = bool(product_brand and wh and (wh.id, product_brand) in sn_config_set)
+        items_data.append({
+            "id": i.id,
+            "shipped_qty": i.shipped_qty,
+            "remaining_qty": abs(i.quantity) - i.shipped_qty,
+            "product_name": i.product.name,
+            "product_sku": i.product.sku,
+            "product_id": i.product_id,
+            "warehouse_id": wh.id if wh else None,
+            "quantity": i.quantity,
+            "unit_price": float(i.unit_price),
+            "amount": float(i.amount),
+            "sn_required": sn_required,
+        })
+
     return {
         "order": {
             "id": order.id,
@@ -282,16 +315,7 @@ async def get_shipment_detail(order_id: int, user: User = Depends(get_current_us
             "creator_name": order.creator.display_name if order.creator else None,
             "created_at": order.created_at.isoformat(),
             "remark": order.remark,
-            "items": [{
-                "id": i.id,
-                "shipped_qty": i.shipped_qty,
-                "remaining_qty": abs(i.quantity) - i.shipped_qty,
-                "product_name": i.product.name,
-                "product_sku": i.product.sku,
-                "quantity": i.quantity,
-                "unit_price": float(i.unit_price),
-                "amount": float(i.amount)
-            } for i in items]
+            "items": items_data
         },
         "shipments": shipments_data
     }
@@ -331,8 +355,25 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
 
         all_sn_display = []
 
+        # --- 批量预加载只读数据，消除 N+1 ---
+        oi_ids = [si.order_item_id for si in data.items]
+        ois = await OrderItem.filter(id__in=oi_ids, order_id=order_id).select_related("product", "warehouse", "location").all()
+        oi_map = {o.id: o for o in ois}
+
+        # 批量预加载 SN 配置
+        wh_ids = set()
+        for si in data.items:
+            oi = oi_map.get(si.order_item_id)
+            if oi:
+                wh = oi.warehouse if oi.warehouse_id else order.warehouse
+                if wh:
+                    wh_ids.add(wh.id)
+        sn_configs = await SnConfig.filter(warehouse_id__in=list(wh_ids), is_active=True).all() if wh_ids else []
+        sn_config_set = {(sc.warehouse_id, sc.brand) for sc in sn_configs}
+        # --- 预加载结束 ---
+
         for ship_item in data.items:
-            oi = await OrderItem.filter(id=ship_item.order_item_id, order_id=order_id).select_related("product", "warehouse", "location").first()
+            oi = oi_map.get(ship_item.order_item_id)
             if not oi:
                 raise HTTPException(status_code=404, detail=f"订单项不存在: {ship_item.order_item_id}")
 
@@ -347,7 +388,9 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
             if not wh or not loc:
                 raise HTTPException(status_code=400, detail=f"商品 {oi.product.name} 没有仓库/仓位信息")
 
-            sn_required = await check_sn_required(wh.id, oi.product_id)
+            # SN 检查：用预加载的 sn_config_set 替代逐条查询
+            product_brand = oi.product.brand if oi.product else None
+            sn_required = bool(product_brand and (wh.id, product_brand) in sn_config_set)
             if sn_required and (not ship_item.sn_codes or len(ship_item.sn_codes) != ship_item.quantity):
                 raise HTTPException(status_code=400, detail=f"商品 {oi.product.name} 需要提供 {ship_item.quantity} 个SN码")
 
@@ -403,73 +446,78 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
         order.shipping_status = "completed" if all_shipped else "partial"
         await order.save()
 
+    # 钩子放在事务外部：钩子失败不会回滚核心发货操作
+    if order.shipping_status == "completed" and getattr(order, "account_set_id", None):
         # 钩子：发货完成 → 自动生成应收单
-        if order.shipping_status == "completed" and getattr(order, "account_set_id", None):
-            try:
-                from app.services.ar_service import create_receivable_bill, create_receipt_bill_for_payment
-                from app.models import Payment
+        try:
+            from app.services.ar_service import create_receivable_bill, create_receipt_bill_for_payment
+            from app.models import Payment
 
-                if order.order_type in ("CASH", "CREDIT", "CONSIGN_SETTLE"):
-                    total = abs(order.total_amount)
-                    if order.order_type == "CASH":
-                        rb = await create_receivable_bill(
-                            account_set_id=order.account_set_id,
-                            customer_id=order.customer_id,
-                            order_id=order.id,
-                            total_amount=total,
-                            status="completed",
-                            creator=user,
-                        )
-                        payment = await Payment.filter(order_id=order.id).first()
-                        if payment:
-                            await create_receipt_bill_for_payment(
-                                account_set_id=order.account_set_id,
-                                customer_id=order.customer_id,
-                                receivable_bill=rb,
-                                payment_id=payment.id,
-                                amount=total,
-                                payment_method=payment.payment_method or "现金",
-                                creator=user,
-                            )
-                    else:  # CREDIT / CONSIGN_SETTLE
-                        await create_receivable_bill(
-                            account_set_id=order.account_set_id,
-                            customer_id=order.customer_id,
-                            order_id=order.id,
-                            total_amount=total,
-                            status="pending",
-                            creator=user,
-                        )
-            except Exception as e:
-                logger.warning(f"自动生成应收单失败: {e}")
-
-            # 钩子：发货完成 → 自动生成出库单
-            try:
-                from app.services.delivery_service import create_sales_delivery
-                from app.models import Product
-                shipped_items = []
-                for oi in all_items:
-                    if oi.shipped_qty > 0:
-                        product = await Product.filter(id=oi.product_id).first()
-                        shipped_items.append({
-                            "order_item_id": oi.id,
-                            "product_id": oi.product_id,
-                            "product_name": product.name if product else str(oi.product_id),
-                            "quantity": oi.shipped_qty,
-                            "cost_price": str(oi.cost_price),
-                            "sale_price": str(oi.unit_price),
-                        })
-                if shipped_items:
-                    await create_sales_delivery(
+            if order.order_type in ("CASH", "CREDIT", "CONSIGN_SETTLE"):
+                total = abs(order.total_amount)
+                if order.order_type == "CASH":
+                    rb = await create_receivable_bill(
                         account_set_id=order.account_set_id,
                         customer_id=order.customer_id,
                         order_id=order.id,
-                        warehouse_id=order.warehouse_id,
-                        items=shipped_items,
+                        total_amount=total,
+                        status="completed",
                         creator=user,
                     )
-            except Exception as e:
-                logger.warning(f"自动生成出库单失败: {e}")
+                    payment = await Payment.filter(order_id=order.id).first()
+                    if payment:
+                        await create_receipt_bill_for_payment(
+                            account_set_id=order.account_set_id,
+                            customer_id=order.customer_id,
+                            receivable_bill=rb,
+                            payment_id=payment.id,
+                            amount=total,
+                            payment_method=payment.payment_method or "现金",
+                            creator=user,
+                        )
+                else:  # CREDIT / CONSIGN_SETTLE
+                    await create_receivable_bill(
+                        account_set_id=order.account_set_id,
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        total_amount=total,
+                        status="pending",
+                        creator=user,
+                    )
+        except Exception as e:
+            logger.warning(f"自动生成应收单失败: {e}")
+
+        # 钩子：发货完成 → 自动生成出库单
+        try:
+            from app.services.delivery_service import create_sales_delivery
+            from app.models import Product
+            # 重新查询 all_items（事务已提交，需要最新数据）
+            all_items = await OrderItem.filter(order_id=order_id).all()
+            prod_ids = {oi.product_id for oi in all_items if oi.shipped_qty > 0}
+            products_map = {p.id: p for p in await Product.filter(id__in=list(prod_ids)).all()} if prod_ids else {}
+            shipped_items = []
+            for oi in all_items:
+                if oi.shipped_qty > 0:
+                    product = products_map.get(oi.product_id)
+                    shipped_items.append({
+                        "order_item_id": oi.id,
+                        "product_id": oi.product_id,
+                        "product_name": product.name if product else str(oi.product_id),
+                        "quantity": oi.shipped_qty,
+                        "cost_price": str(oi.cost_price),
+                        "sale_price": str(oi.unit_price),
+                    })
+            if shipped_items:
+                await create_sales_delivery(
+                    account_set_id=order.account_set_id,
+                    customer_id=order.customer_id,
+                    order_id=order.id,
+                    warehouse_id=order.warehouse_id,
+                    items=shipped_items,
+                    creator=user,
+                )
+        except Exception as e:
+            logger.warning(f"自动生成出库单失败: {e}")
 
     if not is_self_pickup and data.tracking_no:
         try:
@@ -513,7 +561,7 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
     )
 
     if data.sn_codes:
-        await validate_and_consume_sn_codes(data.sn_codes, shipment, user)
+        await validate_and_consume_sn_codes(data.sn_codes, shipment, user, strict=False)
 
     tracking_info = []
     if not is_self_pickup and data.tracking_no:
@@ -589,7 +637,7 @@ async def update_shipment_sn(shipment_id: int, data: SNCodeUpdate, user: User = 
             await sn_obj.save()
 
         if data.sn_codes:
-            await validate_and_consume_sn_codes(data.sn_codes, shipment, user)
+            await validate_and_consume_sn_codes(data.sn_codes, shipment, user, strict=False)
 
         shipment.sn_code = data.sn_code or None
         await shipment.save()
@@ -666,7 +714,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                             v_before_qty = v_stock.quantity if v_stock else 0
                             if v_stock and v_stock.quantity >= si.quantity:
                                 await WarehouseStock.filter(
-                                    warehouse_id=consignment_wh.id, product_id=si.product_id
+                                    id=v_stock.id
                                 ).update(quantity=F('quantity') - si.quantity)
                                 await StockLog.create(
                                     product_id=si.product_id, warehouse=consignment_wh,
@@ -728,7 +776,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
 
 
 @router.post("/shipment/{shipment_id}/refresh")
-async def refresh_shipment(shipment_id: int, user: User = Depends(get_current_user)):
+async def refresh_shipment(shipment_id: int, user: User = Depends(require_permission("logistics", "sales"))):
     """实时查询快递100获取最新物流信息"""
     shipment = await Shipment.filter(id=shipment_id).first()
     if not shipment:
@@ -770,6 +818,10 @@ async def kd100_callback(request: Request, order_id: Optional[int] = None, shipm
             shipment = await Shipment.filter(order_id=order_id).first()
 
         if shipment:
+            # 校验回调的快递单号与 shipment 匹配（防止参数篡改）
+            if tracking_no and shipment.tracking_no and tracking_no != shipment.tracking_no:
+                logger.warning(f"快递100回调单号不匹配: callback={tracking_no}, shipment={shipment.tracking_no}")
+                return {"result": True, "returnCode": "200", "message": "成功"}
             if str(param.get("lastResult", {}).get("ischeck")) == "1":
                 shipment.status = "signed"
                 shipment.status_text = "已签收"

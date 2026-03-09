@@ -3,8 +3,12 @@ from pydantic import BaseModel, Field, field_validator
 
 VALID_PERMISSIONS = [
     "dashboard", "sales", "customer", "stock_view", "stock_edit",
-    "finance", "finance_confirm", "logistics",
+    "finance", "finance_confirm", "finance_pay", "finance_rebate", "logistics", "consignment",
     "purchase", "purchase_approve", "purchase_pay", "purchase_receive",
+    "accounting_view", "accounting_edit", "accounting_approve", "accounting_post",
+    "period_end",
+    "accounting_ar_view", "accounting_ar_edit", "accounting_ar_confirm",
+    "accounting_ap_view", "accounting_ap_edit", "accounting_ap_confirm",
     "settings", "logs", "admin"
 ]
 

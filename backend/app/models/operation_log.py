@@ -12,3 +12,4 @@ class OperationLog(models.Model):
 
     class Meta:
         table = "operation_logs"
+        indexes = (("created_at",),)

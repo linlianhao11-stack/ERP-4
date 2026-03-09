@@ -1,6 +1,7 @@
 """应收服务层"""
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from tortoise import transactions
@@ -152,19 +153,7 @@ async def confirm_write_off(write_off_id: int, user) -> ReceivableWriteOff:
     return wo
 
 
-async def _next_voucher_no(account_set_id: int, voucher_type: str, period_name: str) -> str:
-    account_set = await AccountSet.filter(id=account_set_id).first()
-    prefix = f"{account_set.code}-{voucher_type}-{period_name.replace('-', '')}-"
-    last = await Voucher.filter(
-        account_set_id=account_set_id,
-        voucher_type=voucher_type,
-        period_name=period_name,
-    ).order_by("-voucher_no").first()
-    if last and last.voucher_no.startswith(prefix):
-        seq = int(last.voucher_no[len(prefix):]) + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:03d}"
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
 async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> list:
@@ -173,6 +162,11 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
     ).first()
     if not period:
         raise ValueError(f"会计期间 {period_name} 不存在")
+
+    # 根据年月计算期间起止日期
+    period_start = date(period.year, period.month, 1)
+    _, last_day = calendar.monthrange(period.year, period.month)
+    period_end = date(period.year, period.month, last_day)
 
     bank_account = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1002", is_active=True
@@ -188,9 +182,10 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
 
     vouchers = []
 
-    # 收款单 → 借 银行存款1002，贷 应收账款1122
+    # 收款单 → 借 银行存款1002，贷 应收账款1122（仅处理当前期间）
     receipts = await ReceiptBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        receipt_date__gte=period_start, receipt_date__lte=period_end,
     ).all()
     for r in receipts:
         async with transactions.in_transaction():
@@ -229,9 +224,10 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
             await r.save()
             vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款单 {r.bill_no}"})
 
-    # 收款退款单 → 借 应收账款1122，贷 银行存款1002
+    # 收款退款单 → 借 应收账款1122，贷 银行存款1002（仅处理当前期间）
     refunds = await ReceiptRefundBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        refund_date__gte=period_start, refund_date__lte=period_end,
     ).all()
     for rf in refunds:
         async with transactions.in_transaction():
@@ -270,10 +266,11 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
             await rf.save()
             vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款退款 {rf.bill_no}"})
 
-    # 核销单 → 借 预收账款2203，贷 应收账款1122
+    # 核销单 → 借 预收账款2203，贷 应收账款1122（仅处理当前期间）
     if advance_account:
         write_offs = await ReceivableWriteOff.filter(
-            account_set_id=account_set_id, status="confirmed", voucher_id=None
+            account_set_id=account_set_id, status="confirmed", voucher_id=None,
+            write_off_date__gte=period_start, write_off_date__lte=period_end,
         ).all()
         for wo in write_offs:
             async with transactions.in_transaction():

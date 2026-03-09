@@ -1,5 +1,142 @@
 # 迭代记录
 
+## v4.16.0 — 数据库性能优化 + 发货事务 Bug 修复（2026-03-05）
+
+> 物流列表分页、N+1 查询消除、9 张表添加索引；修复发货操作事务回滚和凭证号重复两个关键 Bug。
+
+### 性能优化
+
+| 优化项 | 文件 | 效果 |
+|--------|------|------|
+| 物流列表分页 | `logistics.py` | `list_shipments`/`list_pending_orders` 加 offset/limit，返回 `{"items":[], "total":N}` |
+| 采购收货消除 N+1 | `purchase_orders.py` | 批量预加载 PurchaseOrderItem/Warehouse/Location/SnConfig，每商品 6→2 次查询 |
+| 发货流程消除 N+1 | `logistics.py` | 批量预加载 OrderItem/SnConfig，每商品 3→1 次查询 |
+| 9 张表添加索引 | `order.py` `shipment.py` `purchase.py` `payment.py` `sn.py` `operation_log.py` | 高频外键字段加复合索引 |
+
+### Bug 修复
+
+| Bug | 根因 | 修复 |
+|-----|------|------|
+| 发货后状态仍显示"待发货" | 出库单钩子在事务内部失败（凭证号重复），PostgreSQL 约束违反导致整个事务静默回滚，API 返回 200 但数据未持久化 | 将 AR/出库单钩子移到事务块外部（`logistics.py` L425-500） |
+| 凭证号生成重复 | `next_voucher_no` 按 `period_name` 字段查询，已有凭证的 `period_name` 与 `voucher_no` 不匹配导致序号从 001 重新开始 | 改为按 `voucher_no` 前缀查询（`voucher_no.py`） |
+| 付款管理列表为空 | `FinancePayablesPanel.vue` 未适配分页返回格式 `{"items":[],"total":N}` | `data` → `data.items \|\| data` |
+| 物流列表渲染为空 | `useShipment.js` 同上原因 | `data` → `data.items \|\| data` |
+
+### 修改文件清单
+
+**后端:**
+- `app/routers/logistics.py` — 分页参数、N+1 消除、钩子移出事务
+- `app/routers/purchase_orders.py` — 收货 N+1 消除
+- `app/utils/voucher_no.py` — 按 voucher_no 前缀查询替代 period_name
+- `app/models/order.py` `shipment.py` `purchase.py` `payment.py` `sn.py` `operation_log.py` — 添加索引
+
+**前端:**
+- `src/composables/useShipment.js` — 适配分页格式
+- `src/components/business/FinancePayablesPanel.vue` — 适配分页格式
+
+---
+
+## v4.15.0 — API 索引文档 + 6 大组件拆分重构（2026-03-04）
+
+> 生成完整 API 端点索引文档（192 端点）；将 6 个 800+ 行的大组件拆分为瘦容器 + 19 个子组件 + 4 个 composable。
+
+### API 索引
+
+- 新增 `docs/API_INDEX.md`：按 35 个路由模块列出全部 192 个端点（方法/路径/说明/权限）
+
+### 组件拆分
+
+| 原组件 | 原行数 | 拆分后行数 | 新增子组件 |
+|--------|--------|-----------|-----------|
+| SettingsView.vue | 1083 | 96 | WarehouseSettings, PaymentMethodSettings, SalespersonSettings, UserSettings, PermissionSettings, LogsSettings |
+| SalesView.vue | 939 | 386 | ProductSelector, ShoppingCart, OrderConfirmModal |
+| PurchaseOrdersPanel.vue | 1087 | 166 | PurchaseOrderForm, PurchaseOrderDetail |
+| FinanceOrdersPanel.vue | 876 | 71 | FinanceOrdersTab, FinanceUnpaidTab |
+| LogisticsView.vue | 873 | 256 | ShipmentDetailModal |
+| StockView.vue | 841 | 287 | ProductFormModal, RestockModal, TransferModal, ImportModal, ImportPreviewModal |
+
+### 新增 Composable
+
+| 文件 | 行数 | 用途 |
+|------|------|------|
+| useSalesCart.js | 165 | 购物车增删改算逻辑 |
+| usePurchaseOrder.js | 86 | 采购单列表加载/筛选/导出 |
+| useShipment.js | 149 | 发货列表加载/排序/列配置 |
+| useStock.js | 151 | 库存列表加载/筛选/排序/导出 |
+
+### 文件组织
+
+```
+components/business/
+├── sales/          ProductSelector, ShoppingCart, OrderConfirmModal
+├── purchase/       PurchaseOrderForm, PurchaseOrderDetail
+├── finance/        FinanceOrdersTab, FinanceUnpaidTab
+├── logistics/      ShipmentDetailModal
+├── stock/          ProductFormModal, RestockModal, TransferModal, ImportModal, ImportPreviewModal
+└── settings/       WarehouseSettings, PaymentMethodSettings, SalespersonSettings, UserSettings, PermissionSettings, LogsSettings
+```
+
+---
+
+## v4.14.0 — 全量代码审查修复 + 权限管理 + 业务补丁（2026-03-04）
+
+> 基于第五轮全量代码审查，修复 5 个 Critical、10 个 Important、4 个 Improvement 问题；新增权限管理系统；修复多个业务 Bug。
+
+### Critical 修复
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | 凭证号竞态条件（6处重复函数无锁） | 提取共享 `app/utils/voucher_no.py`，加 `select_for_update` 防并发 |
+| C2 | `_next_voucher_no` 空值崩溃 | 共享函数增加 `account_set` 存在性检查 |
+| C3 | 应付单并发修改无锁 | `create_disbursement_for_po_payment` 加事务包装 + `select_for_update` |
+| C4 | Docker SECRET_KEY 已知明文默认值 | 改为 `${SECRET_KEY:?}` 强制设置，无默认值 |
+| C5 | 16处原生 `confirm()` 弹窗 | 全部替换为 `appStore.customConfirm()`（12个Vue组件） |
+
+### Important 修复
+
+| # | 问题 | 修复 |
+|---|------|------|
+| I1 | 财务钩子静默失败 | 改为 `raise HTTPException(500)` 通知前端 |
+| I2 | 订单取消拆分未复制 `account_set_id` | 拆分 `Order.create` 补 `account_set_id=order.account_set_id` |
+| I3 | 6个详情端点无账套隔离 | 增加可选 `account_set_id` 查询参数过滤 |
+| I4 | 金额缺少正数校验 | `PayableBillCreate.total_amount`、`InvoiceItemCreate.quantity/unit_price` 加 `gt=0` |
+| I5 | 取消发票不清理凭证 | `cancel_invoice` 事务内删除关联凭证分录 |
+| I6 | 反结账不检查后续期间 | `reopen_period` 检查是否存在已结账后续期间 |
+| I7 | `token_version` 非原子更新 | 改用 `F('token_version') + 1` 原子操作 |
+| I8 | 采购部分收货应付单金额错误 | 多次收货时更新已有应付单金额 |
+| I9 | StockView/CustomersView 无 onMounted | 添加 `onMounted` 加载初始数据 |
+| I10 | accounting store 静默吞错 | `catch(e) { /* ignore */ }` → `console.error` |
+
+### Improvement 优化
+
+| # | 内容 |
+|---|------|
+| P1 | `_next_voucher_no` 6处重复 → 抽取 `app/utils/voucher_no.py` 共享工具 |
+| P4 | 现金流量表 O(n²) 查询 → 批量预加载（3条SQL） |
+| P5 | 凭证批量PDF N+1 查询 → 批量加载（3条SQL） |
+| P7 | 版本号 v4.9.0 → v4.13.0 |
+| P8 | 备份上传整文件读入内存 → 流式写入 |
+
+### 权限管理系统
+
+| # | 内容 |
+|---|------|
+| 1 | SettingsView 新增"权限管理"Tab（admin可见）：左侧用户列表 + 右侧模块卡片 + iOS风格开关 |
+| 2 | `constants.js` 新增 `permissionGroups`（10个模块分组） |
+| 3 | PeriodEndPanel 权限检查从 `isAdmin` 改为 `hasPermission('period_end')` |
+
+### 业务 Bug 修复
+
+| # | 内容 |
+|---|------|
+| 1 | 客户/采购单列表不显示（API返回格式 `{items:[]}` 前端未解构） |
+| 2 | 销售开单数量只能按+-修改 → 改为可手动输入的 `<input type="number">` |
+| 3 | 物流列表新增"发货时间"列（可选显示） |
+| 4 | 财务Tab"应收管理/应付管理"重命名为"收款管理/付款管理" |
+| 5 | Docker 端口绑定 `127.0.0.1` → `0.0.0.0`（局域网访问） |
+
+---
+
 ## v4.13.0 — 业财一体化会计模块：阶段4-5 + UI补丁（2026-02-28）
 
 > 完成发票管理、出入库单、PDF套打、期末处理、三张财务报表、Excel/PDF导出，以及6个详情弹窗补全。至此五阶段全部完成，79个后端测试通过。

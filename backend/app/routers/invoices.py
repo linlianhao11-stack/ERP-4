@@ -72,9 +72,13 @@ async def list_invoices(
 @router.get("/{invoice_id}")
 async def get_invoice(
     invoice_id: int,
+    account_set_id: int = Query(None),
     user: User = Depends(require_permission("accounting_view")),
 ):
-    inv = await Invoice.filter(id=invoice_id).prefetch_related(
+    q = {"id": invoice_id}
+    if account_set_id:
+        q["account_set_id"] = account_set_id
+    inv = await Invoice.filter(**q).prefetch_related(
         "customer", "supplier", "receivable_bill", "payable_bill"
     ).first()
     if not inv:

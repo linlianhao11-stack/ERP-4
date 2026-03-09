@@ -71,9 +71,13 @@ async def list_receivable_bills(
 @router.get("/receivable-bills/{bill_id}")
 async def get_receivable_bill(
     bill_id: int,
+    account_set_id: int = Query(None),
     user: User = Depends(require_permission("accounting_ar_view")),
 ):
-    b = await ReceivableBill.filter(id=bill_id).prefetch_related("customer", "order").first()
+    q = {"id": bill_id}
+    if account_set_id:
+        q["account_set_id"] = account_set_id
+    b = await ReceivableBill.filter(**q).prefetch_related("customer", "order").first()
     if not b:
         raise HTTPException(status_code=404, detail="应收单不存在")
     return {

@@ -16,19 +16,7 @@ def _dec_str(d: Decimal) -> str:
     return format(d.normalize(), 'f')
 
 
-async def _next_voucher_no(account_set_id: int, voucher_type: str, period_name: str) -> str:
-    account_set = await AccountSet.filter(id=account_set_id).first()
-    prefix = f"{account_set.code}-{voucher_type}-{period_name.replace('-', '')}-"
-    last = await Voucher.filter(
-        account_set_id=account_set_id,
-        voucher_type=voucher_type,
-        period_name=period_name,
-    ).order_by("-voucher_no").first()
-    if last and last.voucher_no.startswith(prefix):
-        seq = int(last.voucher_no[len(prefix):]) + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:03d}"
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
 async def preview_carry_forward(account_set_id: int, period_name: str) -> dict:
@@ -378,6 +366,15 @@ async def reopen_period(account_set_id: int, period_name: str, user) -> dict:
         raise ValueError(f"会计期间 {period_name} 不存在")
     if not period.is_closed:
         return {"period_name": period_name, "message": "该期间未结账"}
+
+    # 检查后续期间是否已结账
+    later_closed = await AccountingPeriod.filter(
+        account_set_id=account_set_id,
+        period_name__gt=period_name,
+        is_closed=True
+    ).exists()
+    if later_closed:
+        raise ValueError("存在已结账的后续期间，请先反结账后续期间")
 
     # 如果是12月反结账，需要删除年度结转凭证
     if period.month == 12:

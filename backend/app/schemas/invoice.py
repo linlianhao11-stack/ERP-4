@@ -8,8 +8,8 @@ from typing import Optional
 class InvoiceItemCreate(BaseModel):
     product_id: Optional[int] = None
     product_name: str
-    quantity: int
-    unit_price: Decimal = Field(max_digits=18, decimal_places=2)
+    quantity: int = Field(gt=0)
+    unit_price: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     tax_rate: Decimal = Field(max_digits=5, decimal_places=2, default=Decimal("13"))
 
 

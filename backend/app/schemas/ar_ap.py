@@ -49,7 +49,7 @@ class PayableBillCreate(BaseModel):
     supplier_id: int
     purchase_order_id: Optional[int] = None
     bill_date: date
-    total_amount: Decimal = Field(max_digits=18, decimal_places=2)
+    total_amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     remark: str = Field(default="", max_length=500)
 
 

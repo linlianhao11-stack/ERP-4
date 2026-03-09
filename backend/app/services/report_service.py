@@ -317,38 +317,41 @@ async def get_cash_flow(account_set_id: int, period_name: str) -> dict:
         "4001": ("financing", "capital", "吸收投资收到的现金"),
     }
 
-    # 聚合
+    # 聚合（批量预加载，避免 N+1 查询）
     flow = defaultdict(lambda: Decimal("0"))
 
-    for ce in cash_entries:
-        # 查找同凭证的对手分录
-        voucher_entries = await VoucherEntry.filter(
-            voucher_id=ce.voucher_id,
-        ).exclude(id=ce.id).all()
+    # 批量加载所有相关凭证的全部分录
+    voucher_ids = {ce.voucher_id for ce in cash_entries}
+    all_entries = await VoucherEntry.filter(voucher_id__in=list(voucher_ids)).all() if voucher_ids else []
 
-        for counter in voucher_entries:
-            if counter.account_id in cash_account_ids:
+    # 批量加载所有涉及的科目
+    account_ids = {e.account_id for e in all_entries}
+    accounts = {a.id: a for a in await ChartOfAccount.filter(id__in=list(account_ids)).all()} if account_ids else {}
+
+    # 按 voucher_id 分组
+    entries_by_voucher = defaultdict(list)
+    for e in all_entries:
+        entries_by_voucher[e.voucher_id].append(e)
+
+    for ce in cash_entries:
+        for counter in entries_by_voucher.get(ce.voucher_id, []):
+            if counter.id == ce.id or counter.account_id in cash_account_ids:
                 continue
-            # 查找对手科目的 code
-            counter_acct = await ChartOfAccount.filter(id=counter.account_id).first()
+            counter_acct = accounts.get(counter.account_id)
             if not counter_acct:
                 continue
 
             code = counter_acct.code
-            # 尝试匹配
             category_key = None
             for map_code, (cat, key, _) in counter_mapping.items():
                 if code == map_code or code.startswith(map_code):
                     category_key = (cat, key)
                     break
-            # 6xxx 损益类
             if not category_key and code.startswith("6"):
                 category_key = ("operating", "other_operating")
-            # 默认经营
             if not category_key:
                 category_key = ("operating", "other_operating")
 
-            # 现金科目借方=流入，贷方=流出
             amount = ce.debit_amount - ce.credit_amount
             flow[category_key] += amount
 

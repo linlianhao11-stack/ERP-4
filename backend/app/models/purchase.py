@@ -30,6 +30,7 @@ class PurchaseOrder(models.Model):
 
     class Meta:
         table = "purchase_orders"
+        indexes = (("supplier_id", "status"), ("created_at",),)
 
 
 class PurchaseOrderItem(models.Model):
@@ -50,3 +51,4 @@ class PurchaseOrderItem(models.Model):
 
     class Meta:
         table = "purchase_order_items"
+        indexes = (("purchase_order_id",),)

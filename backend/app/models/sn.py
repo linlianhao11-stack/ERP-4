@@ -33,3 +33,4 @@ class SnCode(models.Model):
 
     class Meta:
         table = "sn_codes"
+        indexes = (("warehouse_id", "product_id", "status"),)

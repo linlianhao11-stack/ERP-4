@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from tortoise.expressions import F
 from app.auth.password import hash_password, validate_password_strength
 from app.auth.dependencies import require_permission
 from app.models import User
@@ -49,7 +50,7 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         validate_password_strength(data.password)
         user.password_hash = hash_password(data.password)
         user.must_change_password = True
-        user.token_version += 1
+        await User.filter(id=user.id).update(token_version=F('token_version') + 1)
     await user.save()
     await log_operation(admin, "UPDATE_USER", "USER", user.id, f"更新用户 {user.username}")
     return {"message": "更新成功"}
@@ -64,7 +65,7 @@ async def toggle_user(user_id: int, admin: User = Depends(require_permission("ad
         raise HTTPException(status_code=400, detail="不能禁用自己")
     user.is_active = not user.is_active
     if not user.is_active:
-        user.token_version += 1
+        await User.filter(id=user.id).update(token_version=F('token_version') + 1)
     await user.save()
     action_text = "启用" if user.is_active else "禁用"
     await log_operation(admin, "USER_TOGGLE", "USER", user.id,

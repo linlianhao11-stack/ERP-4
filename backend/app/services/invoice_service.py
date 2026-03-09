@@ -15,17 +15,7 @@ from app.logger import get_logger
 logger = get_logger("invoice_service")
 
 
-async def _next_voucher_no(account_set_id: int, voucher_type: str, period_name: str) -> str:
-    account_set = await AccountSet.filter(id=account_set_id).first()
-    prefix = f"{account_set.code}-{voucher_type}-{period_name.replace('-', '')}-"
-    last = await Voucher.filter(
-        account_set_id=account_set_id, voucher_type=voucher_type, period_name=period_name,
-    ).order_by("-voucher_no").first()
-    if last and last.voucher_no.startswith(prefix):
-        seq = int(last.voucher_no[len(prefix):]) + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:03d}"
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
 def _calc_item_amounts(unit_price: Decimal, quantity: int, tax_rate: Decimal) -> tuple:
@@ -275,13 +265,20 @@ async def confirm_invoice(invoice_id: int, user) -> Invoice:
 
 
 async def cancel_invoice(invoice_id: int) -> Invoice:
-    """作废发票"""
-    inv = await Invoice.filter(id=invoice_id).first()
-    if not inv:
-        raise ValueError("发票不存在")
-    if inv.status == "cancelled":
-        raise ValueError("发票已作废")
-    inv.status = "cancelled"
-    await inv.save()
+    """作废发票，同时清理关联凭证"""
+    async with transactions.in_transaction():
+        inv = await Invoice.filter(id=invoice_id).select_for_update().first()
+        if not inv:
+            raise ValueError("发票不存在")
+        if inv.status == "cancelled":
+            raise ValueError("发票已作废")
+        # 清理关联凭证
+        if inv.voucher_id:
+            await VoucherEntry.filter(voucher_id=inv.voucher_id).delete()
+            await Voucher.filter(id=inv.voucher_id).delete()
+            inv.voucher_id = None
+            inv.voucher_no = None
+        inv.status = "cancelled"
+        await inv.save()
     logger.info(f"作废发票: {inv.invoice_no}")
     return inv

@@ -71,9 +71,13 @@ async def list_payable_bills(
 @router.get("/payable-bills/{bill_id}")
 async def get_payable_bill(
     bill_id: int,
+    account_set_id: int = Query(None),
     user: User = Depends(require_permission("accounting_ap_view")),
 ):
-    b = await PayableBill.filter(id=bill_id).prefetch_related("supplier", "purchase_order").first()
+    q = {"id": bill_id}
+    if account_set_id:
+        q["account_set_id"] = account_set_id
+    b = await PayableBill.filter(**q).prefetch_related("supplier", "purchase_order").first()
     if not b:
         raise HTTPException(status_code=404, detail="应付单不存在")
     return {

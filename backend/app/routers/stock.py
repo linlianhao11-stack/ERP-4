@@ -60,7 +60,8 @@ async def restock(data: RestockRequest, user: User = Depends(require_permission(
             await update_weighted_entry_date(data.warehouse_id, data.product_id, data.quantity, cost_price, data.location_id)
 
             # 刷新库存记录（update_weighted_entry_date 已更新数量）
-            await stock.refresh_from_db() if stock else None
+            if stock:
+                await stock.refresh_from_db()
             stock = stock or await WarehouseStock.filter(warehouse_id=data.warehouse_id, product_id=data.product_id, location_id=data.location_id).first()
 
             product.cost_price = await get_product_weighted_cost(data.product_id)

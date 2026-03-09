@@ -109,16 +109,16 @@ async def upload_restore_backup(file: UploadFile = File(...), user: User = Depen
     saved_path = os.path.join(backup_dir, saved_name)
     try:
         MAX_SIZE = 100 * 1024 * 1024
-        content = b""
-        while True:
-            chunk = await file.read(8192)
-            if not chunk:
-                break
-            content += chunk
-            if len(content) > MAX_SIZE:
-                raise HTTPException(status_code=400, detail="备份文件过大，最大支持 100MB")
+        total_size = 0
         with open(saved_path, "wb") as f:
-            f.write(content)
+            while True:
+                chunk = await file.read(8192)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_SIZE:
+                    raise HTTPException(status_code=400, detail="备份文件过大，最大支持 100MB")
+                f.write(chunk)
         # 执行恢复
         pre_backup = do_restore(saved_name)
         # 恢复后运行迁移，确保 schema 兼容

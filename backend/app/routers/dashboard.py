@@ -4,7 +4,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends
 from tortoise import connections
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.utils.time import now
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api", tags=["仪表盘"])
 
 
 @router.get("/dashboard")
-async def get_dashboard(user: User = Depends(get_current_user)):
+async def get_dashboard(user: User = Depends(require_permission("dashboard"))):
     today = now().replace(hour=0, minute=0, second=0, microsecond=0)
     thirty_days_ago = today - timedelta(days=30)
 

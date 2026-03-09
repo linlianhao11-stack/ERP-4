@@ -19,6 +19,7 @@ class Payment(models.Model):
 
     class Meta:
         table = "payments"
+        indexes = (("customer_id",), ("order_id",),)
 
 
 class PaymentOrder(models.Model):
@@ -30,6 +31,7 @@ class PaymentOrder(models.Model):
 
     class Meta:
         table = "payment_orders"
+        indexes = (("payment_id",), ("order_id",),)
 
 
 class PaymentMethod(models.Model):

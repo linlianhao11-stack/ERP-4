@@ -57,9 +57,13 @@ async def list_purchase_receipts(
 @router.get("/{bill_id}")
 async def get_purchase_receipt(
     bill_id: int,
+    account_set_id: int = Query(None),
     user: User = Depends(require_permission("accounting_view")),
 ):
-    b = await PurchaseReceiptBill.filter(id=bill_id).prefetch_related("supplier", "purchase_order").first()
+    q = {"id": bill_id}
+    if account_set_id:
+        q["account_set_id"] = account_set_id
+    b = await PurchaseReceiptBill.filter(**q).prefetch_related("supplier", "purchase_order").first()
     if not b:
         raise HTTPException(status_code=404, detail="入库单不存在")
     return {
@@ -116,10 +120,11 @@ async def get_purchase_receipt_pdf(
                   "tax_rate": it.tax_rate} for it in items]
     pdf_bytes = generate_delivery_pdf(bill_dict, item_list, "采购入库单")
     import io
+    from urllib.parse import quote
     from fastapi.responses import StreamingResponse
     return StreamingResponse(
         io.BytesIO(pdf_bytes), media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={b.bill_no}.pdf"})
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(b.bill_no + '.pdf')}"})
 
 
 @router.post("/batch-pdf")
@@ -156,6 +161,8 @@ async def batch_purchase_receipt_pdf(
     if not pdf_list:
         raise HTTPException(status_code=404, detail="未找到入库单")
     merged = merge_pdfs(pdf_list)
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     return StreamingResponse(
         io.BytesIO(merged), media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=receipt_batch.pdf"})
+        headers={"Content-Disposition": f"attachment; filename=receipt_batch_{ts}.pdf"})

@@ -41,6 +41,13 @@ async def _setup():
     await AccountingPeriod.create(
         account_set=a, period_name="2026-02", year=2026, month=2
     )
+    # 当前月份期间（用于凭证生成测试，因为单据日期使用 date.today()）
+    today = date.today()
+    current_period = f"{today.year}-{today.month:02d}"
+    if current_period != "2026-02":
+        await AccountingPeriod.create(
+            account_set=a, period_name=current_period, year=today.year, month=today.month
+        )
     c = await Customer.create(name="测试客户")
     s = await Supplier.create(name="测试供应商")
     u = await User.create(username="testuser", password_hash="x", display_name="测试")
@@ -164,6 +171,8 @@ async def test_confirm_disbursement_full():
 
 async def test_generate_ar_vouchers():
     a, c, _, u = await _setup()
+    today = date.today()
+    current_period = f"{today.year}-{today.month:02d}"
     rb = await create_receivable_bill(
         account_set_id=a.id, customer_id=c.id,
         total_amount=Decimal("1000.00"), status="completed", creator=u,
@@ -173,7 +182,7 @@ async def test_generate_ar_vouchers():
         receivable_bill=rb, payment_id=None,
         amount=Decimal("1000.00"), payment_method="银行转账", creator=u,
     )
-    vouchers = await generate_ar_vouchers(a.id, "2026-02", u)
+    vouchers = await generate_ar_vouchers(a.id, current_period, u)
     assert len(vouchers) == 1
     assert vouchers[0]["source"].startswith("收款单")
 
@@ -187,6 +196,8 @@ async def test_generate_ar_vouchers():
 
 async def test_generate_ap_vouchers():
     a, _, s, u = await _setup()
+    today = date.today()
+    current_period = f"{today.year}-{today.month:02d}"
     pb = await create_payable_bill(
         account_set_id=a.id, supplier_id=s.id,
         total_amount=Decimal("5000.00"), status="pending", creator=u,
@@ -196,7 +207,7 @@ async def test_generate_ap_vouchers():
         payable_bill=pb, amount=Decimal("5000.00"),
         disbursement_method="对公转账", creator=u,
     )
-    vouchers = await generate_ap_vouchers(a.id, "2026-02", u)
+    vouchers = await generate_ap_vouchers(a.id, current_period, u)
     assert len(vouchers) == 1
     assert vouchers[0]["source"].startswith("付款单")
 
@@ -209,6 +220,8 @@ async def test_generate_ap_vouchers():
 
 async def test_voucher_generation_idempotent():
     a, c, _, u = await _setup()
+    today = date.today()
+    current_period = f"{today.year}-{today.month:02d}"
     rb = await create_receivable_bill(
         account_set_id=a.id, customer_id=c.id,
         total_amount=Decimal("500.00"), status="completed", creator=u,
@@ -218,7 +231,7 @@ async def test_voucher_generation_idempotent():
         receivable_bill=rb, payment_id=None,
         amount=Decimal("500.00"), payment_method="现金", creator=u,
     )
-    v1 = await generate_ar_vouchers(a.id, "2026-02", u)
-    v2 = await generate_ar_vouchers(a.id, "2026-02", u)
+    v1 = await generate_ar_vouchers(a.id, current_period, u)
+    v2 = await generate_ar_vouchers(a.id, current_period, u)
     assert len(v1) == 1
     assert len(v2) == 0  # 已生成凭证的不会重复生成

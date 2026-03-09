@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 _debug = os.environ.get("DEBUG", "false").lower() == "true"
 app = FastAPI(
-    title="轻量级ERP系统 v4.9.0",
+    title="轻量级ERP系统 v4.15.0",
     lifespan=lifespan,
     docs_url="/docs" if _debug else None,
     redoc_url="/redoc" if _debug else None,
