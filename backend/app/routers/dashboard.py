@@ -92,7 +92,7 @@ async def get_dashboard(user: User = Depends(require_permission("dashboard"))):
     # 今日发货数量（已发货的发货单数）
     ship_agg = await conn.execute_query_dict("""
         SELECT COUNT(*) as cnt FROM shipments
-        WHERE shipped_at >= $1 AND status IN ('shipped', 'in_transit', 'signed')
+        WHERE updated_at >= $1 AND status IN ('shipped', 'in_transit', 'signed')
     """, [today])
     today_shipments = int(ship_agg[0]["cnt"]) if ship_agg else 0
 
