@@ -3,6 +3,7 @@ from tortoise import fields, models
 
 class Shipment(models.Model):
     id = fields.IntField(pk=True)
+    shipment_no = fields.CharField(max_length=30, unique=True, null=True)
     order = fields.ForeignKeyField("models.Order", related_name="shipments", on_delete=fields.RESTRICT)
     carrier_code = fields.CharField(max_length=30, null=True)
     carrier_name = fields.CharField(max_length=50, null=True)

@@ -19,6 +19,7 @@ from app.services.logistics_service import (
 )
 from app.services.sn_service import validate_and_consume_sn_codes
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
+from app.utils.generators import generate_sequential_no
 from app.logger import get_logger
 
 logger = get_logger("logistics")
@@ -37,6 +38,7 @@ def _shipment_to_dict(s, tracking_info=None):
     ti = ti or []
     return {
         "id": s.id,
+        "shipment_no": s.shipment_no,
         "order_id": s.order_id,
         "carrier_code": s.carrier_code,
         "carrier_name": s.carrier_name,
@@ -339,7 +341,9 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
         raise HTTPException(status_code=400, detail="请填写快递单号")
 
     async with transactions.in_transaction():
+        sh_no = await generate_sequential_no("SH", "shipments", "shipment_no")
         shipment = await Shipment.create(
+            shipment_no=sh_no,
             order=order,
             carrier_code=data.carrier_code,
             carrier_name=data.carrier_name,
@@ -549,7 +553,9 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
         raise HTTPException(status_code=400, detail="该订单类型不支持添加物流单")
 
     is_self_pickup = data.carrier_code == "self_pickup"
+    sh_no = await generate_sequential_no("SH", "shipments", "shipment_no")
     shipment = await Shipment.create(
+        shipment_no=sh_no,
         order=order,
         carrier_code=data.carrier_code,
         carrier_name=data.carrier_name,

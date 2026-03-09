@@ -1,0 +1,63 @@
+/* ============================
+   Tailwind 4 Theme Configuration
+   Maps CSS custom properties → Tailwind utility classes.
+   Variable definitions are in base.css (:root / [data-theme="dark"])
+   ============================ */
+
+@theme {
+  /* Primary brand: text-primary, bg-primary, border-primary */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-muted: var(--primary-muted);
+  --color-primary-ring: var(--primary-ring);
+
+  /* Semantic: text-success, bg-success, etc. */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  /* Surfaces: bg-canvas, bg-surface, bg-elevated, bg-sunken */
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-sunken: var(--sunken);
+  --color-sidebar: var(--sidebar-bg);
+
+  /* Foreground: text-foreground, text-secondary, text-muted */
+  --color-foreground: var(--text);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+
+  /* Borders: border-line, border-line-strong */
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  /* Badge semantic — subtle bg + emphasis text */
+  --color-success-subtle: var(--success-subtle);
+  --color-success-emphasis: var(--success-emphasis);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-emphasis: var(--warning-emphasis);
+  --color-error-subtle: var(--error-subtle);
+  --color-error-emphasis: var(--error-emphasis);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-emphasis: var(--info-emphasis);
+  --color-purple-subtle: var(--purple-subtle);
+  --color-purple-emphasis: var(--purple-emphasis);
+  --color-gray-subtle: var(--gray-subtle);
+  --color-gray-emphasis: var(--gray-emphasis);
+  --color-orange-subtle: var(--orange-subtle);
+  --color-orange-emphasis: var(--orange-emphasis);
+
+  /* Interaction surfaces */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+
+  /* On-color (text on colored backgrounds) */
+  --color-on-primary: var(--on-primary);
+
+  /* Fonts */
+  --font-sans: 'Inter', 'Geist', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', monospace;
+}

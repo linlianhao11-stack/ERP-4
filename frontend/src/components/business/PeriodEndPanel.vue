@@ -12,10 +12,10 @@
       </div>
 
       <!-- 当前期间状态卡片 -->
-      <div v-if="selectedPeriodObj" class="flex-1 bg-[#f5f5f7] rounded-xl p-4 flex items-center justify-between min-w-[280px]">
+      <div v-if="selectedPeriodObj" class="flex-1 bg-elevated rounded-xl p-4 flex items-center justify-between min-w-[280px]">
         <div>
-          <div class="text-[15px] font-semibold text-[#1d1d1f]">{{ selectedPeriodObj.period_name }}</div>
-          <div class="text-[12px] text-[#86868b] mt-0.5">
+          <div class="text-[15px] font-semibold text-foreground">{{ selectedPeriodObj.period_name }}</div>
+          <div class="text-[12px] text-muted mt-0.5">
             {{ selectedPeriodObj.year }}年第{{ selectedPeriodObj.month }}期
           </div>
         </div>
@@ -27,9 +27,9 @@
 
     <template v-if="selectedPeriod">
       <!-- 1. 损益结转区域 -->
-      <div class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
+      <div class="bg-elevated rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
-          <h4 class="text-[15px] font-semibold text-[#1d1d1f]">损益结转</h4>
+          <h4 class="text-[15px] font-semibold text-foreground">损益结转</h4>
           <div class="flex gap-2">
             <button @click="handlePreview" class="btn btn-secondary btn-sm" :disabled="loading.preview">
               {{ loading.preview ? '预览中...' : '预览结转' }}
@@ -46,12 +46,12 @@
         </div>
 
         <!-- 已存在提示 -->
-        <div v-if="previewData && previewData.already_exists" class="p-3 bg-[#fff3e0] rounded-lg text-[13px] text-[#c93400]">
+        <div v-if="previewData && previewData.already_exists" class="p-3 bg-orange-subtle rounded-lg text-[13px] text-orange-emphasis">
           该期间已存在损益结转凭证，凭证号：<span class="font-semibold">{{ previewData.voucher_no }}</span>
         </div>
 
         <!-- 执行结果 -->
-        <div v-if="carryForwardResult" class="p-3 bg-[#e8f8ee] rounded-lg text-[13px] text-[#248a3d] mb-3">
+        <div v-if="carryForwardResult" class="p-3 bg-success-subtle rounded-lg text-[13px] text-success-emphasis mb-3">
           <template v-if="carryForwardResult.already_existed">
             结转凭证已存在，凭证号：<span class="font-semibold">{{ carryForwardResult.voucher_no }}</span>
           </template>
@@ -92,15 +92,15 @@
         </div>
 
         <!-- 无结转分录 -->
-        <div v-if="previewData && !previewData.already_exists && previewData.entries && previewData.entries.length === 0" class="text-center py-4 text-[13px] text-[#86868b]">
+        <div v-if="previewData && !previewData.already_exists && previewData.entries && previewData.entries.length === 0" class="text-center py-4 text-[13px] text-muted">
           本期无损益类科目发生额，无需结转
         </div>
       </div>
 
       <!-- 2. 结账检查区域 -->
-      <div class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
+      <div class="bg-elevated rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
-          <h4 class="text-[15px] font-semibold text-[#1d1d1f]">结账检查</h4>
+          <h4 class="text-[15px] font-semibold text-foreground">结账检查</h4>
           <div class="flex gap-2">
             <button @click="handleCloseCheck" class="btn btn-secondary btn-sm" :disabled="loading.check">
               {{ loading.check ? '检查中...' : '执行检查' }}
@@ -123,38 +123,38 @@
             :key="idx"
             :class="[
               'flex items-start gap-3 p-3 rounded-lg text-[13px]',
-              item.passed ? 'bg-[#e8f8ee]' : 'bg-[#ffeaee]'
+              item.passed ? 'bg-success-subtle' : 'bg-error-subtle'
             ]"
           >
-            <span :class="item.passed ? 'text-[#248a3d]' : 'text-[#d70015]'" class="text-[16px] font-bold shrink-0 mt-px">
+            <span :class="item.passed ? 'text-success-emphasis' : 'text-error-emphasis'" class="text-[16px] font-bold shrink-0 mt-px">
               {{ item.passed ? '\u2713' : '\u2717' }}
             </span>
             <div>
-              <div :class="item.passed ? 'text-[#248a3d]' : 'text-[#d70015]'" class="font-medium">{{ item.label }}</div>
-              <div class="text-[12px] mt-0.5" :class="item.passed ? 'text-[#248a3d]/70' : 'text-[#d70015]/70'">{{ item.detail }}</div>
+              <div :class="item.passed ? 'text-success-emphasis' : 'text-error-emphasis'" class="font-medium">{{ item.label }}</div>
+              <div class="text-[12px] mt-0.5" :class="item.passed ? 'text-success-emphasis/70' : 'text-error-emphasis/70'">{{ item.detail }}</div>
             </div>
           </div>
         </div>
 
         <!-- 结账成功提示 -->
-        <div v-if="closeResult" class="p-3 bg-[#e8f8ee] rounded-lg text-[13px] text-[#248a3d] mt-3">
+        <div v-if="closeResult" class="p-3 bg-success-subtle rounded-lg text-[13px] text-success-emphasis mt-3">
           {{ closeResult.already_closed ? '该期间已结账' : `期间 ${closeResult.period_name} 结账成功` }}
         </div>
       </div>
 
       <!-- 3. 年度结转区域（仅12月） -->
-      <div v-if="selectedMonth === 12" class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
+      <div v-if="selectedMonth === 12" class="bg-elevated rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
-          <h4 class="text-[15px] font-semibold text-[#1d1d1f]">年度结转</h4>
+          <h4 class="text-[15px] font-semibold text-foreground">年度结转</h4>
           <button v-if="hasPermission('period_end')" @click="handleYearClose" class="btn btn-primary btn-sm" :disabled="loading.yearClose">
             {{ loading.yearClose ? '结转中...' : '年度结转' }}
           </button>
         </div>
-        <p class="text-[13px] text-[#86868b] mb-2">
+        <p class="text-[13px] text-muted mb-2">
           将本年利润（4103）结转至利润分配-未分配利润（4104），并初始化下一年度会计期间。
         </p>
 
-        <div v-if="yearCloseResult" class="p-3 bg-[#e8f8ee] rounded-lg text-[13px] text-[#248a3d]">
+        <div v-if="yearCloseResult" class="p-3 bg-success-subtle rounded-lg text-[13px] text-success-emphasis">
           <template v-if="yearCloseResult.already_existed">
             年度结转凭证已存在，凭证号：<span class="font-semibold">{{ yearCloseResult.voucher_no }}</span>
           </template>
@@ -172,17 +172,17 @@
       </div>
 
       <!-- 4. 反结账按钮（admin + 已结账） -->
-      <div v-if="hasPermission('period_end') && selectedPeriodObj?.is_closed" class="bg-[#f5f5f7] rounded-xl p-5 mb-4">
+      <div v-if="hasPermission('period_end') && selectedPeriodObj?.is_closed" class="bg-elevated rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between">
           <div>
-            <h4 class="text-[15px] font-semibold text-[#1d1d1f]">反结账</h4>
-            <p class="text-[13px] text-[#86868b] mt-1">解锁已结账期间，允许继续录入和修改凭证。</p>
+            <h4 class="text-[15px] font-semibold text-foreground">反结账</h4>
+            <p class="text-[13px] text-muted mt-1">解锁已结账期间，允许继续录入和修改凭证。</p>
           </div>
-          <button @click="handleReopen" class="btn btn-sm px-3 py-1.5 rounded-lg text-[13px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors" :disabled="loading.reopen">
+          <button @click="handleReopen" class="btn btn-sm px-3 py-1.5 rounded-lg text-[13px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors" :disabled="loading.reopen">
             {{ loading.reopen ? '处理中...' : '反结账' }}
           </button>
         </div>
-        <div v-if="reopenResult" class="p-3 bg-[#e8f8ee] rounded-lg text-[13px] text-[#248a3d] mt-3">
+        <div v-if="reopenResult" class="p-3 bg-success-subtle rounded-lg text-[13px] text-success-emphasis mt-3">
           期间 {{ reopenResult.period_name }} 已成功反结账
         </div>
       </div>
@@ -191,7 +191,7 @@
     <!-- 5. 期间历史列表 -->
     <div class="mt-5">
       <div class="flex items-center justify-between mb-3">
-        <h4 class="text-[15px] font-semibold text-[#1d1d1f]">期间列表</h4>
+        <h4 class="text-[15px] font-semibold text-foreground">期间列表</h4>
         <div class="flex items-center gap-2">
           <label class="label mb-0 text-[12px]">年度</label>
           <select v-model.number="listYear" class="input input-sm w-24" @change="loadPeriodList">
@@ -225,7 +225,7 @@
               <td>{{ p.closed_by || '-' }}</td>
             </tr>
             <tr v-if="periodList.length === 0">
-              <td colspan="6" class="text-center text-[#86868b] py-8">暂无期间数据</td>
+              <td colspan="6" class="text-center text-muted py-8">暂无期间数据</td>
             </tr>
           </tbody>
         </table>

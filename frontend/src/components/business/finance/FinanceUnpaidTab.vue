@@ -11,21 +11,21 @@
     <div class="md:hidden space-y-2">
       <div v-for="o in unpaidOrders" :key="o.id" class="card p-3 flex justify-between items-center cursor-pointer" @click="handleViewOrder(o.id)">
         <div class="min-w-0 flex-1 mr-3">
-          <div class="font-medium truncate">{{ o.customer_name }}</div>
-          <div class="text-xs text-[#86868b] truncate">{{ o.order_no }} · <span :class="orderTypeBadges[o.order_type]">{{ orderTypeNames[o.order_type] }}</span></div>
+          <div class="font-medium truncate"><span class="todo-dot mr-1"></span>{{ o.customer_name }}</div>
+          <div class="text-xs text-muted truncate">{{ o.order_no }} · <span :class="orderTypeBadges[o.order_type]">{{ orderTypeNames[o.order_type] }}</span></div>
         </div>
         <div class="text-right flex-shrink-0">
-          <div class="text-lg font-bold text-[#ff3b30]">¥{{ fmt(o.unpaid_amount) }}</div>
-          <div class="text-xs text-[#86868b]">{{ fmtDate(o.created_at) }}</div>
+          <div class="text-lg font-bold text-error">¥{{ fmt(o.unpaid_amount) }}</div>
+          <div class="text-xs text-muted">{{ fmtDate(o.created_at) }}</div>
         </div>
       </div>
-      <div v-if="!unpaidOrders.length" class="p-8 text-center text-[#86868b] text-sm">暂无欠款</div>
+      <div v-if="!unpaidOrders.length" class="p-8 text-center text-muted text-sm">暂无欠款</div>
     </div>
     <!-- 桌面端欠款表格 -->
     <div class="card hidden md:block">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th class="px-3 py-2 text-left">订单号</th>
               <th class="px-3 py-2 text-left">客户</th>
@@ -36,18 +36,18 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in unpaidOrders" :key="o.id" class="hover:bg-[#f5f5f7] cursor-pointer" @click="handleViewOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm text-[#0071e3]">{{ o.order_no }}</td>
+            <tr v-for="o in unpaidOrders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="handleViewOrder(o.id)">
+              <td class="px-3 py-2 font-mono text-sm text-primary"><span class="todo-dot mr-1.5"></span>{{ o.order_no }}</td>
               <td class="px-3 py-2">{{ o.customer_name }}</td>
               <td class="px-3 py-2 text-center"><StatusBadge type="orderType" :status="o.order_type" /></td>
               <td class="px-3 py-2 text-right">¥{{ fmt(o.total_amount) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-[#ff3b30]">¥{{ fmt(o.unpaid_amount) }}</td>
-              <td class="px-3 py-2 text-[#86868b] text-xs">{{ fmtDate(o.created_at) }}</td>
+              <td class="px-3 py-2 text-right font-semibold text-error">¥{{ fmt(o.unpaid_amount) }}</td>
+              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="!unpaidOrders.length" class="p-8 text-center text-[#86868b] text-sm">暂无欠款</div>
+      <div v-if="!unpaidOrders.length" class="p-8 text-center text-muted text-sm">暂无欠款</div>
     </div>
 
     <!-- ============ 弹窗：收款 ============ -->
@@ -55,7 +55,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">收款</h3>
-          <button @click="showPaymentModal = false" class="text-[#86868b] hover:text-[#6e6e73] text-xl">&times;</button>
+          <button @click="showPaymentModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
         </div>
         <div class="modal-body">
           <form @submit.prevent="savePayment" class="space-y-3">
@@ -71,10 +71,10 @@
             <div v-if="customerUnpaidOrders.length">
               <label class="label">核销订单</label>
               <div class="space-y-1 max-h-36 overflow-y-auto border rounded p-2">
-                <label v-for="o in customerUnpaidOrders" :key="o.id" class="flex items-center p-2 hover:bg-[#f5f5f7] rounded cursor-pointer text-sm">
+                <label v-for="o in customerUnpaidOrders" :key="o.id" class="flex items-center p-2 hover:bg-elevated rounded cursor-pointer text-sm">
                   <input type="checkbox" v-model="paymentForm.order_ids" :value="o.id" class="mr-2">
                   <span class="flex-1">{{ o.order_no }}</span>
-                  <span class="text-[#ff3b30] font-semibold">¥{{ fmt(o.unpaid_amount) }}</span>
+                  <span class="text-error font-semibold">¥{{ fmt(o.unpaid_amount) }}</span>
                 </label>
               </div>
             </div>

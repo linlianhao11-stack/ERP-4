@@ -6,7 +6,7 @@
       <span @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">收款退款</span>
       <span @click="sub = 'writeoffs'" :class="['tab', sub === 'writeoffs' ? 'active' : '']">应收核销</span>
       <span @click="sub = 'delivery'" :class="['tab', sub === 'delivery' ? 'active' : '']">出库单</span>
-      <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-[#f0e6fa] text-[#7d2ae8] hover:bg-[#e8d5f5] transition-colors">
+      <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">
         {{ generating ? '生成中...' : '批量生成凭证' }}
       </button>
     </div>

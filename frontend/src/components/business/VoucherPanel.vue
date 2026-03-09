@@ -50,18 +50,18 @@
             <td><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
             <td @click.stop>
               <div class="flex gap-1.5">
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f4fd] text-[#0062cc] hover:bg-[#d0e8fa] transition-colors">提交</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f8ee] text-[#248a3d] hover:bg-[#d0f0dc] transition-colors">审核</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleReject(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#fff3e0] text-[#c93400] hover:bg-[#ffe6c7] transition-colors">驳回</button>
-                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#f3eef8] text-[#8944ab] hover:bg-[#e8ddf2] transition-colors">过账</button>
-                <button v-if="v.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#fff3e0] text-[#c93400] hover:bg-[#ffe6c7] transition-colors">反过账</button>
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors">删除</button>
-                <button @click="handlePrintPdf(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#f0f0f0] text-[#333] hover:bg-[#e0e0e0] transition-colors">打印</button>
+                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">提交</button>
+                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-success-subtle text-success-emphasis hover:bg-success-subtle transition-colors">审核</button>
+                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleReject(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-orange-subtle text-orange-emphasis hover:bg-orange-subtle transition-colors">驳回</button>
+                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">过账</button>
+                <button v-if="v.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-orange-subtle text-orange-emphasis hover:bg-orange-subtle transition-colors">反过账</button>
+                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleDelete(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">删除</button>
+                <button @click="handlePrintPdf(v)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-elevated text-foreground hover:bg-surface-hover transition-colors">打印</button>
               </div>
             </td>
           </tr>
           <tr v-if="vouchers.length === 0">
-            <td colspan="8" class="text-center text-[#86868b] py-8">暂无凭证</td>
+            <td colspan="8" class="text-center text-muted py-8">暂无凭证</td>
           </tr>
         </tbody>
       </table>
@@ -70,7 +70,7 @@
     <!-- 分页 -->
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
       <button @click="page > 1 && (page--, loadList())" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 

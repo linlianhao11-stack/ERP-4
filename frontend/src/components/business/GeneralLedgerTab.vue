@@ -8,7 +8,7 @@
         </option>
       </select>
       <input type="month" v-model="startPeriod" class="input input-sm w-36" @change="query">
-      <span class="text-[13px] text-[#86868b]">至</span>
+      <span class="text-[13px] text-muted">至</span>
       <input type="month" v-model="endPeriod" class="input input-sm w-36" @change="query">
       <button @click="query" class="btn btn-primary btn-sm" :disabled="!selectedAccountId">查询</button>
       <button v-if="data" @click="handleExport" class="btn btn-secondary btn-sm">导出 Excel</button>
@@ -31,7 +31,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="bg-[#f9f9fb]">
+          <tr class="bg-canvas">
             <td></td><td></td>
             <td class="font-medium">期初余额</td>
             <td></td><td></td>
@@ -47,14 +47,14 @@
             <td class="text-center">{{ e.direction }}</td>
             <td class="text-right">{{ fmt(e.balance) }}</td>
           </tr>
-          <tr class="bg-[#f9f9fb] font-semibold">
+          <tr class="bg-canvas font-semibold">
             <td></td><td></td>
             <td>本期合计</td>
             <td class="text-right">{{ fmt(data.period_debit_total) }}</td>
             <td class="text-right">{{ fmt(data.period_credit_total) }}</td>
             <td></td><td></td>
           </tr>
-          <tr class="bg-[#f9f9fb] font-semibold">
+          <tr class="bg-canvas font-semibold">
             <td></td><td></td>
             <td>期末余额</td>
             <td></td><td></td>
@@ -63,11 +63,11 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="data.entries.length === 0" class="text-center text-[#86868b] py-4 text-[13px]">
+      <div v-if="data.entries.length === 0" class="text-center text-muted py-4 text-[13px]">
         本期无发生额
       </div>
     </div>
-    <div v-else class="text-center text-[#86868b] py-12 text-[14px]">
+    <div v-else class="text-center text-muted py-12 text-[14px]">
       请选择科目和期间后点击查询
     </div>
   </div>

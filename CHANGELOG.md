@@ -1,5 +1,71 @@
 # 迭代记录
 
+## v4.17.0 — UI 重构：Modern Industrial 设计系统（2026-03-09）
+
+> 全面重构前端 UI 系统，建立 OKLCH 色彩 Token 体系 + Tailwind 4 主题配置，支持亮/暗双模式切换，消灭 1,370 处硬编码色值。新增侧边栏待办角标和仪表盘待办面板。
+
+### P0：Token 基础设施
+- 新建 `styles/theme.css` — Tailwind 4 `@theme` 配置，CSS 变量映射为工具类
+- 重写 `styles/base.css` — `:root` / `[data-theme="dark"]` 定义 60+ OKLCH 色彩 Token
+- 主色从 Apple Blue `#0071e3` 改为 Steel Blue `oklch(0.55 0.20 250)`
+- 中性色改为 Zinc 冷灰（无色温），暗色模式完整覆盖
+- `stores/app.js` 新增 `theme` / `setTheme` / `toggleTheme` / `initTheme`
+- `index.html` 添加 FOUC 防闪烁内联脚本
+
+### P1：公共组件迁移
+- `base.css` 组件层全部迁移 CSS 变量：`.btn` / `.input` / `.badge` / `.modal` / `.tab` / `.toggle` / `.card` 等
+- `AppTable.vue` / `constants.js shipmentStatusBadges` 去除 `[#hex]`
+
+### P2：全局色值批量替换
+- 57 个 Vue 文件，3 轮脚本执行，共 1,370 处 `[#hex]` → Tailwind Token class
+- 替换后 `grep -r '\[#' frontend/src/` 返回 0 结果
+
+### P3：布局与视觉调整
+- **后端** 新增 `GET /api/todo-counts` — 按用户权限返回 6 类待办数量（待发货/待审核/在途/待收款/低库存/待处理应收）
+- **侧边栏** iOS 风格红色圆形角标 + 亮/暗模式切换按钮
+- **仪表盘** 新增待办事项面板（按权限过滤，红色计数标签，点击跳转对应模块）
+- 前端 API / Store / Sidebar / DashboardView 四文件联动
+
+### P4：暗色模式完善
+- `--shadow-*` 阴影 Token（暗色模式使用更强阴影，亮色保持轻盈）
+- `--surface-translucent` 底栏半透明适配双模式
+- SVG logo `stroke="white"` → `stroke="currentColor"` + `text-canvas` 适配主题反转
+- Toast / Modal / Card 阴影全部改用 CSS 变量
+
+### P5：打磨收尾
+- 全局 `:focus-visible` 焦点样式（主色 outline + 2px offset）
+- `prefers-reduced-motion` 媒体查询（尊重用户无障碍偏好）
+
+### 修改文件清单
+
+**后端：**
+- `app/routers/dashboard.py` — 新增 `GET /api/todo-counts` 端点
+
+**前端核心：**
+- `src/styles/base.css` — 完全重写（CSS 变量 + 组件层 + 阴影 Token + 无障碍）
+- `src/styles/theme.css` — 新建 Tailwind 4 `@theme` 配置
+- `src/stores/app.js` — 主题切换 + todoCounts
+- `src/App.vue` — initTheme + loadTodoCounts
+- `index.html` — FOUC 防闪烁脚本
+
+**布局组件：**
+- `src/components/layout/Sidebar.vue` — 红色角标 + 主题切换 + SVG 适配
+- `src/components/layout/BottomNav.vue` — Token class
+
+**页面视图：**
+- `src/views/DashboardView.vue` — 待办面板
+- `src/views/LoginView.vue` — SVG 适配暗色
+- 57 个 Vue 文件 — 批量色值替换
+
+**API：**
+- `src/api/dashboard.js` — 新增 `getTodoCounts()`
+
+**配置：**
+- `CLAUDE.md` — 主色修正
+- `docs/plans/2026-03-09-ui-refactor.md` — 完整设计文档
+
+---
+
 ## v4.16.0 — 数据库性能优化 + 发货事务 Bug 修复（2026-03-05）
 
 > 物流列表分页、N+1 查询消除、9 张表添加索引；修复发货操作事务回滚和凭证号重复两个关键 Bug。

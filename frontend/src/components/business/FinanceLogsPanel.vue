@@ -20,32 +20,32 @@
     </div>
     <div class="overflow-x-auto table-container">
       <table class="w-full text-sm">
-        <thead class="bg-[#f5f5f7]">
+        <thead class="bg-elevated">
           <tr>
-            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-[#0071e3]" @click="toggleLogSort('product')">商品 <span v-if="logSort.key === 'product'" class="text-[#0071e3]">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-            <th class="px-2 py-2 text-left md-hide cursor-pointer select-none hover:text-[#0071e3]" @click="toggleLogSort('warehouse')">仓库 <span v-if="logSort.key === 'warehouse'" class="text-[#0071e3]">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-[#0071e3]" @click="toggleLogSort('type')">类型 <span v-if="logSort.key === 'type'" class="text-[#0071e3]">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-            <th class="px-2 py-2 text-right cursor-pointer select-none hover:text-[#0071e3]" @click="toggleLogSort('quantity')">数量 <span v-if="logSort.key === 'quantity'" class="text-[#0071e3]">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleLogSort('product')">商品 <span v-if="logSort.key === 'product'" class="text-primary">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+            <th class="px-2 py-2 text-left md-hide cursor-pointer select-none hover:text-primary" @click="toggleLogSort('warehouse')">仓库 <span v-if="logSort.key === 'warehouse'" class="text-primary">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleLogSort('type')">类型 <span v-if="logSort.key === 'type'" class="text-primary">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+            <th class="px-2 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleLogSort('quantity')">数量 <span v-if="logSort.key === 'quantity'" class="text-primary">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
             <th class="px-2 py-2 text-center md-hide">库存变化</th>
             <th class="px-2 py-2 text-left md-hide">备注</th>
             <th class="px-2 py-2 text-left md-hide">操作人</th>
-            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-[#0071e3]" @click="toggleLogSort('time')">时间 <span v-if="logSort.key === 'time'" class="text-[#0071e3]">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+            <th class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleLogSort('time')">时间 <span v-if="logSort.key === 'time'" class="text-primary">{{ logSort.order === 'asc' ? '↑' : '↓' }}</span></th>
           </tr>
         </thead>
         <tbody class="divide-y">
           <tr v-for="l in sortedLogs" :key="l.id">
-            <td class="px-2 py-2"><div>{{ l.product_name }}</div><div class="text-xs text-[#86868b]">{{ l.product_sku }}</div></td>
+            <td class="px-2 py-2"><div>{{ l.product_name }}</div><div class="text-xs text-muted">{{ l.product_sku }}</div></td>
             <td class="px-2 py-2 md-hide">{{ l.warehouse_name }}</td>
             <td class="px-2 py-2"><StatusBadge type="logType" :status="l.change_type" :label="l.change_type_name" /></td>
-            <td class="px-2 py-2 text-right font-semibold" :class="l.quantity > 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ l.quantity > 0 ? '+' : '' }}{{ l.quantity }}</td>
-            <td class="px-2 py-2 text-center text-[#86868b] md-hide">{{ l.before_qty }}→{{ l.after_qty }}</td>
-            <td class="px-2 py-2 text-[#86868b] text-xs max-w-24 truncate md-hide">{{ l.remark }}</td>
-            <td class="px-2 py-2 text-[#86868b] md-hide">{{ l.creator_name }}</td>
-            <td class="px-2 py-2 text-[#86868b] text-xs">{{ fmtDate(l.created_at) }}</td>
+            <td class="px-2 py-2 text-right font-semibold" :class="l.quantity > 0 ? 'text-success' : 'text-error'">{{ l.quantity > 0 ? '+' : '' }}{{ l.quantity }}</td>
+            <td class="px-2 py-2 text-center text-muted md-hide">{{ l.before_qty }}→{{ l.after_qty }}</td>
+            <td class="px-2 py-2 text-muted text-xs max-w-24 truncate md-hide">{{ l.remark }}</td>
+            <td class="px-2 py-2 text-muted md-hide">{{ l.creator_name }}</td>
+            <td class="px-2 py-2 text-muted text-xs">{{ fmtDate(l.created_at) }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-if="!stockLogs.length" class="p-6 text-center text-[#86868b] text-sm">暂无日志</div>
+      <div v-if="!stockLogs.length" class="p-6 text-center text-muted text-sm">暂无日志</div>
     </div>
   </div>
 </template>

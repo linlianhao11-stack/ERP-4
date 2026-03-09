@@ -29,7 +29,7 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="10" class="text-center text-[#86868b] py-8">暂无数据</td>
+            <td colspan="10" class="text-center text-muted py-8">暂无数据</td>
           </tr>
           <tr v-for="b in items" :key="b.id">
             <td class="font-mono text-[12px]">{{ b.bill_no }}</td>
@@ -43,8 +43,8 @@
             <td class="font-mono text-[12px]">{{ b.purchase_order_no || '-' }}</td>
             <td @click.stop>
               <div class="flex gap-1">
-                <button @click="viewDetail(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
-                <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">取消</button>
+                <button @click="viewDetail(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-info-subtle text-primary-active">查看</button>
+                <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-error-subtle text-error">取消</button>
               </div>
             </td>
           </tr>
@@ -54,7 +54,7 @@
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
       <button @click="page > 1 && (page--, loadList())" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
@@ -67,20 +67,20 @@
             <button @click="showDetail = false" class="modal-close">&times;</button>
           </div>
           <div class="modal-body">
-            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <div v-if="detailLoading" class="text-center py-8 text-muted">加载中...</div>
             <template v-else-if="detail">
               <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
-                <div><span class="text-[#86868b]">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
-                <div><span class="text-[#86868b]">日期：</span>{{ detail.bill_date }}</div>
-                <div><span class="text-[#86868b]">供应商：</span>{{ detail.supplier_name }}</div>
-                <div><span class="text-[#86868b]">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
-                <div><span class="text-[#86868b]">应付金额：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
-                <div><span class="text-[#86868b]">已付金额：</span>{{ detail.paid_amount }}</div>
-                <div><span class="text-[#86868b]">未付金额：</span>{{ detail.unpaid_amount }}</div>
-                <div><span class="text-[#86868b]">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
-                <div><span class="text-[#86868b]">来源采购单：</span>{{ detail.purchase_order_no || '-' }}</div>
-                <div><span class="text-[#86868b]">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
-                <div class="col-span-2"><span class="text-[#86868b]">备注：</span>{{ detail.remark || '-' }}</div>
+                <div><span class="text-muted">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
+                <div><span class="text-muted">日期：</span>{{ detail.bill_date }}</div>
+                <div><span class="text-muted">供应商：</span>{{ detail.supplier_name }}</div>
+                <div><span class="text-muted">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
+                <div><span class="text-muted">应付金额：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
+                <div><span class="text-muted">已付金额：</span>{{ detail.paid_amount }}</div>
+                <div><span class="text-muted">未付金额：</span>{{ detail.unpaid_amount }}</div>
+                <div><span class="text-muted">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
+                <div><span class="text-muted">来源采购单：</span>{{ detail.purchase_order_no || '-' }}</div>
+                <div><span class="text-muted">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
+                <div class="col-span-2"><span class="text-muted">备注：</span>{{ detail.remark || '-' }}</div>
               </div>
             </template>
           </div>

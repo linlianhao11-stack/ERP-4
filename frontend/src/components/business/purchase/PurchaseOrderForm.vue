@@ -20,10 +20,10 @@
               placeholder="输入供应商名称搜索..."
               autocomplete="off"
             >
-            <div v-if="poSupplierDropdown && filteredPoSuppliers.length" class="absolute z-50 left-0 right-0 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
-              <div v-for="s in filteredPoSuppliers" :key="s.id" @mousedown.prevent="selectPoSupplier(s)" class="px-3 py-2 hover:bg-[#e8f4fd] cursor-pointer text-sm">
+            <div v-if="poSupplierDropdown && filteredPoSuppliers.length" class="absolute z-50 left-0 right-0 bg-surface border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
+              <div v-for="s in filteredPoSuppliers" :key="s.id" @mousedown.prevent="selectPoSupplier(s)" class="px-3 py-2 hover:bg-info-subtle cursor-pointer text-sm">
                 {{ s.name }}
-                <span v-if="s.contact_person" class="text-[#86868b] text-xs ml-1">({{ s.contact_person }})</span>
+                <span v-if="s.contact_person" class="text-muted text-xs ml-1">({{ s.contact_person }})</span>
               </div>
             </div>
           </div>
@@ -51,8 +51,8 @@
             <option :value="null">不指定</option>
             <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
-          <div v-if="poForm.account_set_id" class="text-xs text-[#86868b] mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
-          <div v-else class="text-xs text-[#ff9500] mt-1">未选择财务账套，收货后将不会自动生成财务单据（应付单/入库单）</div>
+          <div v-if="poForm.account_set_id" class="text-xs text-muted mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
+          <div v-else class="text-xs text-warning mt-1">未选择财务账套，收货后将不会自动生成财务单据（应付单/入库单）</div>
         </div>
 
         <!-- 商品明细 -->
@@ -61,10 +61,10 @@
             <span class="font-semibold text-sm">商品明细</span>
             <button type="button" @click="poAddItem" class="btn btn-secondary btn-sm text-xs">+ 添加商品</button>
           </div>
-          <div v-for="(item, idx) in poForm.items" :key="idx" class="p-3 bg-[#f5f5f7] rounded-lg mb-2">
+          <div v-for="(item, idx) in poForm.items" :key="idx" class="p-3 bg-elevated rounded-lg mb-2">
             <div class="flex justify-between items-center mb-2">
-              <span class="text-xs font-semibold text-[#86868b]">#{{ idx + 1 }}</span>
-              <button type="button" @click="poRemoveItem(idx)" class="text-[#ff3b30] text-xs" v-if="poForm.items.length > 1">删除</button>
+              <span class="text-xs font-semibold text-muted">#{{ idx + 1 }}</span>
+              <button type="button" @click="poRemoveItem(idx)" class="text-error text-xs" v-if="poForm.items.length > 1">删除</button>
             </div>
             <!-- 商品搜索下拉 -->
             <div class="mb-2 relative">
@@ -78,10 +78,10 @@
                 placeholder="输入SKU或商品名搜索..."
                 autocomplete="off"
               >
-              <div v-if="item._dropdownOpen && poFilteredProducts(item._search).length" class="absolute z-50 left-0 right-0 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
-                <div v-for="p in poFilteredProducts(item._search)" :key="p.id" @mousedown.prevent="poPickProduct(item, p)" class="px-3 py-2 hover:bg-[#e8f4fd] cursor-pointer text-sm">
-                  <span class="font-mono text-[#86868b]">{{ p.sku }}</span> <span>{{ p.name }}</span>
-                  <span v-if="p.brand" class="text-[#86868b] text-xs ml-1">[{{ p.brand }}]</span>
+              <div v-if="item._dropdownOpen && poFilteredProducts(item._search).length" class="absolute z-50 left-0 right-0 bg-surface border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
+                <div v-for="p in poFilteredProducts(item._search)" :key="p.id" @mousedown.prevent="poPickProduct(item, p)" class="px-3 py-2 hover:bg-info-subtle cursor-pointer text-sm">
+                  <span class="font-mono text-muted">{{ p.sku }}</span> <span>{{ p.name }}</span>
+                  <span v-if="p.brand" class="text-muted text-xs ml-1">[{{ p.brand }}]</span>
                 </div>
               </div>
             </div>
@@ -107,10 +107,10 @@
               </div>
             </div>
             <!-- 小计信息 -->
-            <div class="flex justify-between text-xs text-[#86868b]">
+            <div class="flex justify-between text-xs text-muted">
               <span>未税单价: ¥{{ item.tax_exclusive_price.toFixed(2) }}</span>
-              <span v-if="item.rebate_amount > 0" class="text-[#34c759]">返利: -¥{{ item.rebate_amount.toFixed(2) }}</span>
-              <span class="font-semibold text-[#1d1d1f]">小计: ¥{{ (item.amount - (item.rebate_amount || 0)).toFixed(2) }}</span>
+              <span v-if="item.rebate_amount > 0" class="text-success">返利: -¥{{ item.rebate_amount.toFixed(2) }}</span>
+              <span class="font-semibold text-foreground">小计: ¥{{ (item.amount - (item.rebate_amount || 0)).toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -120,17 +120,17 @@
           <label class="flex items-center cursor-pointer mb-2">
             <input type="checkbox" v-model="poForm.use_rebate" class="mr-2 w-4 h-4" @change="!poForm.use_rebate && poForm.items.forEach(i => i.rebate_amount = 0)">
             <span class="font-medium text-sm">使用返利</span>
-            <span class="text-xs text-[#34c759] ml-2">可用: ¥{{ fmt(poForm.supplier_rebate_balance) }}</span>
+            <span class="text-xs text-success ml-2">可用: ¥{{ fmt(poForm.supplier_rebate_balance) }}</span>
           </label>
           <div v-if="poForm.use_rebate" class="space-y-2">
-            <div v-for="(item, idx) in poForm.items.filter(i => i.product_id)" :key="idx" class="flex items-center gap-2 text-sm bg-[#f5f5f7] rounded p-2">
+            <div v-for="(item, idx) in poForm.items.filter(i => i.product_id)" :key="idx" class="flex items-center gap-2 text-sm bg-elevated rounded p-2">
               <span class="flex-1 truncate">{{ item._search || '商品' + (idx + 1) }}</span>
-              <span class="text-[#86868b]">¥{{ item.amount.toFixed(2) }}</span>
+              <span class="text-muted">¥{{ item.amount.toFixed(2) }}</span>
               <input v-model.number="item.rebate_amount" type="number" step="0.01" min="0" :max="item.amount" class="w-24 text-right border rounded px-2 py-1 text-sm" placeholder="返利">
             </div>
             <div class="flex justify-between text-sm mt-1">
-              <span class="text-[#34c759]">返利总额: <b>¥{{ fmt(poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0)) }}</b></span>
-              <span v-if="poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0) > poForm.supplier_rebate_balance" class="text-[#ff3b30] text-xs">超过可用余额!</span>
+              <span class="text-success">返利总额: <b>¥{{ fmt(poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0)) }}</b></span>
+              <span v-if="poForm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0) > poForm.supplier_rebate_balance" class="text-error text-xs">超过可用余额!</span>
             </div>
           </div>
         </div>
@@ -140,21 +140,21 @@
           <label class="flex items-center cursor-pointer mb-2">
             <input type="checkbox" v-model="poForm.use_credit" class="mr-2 w-4 h-4">
             <span class="font-medium text-sm">使用在账资金</span>
-            <span class="text-xs text-[#0071e3] ml-2">可用: ¥{{ fmt(poForm.supplier_credit_balance) }}</span>
+            <span class="text-xs text-primary ml-2">可用: ¥{{ fmt(poForm.supplier_credit_balance) }}</span>
           </label>
           <div v-if="poForm.use_credit" class="flex items-center gap-2">
-            <label class="text-sm text-[#6e6e73]">抵扣金额:</label>
+            <label class="text-sm text-secondary">抵扣金额:</label>
             <input v-model.number="poForm.credit_amount" type="number" step="0.01" min="0"
               :max="poForm.supplier_credit_balance" class="input text-sm w-40" placeholder="输入抵扣金额">
-            <span v-if="poForm.credit_amount > poForm.supplier_credit_balance" class="text-[#ff3b30] text-xs">超过可用余额!</span>
+            <span v-if="poForm.credit_amount > poForm.supplier_credit_balance" class="text-error text-xs">超过可用余额!</span>
           </div>
         </div>
 
         <!-- 含税总额 -->
         <div class="border-t pt-3 flex justify-between items-center">
           <div class="text-sm">
-            含税总额: <span class="text-xl font-bold text-[#0071e3]">¥{{ poFinalAmount.toFixed(2) }}</span>
-            <span v-if="(poForm.use_rebate && poRebateTotal > 0) || (poForm.use_credit && poForm.credit_amount > 0)" class="text-xs text-[#86868b] ml-2">
+            含税总额: <span class="text-xl font-bold text-primary">¥{{ poFinalAmount.toFixed(2) }}</span>
+            <span v-if="(poForm.use_rebate && poRebateTotal > 0) || (poForm.use_credit && poForm.credit_amount > 0)" class="text-xs text-muted ml-2">
               (原价 ¥{{ poTotal.toFixed(2) }}
               <template v-if="poForm.use_rebate && poRebateTotal > 0"> - 返利 ¥{{ poRebateTotal.toFixed(2) }}</template>
               <template v-if="poForm.use_credit && poForm.credit_amount > 0"> - 在账 ¥{{ poForm.credit_amount.toFixed(2) }}</template>)

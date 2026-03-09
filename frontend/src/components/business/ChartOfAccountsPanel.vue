@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-[15px] font-semibold text-[#1d1d1f]">会计科目</h3>
+      <h3 class="text-[15px] font-semibold text-foreground">会计科目</h3>
       <button v-if="hasPermission('accounting_edit')" @click="openAddForm" class="btn btn-primary btn-sm">新增子科目</button>
     </div>
 
@@ -31,8 +31,8 @@
             </td>
             <td v-if="hasPermission('accounting_edit')">
               <div class="flex gap-1">
-                <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#e8f4fd] text-[#0062cc] hover:bg-[#d0e8fa] transition-colors">编辑</button>
-                <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-[#ffeaee] text-[#d70015] hover:bg-[#ffd5dc] transition-colors">停用</button>
+                <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">编辑</button>
+                <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">停用</button>
               </div>
             </td>
           </tr>
@@ -51,11 +51,11 @@
           <div class="modal-body space-y-3">
             <div>
               <label class="label">上级科目编码</label>
-              <input v-model="form.parent_code" class="input text-sm" placeholder="如 1002" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
+              <input v-model="form.parent_code" class="input text-sm" placeholder="如 1002" :disabled="isEditMode" :class="{ 'bg-elevated opacity-60 cursor-not-allowed': isEditMode }">
             </div>
             <div>
               <label class="label">科目编码</label>
-              <input v-model="form.code" class="input text-sm" placeholder="如 100201" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
+              <input v-model="form.code" class="input text-sm" placeholder="如 100201" :disabled="isEditMode" :class="{ 'bg-elevated opacity-60 cursor-not-allowed': isEditMode }">
             </div>
             <div>
               <label class="label">科目名称</label>
@@ -64,7 +64,7 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="label">类别</label>
-                <select v-model="form.category" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
+                <select v-model="form.category" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-elevated opacity-60 cursor-not-allowed': isEditMode }">
                   <option value="asset">资产</option>
                   <option value="liability">负债</option>
                   <option value="equity">权益</option>
@@ -74,7 +74,7 @@
               </div>
               <div>
                 <label class="label">余额方向</label>
-                <select v-model="form.direction" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-[#f5f5f7] opacity-60 cursor-not-allowed': isEditMode }">
+                <select v-model="form.direction" class="input text-sm" :disabled="isEditMode" :class="{ 'bg-elevated opacity-60 cursor-not-allowed': isEditMode }">
                   <option value="debit">借</option>
                   <option value="credit">贷</option>
                 </select>

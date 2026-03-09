@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-[15px] font-semibold text-[#1d1d1f]">会计期间</h3>
+      <h3 class="text-[15px] font-semibold text-foreground">会计期间</h3>
       <div class="flex items-center gap-2">
         <select v-model="selectedYear" class="input input-sm w-28">
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}年</option>
@@ -34,7 +34,7 @@
             <td>{{ p.closed_at ? new Date(p.closed_at).toLocaleString() : '-' }}</td>
           </tr>
           <tr v-if="periods.length === 0">
-            <td colspan="5" class="text-center text-[#86868b] py-8">
+            <td colspan="5" class="text-center text-muted py-8">
               该年度暂无会计期间，请点击"初始化年度期间"创建
             </td>
           </tr>

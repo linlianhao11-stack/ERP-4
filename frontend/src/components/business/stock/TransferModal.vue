@@ -9,38 +9,38 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">调拨 - {{ product?.sku }}</h3>
-          <button @click="close" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="close" class="text-muted text-xl">&times;</button>
         </div>
         <!-- 表单 -->
         <div class="p-4">
           <form @submit.prevent="handleSave" class="space-y-4">
             <!-- 商品信息 -->
-            <div class="p-4 bg-[#e8f4fd] border border-[#b3d7f5] rounded-lg">
-              <div class="text-xs text-[#0071e3] font-semibold mb-1">调拨商品</div>
-              <div class="font-medium text-[#1d1d1f]">{{ productLabel }}</div>
+            <div class="p-4 bg-info-subtle border border-primary rounded-lg">
+              <div class="text-xs text-primary font-semibold mb-1">调拨商品</div>
+              <div class="font-medium text-foreground">{{ productLabel }}</div>
             </div>
             <div class="grid form-grid grid-cols-2 gap-4">
               <!-- 调出信息（只读） -->
-              <div class="p-4 bg-[#ffeaee] border-2 border-[#ffb3b3] rounded-lg">
-                <div class="text-sm text-[#ff3b30] font-bold mb-3 flex items-center">
+              <div class="p-4 bg-error-subtle border-2 border-error rounded-lg">
+                <div class="text-sm text-error font-bold mb-3 flex items-center">
                   <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/></svg>
                   调出
                 </div>
                 <div class="space-y-2 text-sm">
-                  <div><span class="text-[#86868b]">仓库：</span><span class="font-medium text-[#1d1d1f]">{{ fromWarehouseName }}</span></div>
-                  <div><span class="text-[#86868b]">仓位：</span><span class="font-medium text-[#1d1d1f]">{{ fromLocationCode }}</span></div>
-                  <div class="pt-2 border-t border-[#ffb3b3]"><span class="text-[#86868b]">可用库存：</span><span class="text-lg font-bold text-[#ff3b30]">{{ sourceQty }}</span></div>
+                  <div><span class="text-muted">仓库：</span><span class="font-medium text-foreground">{{ fromWarehouseName }}</span></div>
+                  <div><span class="text-muted">仓位：</span><span class="font-medium text-foreground">{{ fromLocationCode }}</span></div>
+                  <div class="pt-2 border-t border-error"><span class="text-muted">可用库存：</span><span class="text-lg font-bold text-error">{{ sourceQty }}</span></div>
                 </div>
               </div>
               <!-- 调入信息（可编辑） -->
-              <div class="p-4 bg-[#e8f8ee] border-2 border-[#a8e6c1] rounded-lg">
-                <div class="text-sm text-[#34c759] font-bold mb-3 flex items-center">
+              <div class="p-4 bg-success-subtle border-2 border-success rounded-lg">
+                <div class="text-sm text-success font-bold mb-3 flex items-center">
                   <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/></svg>
                   调入
                 </div>
                 <div class="space-y-2">
                   <div>
-                    <label class="block text-xs text-[#6e6e73] mb-1">目标仓库 *</label>
+                    <label class="block text-xs text-secondary mb-1">目标仓库 *</label>
                     <select v-model="form.to_warehouse_id" class="input" required>
                       <option value="">请选择</option>
                       <option
@@ -51,7 +51,7 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs text-[#6e6e73] mb-1">目标仓位 *</label>
+                    <label class="block text-xs text-secondary mb-1">目标仓位 *</label>
                     <select v-model="form.to_location_id" class="input" required :disabled="!form.to_warehouse_id">
                       <option value="">{{ form.to_warehouse_id ? '请选择' : '请先选择仓库' }}</option>
                       <option v-for="loc in transferToLocations" :key="loc.id" :value="loc.id">{{ loc.code }}</option>

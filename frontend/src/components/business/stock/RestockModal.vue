@@ -9,7 +9,7 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">入库</h3>
-          <button @click="close" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="close" class="text-muted text-xl">&times;</button>
         </div>
         <!-- 表单 -->
         <div class="p-4">
@@ -61,12 +61,12 @@
               <input v-model="form.remark" class="input">
             </div>
             <!-- SN码区域 -->
-            <div v-if="form.sn_required" class="bg-[#fff8e1] border border-[#ffe082] rounded-lg p-3">
+            <div v-if="form.sn_required" class="bg-warning-subtle border border-warning rounded-lg p-3">
               <label class="label">
                 SN码 *
                 <span
                   class="font-normal text-xs"
-                  :class="parsedSnCount === parseInt(form.quantity || 0) ? 'text-[#34c759]' : 'text-[#ff3b30]'"
+                  :class="parsedSnCount === parseInt(form.quantity || 0) ? 'text-success' : 'text-error'"
                 >
                   (已输入 {{ parsedSnCount }} / 需要 {{ form.quantity || 0 }})
                 </span>

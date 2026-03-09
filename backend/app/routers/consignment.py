@@ -287,8 +287,8 @@ async def consignment_return(
             raise HTTPException(status_code=404, detail="客户不存在")
 
         consignment_wh = await get_or_create_consignment_warehouse(customer_id)
-        from app.utils.generators import generate_order_no
-        order_no = generate_order_no("CSR")
+        from app.utils.generators import generate_sequential_no
+        order_no = await generate_sequential_no("CR", "orders", "order_no")
 
         async with transactions.in_transaction():
             order = await Order.create(

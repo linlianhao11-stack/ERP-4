@@ -14,19 +14,19 @@
         <div
           v-for="c in filteredCustomers"
           :key="c.id"
-          class="p-3 flex justify-between items-center cursor-pointer hover:bg-[#f5f5f7]"
+          class="p-3 flex justify-between items-center cursor-pointer hover:bg-elevated"
           @click="openCustomerTrans(c)"
         >
           <div>
             <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-[#86868b]">{{ c.phone }}</div>
+            <div class="text-xs text-muted">{{ c.phone }}</div>
           </div>
           <div class="text-right">
             <div :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
-            <div class="text-xs text-[#86868b]">点击查看交易明细 →</div>
+            <div class="text-xs text-muted">点击查看交易明细 →</div>
           </div>
         </div>
-        <div v-if="!filteredCustomers.length" class="p-6 text-center text-[#86868b] text-sm">暂无客户</div>
+        <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
       </div>
     </div>
 
@@ -37,16 +37,16 @@
         <div
           v-for="c in filteredCustomers"
           :key="c.id"
-          class="p-3 flex justify-between items-center cursor-pointer hover:bg-[#f5f5f7]"
+          class="p-3 flex justify-between items-center cursor-pointer hover:bg-elevated"
           @click="editCustomer(c)"
         >
           <div>
             <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-[#86868b]">{{ c.contact_person }} · {{ c.phone }}</div>
+            <div class="text-xs text-muted">{{ c.contact_person }} · {{ c.phone }}</div>
           </div>
           <div :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
         </div>
-        <div v-if="!filteredCustomers.length" class="p-6 text-center text-[#86868b] text-sm">暂无客户</div>
+        <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
       </div>
     </div>
 
@@ -55,7 +55,7 @@
       <div class="modal">
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">{{ modal.title }}</h3>
-          <button @click="closeModal" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="closeModal" class="text-muted text-xl">&times;</button>
         </div>
         <div class="p-4">
           <form @submit.prevent="saveCustomerHandler" class="space-y-3">
@@ -91,14 +91,14 @@
       <div class="modal">
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">{{ modal.title }}</h3>
-          <button @click="closeModal" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="closeModal" class="text-muted text-xl">&times;</button>
         </div>
         <div class="p-4">
           <!-- Customer summary and filters -->
-          <div class="mb-4 p-3 bg-[#f5f5f7] rounded-lg flex flex-wrap gap-2 justify-between items-center">
+          <div class="mb-4 p-3 bg-elevated rounded-lg flex flex-wrap gap-2 justify-between items-center">
             <div>
               <div class="font-semibold text-lg">{{ customerTrans.customer?.name }}</div>
-              <div class="text-sm text-[#86868b]">
+              <div class="text-sm text-muted">
                 <span :class="getBalanceClass(customerTrans.customer?.balance)" class="font-semibold">
                   {{ getBalanceLabel(customerTrans.customer?.balance) }}: ¥{{ formatBalance(customerTrans.customer?.balance) }}
                 </span>
@@ -123,47 +123,47 @@
           <!-- Stats cards (finance permission) -->
           <div v-if="customerTrans.stats && hasPermission('finance')" class="grid grid-cols-3 md:grid-cols-5 gap-2 mb-4 text-center text-xs">
             <div
-              class="p-2 bg-[#e8f8ee] rounded cursor-pointer hover:ring-2 ring-[#34c759]"
-              :class="transType === 'CASH' ? 'ring-2 ring-[#34c759]' : ''"
+              class="p-2 bg-success-subtle rounded cursor-pointer hover:ring-2 ring-success"
+              :class="transType === 'CASH' ? 'ring-2 ring-success' : ''"
               @click="transType = transType === 'CASH' ? '' : 'CASH'"
             >
-              <div class="font-semibold text-[#34c759]">现款</div>
+              <div class="font-semibold text-success">现款</div>
               <div>{{ customerTrans.stats.CASH?.count || 0 }}笔</div>
               <div>¥{{ fmt(customerTrans.stats.CASH?.amount) }}</div>
             </div>
             <div
-              class="p-2 bg-[#fff8e1] rounded cursor-pointer hover:ring-2 ring-[#ff9f0a]"
-              :class="transType === 'CREDIT' ? 'ring-2 ring-[#ff9f0a]' : ''"
+              class="p-2 bg-warning-subtle rounded cursor-pointer hover:ring-2 ring-warning"
+              :class="transType === 'CREDIT' ? 'ring-2 ring-warning' : ''"
               @click="transType = transType === 'CREDIT' ? '' : 'CREDIT'"
             >
-              <div class="font-semibold text-[#ff9f0a]">账期</div>
+              <div class="font-semibold text-warning">账期</div>
               <div>{{ customerTrans.stats.CREDIT?.count || 0 }}笔</div>
               <div>¥{{ fmt(customerTrans.stats.CREDIT?.amount) }}</div>
             </div>
             <div
-              class="p-2 bg-[#f3eef8] rounded cursor-pointer hover:ring-2 ring-[#af52de]"
-              :class="transType === 'CONSIGN_OUT' ? 'ring-2 ring-[#af52de]' : ''"
+              class="p-2 bg-purple-subtle rounded cursor-pointer hover:ring-2 ring-purple-emphasis"
+              :class="transType === 'CONSIGN_OUT' ? 'ring-2 ring-purple-emphasis' : ''"
               @click="transType = transType === 'CONSIGN_OUT' ? '' : 'CONSIGN_OUT'"
             >
-              <div class="font-semibold text-[#af52de]">寄售调拨</div>
+              <div class="font-semibold text-purple-emphasis">寄售调拨</div>
               <div>{{ customerTrans.stats.CONSIGN_OUT?.count || 0 }}笔</div>
               <div>¥{{ fmt(customerTrans.stats.CONSIGN_OUT?.amount) }}</div>
             </div>
             <div
-              class="p-2 bg-[#e8f4fd] rounded cursor-pointer hover:ring-2 ring-[#0071e3]"
-              :class="transType === 'CONSIGN_SETTLE' ? 'ring-2 ring-[#0071e3]' : ''"
+              class="p-2 bg-info-subtle rounded cursor-pointer hover:ring-2 ring-primary"
+              :class="transType === 'CONSIGN_SETTLE' ? 'ring-2 ring-primary' : ''"
               @click="transType = transType === 'CONSIGN_SETTLE' ? '' : 'CONSIGN_SETTLE'"
             >
-              <div class="font-semibold text-[#0071e3]">寄售结算</div>
+              <div class="font-semibold text-primary">寄售结算</div>
               <div>{{ customerTrans.stats.CONSIGN_SETTLE?.count || 0 }}笔</div>
               <div>¥{{ fmt(customerTrans.stats.CONSIGN_SETTLE?.amount) }}</div>
             </div>
             <div
-              class="p-2 bg-[#ffeaee] rounded cursor-pointer hover:ring-2 ring-[#ff3b30]"
-              :class="transType === 'RETURN' ? 'ring-2 ring-[#ff3b30]' : ''"
+              class="p-2 bg-error-subtle rounded cursor-pointer hover:ring-2 ring-error"
+              :class="transType === 'RETURN' ? 'ring-2 ring-error' : ''"
               @click="transType = transType === 'RETURN' ? '' : 'RETURN'"
             >
-              <div class="font-semibold text-[#ff3b30]">退货</div>
+              <div class="font-semibold text-error">退货</div>
               <div>{{ customerTrans.stats.RETURN?.count || 0 }}笔</div>
               <div>¥{{ fmt(customerTrans.stats.RETURN?.amount) }}</div>
             </div>
@@ -171,11 +171,11 @@
 
           <!-- Transaction list -->
           <div class="font-semibold mb-2 text-sm">
-            交易记录 <span v-if="transType" class="text-[#0071e3]">({{ orderTypeNames[transType] || transType }})</span>
+            交易记录 <span v-if="transType" class="text-primary">({{ orderTypeNames[transType] || transType }})</span>
           </div>
           <div class="max-h-64 overflow-y-auto">
             <table class="w-full text-sm">
-              <thead class="bg-[#f5f5f7] sticky top-0">
+              <thead class="bg-elevated sticky top-0">
                 <tr>
                   <th class="px-2 py-1 text-left">订单号</th>
                   <th class="px-2 py-1 text-left">类型</th>
@@ -191,7 +191,7 @@
                   class="clickable-row"
                   @click="viewOrderFromTrans(t.id)"
                 >
-                  <td class="px-2 py-1 font-mono text-xs text-[#0071e3]">{{ t.order_no }}</td>
+                  <td class="px-2 py-1 font-mono text-xs text-primary">{{ t.order_no }}</td>
                   <td class="px-2 py-1">
                     <span :class="orderTypeBadges[t.order_type] || 'badge badge-gray'">{{ orderTypeNames[t.order_type] || t.order_type }}</span>
                   </td>
@@ -199,11 +199,11 @@
                   <td class="px-2 py-1 text-center">
                     <span :class="t.is_cleared ? 'badge badge-green' : 'badge badge-red'">{{ t.is_cleared ? '已结' : '未结' }}</span>
                   </td>
-                  <td class="px-2 py-1 text-[#86868b] text-xs">{{ fmtDate(t.created_at) }}</td>
+                  <td class="px-2 py-1 text-muted text-xs">{{ fmtDate(t.created_at) }}</td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!filteredTransactions?.length" class="p-6 text-center text-[#86868b] text-sm">暂无交易记录</div>
+            <div v-if="!filteredTransactions?.length" class="p-6 text-center text-muted text-sm">暂无交易记录</div>
           </div>
           <div class="flex gap-3 pt-4">
             <button type="button" @click="closeModal" class="btn btn-secondary flex-1">关闭</button>
@@ -217,18 +217,18 @@
       <div class="modal">
         <div class="p-4 border-b flex justify-between items-center">
           <div class="flex items-center gap-2">
-            <button v-if="previousModal" @click="goBackToPrevious" class="text-[#86868b] hover:text-[#0071e3] text-xl" title="返回上一页">←</button>
+            <button v-if="previousModal" @click="goBackToPrevious" class="text-muted hover:text-primary text-xl" title="返回上一页">←</button>
             <h3 class="font-semibold">{{ modal.title }}</h3>
           </div>
-          <button @click="closeModal" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="closeModal" class="text-muted text-xl">&times;</button>
         </div>
         <div class="p-4">
           <!-- Order header -->
-          <div class="mb-4 p-3 bg-[#f5f5f7] rounded-lg">
+          <div class="mb-4 p-3 bg-elevated rounded-lg">
             <div class="flex justify-between items-start mb-2">
               <div>
                 <div class="font-semibold">{{ orderDetail.order_no }}</div>
-                <div class="text-sm text-[#86868b]">
+                <div class="text-sm text-muted">
                   <span v-if="orderDetail.salesperson_name">销售员: {{ orderDetail.salesperson_name }} · </span>
                   {{ orderDetail.creator_name }} · {{ fmtDate(orderDetail.created_at) }}
                 </div>
@@ -236,41 +236,41 @@
               <span :class="orderTypeBadges[orderDetail.order_type] || 'badge badge-gray'">{{ orderTypeNames[orderDetail.order_type] || orderDetail.order_type }}</span>
             </div>
             <div class="grid detail-grid grid-cols-2 gap-2 text-sm">
-              <div><span class="text-[#86868b]">客户:</span> {{ orderDetail.customer?.name || '-' }}</div>
-              <div><span class="text-[#86868b]">仓库:</span> {{ orderDetail.warehouse?.name || '-' }}</div>
+              <div><span class="text-muted">客户:</span> {{ orderDetail.customer?.name || '-' }}</div>
+              <div><span class="text-muted">仓库:</span> {{ orderDetail.warehouse?.name || '-' }}</div>
               <div v-if="orderDetail.related_order" class="col-span-2">
-                <span class="text-[#86868b]">关联销售订单:</span>
-                <span @click="viewOrder(orderDetail.related_order.id)" class="text-[#0071e3] hover:underline cursor-pointer font-mono">{{ orderDetail.related_order.order_no }}</span>
+                <span class="text-muted">关联销售订单:</span>
+                <span @click="viewOrder(orderDetail.related_order.id)" class="text-primary hover:underline cursor-pointer font-mono">{{ orderDetail.related_order.order_no }}</span>
               </div>
-              <div><span class="text-[#86868b]">金额:</span> <span class="font-semibold">¥{{ fmt(orderDetail.total_amount) }}</span></div>
+              <div><span class="text-muted">金额:</span> <span class="font-semibold">¥{{ fmt(orderDetail.total_amount) }}</span></div>
               <div v-if="hasPermission('finance')">
-                <span class="text-[#86868b]">毛利:</span>
-                <span :class="orderDetail.total_profit >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'">¥{{ fmt(orderDetail.total_profit) }}</span>
+                <span class="text-muted">毛利:</span>
+                <span :class="orderDetail.total_profit >= 0 ? 'text-success' : 'text-error'">¥{{ fmt(orderDetail.total_profit) }}</span>
               </div>
               <div v-if="orderDetail.rebate_used > 0" class="col-span-2">
-                <span class="text-[#86868b]">已使用返利:</span>
-                <span class="text-[#34c759] font-semibold">¥{{ fmt(orderDetail.rebate_used) }}</span>
+                <span class="text-muted">已使用返利:</span>
+                <span class="text-success font-semibold">¥{{ fmt(orderDetail.rebate_used) }}</span>
               </div>
               <div v-if="orderDetail.credit_used > 0" class="col-span-2">
-                <span class="text-[#86868b]">已使用在账资金:</span>
-                <span class="text-[#0071e3] font-semibold">¥{{ fmt(orderDetail.credit_used) }}</span>
+                <span class="text-muted">已使用在账资金:</span>
+                <span class="text-primary font-semibold">¥{{ fmt(orderDetail.credit_used) }}</span>
               </div>
               <div v-if="orderDetail.payment_records && orderDetail.payment_records.length" class="col-span-2">
                 <div v-for="pr in orderDetail.payment_records" :key="pr.id" class="flex items-center gap-2 text-sm mb-1">
-                  <span class="text-[#86868b]">{{ pr.source === 'CASH' ? '销售收款' : '账期回款' }}:</span>
-                  <span class="font-semibold text-[#34c759]">¥{{ fmt(pr.amount) }}</span>
+                  <span class="text-muted">{{ pr.source === 'CASH' ? '销售收款' : '账期回款' }}:</span>
+                  <span class="font-semibold text-success">¥{{ fmt(pr.amount) }}</span>
                   <span class="badge badge-blue" style="font-size:11px">{{ getPaymentMethodName(pr.payment_method) }}</span>
-                  <span :class="pr.is_confirmed ? 'text-[#34c759]' : 'text-[#ff9f0a]'" style="font-size:11px">{{ pr.is_confirmed ? '已确认' : '待确认' }}</span>
+                  <span :class="pr.is_confirmed ? 'text-success' : 'text-warning'" style="font-size:11px">{{ pr.is_confirmed ? '已确认' : '待确认' }}</span>
                 </div>
               </div>
-              <div v-else-if="!orderDetail.credit_used"><span class="text-[#86868b]">已付:</span> ¥{{ fmt(orderDetail.paid_amount) }}</div>
-              <div><span class="text-[#86868b]">状态:</span> <span :class="orderDetail.is_cleared ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ orderDetail.is_cleared ? '已结清' : '未结清' }}</span></div>
+              <div v-else-if="!orderDetail.credit_used"><span class="text-muted">已付:</span> ¥{{ fmt(orderDetail.paid_amount) }}</div>
+              <div><span class="text-muted">状态:</span> <span :class="orderDetail.is_cleared ? 'text-success' : 'text-error'">{{ orderDetail.is_cleared ? '已结清' : '未结清' }}</span></div>
               <div v-if="orderDetail.order_type === 'RETURN'" class="col-span-2">
-                <span class="text-[#86868b]">退款状态:</span>
-                <span :class="orderDetail.refunded ? 'text-[#ff9f0a]' : 'text-[#d70015]'">{{ orderDetail.refunded ? '已退款给客户' : '形成在账资金' }}</span>
+                <span class="text-muted">退款状态:</span>
+                <span :class="orderDetail.refunded ? 'text-warning' : 'text-error-emphasis'">{{ orderDetail.refunded ? '已退款给客户' : '形成在账资金' }}</span>
               </div>
               <div v-if="orderDetail.remark" class="col-span-2 pt-2 border-t">
-                <span class="text-[#86868b]">备注:</span> <span class="text-[#6e6e73]">{{ orderDetail.remark }}</span>
+                <span class="text-muted">备注:</span> <span class="text-secondary">{{ orderDetail.remark }}</span>
               </div>
             </div>
           </div>
@@ -278,25 +278,25 @@
           <!-- 物流信息与SN码 -->
           <div v-if="orderDetail.shipments?.length" class="mb-4">
             <div class="font-semibold text-sm mb-2">物流信息 ({{ orderDetail.shipments.length }})</div>
-            <div v-for="sh in orderDetail.shipments" :key="sh.id" class="p-3 bg-[#e8f4fd] rounded-lg mb-2">
+            <div v-for="sh in orderDetail.shipments" :key="sh.id" class="p-3 bg-info-subtle rounded-lg mb-2">
               <div class="flex justify-between items-center mb-1">
                 <div class="text-sm">{{ sh.carrier_name || '未填写' }} <span v-if="sh.tracking_no" class="font-mono text-xs">{{ sh.tracking_no }}</span></div>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-[#f5f5f7] text-[#6e6e73]">{{ sh.status_text }}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-elevated text-secondary">{{ sh.status_text }}</span>
               </div>
               <div v-if="sh.items?.length" class="mt-1.5 space-y-1">
                 <div v-for="(si, idx) in sh.items" :key="idx" class="text-xs">
-                  <span class="text-[#6e6e73]">{{ si.product_name }} × {{ si.quantity }}</span>
-                  <div v-if="si.sn_codes" class="mt-0.5 p-1.5 bg-[#e8f8ee] rounded">
-                    <span class="text-[#86868b] font-semibold">SN码:</span>
-                    <span v-for="sn in parseSN(si.sn_codes)" :key="sn" class="text-[#34c759] font-mono ml-1">{{ sn }}</span>
+                  <span class="text-secondary">{{ si.product_name }} × {{ si.quantity }}</span>
+                  <div v-if="si.sn_codes" class="mt-0.5 p-1.5 bg-success-subtle rounded">
+                    <span class="text-muted font-semibold">SN码:</span>
+                    <span v-for="sn in parseSN(si.sn_codes)" :key="sn" class="text-success font-mono ml-1">{{ sn }}</span>
                   </div>
                 </div>
               </div>
-              <div v-else-if="sh.sn_code" class="mt-1 p-1.5 bg-[#e8f8ee] rounded">
-                <span class="text-xs text-[#86868b] font-semibold">SN码:</span>
-                <span class="text-xs text-[#34c759] font-mono ml-1">{{ sh.sn_code }}</span>
+              <div v-else-if="sh.sn_code" class="mt-1 p-1.5 bg-success-subtle rounded">
+                <span class="text-xs text-muted font-semibold">SN码:</span>
+                <span class="text-xs text-success font-mono ml-1">{{ sh.sn_code }}</span>
               </div>
-              <div v-if="sh.last_info" class="text-xs text-[#86868b] mt-1">{{ sh.last_info }}</div>
+              <div v-if="sh.last_info" class="text-xs text-muted mt-1">{{ sh.last_info }}</div>
             </div>
           </div>
 
@@ -304,7 +304,7 @@
           <div class="font-semibold mb-2 text-sm">商品明细</div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
-              <thead class="bg-[#f5f5f7]">
+              <thead class="bg-elevated">
                 <tr>
                   <th class="px-2 py-1 text-left">商品</th>
                   <th class="px-2 py-1 text-right">单价</th>
@@ -318,13 +318,13 @@
                 <tr v-for="item in orderDetail.items" :key="item.product_id">
                   <td class="px-2 py-1">
                     <div>{{ item.product_name }}</div>
-                    <div class="text-xs text-[#86868b]">{{ item.product_sku }}</div>
+                    <div class="text-xs text-muted">{{ item.product_sku }}</div>
                   </td>
                   <td class="px-2 py-1 text-right">{{ fmt(item.unit_price) }}</td>
                   <td class="px-2 py-1 text-right">{{ item.quantity }}</td>
-                  <td v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right text-[#34c759]">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
+                  <td v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
                   <td class="px-2 py-1 text-right font-semibold">{{ fmt(item.amount) }}</td>
-                  <td v-if="hasPermission('finance')" class="px-2 py-1 text-right" :class="item.profit >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ fmt(item.profit) }}</td>
+                  <td v-if="hasPermission('finance')" class="px-2 py-1 text-right" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
                 </tr>
               </tbody>
             </table>

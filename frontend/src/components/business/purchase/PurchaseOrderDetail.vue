@@ -9,30 +9,30 @@
       <div class="space-y-4 p-4">
         <!-- 基本信息 -->
         <div class="grid grid-cols-2 gap-3 text-sm">
-          <div><span class="text-[#86868b]">采购单号:</span> <span class="font-mono font-semibold">{{ purchaseOrderDetail.po_no }}</span></div>
-          <div><span class="text-[#86868b]">状态:</span> <StatusBadge type="purchaseStatus" :status="purchaseOrderDetail.status" /></div>
-          <div><span class="text-[#86868b]">供应商:</span> {{ purchaseOrderDetail.supplier_name }}</div>
+          <div><span class="text-muted">采购单号:</span> <span class="font-mono font-semibold">{{ purchaseOrderDetail.po_no }}</span></div>
+          <div><span class="text-muted">状态:</span> <StatusBadge type="purchaseStatus" :status="purchaseOrderDetail.status" /></div>
+          <div><span class="text-muted">供应商:</span> {{ purchaseOrderDetail.supplier_name }}</div>
           <div v-if="purchaseOrderDetail.rebate_used > 0 || purchaseOrderDetail.credit_used > 0">
-            <span class="text-[#86868b]">原价合计:</span>
+            <span class="text-muted">原价合计:</span>
             <span class="font-semibold">¥{{ fmt(purchaseOrderDetail.total_amount + purchaseOrderDetail.rebate_used + (purchaseOrderDetail.credit_used || 0)) }}</span>
           </div>
-          <div v-if="purchaseOrderDetail.rebate_used > 0"><span class="text-[#86868b]">返利抵扣:</span> <span class="text-[#34c759] font-semibold">-¥{{ fmt(purchaseOrderDetail.rebate_used) }}</span></div>
-          <div v-if="purchaseOrderDetail.credit_used > 0"><span class="text-[#86868b]">在账资金抵扣:</span> <span class="text-[#0071e3] font-semibold">-¥{{ fmt(purchaseOrderDetail.credit_used) }}</span></div>
-          <div><span class="text-[#86868b]">{{ purchaseOrderDetail.rebate_used > 0 || purchaseOrderDetail.credit_used > 0 ? '实付金额' : '总金额' }}:</span> <span class="font-semibold text-[#0071e3]">¥{{ fmt(purchaseOrderDetail.total_amount) }}</span></div>
-          <div><span class="text-[#86868b]">创建人:</span> {{ purchaseOrderDetail.creator_name }}</div>
-          <div><span class="text-[#86868b]">创建时间:</span> {{ fmtDate(purchaseOrderDetail.created_at) }}</div>
-          <div v-if="purchaseOrderDetail.reviewed_by_name"><span class="text-[#86868b]">审核人:</span> {{ purchaseOrderDetail.reviewed_by_name }} {{ fmtDate(purchaseOrderDetail.reviewed_at) }}</div>
-          <div v-if="purchaseOrderDetail.paid_by_name"><span class="text-[#86868b]">付款确认:</span> {{ purchaseOrderDetail.paid_by_name }} {{ fmtDate(purchaseOrderDetail.paid_at) }}</div>
-          <div v-if="purchaseOrderDetail.remark"><span class="text-[#86868b]">备注:</span> {{ purchaseOrderDetail.remark }}</div>
+          <div v-if="purchaseOrderDetail.rebate_used > 0"><span class="text-muted">返利抵扣:</span> <span class="text-success font-semibold">-¥{{ fmt(purchaseOrderDetail.rebate_used) }}</span></div>
+          <div v-if="purchaseOrderDetail.credit_used > 0"><span class="text-muted">在账资金抵扣:</span> <span class="text-primary font-semibold">-¥{{ fmt(purchaseOrderDetail.credit_used) }}</span></div>
+          <div><span class="text-muted">{{ purchaseOrderDetail.rebate_used > 0 || purchaseOrderDetail.credit_used > 0 ? '实付金额' : '总金额' }}:</span> <span class="font-semibold text-primary">¥{{ fmt(purchaseOrderDetail.total_amount) }}</span></div>
+          <div><span class="text-muted">创建人:</span> {{ purchaseOrderDetail.creator_name }}</div>
+          <div><span class="text-muted">创建时间:</span> {{ fmtDate(purchaseOrderDetail.created_at) }}</div>
+          <div v-if="purchaseOrderDetail.reviewed_by_name"><span class="text-muted">审核人:</span> {{ purchaseOrderDetail.reviewed_by_name }} {{ fmtDate(purchaseOrderDetail.reviewed_at) }}</div>
+          <div v-if="purchaseOrderDetail.paid_by_name"><span class="text-muted">付款确认:</span> {{ purchaseOrderDetail.paid_by_name }} {{ fmtDate(purchaseOrderDetail.paid_at) }}</div>
+          <div v-if="purchaseOrderDetail.remark"><span class="text-muted">备注:</span> {{ purchaseOrderDetail.remark }}</div>
         </div>
         <!-- 退货信息 -->
-        <div v-if="purchaseOrderDetail.return_amount > 0" class="bg-[#fff3e0] border border-[#ffcc80] rounded-lg p-3">
-          <h4 class="font-semibold text-sm text-[#ff9f0a] mb-2">退货信息</h4>
+        <div v-if="purchaseOrderDetail.return_amount > 0" class="bg-orange-subtle border border-warning rounded-lg p-3">
+          <h4 class="font-semibold text-sm text-warning mb-2">退货信息</h4>
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div><span class="text-[#86868b]">退货金额:</span> <span class="font-semibold text-[#ff9f0a]">¥{{ fmt(purchaseOrderDetail.return_amount) }}</span></div>
-            <div><span class="text-[#86868b]">退款状态:</span> <span :class="purchaseOrderDetail.is_refunded ? 'text-[#34c759]' : 'text-[#d70015]'">{{ purchaseOrderDetail.is_refunded ? '已退款' : '转为在账资金' }}</span></div>
-            <div v-if="purchaseOrderDetail.return_tracking_no"><span class="text-[#86868b]">退货物流:</span> {{ purchaseOrderDetail.return_tracking_no }}</div>
-            <div v-if="purchaseOrderDetail.returned_by_name"><span class="text-[#86868b]">处理人:</span> {{ purchaseOrderDetail.returned_by_name }} {{ fmtDate(purchaseOrderDetail.returned_at) }}</div>
+            <div><span class="text-muted">退货金额:</span> <span class="font-semibold text-warning">¥{{ fmt(purchaseOrderDetail.return_amount) }}</span></div>
+            <div><span class="text-muted">退款状态:</span> <span :class="purchaseOrderDetail.is_refunded ? 'text-success' : 'text-error-emphasis'">{{ purchaseOrderDetail.is_refunded ? '已退款' : '转为在账资金' }}</span></div>
+            <div v-if="purchaseOrderDetail.return_tracking_no"><span class="text-muted">退货物流:</span> {{ purchaseOrderDetail.return_tracking_no }}</div>
+            <div v-if="purchaseOrderDetail.returned_by_name"><span class="text-muted">处理人:</span> {{ purchaseOrderDetail.returned_by_name }} {{ fmtDate(purchaseOrderDetail.returned_at) }}</div>
           </div>
         </div>
         <!-- 商品明细表格 -->
@@ -40,7 +40,7 @@
           <h4 class="font-semibold text-sm mb-2">商品明细</h4>
           <div class="table-container">
             <table class="w-full text-xs">
-              <thead class="bg-[#f5f5f7]">
+              <thead class="bg-elevated">
                 <tr>
                   <th class="px-2 py-1 text-left">商品</th>
                   <th class="px-2 py-1 text-right">含税单价</th>
@@ -55,18 +55,18 @@
                 <tr v-for="it in purchaseOrderDetail.items" :key="it.id">
                   <td class="px-2 py-1">
                     <div class="font-medium">{{ it.product_name }}</div>
-                    <div class="text-[#86868b] font-mono">{{ it.product_sku }}</div>
+                    <div class="text-muted font-mono">{{ it.product_sku }}</div>
                   </td>
                   <td class="px-2 py-1 text-right">¥{{ fmt(it.tax_inclusive_price) }}</td>
                   <td class="px-2 py-1 text-right">{{ it.quantity }}</td>
-                  <td v-if="purchaseOrderDetail.rebate_used > 0" class="px-2 py-1 text-right text-[#34c759]">{{ it.rebate_amount > 0 ? '-¥' + fmt(it.rebate_amount) : '' }}</td>
+                  <td v-if="purchaseOrderDetail.rebate_used > 0" class="px-2 py-1 text-right text-success">{{ it.rebate_amount > 0 ? '-¥' + fmt(it.rebate_amount) : '' }}</td>
                   <td class="px-2 py-1 text-right font-semibold">¥{{ fmt(it.amount) }}</td>
                   <td class="px-2 py-1 text-center">
-                    <span :class="it.received_quantity >= it.quantity ? 'text-[#34c759]' : 'text-[#ff9f0a]'">{{ it.received_quantity }}/{{ it.quantity }}</span>
+                    <span :class="it.received_quantity >= it.quantity ? 'text-success' : 'text-warning'">{{ it.received_quantity }}/{{ it.quantity }}</span>
                   </td>
                   <td v-if="purchaseOrderDetail.return_amount > 0 || purchaseOrderDetail.status === 'completed'" class="px-2 py-1 text-center">
-                    <span v-if="it.returned_quantity > 0" class="text-[#ff9f0a]">{{ it.returned_quantity }}</span>
-                    <span v-else class="text-[#d2d2d7]">-</span>
+                    <span v-if="it.returned_quantity > 0" class="text-warning">{{ it.returned_quantity }}</span>
+                    <span v-else class="text-muted">-</span>
                   </td>
                 </tr>
               </tbody>
@@ -93,58 +93,58 @@
         <button @click="showReceiveModal = false" class="modal-close">&times;</button>
       </div>
       <div class="space-y-4 p-4">
-        <div v-if="!receivablePOs.length" class="p-8 text-center text-[#86868b]">暂无可收货的采购订单</div>
+        <div v-if="!receivablePOs.length" class="p-8 text-center text-muted">暂无可收货的采购订单</div>
         <div v-for="po in receivablePOs" :key="po.id" class="border rounded-lg p-3">
           <!-- 可收货PO头部（点击展开/收起） -->
           <div class="flex justify-between items-center mb-2 cursor-pointer" @click="receiveForm.po_id === po.id ? receiveForm.po_id = null : initReceiveItems(po)">
             <div>
               <span class="font-mono font-semibold text-sm">{{ po.po_no }}</span>
-              <span class="text-[#86868b] text-xs ml-2">{{ po.supplier_name }}</span>
+              <span class="text-muted text-xs ml-2">{{ po.supplier_name }}</span>
             </div>
             <div class="flex items-center gap-2">
               <StatusBadge type="purchaseStatus" :status="po.status" />
               <span class="text-sm font-semibold">¥{{ fmt(po.total_amount) }}</span>
-              <span class="text-[#86868b]">{{ receiveForm.po_id === po.id ? '&#9650;' : '&#9660;' }}</span>
+              <span class="text-muted">{{ receiveForm.po_id === po.id ? '&#9650;' : '&#9660;' }}</span>
             </div>
           </div>
           <!-- 收货明细（选中PO后展开） -->
           <div v-if="receiveForm.po_id === po.id" class="space-y-2 border-t pt-2">
-            <div v-for="(item, idx) in receiveForm.items" :key="item.item_id" class="p-2 bg-[#f5f5f7] rounded">
+            <div v-for="(item, idx) in receiveForm.items" :key="item.item_id" class="p-2 bg-elevated rounded">
               <div class="flex items-center gap-2 mb-1">
                 <label class="flex items-center text-sm">
                   <input type="checkbox" v-model="item.checked" class="mr-1">
                   {{ item.product_name }}
                 </label>
-                <span class="text-xs text-[#86868b] ml-auto">
+                <span class="text-xs text-muted ml-auto">
                   待收:{{ item.pending_qty }}
                   <template v-if="item.checked && item.splits.length > 1">
-                    | 已分配:<span :class="getSplitTotal(item) > item.pending_qty ? 'text-[#ff3b30] font-semibold' : 'text-[#34c759]'">{{ getSplitTotal(item) }}</span>
+                    | 已分配:<span :class="getSplitTotal(item) > item.pending_qty ? 'text-error font-semibold' : 'text-success'">{{ getSplitTotal(item) }}</span>
                   </template>
                 </span>
               </div>
               <!-- 收货分组（支持拆分到多个仓库） -->
               <div v-if="item.checked" class="space-y-2 mt-1">
                 <div v-for="(sp, si) in item.splits" :key="sp.id"
-                  :class="['space-y-2', item.splits.length > 1 ? 'border border-[#b3d7f5] rounded p-2 bg-white' : '']">
+                  :class="['space-y-2', item.splits.length > 1 ? 'border border-primary rounded p-2 bg-surface' : '']">
                   <div class="flex items-center justify-between" v-if="item.splits.length > 1">
-                    <span class="text-xs font-semibold text-[#0071e3]">分组 {{ si + 1 }}</span>
-                    <button @click="removeSplit(item, si)" class="text-xs text-[#ff6961] hover:text-[#ff3b30]">删除</button>
+                    <span class="text-xs font-semibold text-primary">分组 {{ si + 1 }}</span>
+                    <button @click="removeSplit(item, si)" class="text-xs text-error hover:text-error">删除</button>
                   </div>
                   <div class="grid grid-cols-3 gap-2">
                     <div>
-                      <label class="text-xs text-[#86868b]">本次收货</label>
+                      <label class="text-xs text-muted">本次收货</label>
                       <input v-model.number="sp.receive_quantity" type="number" :max="item.pending_qty" min="1"
-                        :class="['input text-sm', getSplitTotal(item) > item.pending_qty ? 'border-[#ff6961]' : '']">
+                        :class="['input text-sm', getSplitTotal(item) > item.pending_qty ? 'border-error' : '']">
                     </div>
                     <div>
-                      <label class="text-xs text-[#86868b]">仓库</label>
+                      <label class="text-xs text-muted">仓库</label>
                       <select v-model="sp.warehouse_id" @change="handleSplitWarehouseChange(item, sp)" class="input text-sm">
                         <option value="">选择</option>
                         <option v-for="w in warehouses.filter(x => !x.is_virtual)" :key="w.id" :value="w.id">{{ w.name }}</option>
                       </select>
                     </div>
                     <div>
-                      <label class="text-xs text-[#86868b]">仓位</label>
+                      <label class="text-xs text-muted">仓位</label>
                       <select v-model="sp.location_id" class="input text-sm" :disabled="!sp.warehouse_id">
                         <option value="">{{ sp.warehouse_id ? '选择' : '先选仓库' }}</option>
                         <option v-for="loc in getReceiveLocations(sp.warehouse_id)" :key="loc.id" :value="loc.id">{{ loc.code }}</option>
@@ -152,10 +152,10 @@
                     </div>
                   </div>
                   <!-- SN码输入（需要时显示） -->
-                  <div v-if="sp.sn_required" class="bg-[#fff8e1] border border-[#ffe082] rounded p-2">
+                  <div v-if="sp.sn_required" class="bg-warning-subtle border border-warning rounded p-2">
                     <label class="text-xs font-semibold">
                       SN码 *
-                      <span :class="parseSnCodes(sp.sn_input).length === Number(sp.receive_quantity || 0) ? 'text-[#34c759]' : 'text-[#ff3b30]'">
+                      <span :class="parseSnCodes(sp.sn_input).length === Number(sp.receive_quantity || 0) ? 'text-success' : 'text-error'">
                         ({{ parseSnCodes(sp.sn_input).length }} / {{ sp.receive_quantity || 0 }})
                       </span>
                     </label>
@@ -164,8 +164,8 @@
                 </div>
                 <!-- 拆分操作 -->
                 <div class="flex items-center justify-between">
-                  <button @click="addSplit(item)" class="text-xs text-[#0071e3] hover:text-[#0077ED]">+ 拆分到其他仓库</button>
-                  <span v-if="item.splits.length > 1" class="text-xs" :class="getSplitRemaining(item) < 0 ? 'text-[#ff3b30]' : 'text-[#86868b]'">
+                  <button @click="addSplit(item)" class="text-xs text-primary hover:text-primary-hover">+ 拆分到其他仓库</button>
+                  <span v-if="item.splits.length > 1" class="text-xs" :class="getSplitRemaining(item) < 0 ? 'text-error' : 'text-muted'">
                     剩余未分配: {{ getSplitRemaining(item) }}
                   </span>
                 </div>
@@ -191,17 +191,17 @@
       </div>
       <div class="space-y-4 p-4">
         <!-- 退货商品选择 -->
-        <div v-for="item in returnForm.items" :key="item.item_id" class="p-3 bg-[#f5f5f7] rounded-lg">
+        <div v-for="item in returnForm.items" :key="item.item_id" class="p-3 bg-elevated rounded-lg">
           <label class="flex items-center gap-2 mb-2">
             <input type="checkbox" v-model="item.checked" class="w-4 h-4">
             <span class="font-medium text-sm">{{ item.product_name }}</span>
-            <span class="text-xs text-[#86868b] ml-auto">可退: {{ item.returnable_qty }}</span>
+            <span class="text-xs text-muted ml-auto">可退: {{ item.returnable_qty }}</span>
           </label>
           <div v-if="item.checked" class="flex items-center gap-3">
-            <label class="text-xs text-[#86868b]">退货数量:</label>
+            <label class="text-xs text-muted">退货数量:</label>
             <input v-model.number="item.return_quantity" type="number" min="1" :max="item.returnable_qty" class="input text-sm w-24">
-            <span class="text-xs text-[#86868b]">单价: ¥{{ fmt(item.unit_amount) }}</span>
-            <span class="text-sm font-semibold text-[#ff9f0a] ml-auto">¥{{ (item.return_quantity * item.unit_amount).toFixed(2) }}</span>
+            <span class="text-xs text-muted">单价: ¥{{ fmt(item.unit_amount) }}</span>
+            <span class="text-sm font-semibold text-warning ml-auto">¥{{ (item.return_quantity * item.unit_amount).toFixed(2) }}</span>
           </div>
         </div>
         <!-- 退货选项 -->
@@ -210,7 +210,7 @@
             <input type="checkbox" v-model="returnForm.is_refunded" class="w-4 h-4">
             <span class="text-sm">供应商已退款</span>
           </label>
-          <div v-if="!returnForm.is_refunded" class="text-xs text-[#0071e3] bg-[#e8f4fd] rounded p-2">
+          <div v-if="!returnForm.is_refunded" class="text-xs text-primary bg-info-subtle rounded p-2">
             未退款的金额将转为供应商"在账资金"，可在后续采购单中抵扣
           </div>
           <div>
@@ -219,7 +219,7 @@
           </div>
           <div class="flex justify-between items-center text-sm">
             <span>退货总金额:</span>
-            <span class="text-xl font-bold text-[#ff9f0a]">¥{{ returnTotalAmount.toFixed(2) }}</span>
+            <span class="text-xl font-bold text-warning">¥{{ returnTotalAmount.toFixed(2) }}</span>
           </div>
         </div>
         <!-- 退货操作按钮 -->

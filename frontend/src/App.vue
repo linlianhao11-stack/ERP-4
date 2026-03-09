@@ -1,6 +1,6 @@
 <template>
   <div v-if="!ready" class="flex items-center justify-center min-h-screen">
-    <div class="text-[#86868b] text-[15px]">加载中...</div>
+    <div class="text-muted text-[15px]">加载中...</div>
   </div>
   <template v-else>
     <div v-if="authStore.user" class="app-layout">
@@ -19,21 +19,21 @@
 
       <!-- More menu overlay (mobile) -->
       <Transition name="fade">
-        <div v-if="showMoreMenu" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" @click="showMoreMenu = false">
-          <div class="fixed bottom-16 left-0 right-0 bg-white/95 backdrop-blur-xl rounded-t-[20px] p-5 pb-6 z-50 shadow-2xl border-t border-[#e8e8ed]" @click.stop>
-            <div class="w-9 h-1 bg-[#d2d2d7] rounded-full mx-auto mb-4"></div>
+        <div v-if="showMoreMenu" class="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" @click="showMoreMenu = false">
+          <div class="fixed bottom-16 left-0 right-0 bg-surface/95 backdrop-blur-xl rounded-t-[20px] p-5 pb-6 z-50 shadow-2xl border-t border-line" @click.stop>
+            <div class="w-9 h-1 bg-line-strong rounded-full mx-auto mb-4"></div>
             <div class="grid grid-cols-4 gap-2">
               <router-link
                 v-for="item in moreMenuItems"
                 :key="item.key"
                 :to="'/' + item.key"
-                class="flex flex-col items-center gap-1.5 p-3 rounded-2xl hover:bg-[#f5f5f7] transition-colors duration-200 cursor-pointer"
+                class="flex flex-col items-center gap-1.5 p-3 rounded-2xl hover:bg-elevated transition-colors duration-200 cursor-pointer"
                 @click="showMoreMenu = false"
               >
-                <div class="w-10 h-10 rounded-xl bg-[#f5f5f7] flex items-center justify-center text-[#1d1d1f]">
+                <div class="w-10 h-10 rounded-xl bg-elevated flex items-center justify-center text-foreground">
                   <component :is="iconMap[item.key]" :size="20" :stroke-width="1.5" />
                 </div>
-                <span class="text-[11px] font-medium text-[#1d1d1f]">{{ item.name }}</span>
+                <span class="text-[11px] font-medium text-foreground">{{ item.name }}</span>
               </router-link>
             </div>
           </div>
@@ -56,11 +56,11 @@
     <div v-if="appStore.confirmDialog.show" class="modal-backdrop" @click.self="appStore.confirmDialogNo" style="z-index:9998">
       <div class="modal" style="max-width: 380px">
         <div class="p-7 text-center">
-          <div class="w-12 h-12 bg-[#fff3cd] rounded-full mx-auto mb-5 flex items-center justify-center">
-            <AlertTriangle :size="22" :stroke-width="1.5" class="text-[#ff9f0a]" />
+          <div class="w-12 h-12 bg-warning-subtle rounded-full mx-auto mb-5 flex items-center justify-center">
+            <AlertTriangle :size="22" :stroke-width="1.5" class="text-warning" />
           </div>
-          <div class="text-[16px] font-semibold text-[#1d1d1f] mb-1.5 leading-snug">{{ appStore.confirmDialog.message }}</div>
-          <div v-if="appStore.confirmDialog.detail" class="text-[13px] text-[#86868b] mb-1 leading-relaxed">{{ appStore.confirmDialog.detail }}</div>
+          <div class="text-[16px] font-semibold text-foreground mb-1.5 leading-snug">{{ appStore.confirmDialog.message }}</div>
+          <div v-if="appStore.confirmDialog.detail" class="text-[13px] text-muted mb-1 leading-relaxed">{{ appStore.confirmDialog.detail }}</div>
           <div class="flex gap-3 mt-6">
             <button @click="appStore.confirmDialogNo" class="btn btn-secondary flex-1">取消</button>
             <button @click="appStore.confirmDialogYes" class="btn btn-warning flex-1">确认</button>
@@ -114,6 +114,7 @@ const loadEssentials = () => {
   settingsStore.loadSalespersons()
   settingsStore.loadPaymentMethods()
   settingsStore.loadCompanyName()
+  appStore.loadTodoCounts()
 }
 
 // 按路由按需加载数据
@@ -156,6 +157,7 @@ useIdleTimeout(async () => {
 })
 
 onMounted(async () => {
+  appStore.initTheme()
   const ok = await authStore.checkAuth()
   if (ok) {
     loadEssentials()

@@ -1,7 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
+import { getTodoCounts } from '../api/dashboard'
 
 export const useAppStore = defineStore('app', () => {
+  // Theme — light/dark, persisted to localStorage
+  const theme = ref(localStorage.getItem('erp-theme') || 'light')
+
+  const setTheme = (newTheme) => {
+    theme.value = newTheme
+    localStorage.setItem('erp-theme', newTheme)
+    document.documentElement.dataset.theme = newTheme
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme.value === 'light' ? 'dark' : 'light')
+  }
+
+  const initTheme = () => {
+    document.documentElement.dataset.theme = theme.value
+  }
+
   const toast = reactive({ show: false, msg: '', type: 'success' })
   const modal = reactive({ show: false, type: '', title: '' })
   const confirmDialog = reactive({ show: false, message: '', detail: '', resolve: null })
@@ -88,9 +106,23 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // Todo counts — sidebar badges
+  const todoCounts = ref({})
+
+  const loadTodoCounts = async () => {
+    try {
+      const { data } = await getTodoCounts()
+      todoCounts.value = data
+    } catch (e) {
+      // silent fail
+    }
+  }
+
   return {
+    theme, setTheme, toggleTheme, initTheme,
     toast, modal, confirmDialog, submitting, previousModal,
     showToast, openModal, closeModal,
-    customConfirm, confirmDialogYes, confirmDialogNo
+    customConfirm, confirmDialogYes, confirmDialogNo,
+    todoCounts, loadTodoCounts
   }
 })

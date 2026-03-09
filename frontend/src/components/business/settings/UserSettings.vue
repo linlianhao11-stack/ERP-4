@@ -9,11 +9,11 @@
     <div v-if="hasPermission('admin')" class="card p-4">
       <h3 class="font-semibold mb-3 text-sm">用户管理</h3>
       <div class="space-y-2 mb-3">
-        <div v-for="u in users" :key="u.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
-          <span>{{ u.display_name }} <span class="text-[#86868b] text-xs">@{{ u.username }}</span></span>
+        <div v-for="u in users" :key="u.id" class="flex justify-between items-center p-2 bg-elevated rounded text-sm">
+          <span>{{ u.display_name }} <span class="text-muted text-xs">@{{ u.username }}</span></span>
           <div>
-            <button @click="editUser(u)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-            <button v-if="u.id !== authStore.user?.id" @click="handleToggleUser(u.id)" :class="u.is_active ? 'text-[#ff3b30]' : 'text-[#34c759]'" class="text-xs">{{ u.is_active ? '禁用' : '启用' }}</button>
+            <button @click="editUser(u)" class="text-primary text-xs mr-2">编辑</button>
+            <button v-if="u.id !== authStore.user?.id" @click="handleToggleUser(u.id)" :class="u.is_active ? 'text-error' : 'text-success'" class="text-xs">{{ u.is_active ? '禁用' : '启用' }}</button>
           </div>
         </div>
       </div>
@@ -41,19 +41,19 @@
       </div>
       <!-- 备份列表 -->
       <div class="space-y-1.5 max-h-48 overflow-y-auto">
-        <div v-for="b in backups" :key="b.filename" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-xs">
+        <div v-for="b in backups" :key="b.filename" class="flex justify-between items-center p-2 bg-elevated rounded text-xs">
           <div>
             <div class="font-medium">{{ b.filename }}</div>
-            <div class="text-[#86868b]">{{ b.size_mb }} MB · {{ fmtDate(b.created_at) }}</div>
+            <div class="text-muted">{{ b.size_mb }} MB · {{ fmtDate(b.created_at) }}</div>
           </div>
           <div class="flex gap-2">
-            <button @click="handleDownloadBackup(b.filename)" class="text-[#0071e3]">下载</button>
-            <button @click="handleDeleteBackup(b.filename)" class="text-[#ff3b30]">删除</button>
+            <button @click="handleDownloadBackup(b.filename)" class="text-primary">下载</button>
+            <button @click="handleDeleteBackup(b.filename)" class="text-error">删除</button>
           </div>
         </div>
-        <div v-if="!backups.length" class="text-[#86868b] text-center py-2">暂无备份</div>
+        <div v-if="!backups.length" class="text-muted text-center py-2">暂无备份</div>
       </div>
-      <div class="text-xs text-[#86868b] mt-2">自动备份：每天凌晨3点 · 保留30天</div>
+      <div class="text-xs text-muted mt-2">自动备份：每天凌晨3点 · 保留30天</div>
     </div>
 
     <!-- 用户编辑弹窗 -->
@@ -76,12 +76,12 @@
           </div>
           <div v-if="userForm.role === 'user'">
             <label class="label">权限</label>
-            <div class="bg-[#f5f5f7] rounded-lg p-3 text-sm text-[#6e6e73]">
+            <div class="bg-elevated rounded-lg p-3 text-sm text-secondary">
               <span v-if="userForm.permissions?.length">已配置 {{ userForm.permissions.length }} 项权限</span>
               <span v-else>暂未配置权限</span>
               <span class="mx-1">·</span>
               <button type="button" @click="goToPermissions"
-                class="text-[#0071e3] hover:underline">前往权限管理</button>
+                class="text-primary hover:underline">前往权限管理</button>
             </div>
           </div>
           <div class="flex gap-3 pt-3">
@@ -100,16 +100,16 @@
           <button @click="showRestoreModal = false" class="modal-close">&times;</button>
         </div>
         <div class="p-4 space-y-4">
-          <div class="text-sm text-[#6e6e73]">上传 <span class="font-medium">.sql</span> 或 <span class="font-medium">.db</span> 备份文件来恢复数据库。恢复前会自动备份当前数据。</div>
-          <div class="border-2 border-dashed border-[#d2d2d7] rounded-lg p-6 text-center cursor-pointer hover:border-[#0071e3] transition-colors" @click="$refs.restoreFileInput.click()" @dragover.prevent @drop.prevent="handleRestoreFileDrop">
-            <div v-if="!restoreFile" class="text-[#86868b] text-sm">点击选择文件 或 拖拽文件到此处</div>
+          <div class="text-sm text-secondary">上传 <span class="font-medium">.sql</span> 或 <span class="font-medium">.db</span> 备份文件来恢复数据库。恢复前会自动备份当前数据。</div>
+          <div class="border-2 border-dashed border-line-strong rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors" @click="$refs.restoreFileInput.click()" @dragover.prevent @drop.prevent="handleRestoreFileDrop">
+            <div v-if="!restoreFile" class="text-muted text-sm">点击选择文件 或 拖拽文件到此处</div>
             <div v-else class="text-sm">
-              <div class="font-medium text-[#6e6e73]">{{ restoreFile.name }}</div>
-              <div class="text-[#86868b] mt-1">{{ (restoreFile.size / 1024 / 1024).toFixed(2) }} MB</div>
+              <div class="font-medium text-secondary">{{ restoreFile.name }}</div>
+              <div class="text-muted mt-1">{{ (restoreFile.size / 1024 / 1024).toFixed(2) }} MB</div>
             </div>
           </div>
           <input ref="restoreFileInput" type="file" accept=".sql,.db" class="hidden" @change="handleRestoreFileSelect">
-          <div class="bg-[#fff8e1] border border-[#ffe082] rounded p-3 text-xs text-[#ff9f0a]">注意：恢复操作将覆盖当前数据库，请确认备份文件正确。恢复后页面将自动刷新。</div>
+          <div class="bg-warning-subtle border border-warning rounded p-3 text-xs text-warning">注意：恢复操作将覆盖当前数据库，请确认备份文件正确。恢复后页面将自动刷新。</div>
           <div class="flex gap-3">
             <button @click="showRestoreModal = false" class="btn btn-secondary flex-1">取消</button>
             <button @click="handleUploadRestore" class="btn btn-primary flex-1" :disabled="!restoreFile || restoreLoading" style="background:#16a34a">{{ restoreLoading ? '恢复中...' : '确认恢复' }}</button>

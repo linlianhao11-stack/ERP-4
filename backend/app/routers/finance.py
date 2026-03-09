@@ -31,6 +31,7 @@ async def get_all_orders(
     end_date: Optional[str] = None,
     search: Optional[str] = None,
     account_set_id: Optional[int] = None,
+    unpaid_only: bool = False,
     offset: int = 0,
     limit: int = 200,
     user: User = Depends(require_permission("finance"))
@@ -38,6 +39,17 @@ async def get_all_orders(
     """获取所有订单（财务视角）"""
     limit = min(limit, 1000)
     query = Order.all()
+    if unpaid_only:
+        # 未结清 或 有待确认收款的订单都算欠款
+        unconfirmed_pay_order_ids = set()
+        for p in await Payment.filter(is_confirmed=False).all():
+            unconfirmed_pay_order_ids.add(p.order_id)
+        for po in await PaymentOrder.filter(payment__is_confirmed=False).all():
+            unconfirmed_pay_order_ids.add(po.order_id)
+        if unconfirmed_pay_order_ids:
+            query = query.filter(Q(is_cleared=False) | Q(id__in=list(unconfirmed_pay_order_ids)))
+        else:
+            query = query.filter(is_cleared=False)
     if order_type:
         query = query.filter(order_type=order_type)
     if account_set_id:
@@ -252,8 +264,12 @@ async def get_unpaid_orders(
     customer_id: Optional[int] = None,
     user: User = Depends(require_permission("finance"))
 ):
-    """获取未结清的账期/寄售结算订单"""
-    query = Order.filter(is_cleared=False, order_type__in=["CREDIT", "CONSIGN_SETTLE"])
+    """获取未结清的账期/寄售结算订单（仅显示实际欠款 > 0 的订单）"""
+    query = Order.filter(
+        is_cleared=False,
+        order_type__in=["CREDIT", "CONSIGN_SETTLE"],
+        total_amount__gt=F('paid_amount')
+    )
     if customer_id:
         query = query.filter(customer_id=customer_id)
     orders = await query.order_by("created_at").select_related("customer", "salesperson")

@@ -33,7 +33,7 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9" class="text-center text-[#86868b] py-8">暂无数据</td>
+            <td colspan="9" class="text-center text-muted py-8">暂无数据</td>
           </tr>
           <tr v-for="inv in items" :key="inv.id">
             <td class="font-mono text-[12px]">{{ inv.invoice_no }}</td>
@@ -46,9 +46,9 @@
             <td><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
             <td @click.stop>
               <div class="flex gap-1">
-                <button @click="viewDetail(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
-                <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8f8ee] text-[#248a3d]">确认</button>
-                <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">作废</button>
+                <button @click="viewDetail(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-info-subtle text-primary-active">查看</button>
+                <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
+                <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-[12px] px-2 py-0.5 rounded-full bg-error-subtle text-error">作废</button>
               </div>
             </td>
           </tr>
@@ -58,7 +58,7 @@
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
       <button @click="page > 1 && (page--, loadList())" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
@@ -71,19 +71,19 @@
             <button @click="showDetail = false" class="modal-close">&times;</button>
           </div>
           <div class="modal-body">
-            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <div v-if="detailLoading" class="text-center py-8 text-muted">加载中...</div>
             <template v-else-if="detail">
               <template v-if="!editing">
                 <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-4">
-                  <div><span class="text-[#86868b]">发票号：</span><span class="font-mono">{{ detail.invoice_no }}</span></div>
-                  <div><span class="text-[#86868b]">日期：</span>{{ detail.invoice_date }}</div>
-                  <div><span class="text-[#86868b]">供应商：</span>{{ detail.supplier_name }}</div>
-                  <div><span class="text-[#86868b]">类型：</span>{{ detail.invoice_type === 'special' ? '专票' : '普票' }}</div>
-                  <div><span class="text-[#86868b]">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
-                  <div><span class="text-[#86868b]">关联应付单：</span>{{ detail.payable_bill_no || '-' }}</div>
-                  <div class="col-span-2"><span class="text-[#86868b]">备注：</span>{{ detail.remark || '-' }}</div>
+                  <div><span class="text-muted">发票号：</span><span class="font-mono">{{ detail.invoice_no }}</span></div>
+                  <div><span class="text-muted">日期：</span>{{ detail.invoice_date }}</div>
+                  <div><span class="text-muted">供应商：</span>{{ detail.supplier_name }}</div>
+                  <div><span class="text-muted">类型：</span>{{ detail.invoice_type === 'special' ? '专票' : '普票' }}</div>
+                  <div><span class="text-muted">状态：</span><span :class="statusBadge(detail.status)">{{ statusName(detail.status) }}</span></div>
+                  <div><span class="text-muted">关联应付单：</span>{{ detail.payable_bill_no || '-' }}</div>
+                  <div class="col-span-2"><span class="text-muted">备注：</span>{{ detail.remark || '-' }}</div>
                 </div>
-                <div class="bg-[#f5f5f7] rounded-xl p-3 mb-3">
+                <div class="bg-elevated rounded-xl p-3 mb-3">
                   <div class="grid grid-cols-3 gap-2 text-[13px]">
                     <div>不含税：<span class="font-medium">{{ detail.amount_without_tax }}</span></div>
                     <div>税额：<span class="font-medium">{{ detail.tax_amount }}</span></div>
@@ -126,12 +126,12 @@
                         <td><input v-model.number="row.tax_rate" type="number" step="0.01" class="form-input w-20 text-[12px]" /></td>
                         <td class="text-right text-[12px]">{{ editRowAmount(row) }}</td>
                         <td class="text-right text-[12px]">{{ editRowTax(row) }}</td>
-                        <td><button @click="editRemoveRow(idx)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">&times;</button></td>
+                        <td><button @click="editRemoveRow(idx)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-error-subtle text-error">&times;</button></td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                <button @click="editAddRow" class="text-[12px] text-[#0071e3] font-medium">+ 添加行</button>
+                <button @click="editAddRow" class="text-[12px] text-primary font-medium">+ 添加行</button>
               </template>
             </template>
           </div>
@@ -160,7 +160,7 @@
           <div class="modal-body">
             <div class="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label class="label">供应商 <span class="text-[#ff3b30]">*</span></label>
+                <label class="label">供应商 <span class="text-error">*</span></label>
                 <select v-model="form.supplier_id" class="form-input">
                   <option value="">请选择</option>
                   <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -188,7 +188,7 @@
             </div>
 
             <!-- 明细行 -->
-            <div class="text-[12px] font-semibold text-[#86868b] uppercase tracking-wider mb-2">发票明细</div>
+            <div class="text-[12px] font-semibold text-muted uppercase tracking-wider mb-2">发票明细</div>
             <div class="table-wrapper mb-3">
               <table class="data-table">
                 <thead>
@@ -211,16 +211,16 @@
                     <td class="text-right text-[12px]">{{ rowAmount(row) }}</td>
                     <td class="text-right text-[12px]">{{ rowTax(row) }}</td>
                     <td>
-                      <button @click="removeRow(idx)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-[#ffeaee] text-[#ff3b30]">&times;</button>
+                      <button @click="removeRow(idx)" class="text-[12px] px-1.5 py-0.5 rounded-full bg-error-subtle text-error">&times;</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <button @click="addRow" class="text-[12px] text-[#0071e3] hover:text-[#0077ED] font-medium">+ 添加明细行</button>
+            <button @click="addRow" class="text-[12px] text-primary hover:text-primary-hover font-medium">+ 添加明细行</button>
 
             <!-- 合计 -->
-            <div class="bg-[#f5f5f7] rounded-xl p-3 mt-3">
+            <div class="bg-elevated rounded-xl p-3 mt-3">
               <div class="grid grid-cols-3 gap-2 text-[13px]">
                 <div>不含税合计: <span class="font-medium">{{ totalWithoutTax }}</span></div>
                 <div>税额合计: <span class="font-medium">{{ totalTax }}</span></div>

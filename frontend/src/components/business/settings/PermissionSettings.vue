@@ -13,14 +13,14 @@
           <div v-for="u in users" :key="u.id"
             @click="selectPermUser(u)"
             :class="['flex items-center justify-between p-2.5 rounded-lg cursor-pointer text-sm transition-colors',
-              permSelectedUser?.id === u.id ? 'bg-[#0071e3] text-white' : 'hover:bg-[#f5f5f7]']">
+              permSelectedUser?.id === u.id ? 'bg-primary text-white' : 'hover:bg-elevated']">
             <div>
               <div class="font-medium">{{ u.display_name || u.username }}</div>
-              <div :class="['text-xs', permSelectedUser?.id === u.id ? 'text-white/70' : 'text-[#86868b]']">@{{ u.username }}</div>
+              <div :class="['text-xs', permSelectedUser?.id === u.id ? 'text-white/70' : 'text-muted']">@{{ u.username }}</div>
             </div>
             <span v-if="u.role === 'admin'"
               :class="['text-xs px-1.5 py-0.5 rounded',
-                permSelectedUser?.id === u.id ? 'bg-white/20 text-white' : 'bg-[#e8f4fd] text-[#0071e3]']">管理员</span>
+                permSelectedUser?.id === u.id ? 'bg-surface/20 text-white' : 'bg-info-subtle text-primary']">管理员</span>
           </div>
         </div>
       </div>
@@ -29,7 +29,7 @@
     <!-- 右侧：权限配置卡片 -->
     <div class="flex-1 min-w-0">
       <!-- 未选择用户提示 -->
-      <div v-if="!permSelectedUser" class="card p-12 text-center text-[#86868b] text-sm">
+      <div v-if="!permSelectedUser" class="card p-12 text-center text-muted text-sm">
         <div class="text-3xl mb-3 opacity-30">🔐</div>
         请从左侧选择一个用户来管理权限
       </div>
@@ -37,15 +37,15 @@
       <!-- 管理员提示（无需配置） -->
       <div v-else-if="permSelectedUser.role === 'admin'" class="card p-12 text-center">
         <div class="text-3xl mb-3 opacity-30">👑</div>
-        <div class="text-[#0071e3] font-semibold mb-1">{{ permSelectedUser.display_name || permSelectedUser.username }}</div>
-        <div class="text-[#86868b] text-sm">管理员拥有全部权限，无需单独配置</div>
+        <div class="text-primary font-semibold mb-1">{{ permSelectedUser.display_name || permSelectedUser.username }}</div>
+        <div class="text-muted text-sm">管理员拥有全部权限，无需单独配置</div>
       </div>
 
       <!-- 权限矩阵 -->
       <div v-else>
         <div class="flex items-center justify-between mb-3">
-          <div class="text-sm text-[#86868b]">
-            正在编辑 <span class="font-semibold text-[#1d1d1f]">{{ permSelectedUser.display_name || permSelectedUser.username }}</span> 的权限
+          <div class="text-sm text-muted">
+            正在编辑 <span class="font-semibold text-foreground">{{ permSelectedUser.display_name || permSelectedUser.username }}</span> 的权限
           </div>
           <button @click="savePermissions" class="btn btn-primary btn-sm">保存权限</button>
         </div>
@@ -55,30 +55,30 @@
             <!-- 主权限开关 -->
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <component :is="iconMap[group.icon]" class="w-4 h-4 text-[#0071e3]" />
+                <component :is="iconMap[group.icon]" class="w-4 h-4 text-primary" />
                 <span class="font-semibold text-sm">{{ group.label }}</span>
               </div>
               <button type="button" @click="toggleMainPerm(group)"
                 :class="['w-10 h-[22px] rounded-full transition-colors relative shrink-0',
-                  permUserPerms.includes(group.main) ? 'bg-[#34c759]' : 'bg-[#d2d2d7]']">
-                <span :class="['absolute top-[3px] left-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform',
+                  permUserPerms.includes(group.main) ? 'bg-success' : 'bg-line-strong']">
+                <span :class="['absolute top-[3px] left-[3px] w-4 h-4 bg-surface rounded-full shadow-sm transition-transform',
                   permUserPerms.includes(group.main) ? 'translate-x-[18px]' : '']"></span>
               </button>
             </div>
             <!-- 子权限开关（主权限开启后显示） -->
-            <div v-if="group.children.length && permUserPerms.includes(group.main)" class="space-y-2 mt-3 pt-3 border-t border-[#e5e5ea]">
+            <div v-if="group.children.length && permUserPerms.includes(group.main)" class="space-y-2 mt-3 pt-3 border-t border-line">
               <div v-for="child in group.children" :key="child.key" class="flex items-center justify-between pl-6">
-                <span class="text-sm text-[#6e6e73]">{{ child.name }}</span>
+                <span class="text-sm text-secondary">{{ child.name }}</span>
                 <button type="button" @click="toggleChildPerm(child.key)"
                   :class="['w-9 h-5 rounded-full transition-colors relative shrink-0',
-                    permUserPerms.includes(child.key) ? 'bg-[#34c759]' : 'bg-[#d2d2d7]']">
-                  <span :class="['absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform',
+                    permUserPerms.includes(child.key) ? 'bg-success' : 'bg-line-strong']">
+                  <span :class="['absolute top-[2px] left-[2px] w-4 h-4 bg-surface rounded-full shadow-sm transition-transform',
                     permUserPerms.includes(child.key) ? 'translate-x-4' : '']"></span>
                 </button>
               </div>
             </div>
             <!-- 子权限提示（主权限关闭时） -->
-            <div v-else-if="group.children.length" class="text-xs text-[#86868b] mt-3 pt-3 border-t border-[#e5e5ea]">
+            <div v-else-if="group.children.length" class="text-xs text-muted mt-3 pt-3 border-t border-line">
               开启主开关后可配置子权限
             </div>
           </div>

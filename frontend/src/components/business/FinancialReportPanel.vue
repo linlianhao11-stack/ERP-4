@@ -6,11 +6,11 @@
       <select v-model.number="queryYear" class="input input-sm w-24">
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
       </select>
-      <span class="text-[13px] text-[#86868b]">年</span>
+      <span class="text-[13px] text-muted">年</span>
       <select v-model.number="queryMonth" class="input input-sm w-20">
         <option v-for="m in 12" :key="m" :value="m">{{ m }}</option>
       </select>
-      <span class="text-[13px] text-[#86868b]">月</span>
+      <span class="text-[13px] text-muted">月</span>
       <button @click="handleQuery" class="btn btn-primary btn-sm" :disabled="loading">
         {{ loading ? '查询中...' : '查询' }}
       </button>
@@ -27,9 +27,9 @@
         <button @click="showExportMenu = !showExportMenu" class="btn btn-secondary btn-sm flex items-center gap-1">
           导出 <span class="text-[10px]">&#9660;</span>
         </button>
-        <div v-if="showExportMenu" class="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-[#e8e8ed] py-1 z-10 min-w-[120px]">
-          <button @click="handleExport('excel')" class="w-full text-left px-3 py-1.5 text-[13px] hover:bg-[#f5f5f7] transition-colors">导出 Excel</button>
-          <button @click="handleExport('pdf')" class="w-full text-left px-3 py-1.5 text-[13px] hover:bg-[#f5f5f7] transition-colors">导出 PDF</button>
+        <div v-if="showExportMenu" class="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-line py-1 z-10 min-w-[120px]">
+          <button @click="handleExport('excel')" class="w-full text-left px-3 py-1.5 text-[13px] hover:bg-elevated transition-colors">导出 Excel</button>
+          <button @click="handleExport('pdf')" class="w-full text-left px-3 py-1.5 text-[13px] hover:bg-elevated transition-colors">导出 PDF</button>
         </div>
       </div>
     </div>

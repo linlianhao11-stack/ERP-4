@@ -13,7 +13,7 @@
     <!-- Desktop table -->
     <div class="hidden md:block overflow-x-auto table-container">
       <table class="w-full text-sm">
-        <thead class="bg-[#f5f5f7]">
+        <thead class="bg-elevated">
           <tr>
             <th class="px-3 py-2 text-left">{{ rebateTab === 'customer' ? '客户' : '供应商' }}名称</th>
             <th class="px-3 py-2 text-right">返利余额</th>
@@ -24,25 +24,25 @@
         <tbody class="divide-y">
           <tr v-for="item in rebateSummary" :key="item.id">
             <td class="px-3 py-2 font-medium">{{ item.name }}</td>
-            <td class="px-3 py-2 text-right"><span :class="item.rebate_balance > 0 ? 'text-[#34c759] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.rebate_balance) }}</span></td>
-            <td v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right"><span :class="(item.credit_balance || 0) > 0 ? 'text-[#0071e3] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.credit_balance || 0) }}</span></td>
+            <td class="px-3 py-2 text-right"><span :class="item.rebate_balance > 0 ? 'text-success font-semibold' : 'text-muted'">¥{{ fmt(item.rebate_balance) }}</span></td>
+            <td v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right"><span :class="(item.credit_balance || 0) > 0 ? 'text-primary font-semibold' : 'text-muted'">¥{{ fmt(item.credit_balance || 0) }}</span></td>
             <td class="px-3 py-2 text-center">
-              <button v-if="hasPermission('finance_rebate')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="text-xs text-[#0071e3] hover:underline mr-3">充值</button>
-              <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="text-xs text-[#0071e3] hover:underline">明细</button>
+              <button v-if="hasPermission('finance_rebate')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="text-xs text-primary hover:underline mr-3">充值</button>
+              <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="text-xs text-primary hover:underline">明细</button>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="!rebateSummary.length" class="p-8 text-center text-[#86868b] text-sm">暂无数据</div>
+      <div v-if="!rebateSummary.length" class="p-8 text-center text-muted text-sm">暂无数据</div>
     </div>
     <!-- Mobile cards -->
     <div class="md:hidden p-3 space-y-2">
-      <div v-for="item in rebateSummary" :key="item.id" class="p-3 bg-[#f5f5f7] rounded-lg">
+      <div v-for="item in rebateSummary" :key="item.id" class="p-3 bg-elevated rounded-lg">
         <div class="flex justify-between items-center mb-2">
           <span class="font-medium">{{ item.name }}</span>
           <div class="text-right">
-            <div :class="item.rebate_balance > 0 ? 'text-[#34c759] font-semibold' : 'text-[#86868b]'">¥{{ fmt(item.rebate_balance) }}</div>
-            <div v-if="rebateTab === 'supplier' && (item.credit_balance || 0) > 0" class="text-xs text-[#0071e3]">在账: ¥{{ fmt(item.credit_balance) }}</div>
+            <div :class="item.rebate_balance > 0 ? 'text-success font-semibold' : 'text-muted'">¥{{ fmt(item.rebate_balance) }}</div>
+            <div v-if="rebateTab === 'supplier' && (item.credit_balance || 0) > 0" class="text-xs text-primary">在账: ¥{{ fmt(item.credit_balance) }}</div>
           </div>
         </div>
         <div class="flex gap-2">
@@ -50,7 +50,7 @@
           <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="btn btn-sm btn-secondary text-xs flex-1">明细</button>
         </div>
       </div>
-      <div v-if="!rebateSummary.length" class="p-8 text-center text-[#86868b] text-sm">暂无数据</div>
+      <div v-if="!rebateSummary.length" class="p-8 text-center text-muted text-sm">暂无数据</div>
     </div>
 
     <!-- Modal: Rebate Charge -->
@@ -58,7 +58,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">{{ rebateChargeForm.target_id ? '返利充值' : (rebateChargeForm.target_type === 'customer' ? '客户返利充值' : '供应商返利充值') }}</h3>
-          <button @click="showRebateChargeModal = false" class="text-[#86868b] hover:text-[#6e6e73] text-xl">&times;</button>
+          <button @click="showRebateChargeModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
         </div>
         <div class="modal-body space-y-4">
           <!-- 弹窗内账套选择 -->
@@ -68,9 +68,9 @@
               <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
-          <div v-if="rebateChargeForm.target_id" class="p-3 bg-[#e8f4fd] rounded-lg text-sm">
-            <div class="font-semibold text-[#0071e3] mb-1">{{ rebateChargeForm.target_name }}</div>
-            <div class="text-[#0071e3]">当前返利余额: <b>¥{{ fmt(rebateChargeForm.current_balance) }}</b></div>
+          <div v-if="rebateChargeForm.target_id" class="p-3 bg-info-subtle rounded-lg text-sm">
+            <div class="font-semibold text-primary mb-1">{{ rebateChargeForm.target_name }}</div>
+            <div class="text-primary">当前返利余额: <b>¥{{ fmt(rebateChargeForm.current_balance) }}</b></div>
           </div>
           <div v-else>
             <label class="label">选择{{ rebateChargeForm.target_type === 'customer' ? '客户' : '供应商' }} *</label>
@@ -100,16 +100,16 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">返利明细 - {{ rebateDetailTarget?.name }}</h3>
-          <button @click="showRebateDetailModal = false" class="text-[#86868b] hover:text-[#6e6e73] text-xl">&times;</button>
+          <button @click="showRebateDetailModal = false" class="text-muted hover:text-secondary text-xl">&times;</button>
         </div>
         <div class="modal-body space-y-4">
-          <div class="p-3 bg-[#f5f5f7] rounded-lg text-sm">
+          <div class="p-3 bg-elevated rounded-lg text-sm">
             <div class="font-semibold">{{ rebateDetailTarget?.name }}</div>
-            <div>当前余额: <b class="text-[#34c759]">¥{{ fmt(rebateDetailTarget?.balance || 0) }}</b></div>
+            <div>当前余额: <b class="text-success">¥{{ fmt(rebateDetailTarget?.balance || 0) }}</b></div>
           </div>
           <div class="max-h-96 overflow-y-auto">
             <table class="w-full text-sm">
-              <thead class="bg-[#f5f5f7] sticky top-0">
+              <thead class="bg-elevated sticky top-0">
                 <tr>
                   <th class="px-2 py-1 text-left">时间</th>
                   <th class="px-2 py-1 text-center">类型</th>
@@ -120,15 +120,15 @@
               </thead>
               <tbody class="divide-y">
                 <tr v-for="log in rebateLogs" :key="log.id">
-                  <td class="px-2 py-1 text-xs text-[#86868b]">{{ fmtDate(log.created_at) }}</td>
-                  <td class="px-2 py-1 text-center"><span :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'" class="text-xs font-semibold">{{ rebateTypeLabel(log.type) }}</span></td>
-                  <td class="px-2 py-1 text-right font-semibold" :class="log.type === 'charge' || log.type === 'refund' ? 'text-[#34c759]' : 'text-[#ff3b30]'">{{ log.type === 'charge' || log.type === 'refund' ? '+' : '-' }}¥{{ fmt(Math.abs(log.amount)) }}</td>
+                  <td class="px-2 py-1 text-xs text-muted">{{ fmtDate(log.created_at) }}</td>
+                  <td class="px-2 py-1 text-center"><span :class="log.type === 'charge' || log.type === 'refund' ? 'text-success' : 'text-error'" class="text-xs font-semibold">{{ rebateTypeLabel(log.type) }}</span></td>
+                  <td class="px-2 py-1 text-right font-semibold" :class="log.type === 'charge' || log.type === 'refund' ? 'text-success' : 'text-error'">{{ log.type === 'charge' || log.type === 'refund' ? '+' : '-' }}¥{{ fmt(Math.abs(log.amount)) }}</td>
                   <td class="px-2 py-1 text-right">¥{{ fmt(log.balance_after) }}</td>
-                  <td class="px-2 py-1 text-xs text-[#86868b]">{{ log.remark || '-' }}</td>
+                  <td class="px-2 py-1 text-xs text-muted">{{ log.remark || '-' }}</td>
                 </tr>
               </tbody>
             </table>
-            <div v-if="!rebateLogs.length" class="p-6 text-center text-[#86868b] text-sm">暂无流水记录</div>
+            <div v-if="!rebateLogs.length" class="p-6 text-center text-muted text-sm">暂无流水记录</div>
           </div>
           <div class="flex gap-3 pt-2">
             <button @click="showRebateDetailModal = false" class="btn btn-secondary flex-1">关闭</button>

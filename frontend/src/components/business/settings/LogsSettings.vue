@@ -25,15 +25,15 @@
     </div>
     <!-- 日志列表 -->
     <div class="space-y-1 max-h-[70vh] overflow-y-auto">
-      <div v-for="log in opLogs" :key="log.id" class="flex justify-between items-start p-2 bg-[#f5f5f7] rounded text-xs">
+      <div v-for="log in opLogs" :key="log.id" class="flex justify-between items-start p-2 bg-elevated rounded text-xs">
         <div>
-          <span class="font-medium text-[#0071e3]">{{ log.operator_name }}</span>
-          <span class="mx-1 text-[#86868b]">·</span>
+          <span class="font-medium text-primary">{{ log.operator_name }}</span>
+          <span class="mx-1 text-muted">·</span>
           <span>{{ log.detail }}</span>
         </div>
-        <div class="text-[#86868b] whitespace-nowrap ml-2">{{ fmtDate(log.created_at) }}</div>
+        <div class="text-muted whitespace-nowrap ml-2">{{ fmtDate(log.created_at) }}</div>
       </div>
-      <div v-if="!opLogs.length" class="text-[#86868b] text-center py-4">暂无操作日志</div>
+      <div v-if="!opLogs.length" class="text-muted text-center py-4">暂无操作日志</div>
     </div>
   </div>
 </template>

@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.15.0
+# 轻量级 ERP 系统 v4.17.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -7,7 +7,7 @@
 | 层级 | 技术 | 版本 |
 |------|------|------|
 | 前端 | Vue 3 + Vue Router + Pinia | Vue 3.5 |
-| UI | Tailwind CSS | v4 |
+| UI | Tailwind CSS（OKLCH Token 设计系统） | v4 |
 | 图表 | Chart.js | v4 |
 | HTTP 客户端 | Axios | v1.13 |
 | 构建工具 | Vite | v7 |
@@ -71,7 +71,7 @@ erp-4/
 
 | 模块 | 路由 | 说明 |
 |------|------|------|
-| 仪表盘 | `/dashboard` | 销售统计、库存预警、经营概览 |
+| 仪表盘 | `/dashboard` | 销售统计、库存预警、经营概览、待办事项面板 |
 | 销售管理 | `/sales` | 现款/账期/寄售调拨/寄售结算/退货订单 |
 | 库存管理 | `/stock` | 入库、调拨、盘点调整、库存导出、SN 码管理 |
 | 采购管理 | `/purchase` | 采购订单（创建→审核→付款→收货→退货）完整流程，供应商在账资金管理 |
@@ -100,6 +100,24 @@ erp-4/
 - **出入库单**: SalesDeliveryBill, SalesDeliveryItem, PurchaseReceiptBill, PurchaseReceiptItem
 - **物流**: Shipment, ShipmentItem
 - **系统**: OperationLog, SystemSetting
+
+## 设计系统
+
+**Modern Industrial** 风格 — 高对比黑白为底，单一亮色点缀。
+
+| 项目 | 值 |
+|------|-----|
+| 主色 | Steel Blue `oklch(0.55 0.20 250)` |
+| 色彩空间 | OKLCH（感知均匀） |
+| 中性色 | Zinc 冷灰 |
+| 字体 | Inter + Geist Mono |
+| 主题 | 亮/暗双模式，手动切换，localStorage 持久化 |
+| Token 数量 | 60+ CSS 变量 |
+| 设计文档 | `docs/plans/2026-03-09-ui-refactor.md` |
+
+样式文件结构：
+- `frontend/src/styles/base.css` — CSS 变量定义（`:root` / `[data-theme="dark"]`）+ 全部组件样式
+- `frontend/src/styles/theme.css` — Tailwind 4 `@theme` 配置，映射 CSS 变量为工具类
 
 ## 关键业务规则
 

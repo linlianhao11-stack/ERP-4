@@ -1,15 +1,15 @@
 <template>
   <div>
-    <div v-if="!data" class="text-center py-12 text-[#86868b] text-[13px]">暂无数据</div>
+    <div v-if="!data" class="text-center py-12 text-muted text-[13px]">暂无数据</div>
     <template v-else>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- 左侧：资产 -->
-        <div class="bg-[#f5f5f7] rounded-xl p-4">
-          <h5 class="text-[14px] font-semibold text-[#1d1d1f] mb-3 border-b border-[#e8e8ed] pb-2">资产</h5>
+        <div class="bg-elevated rounded-xl p-4">
+          <h5 class="text-[14px] font-semibold text-foreground mb-3 border-b border-line pb-2">资产</h5>
 
           <!-- 流动资产 -->
           <div class="mb-4">
-            <div class="text-[13px] font-semibold text-[#6e6e73] mb-2">流动资产</div>
+            <div class="text-[13px] font-semibold text-secondary mb-2">流动资产</div>
             <div class="space-y-1">
               <div class="flex justify-between text-[13px] px-2 py-1">
                 <span>库存现金</span>
@@ -43,7 +43,7 @@
                 <span>在途物资</span>
                 <span class="font-mono">{{ fmt(data.assets.current.goods_in_transit) }}</span>
               </div>
-              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-white/60 rounded-lg mt-1">
+              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-surface/60 rounded-lg mt-1">
                 <span>流动资产合计</span>
                 <span class="font-mono">{{ fmt(data.assets.current.subtotal) }}</span>
               </div>
@@ -52,7 +52,7 @@
 
           <!-- 非流动资产 -->
           <div class="mb-4">
-            <div class="text-[13px] font-semibold text-[#6e6e73] mb-2">非流动资产</div>
+            <div class="text-[13px] font-semibold text-secondary mb-2">非流动资产</div>
             <div class="space-y-1">
               <div class="flex justify-between text-[13px] px-2 py-1">
                 <span>固定资产</span>
@@ -62,7 +62,7 @@
                 <span>累计折旧</span>
                 <span class="font-mono">{{ fmt(data.assets.non_current.accumulated_depreciation) }}</span>
               </div>
-              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-white/60 rounded-lg mt-1">
+              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-surface/60 rounded-lg mt-1">
                 <span>非流动资产合计</span>
                 <span class="font-mono">{{ fmt(data.assets.non_current.subtotal) }}</span>
               </div>
@@ -70,19 +70,19 @@
           </div>
 
           <!-- 资产总计 -->
-          <div class="flex justify-between text-[14px] font-bold px-2 py-2 bg-[#0071e3]/10 rounded-lg text-[#0071e3]">
+          <div class="flex justify-between text-[14px] font-bold px-2 py-2 bg-primary/10 rounded-lg text-primary">
             <span>资产总计</span>
             <span class="font-mono">{{ fmt(data.assets.total) }}</span>
           </div>
         </div>
 
         <!-- 右侧：负债 + 所有者权益 -->
-        <div class="bg-[#f5f5f7] rounded-xl p-4">
-          <h5 class="text-[14px] font-semibold text-[#1d1d1f] mb-3 border-b border-[#e8e8ed] pb-2">负债及所有者权益</h5>
+        <div class="bg-elevated rounded-xl p-4">
+          <h5 class="text-[14px] font-semibold text-foreground mb-3 border-b border-line pb-2">负债及所有者权益</h5>
 
           <!-- 流动负债 -->
           <div class="mb-4">
-            <div class="text-[13px] font-semibold text-[#6e6e73] mb-2">流动负债</div>
+            <div class="text-[13px] font-semibold text-secondary mb-2">流动负债</div>
             <div class="space-y-1">
               <div class="flex justify-between text-[13px] px-2 py-1">
                 <span>短期借款</span>
@@ -108,7 +108,7 @@
                 <span>其他应付款</span>
                 <span class="font-mono">{{ fmt(data.liabilities.current.other_payable) }}</span>
               </div>
-              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-white/60 rounded-lg mt-1">
+              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-surface/60 rounded-lg mt-1">
                 <span>流动负债合计</span>
                 <span class="font-mono">{{ fmt(data.liabilities.current.subtotal) }}</span>
               </div>
@@ -117,7 +117,7 @@
 
           <!-- 所有者权益 -->
           <div class="mb-4">
-            <div class="text-[13px] font-semibold text-[#6e6e73] mb-2">所有者权益</div>
+            <div class="text-[13px] font-semibold text-secondary mb-2">所有者权益</div>
             <div class="space-y-1">
               <div class="flex justify-between text-[13px] px-2 py-1">
                 <span>实收资本</span>
@@ -135,7 +135,7 @@
                 <span>利润分配-未分配利润</span>
                 <span class="font-mono">{{ fmt(data.equity.retained_earnings) }}</span>
               </div>
-              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-white/60 rounded-lg mt-1">
+              <div class="flex justify-between text-[13px] font-semibold px-2 py-1.5 bg-surface/60 rounded-lg mt-1">
                 <span>所有者权益合计</span>
                 <span class="font-mono">{{ fmt(data.equity.subtotal) }}</span>
               </div>
@@ -143,7 +143,7 @@
           </div>
 
           <!-- 负债+权益总计 -->
-          <div class="flex justify-between text-[14px] font-bold px-2 py-2 bg-[#0071e3]/10 rounded-lg text-[#0071e3]">
+          <div class="flex justify-between text-[14px] font-bold px-2 py-2 bg-primary/10 rounded-lg text-primary">
             <span>负债及所有者权益总计</span>
             <span class="font-mono">{{ fmt(data.total_liabilities_equity) }}</span>
           </div>
@@ -156,8 +156,8 @@
           :class="[
             'inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium',
             data.is_balanced
-              ? 'bg-[#e8f8ee] text-[#248a3d]'
-              : 'bg-[#ffeaee] text-[#d70015]'
+              ? 'bg-success-subtle text-success-emphasis'
+              : 'bg-error-subtle text-error-emphasis'
           ]"
         >
           <span class="text-[16px]">{{ data.is_balanced ? '\u2713' : '\u2717' }}</span>

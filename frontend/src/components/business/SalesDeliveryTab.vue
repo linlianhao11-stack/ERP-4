@@ -27,7 +27,7 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9" class="text-center text-[#86868b] py-8">暂无数据</td>
+            <td colspan="9" class="text-center text-muted py-8">暂无数据</td>
           </tr>
           <tr v-for="d in items" :key="d.id">
             <td><input type="checkbox" :value="d.id" v-model="selectedIds" /></td>
@@ -40,8 +40,8 @@
             <td class="font-mono text-[12px]">{{ d.voucher_no || '-' }}</td>
             <td @click.stop>
               <div class="flex gap-1">
-                <button @click="viewDetail(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8eaf8] text-[#3634a3]">查看</button>
-                <button @click="handleDownloadPdf(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#f0e6fa] text-[#7d2ae8]">PDF</button>
+                <button @click="viewDetail(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-info-subtle text-primary-active">查看</button>
+                <button @click="handleDownloadPdf(d)" class="text-[12px] px-2 py-0.5 rounded-full bg-purple-subtle text-purple-emphasis">PDF</button>
               </div>
             </td>
           </tr>
@@ -51,7 +51,7 @@
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
       <button @click="page > 1 && (page--, loadList())" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
@@ -64,20 +64,20 @@
             <button @click="showDetail = false" class="modal-close">&times;</button>
           </div>
           <div class="modal-body">
-            <div v-if="detailLoading" class="text-center py-8 text-[#86868b]">加载中...</div>
+            <div v-if="detailLoading" class="text-center py-8 text-muted">加载中...</div>
             <template v-else-if="detail">
               <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-4">
-                <div><span class="text-[#86868b]">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
-                <div><span class="text-[#86868b]">日期：</span>{{ detail.bill_date }}</div>
-                <div><span class="text-[#86868b]">客户：</span>{{ detail.customer_name }}</div>
-                <div><span class="text-[#86868b]">仓库：</span>{{ detail.warehouse_name || '-' }}</div>
-                <div><span class="text-[#86868b]">成本合计：</span><span class="font-medium">{{ detail.total_cost }}</span></div>
-                <div><span class="text-[#86868b]">销售合计：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
-                <div><span class="text-[#86868b]">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
-                <div><span class="text-[#86868b]">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
+                <div><span class="text-muted">单号：</span><span class="font-mono">{{ detail.bill_no }}</span></div>
+                <div><span class="text-muted">日期：</span>{{ detail.bill_date }}</div>
+                <div><span class="text-muted">客户：</span>{{ detail.customer_name }}</div>
+                <div><span class="text-muted">仓库：</span>{{ detail.warehouse_name || '-' }}</div>
+                <div><span class="text-muted">成本合计：</span><span class="font-medium">{{ detail.total_cost }}</span></div>
+                <div><span class="text-muted">销售合计：</span><span class="font-medium">{{ detail.total_amount }}</span></div>
+                <div><span class="text-muted">凭证号：</span>{{ detail.voucher_no || '-' }}</div>
+                <div><span class="text-muted">创建时间：</span>{{ detail.created_at?.slice(0, 19).replace('T', ' ') }}</div>
               </div>
               <div v-if="detail.items && detail.items.length">
-                <div class="text-[12px] font-semibold text-[#86868b] uppercase tracking-wider mb-2">商品明细</div>
+                <div class="text-[12px] font-semibold text-muted uppercase tracking-wider mb-2">商品明细</div>
                 <div class="table-wrapper">
                   <table class="data-table">
                     <thead>

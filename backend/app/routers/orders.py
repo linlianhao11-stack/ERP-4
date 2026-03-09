@@ -20,7 +20,7 @@ from app.services.order_service import (
     process_rebate_deduction, process_order_settlement, release_cancelled_stock
 )
 from app.services.operation_log_service import log_operation
-from app.utils.generators import generate_order_no
+from app.utils.generators import generate_order_no, generate_sequential_no
 from app.utils.errors import parse_date
 from app.logger import get_logger
 
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/orders", tags=["订单管理"])
 async def create_order(data: OrderCreate, user: User = Depends(require_permission("sales"))):
     async with transactions.in_transaction():
         try:
-            order_no = generate_order_no("ORD")
+            order_no = await generate_sequential_no("SO", "orders", "order_no")
             total_amount = Decimal("0")
             total_cost = Decimal("0")
             total_profit = Decimal("0")
@@ -308,7 +308,8 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
                 pass
         si_list = si_by_shipment.get(sh.id, [])
         shipments_info.append({
-            "id": sh.id, "carrier_name": sh.carrier_name,
+            "id": sh.id, "shipment_no": sh.shipment_no,
+            "carrier_name": sh.carrier_name,
             "tracking_no": sh.tracking_no, "sn_code": sh.sn_code,
             "status": sh.status, "status_text": sh.status_text,
             "last_info": ti[0].get("context", "") if ti else None,

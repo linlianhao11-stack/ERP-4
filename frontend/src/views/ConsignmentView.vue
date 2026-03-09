@@ -5,19 +5,19 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
       <div class="card p-3">
-        <div class="text-xs text-[#86868b]">寄售库存(成本)</div>
-        <div class="text-xl font-bold text-[#af52de]">¥{{ fmt(consignSummary.total_cost_value) }}</div>
+        <div class="text-xs text-muted">寄售库存(成本)</div>
+        <div class="text-xl font-bold text-purple-emphasis">¥{{ fmt(consignSummary.total_cost_value) }}</div>
       </div>
       <div class="card p-3">
-        <div class="text-xs text-[#86868b]">寄售库存(零售)</div>
-        <div class="text-xl font-bold text-[#0071e3]">¥{{ fmt(consignSummary.total_retail_value) }}</div>
+        <div class="text-xs text-muted">寄售库存(零售)</div>
+        <div class="text-xl font-bold text-primary">¥{{ fmt(consignSummary.total_retail_value) }}</div>
       </div>
       <div class="card p-3">
-        <div class="text-xs text-[#86868b]">结算欠款</div>
-        <div class="text-xl font-bold text-[#ff3b30]">¥{{ fmt(consignSummary.total_settle_unpaid) }}</div>
+        <div class="text-xs text-muted">结算欠款</div>
+        <div class="text-xl font-bold text-error">¥{{ fmt(consignSummary.total_settle_unpaid) }}</div>
       </div>
       <div class="card p-3">
-        <div class="text-xs text-[#86868b]">寄售数量</div>
+        <div class="text-xs text-muted">寄售数量</div>
         <div class="text-xl font-bold">{{ consignSummary.total_quantity }}</div>
       </div>
     </div>
@@ -29,19 +29,19 @@
         <div
           v-for="c in consignCustomers"
           :key="c.id"
-          class="p-3 flex justify-between items-center hover:bg-[#f5f5f7] cursor-pointer"
+          class="p-3 flex justify-between items-center hover:bg-elevated cursor-pointer"
           @click="openConsignDetail(c)"
         >
           <div>
             <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-[#86868b]">调拨{{ c.consign_out_count }}次 / 结算{{ c.consign_settle_count }}次</div>
+            <div class="text-xs text-muted">调拨{{ c.consign_out_count }}次 / 结算{{ c.consign_settle_count }}次</div>
           </div>
           <div class="text-right">
-            <div class="text-[#af52de] font-semibold">库存¥{{ fmt(c.consign_remaining_cost) }}</div>
+            <div class="text-purple-emphasis font-semibold">库存¥{{ fmt(c.consign_remaining_cost) }}</div>
             <div class="text-xs" :class="getBalanceClass(c.balance)">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
           </div>
         </div>
-        <div v-if="!consignCustomers.length" class="p-6 text-center text-[#86868b] text-sm">暂无寄售客户</div>
+        <div v-if="!consignCustomers.length" class="p-6 text-center text-muted text-sm">暂无寄售客户</div>
       </div>
     </div>
 
@@ -50,7 +50,7 @@
       <div class="p-3 border-b font-semibold text-sm">寄售库存明细</div>
       <div class="overflow-x-auto table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th class="px-3 py-2 text-left">SKU</th>
               <th class="px-3 py-2 text-left">商品</th>
@@ -69,7 +69,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="!consignSummary.stock_details?.length" class="p-6 text-center text-[#86868b] text-sm">暂无寄售库存</div>
+        <div v-if="!consignSummary.stock_details?.length" class="p-6 text-center text-muted text-sm">暂无寄售库存</div>
       </div>
     </div>
 
@@ -79,15 +79,15 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="font-semibold">寄售详情 - {{ consignDetail.customer?.name }}</h3>
-            <button @click="closeDetailModal" class="text-[#86868b] hover:text-[#6e6e73]">&times;</button>
+            <button @click="closeDetailModal" class="text-muted hover:text-secondary">&times;</button>
           </div>
           <div class="modal-body">
             <!-- Customer Info Header -->
-            <div class="mb-4 p-3 bg-[#f5f5f7] rounded-lg">
+            <div class="mb-4 p-3 bg-elevated rounded-lg">
               <div class="flex justify-between items-center mb-2">
                 <div>
                   <div class="font-semibold">{{ consignDetail.customer?.name }}</div>
-                  <div class="text-sm text-[#86868b]">
+                  <div class="text-sm text-muted">
                     <span :class="getBalanceClass(consignDetail.customer?.balance)">
                       {{ getBalanceLabel(consignDetail.customer?.balance) }}: ¥{{ formatBalance(consignDetail.customer?.balance) }}
                     </span>
@@ -115,18 +115,18 @@
                   <div
                     v-for="p in consignDetail.remaining_products"
                     :key="p.product_id"
-                    class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm"
+                    class="flex justify-between items-center p-2 bg-elevated rounded text-sm"
                   >
                     <div>
                       <div>{{ p.product_name }}</div>
-                      <div class="text-xs text-[#86868b]">{{ p.product_sku }}</div>
+                      <div class="text-xs text-muted">{{ p.product_sku }}</div>
                     </div>
                     <div class="text-right">
                       <div class="font-semibold">{{ p.remaining_quantity }}件</div>
-                      <div class="text-xs text-[#86868b]">¥{{ p.retail_price }}/件</div>
+                      <div class="text-xs text-muted">¥{{ p.retail_price }}/件</div>
                     </div>
                   </div>
-                  <div v-if="!consignDetail.remaining_products?.length" class="text-[#86868b] text-center py-3 text-sm">无待结算商品</div>
+                  <div v-if="!consignDetail.remaining_products?.length" class="text-muted text-center py-3 text-sm">无待结算商品</div>
                 </div>
               </div>
               <div class="flex gap-3 pt-3">
@@ -136,27 +136,27 @@
 
             <!-- Settle Mode: Enter Quantity and Price -->
             <div v-else>
-              <div class="mb-2 p-2 bg-[#fff3e0] rounded border border-[#ffcc80] text-xs text-[#ff9f0a]">
+              <div class="mb-2 p-2 bg-orange-subtle rounded border border-warning text-xs text-warning">
                 输入各商品结算数量（不超过剩余数量），提交后生成寄售结算单
               </div>
               <div class="space-y-2 max-h-64 overflow-y-auto mb-3">
                 <div
                   v-for="item in consignSettleItems"
                   :key="item.product_id"
-                  class="p-3 bg-[#f5f5f7] rounded border"
+                  class="p-3 bg-elevated rounded border"
                 >
                   <div class="flex justify-between items-start mb-2">
                     <div>
                       <div class="font-medium text-sm">{{ item.product_name }}</div>
-                      <div class="text-xs text-[#86868b]">{{ item.product_sku }}</div>
+                      <div class="text-xs text-muted">{{ item.product_sku }}</div>
                     </div>
-                    <div class="text-right text-xs text-[#86868b]">
-                      剩余 <span class="font-semibold text-[#1d1d1f]">{{ item.remaining_quantity }}</span> 件
+                    <div class="text-right text-xs text-muted">
+                      剩余 <span class="font-semibold text-foreground">{{ item.remaining_quantity }}</span> 件
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <div>
-                      <label class="text-xs text-[#6e6e73]">结算数量</label>
+                      <label class="text-xs text-secondary">结算数量</label>
                       <input
                         type="number"
                         v-model.number="item.settle_quantity"
@@ -166,7 +166,7 @@
                       >
                     </div>
                     <div>
-                      <label class="text-xs text-[#6e6e73]">单价</label>
+                      <label class="text-xs text-secondary">单价</label>
                       <input
                         type="number"
                         v-model.number="item.unit_price"
@@ -178,8 +178,8 @@
                   </div>
                 </div>
               </div>
-              <div class="p-2 bg-[#e8f4fd] rounded text-sm mb-3">
-                结算合计: <span class="font-bold text-[#0071e3]">¥{{ fmt(settleTotal) }}</span>
+              <div class="p-2 bg-info-subtle rounded text-sm mb-3">
+                结算合计: <span class="font-bold text-primary">¥{{ fmt(settleTotal) }}</span>
                 ({{ settleQuantity }}件)
               </div>
               <div class="flex gap-3 pt-3">
@@ -198,12 +198,12 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="font-semibold">寄售退货 - {{ consignDetail.customer?.name }}</h3>
-            <button @click="closeReturnModal" class="text-[#86868b] hover:text-[#6e6e73]">&times;</button>
+            <button @click="closeReturnModal" class="text-muted hover:text-secondary">&times;</button>
           </div>
           <div class="modal-body">
-            <div class="mb-4 p-3 bg-[#ffeaee] rounded-lg border border-[#ffb3b3]">
-              <div class="font-semibold text-[#ff3b30] mb-1">寄售退货</div>
-              <div class="text-sm text-[#ff3b30]">从客户虚拟仓调回商品到实际仓库</div>
+            <div class="mb-4 p-3 bg-error-subtle rounded-lg border border-error">
+              <div class="font-semibold text-error mb-1">寄售退货</div>
+              <div class="text-sm text-error">从客户虚拟仓调回商品到实际仓库</div>
             </div>
             <div class="mb-4">
               <div class="font-semibold mb-2 text-sm">可退商品列表</div>
@@ -211,12 +211,12 @@
                 <div
                   v-for="p in consignReturnItems"
                   :key="p.product_id"
-                  class="p-3 bg-[#f5f5f7] rounded border"
+                  class="p-3 bg-elevated rounded border"
                 >
                   <div class="flex justify-between items-start mb-2">
                     <div>
                       <div class="font-medium">{{ p.product_name }}</div>
-                      <div class="text-xs text-[#86868b]">{{ p.product_sku }}</div>
+                      <div class="text-xs text-muted">{{ p.product_sku }}</div>
                     </div>
                     <div class="text-right">
                       <div class="text-sm font-semibold">可退: {{ p.remaining_quantity }}件</div>
@@ -224,7 +224,7 @@
                   </div>
                   <div class="grid form-grid grid-cols-3 gap-2">
                     <div>
-                      <label class="text-xs text-[#6e6e73]">退货数量</label>
+                      <label class="text-xs text-secondary">退货数量</label>
                       <input
                         type="number"
                         v-model.number="p.return_quantity"
@@ -234,7 +234,7 @@
                       >
                     </div>
                     <div>
-                      <label class="text-xs text-[#6e6e73]">退回仓库 *</label>
+                      <label class="text-xs text-secondary">退回仓库 *</label>
                       <select v-model="p.return_warehouse_id" class="input input-sm w-full" @change="p.return_location_id = ''">
                         <option value="">选择</option>
                         <option
@@ -245,7 +245,7 @@
                       </select>
                     </div>
                     <div>
-                      <label class="text-xs text-[#6e6e73]">退回仓位 *</label>
+                      <label class="text-xs text-secondary">退回仓位 *</label>
                       <select
                         v-model="p.return_location_id"
                         class="input input-sm w-full"
@@ -261,7 +261,7 @@
                     </div>
                   </div>
                 </div>
-                <div v-if="!consignReturnItems.length" class="text-[#86868b] text-center py-4 text-sm">无可退商品</div>
+                <div v-if="!consignReturnItems.length" class="text-muted text-center py-4 text-sm">无可退商品</div>
               </div>
             </div>
             <div class="flex gap-3 pt-3">

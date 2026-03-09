@@ -1,22 +1,22 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-[#fbfbfd]">
+  <div class="min-h-screen flex items-center justify-center p-4 bg-canvas">
     <div class="w-full max-w-[400px]">
       <!-- Logo & Brand -->
       <div class="text-center mb-10">
-        <div class="w-14 h-14 bg-[#1d1d1f] rounded-[16px] mx-auto mb-5 flex items-center justify-center shadow-lg">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/></svg>
+        <div class="w-14 h-14 bg-foreground rounded-[16px] mx-auto mb-5 flex items-center justify-center shadow-lg text-canvas">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/></svg>
         </div>
-        <h1 class="text-[22px] font-semibold text-[#1d1d1f] tracking-tight">ERP System</h1>
-        <p class="text-[13px] text-[#86868b] mt-1">企业资源管理平台</p>
+        <h1 class="text-[22px] font-semibold text-foreground tracking-tight">ERP System</h1>
+        <p class="text-[13px] text-muted mt-1">企业资源管理平台</p>
       </div>
 
       <!-- Card -->
-      <div class="bg-white rounded-[20px] border border-[#e8e8ed] shadow-sm p-8">
+      <div class="bg-surface rounded-[20px] border border-line shadow-sm p-8">
         <!-- 强制改密表单 -->
         <form v-if="showChangePwd" @submit.prevent="doChangePassword" class="space-y-5">
-          <div class="flex items-start gap-3 p-3.5 bg-[#fff8e1] rounded-xl border border-[#ffe082]">
-            <Lock :size="16" :stroke-width="1.5" class="text-[#ff9f0a] mt-0.5 shrink-0" />
-            <span class="text-[13px] text-[#1d1d1f] leading-relaxed">首次登录，请修改默认密码后继续使用</span>
+          <div class="flex items-start gap-3 p-3.5 bg-warning-subtle rounded-xl border border-warning">
+            <Lock :size="16" :stroke-width="1.5" class="text-warning mt-0.5 shrink-0" />
+            <span class="text-[13px] text-foreground leading-relaxed">首次登录，请修改默认密码后继续使用</span>
           </div>
           <div>
             <label class="label">新密码</label>
@@ -48,7 +48,7 @@
       </div>
 
       <!-- Footer -->
-      <p class="text-center text-[11px] text-[#86868b] mt-8">&copy; {{ new Date().getFullYear() }} ERP System</p>
+      <p class="text-center text-[11px] text-muted mt-8">&copy; {{ new Date().getFullYear() }} ERP System</p>
     </div>
   </div>
 </template>

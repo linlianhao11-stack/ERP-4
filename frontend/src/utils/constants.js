@@ -17,16 +17,16 @@ export const iconMap = {
 }
 
 export const menuItems = [
-  { key: 'dashboard', name: '首页', perm: 'dashboard' },
-  { key: 'sales', name: '销售', perm: 'sales' },
-  { key: 'stock', name: '库存', perm: 'stock_view' },
-  { key: 'purchase', name: '采购', perm: 'purchase' },
-  { key: 'consignment', name: '寄售', perm: 'consignment' },
-  { key: 'logistics', name: '物流', perm: 'logistics' },
-  { key: 'finance', name: '财务', perm: 'finance' },
-  { key: 'accounting', name: '会计', perm: 'accounting_view' },
-  { key: 'customers', name: '客户', perm: 'customer' },
-  { key: 'settings', name: '设置', perm: '_any' }
+  { key: 'dashboard', name: '首页', perm: 'dashboard', group: '业务' },
+  { key: 'sales', name: '销售', perm: 'sales', group: '业务' },
+  { key: 'stock', name: '库存', perm: 'stock_view', group: '业务' },
+  { key: 'purchase', name: '采购', perm: 'purchase', group: '业务' },
+  { key: 'consignment', name: '寄售', perm: 'consignment', group: '业务' },
+  { key: 'logistics', name: '物流', perm: 'logistics', group: '业务' },
+  { key: 'customers', name: '客户', perm: 'customer', group: '业务' },
+  { key: 'finance', name: '财务', perm: 'finance', group: '财务' },
+  { key: 'accounting', name: '会计', perm: 'accounting_view', group: '财务' },
+  { key: 'settings', name: '设置', perm: '_any', group: '系统' }
 ]
 
 export const bottomNavItems = [
@@ -149,11 +149,11 @@ export const purchaseStatusBadges = {
 }
 
 export const shipmentStatusBadges = {
-  pending: 'bg-[#f5f5f7] text-[#6e6e73]',
-  shipped: 'bg-[#e8f4fd] text-[#0071e3]',
-  in_transit: 'bg-[#fff8e1] text-[#ff9f0a]',
-  signed: 'bg-[#e8f8ee] text-[#34c759]',
-  problem: 'bg-[#ffeaee] text-[#ff3b30]'
+  pending: 'badge badge-gray',
+  shipped: 'badge badge-blue',
+  in_transit: 'badge badge-yellow',
+  signed: 'badge badge-green',
+  problem: 'badge badge-red'
 }
 
 export const shippingStatusNames = {

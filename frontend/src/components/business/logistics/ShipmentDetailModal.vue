@@ -5,11 +5,11 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 class="font-semibold">物流详情</h3>
-          <button @click="close" class="text-[#86868b] hover:text-[#6e6e73]">&times;</button>
+          <button @click="close" class="text-muted hover:text-secondary">&times;</button>
         </div>
         <div class="modal-body space-y-4" v-if="shipmentDetail">
           <!-- 订单信息区 -->
-          <div class="p-3 bg-[#f5f5f7] rounded-lg">
+          <div class="p-3 bg-elevated rounded-lg">
             <div class="flex justify-between items-center mb-2">
               <div class="font-semibold">订单信息</div>
               <span :class="getShippingBadge(shipmentDetail.order.shipping_status)">{{ getShippingName(shipmentDetail.order.shipping_status) }}</span>
@@ -20,23 +20,23 @@
               <div>客户: {{ shipmentDetail.order.customer_name || '-' }}</div>
               <div>金额: ¥{{ fmt(shipmentDetail.order.total_amount) }}</div>
               <div v-if="shipmentDetail.order.remark" class="col-span-2 pt-1 border-t mt-1">
-                <span class="text-[#86868b]">发货地址/备注:</span>
-                <span class="text-[#6e6e73] font-medium">{{ shipmentDetail.order.remark }}</span>
+                <span class="text-muted">发货地址/备注:</span>
+                <span class="text-secondary font-medium">{{ shipmentDetail.order.remark }}</span>
               </div>
             </div>
             <!-- 商品明细及发货进度 -->
             <div v-if="shipmentDetail.order.items?.length" class="mt-2">
-              <div class="text-xs text-[#86868b] mb-1">商品明细:</div>
-              <div v-for="item in shipmentDetail.order.items" :key="item.id || item.product_sku" class="text-xs text-[#6e6e73] flex justify-between">
+              <div class="text-xs text-muted mb-1">商品明细:</div>
+              <div v-for="item in shipmentDetail.order.items" :key="item.id || item.product_sku" class="text-xs text-secondary flex justify-between">
                 <span>{{ item.product_name }} x{{ item.quantity }} ¥{{ fmt(item.unit_price) }}</span>
-                <span v-if="item.remaining_qty > 0" class="text-[#ff9f0a]">待发 {{ item.remaining_qty }}</span>
-                <span v-else class="text-[#34c759]">已发完</span>
+                <span v-if="item.remaining_qty > 0" class="text-warning">待发 {{ item.remaining_qty }}</span>
+                <span v-else class="text-success">已发完</span>
               </div>
             </div>
           </div>
 
           <!-- 物流单列表头 -->
-          <div class="flex justify-between items-center p-3 bg-white border rounded-lg">
+          <div class="flex justify-between items-center p-3 bg-surface border rounded-lg">
             <div class="font-semibold">物流单 ({{ shipmentDetail.shipments?.length || 0 }})</div>
             <div class="flex gap-2">
               <button
@@ -62,7 +62,7 @@
             v-for="(s, idx) in shipmentDetail.shipments"
             :key="s.id"
             class="p-3 border rounded-lg"
-            :class="editingShipmentId === s.id ? 'border-[#b3d7f5] bg-[#e8f4fd]' : 'bg-white'"
+            :class="editingShipmentId === s.id ? 'border-primary bg-info-subtle' : 'bg-surface'"
           >
             <div class="flex justify-between items-center mb-1">
               <div class="text-sm font-semibold">物流单 #{{ idx + 1 }}</div>
@@ -71,23 +71,23 @@
             <div v-if="s.tracking_no" class="text-sm mb-1">
               {{ s.carrier_name }} <span class="font-mono text-xs">{{ s.tracking_no }}</span>
             </div>
-            <div v-else class="text-sm text-[#86868b] mb-1">未填写快递信息</div>
-            <div v-if="s.last_info" class="text-xs text-[#86868b] mb-2">{{ s.last_info }}</div>
+            <div v-else class="text-sm text-muted mb-1">未填写快递信息</div>
+            <div v-if="s.last_info" class="text-xs text-muted mb-2">{{ s.last_info }}</div>
 
             <!-- 包裹内商品明细 -->
-            <div v-if="s.items?.length" class="mb-2 p-2 bg-[#f5f5f7] rounded border border-[#e8e8ed]">
-              <div class="text-xs text-[#86868b] font-semibold mb-1">发货商品:</div>
-              <div v-for="si in s.items" :key="si.product_sku" class="text-xs text-[#6e6e73] flex justify-between">
+            <div v-if="s.items?.length" class="mb-2 p-2 bg-elevated rounded border border-line">
+              <div class="text-xs text-muted font-semibold mb-1">发货商品:</div>
+              <div v-for="si in s.items" :key="si.product_sku" class="text-xs text-secondary flex justify-between">
                 <span>{{ si.product_name }} ({{ si.product_sku }})</span>
                 <span class="font-semibold">x{{ si.quantity }}</span>
               </div>
             </div>
 
             <!-- SN码区域 -->
-            <div class="mb-2 p-2 rounded border" :class="s.sn_code ? 'bg-[#e8f8ee] border-[#a8e6c1]' : 'bg-[#f5f5f7] border-[#d2d2d7]'">
+            <div class="mb-2 p-2 rounded border" :class="s.sn_code ? 'bg-success-subtle border-success' : 'bg-elevated border-line-strong'">
               <div v-if="editingSNId === s.id" class="space-y-1">
-                <label class="text-xs text-[#86868b] font-semibold">
-                  SN码 <span class="font-normal text-[#86868b]">(多个用逗号/空格/换行分隔)</span>
+                <label class="text-xs text-muted font-semibold">
+                  SN码 <span class="font-normal text-muted">(多个用逗号/空格/换行分隔)</span>
                 </label>
                 <textarea v-model="snInput" class="input text-sm py-1" rows="2" placeholder="输入SN码"></textarea>
                 <div class="flex gap-2">
@@ -97,13 +97,13 @@
               </div>
               <div v-else class="flex items-start justify-between gap-2">
                 <div v-if="s.sn_code" class="flex-1">
-                  <span class="text-xs text-[#86868b] font-semibold">SN码:</span>
-                  <div v-for="sn in formatSN(s.sn_code)" :key="sn" class="text-xs text-[#34c759] font-mono">{{ sn }}</div>
+                  <span class="text-xs text-muted font-semibold">SN码:</span>
+                  <div v-for="sn in formatSN(s.sn_code)" :key="sn" class="text-xs text-success font-mono">{{ sn }}</div>
                 </div>
-                <div v-else class="flex-1 text-xs text-[#86868b]">未填写SN码</div>
+                <div v-else class="flex-1 text-xs text-muted">未填写SN码</div>
                 <button
                   @click="editingSNId = s.id; snInput = s.sn_code || ''"
-                  class="text-xs text-[#0071e3] hover:text-[#0071e3] flex-shrink-0"
+                  class="text-xs text-primary hover:text-primary flex-shrink-0"
                 >{{ s.sn_code ? '编辑' : '添加' }}</button>
               </div>
             </div>
@@ -122,16 +122,16 @@
 
             <!-- 物流轨迹时间线 -->
             <div v-if="s.tracking_info?.length" class="mt-3 pt-2 border-t">
-              <div class="text-xs text-[#86868b] mb-1">物流轨迹:</div>
+              <div class="text-xs text-muted mb-1">物流轨迹:</div>
               <div class="space-y-1 max-h-32 overflow-y-auto">
                 <div v-for="(t, i) in s.tracking_info" :key="(t.ftime || t.time || '') + i" class="flex gap-2 text-xs">
                   <div class="flex flex-col items-center flex-shrink-0">
-                    <div :class="['w-2 h-2 rounded-full mt-1', i === 0 ? 'bg-[#34c759]' : 'bg-[#d2d2d7]']"></div>
-                    <div v-if="i < s.tracking_info.length - 1" class="w-0.5 h-5 bg-[#e8e8ed]"></div>
+                    <div :class="['w-2 h-2 rounded-full mt-1', i === 0 ? 'bg-success' : 'bg-line-strong']"></div>
+                    <div v-if="i < s.tracking_info.length - 1" class="w-0.5 h-5 bg-line"></div>
                   </div>
                   <div>
-                    <div class="text-[#86868b]">{{ t.ftime || t.time }}</div>
-                    <div class="text-[#6e6e73]">{{ t.context || t.desc }}</div>
+                    <div class="text-muted">{{ t.ftime || t.time }}</div>
+                    <div class="text-secondary">{{ t.context || t.desc }}</div>
                   </div>
                 </div>
               </div>
@@ -139,18 +139,18 @@
           </div>
 
           <!-- 发货表单（新发货流程，含商品选择）-->
-          <div v-if="showShipForm" class="p-3 bg-[#e8f4fd] rounded-lg border border-[#b3d7f5]">
+          <div v-if="showShipForm" class="p-3 bg-info-subtle rounded-lg border border-primary">
             <div class="font-semibold mb-2 text-sm">发货</div>
             <!-- 选择发货商品 -->
             <div class="mb-3">
-              <div class="text-xs text-[#86868b] font-semibold mb-1">选择发货商品:</div>
-              <div v-for="item in shipItems" :key="item.order_item_id" class="flex items-center gap-2 mb-2 p-2 bg-white rounded border">
+              <div class="text-xs text-muted font-semibold mb-1">选择发货商品:</div>
+              <div v-for="item in shipItems" :key="item.order_item_id" class="flex items-center gap-2 mb-2 p-2 bg-surface rounded border">
                 <div class="flex-1">
                   <div class="text-sm font-medium">{{ item.product_name }}</div>
-                  <div class="text-xs text-[#86868b]">{{ item.product_sku }} | 总{{ item.total_qty }} 已发{{ item.shipped_qty }} 待发{{ item.remaining_qty }}</div>
+                  <div class="text-xs text-muted">{{ item.product_sku }} | 总{{ item.total_qty }} 已发{{ item.shipped_qty }} 待发{{ item.remaining_qty }}</div>
                 </div>
                 <div class="flex items-center gap-1">
-                  <label class="text-xs text-[#86868b]">本次:</label>
+                  <label class="text-xs text-muted">本次:</label>
                   <input
                     v-model.number="item.ship_qty"
                     type="number"
@@ -160,7 +160,7 @@
                   >
                 </div>
                 <div v-if="item.sn_required" class="w-full mt-1">
-                  <label class="text-xs text-[#86868b]">SN码 (必填，{{ item.ship_qty }}个):</label>
+                  <label class="text-xs text-muted">SN码 (必填，{{ item.ship_qty }}个):</label>
                   <textarea v-model="item.sn_input" class="input text-sm py-1 w-full" rows="1" placeholder="逗号/空格/换行分隔"></textarea>
                 </div>
               </div>
@@ -175,7 +175,7 @@
                 </select>
               </div>
               <div v-if="shipForm.carrier_code === 'self_pickup'" class="flex items-end pb-1">
-                <span class="text-sm text-[#34c759] font-semibold">客户上门自提</span>
+                <span class="text-sm text-success font-semibold">客户上门自提</span>
               </div>
               <div v-else>
                 <label class="label text-xs">快递单号</label>
@@ -187,7 +187,7 @@
               >
                 <label class="label text-xs">
                   手机号后四位
-                  <span class="text-[#ff9f0a] font-normal">
+                  <span class="text-warning font-normal">
                     （{{ carriers.find(c => c.code === shipForm.carrier_code)?.name }}必填）
                   </span>
                 </label>
@@ -203,7 +203,7 @@
           </div>
 
           <!-- 编辑/添加物流单表单（legacy）-->
-          <div v-if="showShipmentForm" class="p-3 bg-[#e8f4fd] rounded-lg border border-[#b3d7f5]">
+          <div v-if="showShipmentForm" class="p-3 bg-info-subtle rounded-lg border border-primary">
             <div class="font-semibold mb-2 text-sm">{{ editingShipmentId ? '编辑物流单' : '添加物流单' }}</div>
             <div class="grid grid-cols-2 gap-2">
               <div>
@@ -214,7 +214,7 @@
                 </select>
               </div>
               <div v-if="shipmentForm.carrier_code === 'self_pickup'" class="flex items-end pb-1">
-                <span class="text-sm text-[#34c759] font-semibold">客户上门自提，无需快递单号</span>
+                <span class="text-sm text-success font-semibold">客户上门自提，无需快递单号</span>
               </div>
               <div v-else>
                 <label class="label text-xs">快递单号</label>
@@ -226,14 +226,14 @@
               >
                 <label class="label text-xs">
                   手机号后四位
-                  <span class="text-[#ff9f0a] font-normal">
+                  <span class="text-warning font-normal">
                     （{{ carriers.find(c => c.code === shipmentForm.carrier_code)?.name }}必填）
                   </span>
                 </label>
                 <input v-model="shipmentForm.phone" class="input text-sm py-1" placeholder="收/寄件人手机号后四位" maxlength="11">
               </div>
               <div class="col-span-2">
-                <label class="label text-xs">SN码 <span class="text-[#86868b] font-normal">(选填，多个用逗号/空格/换行分隔)</span></label>
+                <label class="label text-xs">SN码 <span class="text-muted font-normal">(选填，多个用逗号/空格/换行分隔)</span></label>
                 <textarea v-model="shipmentForm.sn_code" class="input text-sm py-1" rows="2" placeholder="输入SN码"></textarea>
               </div>
             </div>
@@ -326,7 +326,7 @@ const canShip = computed(() => {
 // ---- 辅助函数 ----
 const getOrderTypeName = (type) => orderTypeNames[type] || type
 const getOrderTypeBadge = (type) => orderTypeBadges[type] || 'badge badge-gray'
-const getShipmentStatusBadge = (status) => shipmentStatusBadges[status] || 'bg-[#f5f5f7] text-[#6e6e73]'
+const getShipmentStatusBadge = (status) => shipmentStatusBadges[status] || 'bg-elevated text-secondary'
 const getShippingName = (status) => shippingStatusNames[status] || status || '-'
 const getShippingBadge = (status) => shippingStatusBadges[status] || 'badge badge-gray'
 

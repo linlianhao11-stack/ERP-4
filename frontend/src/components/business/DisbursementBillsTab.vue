@@ -25,7 +25,7 @@
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="8" class="text-center text-[#86868b] py-8">暂无数据</td>
+            <td colspan="8" class="text-center text-muted py-8">暂无数据</td>
           </tr>
           <tr v-for="b in items" :key="b.id">
             <td class="font-mono text-[12px]">{{ b.bill_no }}</td>
@@ -36,7 +36,7 @@
             <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
             <td class="font-mono text-[12px]">{{ b.voucher_no || '-' }}</td>
             <td @click.stop>
-              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-[#e8f8ee] text-[#248a3d]">确认</button>
+              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-[12px] px-2 py-0.5 rounded-full bg-success-subtle text-success-emphasis">确认</button>
             </td>
           </tr>
         </tbody>
@@ -45,7 +45,7 @@
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
       <button @click="page > 1 && (page--, loadList())" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-[#86868b] leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
+      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
       <button @click="page < Math.ceil(total / pageSize) && (page++, loadList())" :disabled="page >= Math.ceil(total / pageSize)" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 

@@ -3,14 +3,14 @@
     <!-- Mobile card view -->
     <div v-if="$slots.mobile" class="md:hidden space-y-2">
       <slot name="mobile" />
-      <div v-if="empty" class="p-8 text-center text-[#86868b] text-sm">{{ emptyText }}</div>
+      <div v-if="empty" class="p-8 text-center text-muted text-sm">{{ emptyText }}</div>
     </div>
 
     <!-- Desktop table view -->
     <div class="card" :class="$slots.mobile ? 'hidden md:block' : ''">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th
                 v-for="col in columns"
@@ -18,14 +18,14 @@
                 class="px-3 py-2"
                 :class="[
                   col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
-                  col.sortable ? 'cursor-pointer select-none hover:text-[#0071e3]' : '',
+                  col.sortable ? 'cursor-pointer select-none hover:text-primary' : '',
                   col.class || ''
                 ]"
                 :style="col.width ? { width: col.width } : {}"
                 @click="col.sortable && toggleSort(col.key)"
               >
                 {{ col.label }}
-                <span v-if="col.sortable && sortKey === col.key" class="text-[#0071e3]">
+                <span v-if="col.sortable && sortKey === col.key" class="text-primary">
                   {{ sortOrder === 'asc' ? '\u2191' : '\u2193' }}
                 </span>
               </th>
@@ -35,7 +35,7 @@
             <slot />
           </tbody>
         </table>
-        <div v-if="empty && !$slots.mobile" class="p-8 text-center text-[#86868b] text-sm">{{ emptyText }}</div>
+        <div v-if="empty && !$slots.mobile" class="p-8 text-center text-muted text-sm">{{ emptyText }}</div>
       </div>
     </div>
   </div>

@@ -29,7 +29,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="a in data.accounts" :key="a.code" :class="{ 'font-semibold bg-[#f9f9fb]': !a.is_leaf }">
+          <tr v-for="a in data.accounts" :key="a.code" :class="{ 'font-semibold bg-canvas': !a.is_leaf }">
             <td>{{ a.code }}</td>
             <td :style="{ paddingLeft: (a.level - 1) * 16 + 8 + 'px' }">{{ a.name }}</td>
             <td class="text-right">{{ fmt(a.opening_debit) }}</td>
@@ -40,11 +40,11 @@
             <td class="text-right">{{ fmt(a.closing_credit) }}</td>
           </tr>
           <tr v-if="data.accounts.length === 0">
-            <td colspan="8" class="text-center text-[#86868b] py-8">暂无数据</td>
+            <td colspan="8" class="text-center text-muted py-8">暂无数据</td>
           </tr>
         </tbody>
         <tfoot v-if="data.accounts.length > 0">
-          <tr class="font-bold bg-[#f5f5f7]">
+          <tr class="font-bold bg-elevated">
             <td></td>
             <td>合  计</td>
             <td class="text-right">{{ fmt(data.totals.opening_debit) }}</td>
@@ -57,7 +57,7 @@
         </tfoot>
       </table>
     </div>
-    <div v-else class="text-center text-[#86868b] py-12 text-[14px]">
+    <div v-else class="text-center text-muted py-12 text-[14px]">
       选择期间后点击查询
     </div>
   </div>

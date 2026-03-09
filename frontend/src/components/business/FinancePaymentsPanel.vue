@@ -6,26 +6,26 @@
         <div class="flex justify-between items-start mb-2">
           <div class="min-w-0 flex-1 mr-3">
             <div class="font-medium flex items-center gap-2 truncate">{{ p.customer_name }} <span class="flex-shrink-0" :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></div>
-            <div class="text-xs text-[#86868b] truncate">{{ p.payment_no }} · {{ getPaymentMethodName(p.payment_method) }} · {{ p.creator_name }}</div>
-            <div v-if="p.order_nos && p.order_nos.length" class="text-xs text-[#86868b] mt-1">关联订单：<span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-[#0071e3] font-mono">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span></div>
+            <div class="text-xs text-muted truncate">{{ p.payment_no }} · {{ getPaymentMethodName(p.payment_method) }} · {{ p.creator_name }}</div>
+            <div v-if="p.order_nos && p.order_nos.length" class="text-xs text-muted mt-1">关联订单：<span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-primary font-mono">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span></div>
           </div>
           <div class="text-right flex-shrink-0">
-            <div class="text-lg font-bold text-[#34c759]">+¥{{ fmt(p.amount) }}</div>
-            <div class="text-xs text-[#86868b]">{{ fmtDate(p.created_at) }}</div>
+            <div class="text-lg font-bold text-success">+¥{{ fmt(p.amount) }}</div>
+            <div class="text-xs text-muted">{{ fmtDate(p.created_at) }}</div>
           </div>
         </div>
         <div class="flex justify-end">
-          <div v-if="p.is_confirmed" class="text-xs text-[#34c759] whitespace-nowrap">已确认 · <span class="text-[#86868b]">{{ p.confirmed_by_name }}</span></div>
+          <div v-if="p.is_confirmed" class="text-xs text-success whitespace-nowrap">已确认 · <span class="text-muted">{{ p.confirmed_by_name }}</span></div>
           <button v-else-if="hasPermission('finance_confirm')" @click.stop="confirmPaymentRecord(p.id, p.amount)" class="btn btn-warning btn-sm whitespace-nowrap">确认到账</button>
         </div>
       </div>
-      <div v-if="!payments.length" class="p-8 text-center text-[#86868b] text-sm">暂无记录</div>
+      <div v-if="!payments.length" class="p-8 text-center text-muted text-sm">暂无记录</div>
     </div>
     <!-- Desktop table -->
     <div class="card hidden md:block">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th class="px-3 py-2 text-left">收款单号</th>
               <th class="px-3 py-2 text-left">客户</th>
@@ -39,32 +39,32 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="p in payments" :key="p.id" class="hover:bg-[#f5f5f7] cursor-pointer" @click="p.order_nos && p.order_nos.length ? $emit('view-order', p.order_nos[0].id) : null">
+            <tr v-for="p in payments" :key="p.id" class="hover:bg-elevated cursor-pointer" @click="p.order_nos && p.order_nos.length ? $emit('view-order', p.order_nos[0].id) : null">
               <td class="px-3 py-2 font-mono text-sm">{{ p.payment_no }}</td>
               <td class="px-3 py-2">{{ p.customer_name }}</td>
               <td class="px-3 py-2 text-center"><span :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></td>
               <td class="px-3 py-2">{{ getPaymentMethodName(p.payment_method) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-[#34c759]">+¥{{ fmt(p.amount) }}</td>
+              <td class="px-3 py-2 text-right font-semibold text-success">+¥{{ fmt(p.amount) }}</td>
               <td class="px-3 py-2">
                 <span v-if="p.order_nos && p.order_nos.length">
-                  <span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-[#0071e3] font-mono text-xs">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span>
+                  <span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-primary font-mono text-xs">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span>
                 </span>
-                <span v-else class="text-[#86868b] text-xs">-</span>
+                <span v-else class="text-muted text-xs">-</span>
               </td>
               <td class="px-3 py-2 text-center">
-                <span v-if="p.is_confirmed" class="text-xs text-[#34c759]">已确认</span>
-                <span v-else class="text-xs text-[#ff9f0a]">待确认</span>
+                <span v-if="p.is_confirmed" class="text-xs text-success">已确认</span>
+                <span v-else class="text-xs text-warning">待确认</span>
               </td>
-              <td class="px-3 py-2 text-[#86868b] text-xs">{{ fmtDate(p.created_at) }}</td>
+              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(p.created_at) }}</td>
               <td class="px-3 py-2 text-center">
-                <span v-if="p.is_confirmed" class="text-xs text-[#86868b]">{{ p.confirmed_by_name }}</span>
+                <span v-if="p.is_confirmed" class="text-xs text-muted">{{ p.confirmed_by_name }}</span>
                 <button v-else-if="hasPermission('finance_confirm')" @click.stop="confirmPaymentRecord(p.id, p.amount)" class="btn btn-warning btn-sm text-xs">确认到账</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="!payments.length" class="p-8 text-center text-[#86868b] text-sm">暂无记录</div>
+      <div v-if="!payments.length" class="p-8 text-center text-muted text-sm">暂无记录</div>
     </div>
   </div>
 </template>

@@ -9,7 +9,7 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">导入预览 - {{ fileName }}</h3>
-          <button @click="close" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="close" class="text-muted text-xl">&times;</button>
         </div>
         <!-- 内容 -->
         <div class="p-4">
@@ -17,21 +17,21 @@
             <!-- 统计信息 -->
             <div
               class="p-3 rounded-lg"
-              :class="previewData.valid_count > 0 ? 'bg-[#e8f8ee] border border-[#a8e6c1]' : 'bg-[#fff8e1] border border-[#ffe082]'"
+              :class="previewData.valid_count > 0 ? 'bg-success-subtle border border-success' : 'bg-warning-subtle border border-warning'"
             >
               <div class="flex justify-between items-center">
                 <div><span class="font-semibold text-lg">共 {{ previewData.total }} 条数据</span></div>
                 <div class="text-sm">
-                  <span class="text-[#34c759] font-semibold">{{ previewData.valid_count }} 条有效</span>
+                  <span class="text-success font-semibold">{{ previewData.valid_count }} 条有效</span>
                   <span class="mx-2">|</span>
-                  <span class="text-[#86868b]">{{ previewData.skip_count }} 条跳过</span>
+                  <span class="text-muted">{{ previewData.skip_count }} 条跳过</span>
                 </div>
               </div>
             </div>
             <!-- 预览表格 -->
             <div class="max-h-96 overflow-y-auto border rounded-lg">
               <table class="w-full text-sm">
-                <thead class="bg-[#f5f5f7] sticky top-0">
+                <thead class="bg-elevated sticky top-0">
                   <tr>
                     <th class="px-2 py-2 text-left w-12">行</th>
                     <th class="px-2 py-2 text-left">SKU</th>
@@ -48,25 +48,25 @@
                   <tr
                     v-for="item in previewData.items"
                     :key="item.row"
-                    :class="item.status === 'skip' ? 'bg-[#f5f5f7] text-[#86868b]' : ''"
+                    :class="item.status === 'skip' ? 'bg-elevated text-muted' : ''"
                   >
-                    <td class="px-2 py-1.5 text-[#86868b]">{{ item.row }}</td>
+                    <td class="px-2 py-1.5 text-muted">{{ item.row }}</td>
                     <td class="px-2 py-1.5 font-mono text-xs">{{ item.sku }}</td>
                     <td class="px-2 py-1.5 truncate max-w-32">{{ item.name }}</td>
                     <td class="px-2 py-1.5">
                       <span v-if="item.warehouse" class="text-xs">{{ item.warehouse }}</span>
-                      <span v-else class="text-[#ff6961]">-</span>
+                      <span v-else class="text-error">-</span>
                     </td>
                     <td class="px-2 py-1.5">
                       <span v-if="item.location" class="badge badge-blue text-xs">{{ item.location }}</span>
-                      <span v-else class="text-[#ff6961]">-</span>
+                      <span v-else class="text-error">-</span>
                     </td>
-                    <td class="px-2 py-1.5 text-right font-semibold text-[#34c759]">+{{ item.quantity || 0 }}</td>
+                    <td class="px-2 py-1.5 text-right font-semibold text-success">+{{ item.quantity || 0 }}</td>
                     <td class="px-2 py-1.5 text-center">
                       <span v-if="item.current_stock > 0" class="text-xs">
-                        {{ item.current_stock }} → <span class="font-semibold text-[#0071e3]">{{ item.after_stock }}</span>
+                        {{ item.current_stock }} → <span class="font-semibold text-primary">{{ item.after_stock }}</span>
                       </span>
-                      <span v-else-if="item.status === 'valid'" class="text-xs text-[#86868b]">
+                      <span v-else-if="item.status === 'valid'" class="text-xs text-muted">
                         0 → <span class="font-semibold">{{ item.after_stock }}</span>
                       </span>
                       <span v-else>-</span>
@@ -80,10 +80,10 @@
                   </tr>
                 </tbody>
               </table>
-              <div v-if="!previewData.items?.length" class="p-6 text-center text-[#86868b]">无数据</div>
+              <div v-if="!previewData.items?.length" class="p-6 text-center text-muted">无数据</div>
             </div>
             <!-- 无有效数据警告 -->
-            <div v-if="previewData.valid_count === 0" class="p-3 bg-[#fff8e1] border border-[#ffe082] rounded-lg text-[#ff9f0a] text-sm">
+            <div v-if="previewData.valid_count === 0" class="p-3 bg-warning-subtle border border-warning rounded-lg text-warning text-sm">
               没有有效的导入数据，请检查Excel文件是否正确填写了仓库、仓位和数量。
             </div>
             <!-- 按钮 -->

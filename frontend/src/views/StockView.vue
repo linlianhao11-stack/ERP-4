@@ -13,7 +13,7 @@
           <option v-for="vw in virtualWarehouses" :key="'v' + vw.id" :value="vw.id">{{ vw.name }}</option>
         </template>
       </select>
-      <label class="flex items-center gap-1.5 text-xs text-[#86868b] cursor-pointer whitespace-nowrap select-none">
+      <label class="flex items-center gap-1.5 text-xs text-muted cursor-pointer whitespace-nowrap select-none">
         <span class="toggle">
           <input type="checkbox" v-model="showVirtualStock" @change="onToggleVirtualStock">
           <span class="slider"></span>
@@ -40,69 +40,71 @@
           v-for="(s, idx) in (p.stocks?.length ? (showVirtualStock ? p.stocks : p.stocks.filter(x => !x.is_virtual)) : [])"
           :key="'m' + p.id + '-' + idx"
           class="card p-3"
-          :class="{ 'bg-[#f3eef8]': s.is_virtual }"
+          :class="{ 'bg-purple-subtle': s.is_virtual }"
         >
           <div class="flex justify-between items-start mb-1.5">
             <div class="flex-1 min-w-0 mr-2">
-              <div class="font-medium text-sm truncate">{{ p.name }}</div>
-              <div class="text-xs text-[#86868b] font-mono">
+              <div class="font-medium text-sm truncate">
+                <span v-if="!s.is_virtual && s.quantity < 10" class="todo-dot mr-1"></span>{{ p.name }}
+              </div>
+              <div class="text-xs text-muted font-mono">
                 {{ p.sku }}
-                <span v-if="p.brand" class="text-[#86868b] ml-1">· {{ p.brand }}</span>
+                <span v-if="p.brand" class="text-muted ml-1">· {{ p.brand }}</span>
               </div>
             </div>
             <div class="text-right flex-shrink-0">
-              <div class="text-lg font-bold" :class="s.is_virtual ? 'text-[#af52de]' : 'text-[#1d1d1f]'">{{ s.quantity }}</div>
-              <div class="text-xs text-[#86868b]">库存</div>
-              <div v-if="(s.reserved_qty || 0) > 0" class="text-xs text-[#ff9f0a]">预留 {{ s.reserved_qty }} / 可用 {{ s.available_qty ?? s.quantity }}</div>
+              <div class="text-lg font-bold" :class="s.is_virtual ? 'text-purple-emphasis' : 'text-foreground'">{{ s.quantity }}</div>
+              <div class="text-xs text-muted">库存</div>
+              <div v-if="(s.reserved_qty || 0) > 0" class="text-xs text-warning">预留 {{ s.reserved_qty }} / 可用 {{ s.available_qty ?? s.quantity }}</div>
             </div>
           </div>
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-1.5 text-xs">
               <span :class="s.is_virtual ? 'badge badge-purple' : 'badge badge-blue'">{{ s.is_virtual ? '寄售' : (s.location_code || '-') }}</span>
-              <span class="text-[#86868b]">{{ s.warehouse_name }}</span>
+              <span class="text-muted">{{ s.warehouse_name }}</span>
               <span v-if="!s.is_virtual" :class="getAgeClass(p.age_days)" class="ml-1">{{ p.age_days }}天</span>
             </div>
             <div class="flex items-center gap-2 text-xs flex-shrink-0">
               <template v-if="!s.is_virtual">
-                <button @click="openProductModal(p)" class="text-[#0071e3]">编辑</button>
-                <button v-if="hasPermission('stock_edit')" @click="openTransferModal(p, s)" class="text-[#34c759]">调拨</button>
+                <button @click="openProductModal(p)" class="text-primary">编辑</button>
+                <button v-if="hasPermission('stock_edit')" @click="openTransferModal(p, s)" class="text-success">调拨</button>
               </template>
-              <span v-else class="text-[#86868b]">只读</span>
+              <span v-else class="text-muted">只读</span>
             </div>
           </div>
         </div>
       </template>
-      <div v-if="!hasStockProducts" class="p-8 text-center text-[#86868b] text-sm">暂无库存商品</div>
+      <div v-if="!hasStockProducts" class="p-8 text-center text-muted text-sm">暂无库存商品</div>
     </div>
 
     <!-- 桌面表格视图 -->
     <div class="card hidden md:block">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left w-24 cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('brand')">
-                品牌 <span v-if="stockSort.key === 'brand'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-left w-24 cursor-pointer select-none hover:text-primary" @click="toggleStockSort('brand')">
+                品牌 <span v-if="stockSort.key === 'brand'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th class="px-3 py-2 text-left cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('name')">
-                商品名称 <span v-if="stockSort.key === 'name'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('name')">
+                商品名称 <span v-if="stockSort.key === 'name'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th class="px-3 py-2 text-left cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('warehouse')">
-                仓位 <span v-if="stockSort.key === 'warehouse'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('warehouse')">
+                仓位 <span v-if="stockSort.key === 'warehouse'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th class="px-3 py-2 text-right cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('retail_price')">
-                零售价 <span v-if="stockSort.key === 'retail_price'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('retail_price')">
+                零售价 <span v-if="stockSort.key === 'retail_price'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="hasPermission('finance')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('cost_price')">
-                成本 <span v-if="stockSort.key === 'cost_price'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th v-if="hasPermission('finance')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('cost_price')">
+                成本 <span v-if="stockSort.key === 'cost_price'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th class="px-3 py-2 text-right cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('quantity')">
-                库存 <span v-if="stockSort.key === 'quantity'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('quantity')">
+                库存 <span v-if="stockSort.key === 'quantity'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
               <th class="px-3 py-2 text-right">预留</th>
               <th class="px-3 py-2 text-right">可用</th>
-              <th class="px-3 py-2 text-center cursor-pointer select-none hover:text-[#0071e3]" @click="toggleStockSort('age')">
-                库龄 <span v-if="stockSort.key === 'age'" class="text-[#0071e3]">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
+              <th class="px-3 py-2 text-center cursor-pointer select-none hover:text-primary" @click="toggleStockSort('age')">
+                库龄 <span v-if="stockSort.key === 'age'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
               <th class="px-3 py-2 text-center">操作</th>
             </tr>
@@ -111,38 +113,40 @@
             <tr
               v-for="(row, idx) in sortedStockRows"
               :key="row.p.id + '-' + idx"
-              class="hover:bg-[#f5f5f7]"
-              :class="{ 'bg-[#f3eef8]': row.s.is_virtual }"
+              class="hover:bg-elevated"
+              :class="{ 'bg-purple-subtle': row.s.is_virtual }"
             >
-              <td class="px-3 py-2 text-[#6e6e73] text-xs">{{ row.p.brand || '-' }}</td>
+              <td class="px-3 py-2 text-secondary text-xs">{{ row.p.brand || '-' }}</td>
               <td class="px-3 py-2">
-                <div class="font-medium">{{ row.p.name }}</div>
-                <div class="text-xs text-[#86868b] font-mono mt-0.5">{{ row.p.sku }}</div>
+                <div class="font-medium">
+                  <span v-if="!row.s.is_virtual && row.s.quantity < 10" class="todo-dot mr-1.5"></span>{{ row.p.name }}
+                </div>
+                <div class="text-xs text-muted font-mono mt-0.5">{{ row.p.sku }}</div>
               </td>
               <td class="px-3 py-2">
                 <span :class="row.s.is_virtual ? 'badge badge-purple' : 'badge badge-blue'">{{ row.s.is_virtual ? '寄售' : (row.s.location_code || '-') }}</span>
-                <div class="text-xs text-[#86868b]">{{ row.s.warehouse_name }}</div>
+                <div class="text-xs text-muted">{{ row.s.warehouse_name }}</div>
               </td>
               <td class="px-3 py-2 text-right">{{ row.p.retail_price }}</td>
               <td v-if="hasPermission('finance')" class="px-3 py-2 text-right">{{ row.p.cost_price }}</td>
-              <td class="px-3 py-2 text-right font-semibold" :class="{ 'text-[#af52de]': row.s.is_virtual }">{{ row.s.quantity }}</td>
-              <td class="px-3 py-2 text-right" :class="(row.s.reserved_qty || 0) > 0 ? 'text-[#ff9f0a] font-semibold' : 'text-[#86868b]'">{{ row.s.reserved_qty || 0 }}</td>
-              <td class="px-3 py-2 text-right" :class="(row.s.available_qty ?? row.s.quantity) < (row.s.reserved_qty || 0) ? 'text-[#ff3b30] font-semibold' : 'text-[#34c759] font-semibold'">{{ row.s.available_qty ?? row.s.quantity }}</td>
+              <td class="px-3 py-2 text-right font-semibold" :class="{ 'text-purple-emphasis': row.s.is_virtual }">{{ row.s.quantity }}</td>
+              <td class="px-3 py-2 text-right" :class="(row.s.reserved_qty || 0) > 0 ? 'text-warning font-semibold' : 'text-muted'">{{ row.s.reserved_qty || 0 }}</td>
+              <td class="px-3 py-2 text-right" :class="(row.s.available_qty ?? row.s.quantity) < (row.s.reserved_qty || 0) ? 'text-error font-semibold' : 'text-success font-semibold'">{{ row.s.available_qty ?? row.s.quantity }}</td>
               <td class="px-3 py-2 text-center">
                 <span :class="getAgeClass(row.p.age_days)">{{ row.p.age_days }}天</span>
               </td>
               <td class="px-3 py-2 text-center">
                 <template v-if="!row.s.is_virtual">
-                  <button @click="openProductModal(row.p)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-                  <button v-if="hasPermission('stock_edit')" @click="openTransferModal(row.p, row.s)" class="text-[#34c759] text-xs">调拨</button>
+                  <button @click="openProductModal(row.p)" class="text-primary text-xs mr-2">编辑</button>
+                  <button v-if="hasPermission('stock_edit')" @click="openTransferModal(row.p, row.s)" class="text-success text-xs">调拨</button>
                 </template>
-                <span v-else class="text-xs text-[#86868b]">只读</span>
+                <span v-else class="text-xs text-muted">只读</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="!hasStockProducts" class="p-8 text-center text-[#86868b] text-sm">暂无库存商品</div>
+      <div v-if="!hasStockProducts" class="p-8 text-center text-muted text-sm">暂无库存商品</div>
     </div>
 
     <!-- 商品新增/编辑弹窗 -->

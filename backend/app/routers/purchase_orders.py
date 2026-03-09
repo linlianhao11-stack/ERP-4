@@ -23,7 +23,7 @@ from app.schemas.purchase import PurchaseOrderCreate, PurchaseReturnRequest, Rec
 from app.services.operation_log_service import log_operation
 from app.services.stock_service import update_weighted_entry_date, get_product_weighted_cost
 from app.services.sn_service import validate_and_add_sn_codes
-from app.utils.generators import generate_order_no
+from app.utils.generators import generate_order_no, generate_sequential_no
 from app.utils.time import now
 from app.utils.errors import parse_date
 
@@ -167,7 +167,7 @@ async def create_purchase_order(data: PurchaseOrderCreate, user: User = Depends(
     if not supplier:
         raise HTTPException(status_code=404, detail="供应商不存在")
 
-    po_no = generate_order_no("PO")
+    po_no = await generate_sequential_no("PO", "purchase_orders", "po_no")
     # resolve account_set: 优先用 data.account_set_id，其次 warehouse.account_set_id
     account_set_id = data.account_set_id
     if not account_set_id and data.target_warehouse_id:

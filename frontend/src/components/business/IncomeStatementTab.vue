@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="!data || !data.rows || data.rows.length === 0" class="text-center py-12 text-[#86868b] text-[13px]">暂无数据</div>
+    <div v-if="!data || !data.rows || data.rows.length === 0" class="text-center py-12 text-muted text-[13px]">暂无数据</div>
     <template v-else>
       <div class="table-container">
         <table class="w-full text-[13px]">
@@ -12,8 +12,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in data.rows" :key="idx" :class="isHeader(row.name) ? 'bg-[#f5f5f7]' : ''">
-              <td :class="[isHeader(row.name) ? 'font-semibold text-[#1d1d1f]' : 'text-[#6e6e73]', isSubItem(row.name) ? 'pl-6' : '']">
+            <tr v-for="(row, idx) in data.rows" :key="idx" :class="isHeader(row.name) ? 'bg-elevated' : ''">
+              <td :class="[isHeader(row.name) ? 'font-semibold text-foreground' : 'text-secondary', isSubItem(row.name) ? 'pl-6' : '']">
                 {{ row.name }}
               </td>
               <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">

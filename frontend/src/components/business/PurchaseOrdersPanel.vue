@@ -29,23 +29,25 @@
     <div class="md:hidden space-y-2">
       <div v-for="o in purchaseOrders" :key="o.id" class="card p-3" @click="detailRef?.viewPurchaseOrder(o.id)">
         <div class="flex justify-between items-start mb-1">
-          <div class="font-medium text-sm font-mono">{{ o.po_no }}</div>
-          <div class="text-lg font-bold text-[#0071e3]">¥{{ fmt(o.total_amount) }}</div>
+          <div class="font-medium text-sm font-mono">
+            <span v-if="['pending_review','paid','partial'].includes(o.status)" class="todo-dot mr-1"></span>{{ o.po_no }}
+          </div>
+          <div class="text-lg font-bold text-primary">¥{{ fmt(o.total_amount) }}</div>
         </div>
         <div class="flex justify-between items-center text-xs">
-          <div class="text-[#86868b]">{{ o.supplier_name }}</div>
+          <div class="text-muted">{{ o.supplier_name }}</div>
           <StatusBadge type="purchaseStatus" :status="o.status" />
         </div>
-        <div class="text-xs text-[#86868b] mt-1">{{ fmtDate(o.created_at) }} · {{ o.creator_name }}</div>
+        <div class="text-xs text-muted mt-1">{{ fmtDate(o.created_at) }} · {{ o.creator_name }}</div>
       </div>
-      <div v-if="!purchaseOrders.length" class="p-8 text-center text-[#86868b] text-sm">暂无采购订单</div>
+      <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无采购订单</div>
     </div>
 
     <!-- 桌面端表格 -->
     <div class="card hidden md:block">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th class="px-3 py-2 text-left">采购单号</th>
               <th class="px-3 py-2 text-left">供应商</th>
@@ -56,20 +58,22 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in purchaseOrders" :key="o.id" class="hover:bg-[#f5f5f7] cursor-pointer" @click="detailRef?.viewPurchaseOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm">{{ o.po_no }}</td>
+            <tr v-for="o in purchaseOrders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="detailRef?.viewPurchaseOrder(o.id)">
+              <td class="px-3 py-2 font-mono text-sm">
+                <span v-if="['pending_review','paid','partial'].includes(o.status)" class="todo-dot mr-1.5"></span>{{ o.po_no }}
+              </td>
               <td class="px-3 py-2">{{ o.supplier_name }}</td>
               <td class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
               <td class="px-3 py-2 text-center">
                 <StatusBadge type="purchaseStatus" :status="o.status" />
               </td>
-              <td class="px-3 py-2 text-[#6e6e73]">{{ o.creator_name }}</td>
-              <td class="px-3 py-2 text-[#86868b] text-xs">{{ fmtDate(o.created_at) }}</td>
+              <td class="px-3 py-2 text-secondary">{{ o.creator_name }}</td>
+              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="!purchaseOrders.length" class="p-8 text-center text-[#86868b] text-sm">暂无采购订单</div>
+      <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无采购订单</div>
     </div>
 
     <!-- 新建采购单弹窗（子组件） -->

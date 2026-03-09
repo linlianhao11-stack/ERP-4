@@ -10,14 +10,14 @@
       <h3 class="font-semibold mb-3 text-sm">销售员管理</h3>
       <!-- 销售员列表 -->
       <div class="space-y-2 mb-3 max-h-48 overflow-y-auto">
-        <div v-for="s in salespersons" :key="s.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
-          <span>{{ s.name }} <span v-if="s.phone" class="text-xs text-[#86868b]">{{ s.phone }}</span></span>
+        <div v-for="s in salespersons" :key="s.id" class="flex justify-between items-center p-2 bg-elevated rounded text-sm">
+          <span>{{ s.name }} <span v-if="s.phone" class="text-xs text-muted">{{ s.phone }}</span></span>
           <div>
-            <button @click="editSalesperson(s)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-            <button @click="handleDeleteSalesperson(s.id)" class="text-[#ff3b30] text-xs">删除</button>
+            <button @click="editSalesperson(s)" class="text-primary text-xs mr-2">编辑</button>
+            <button @click="handleDeleteSalesperson(s.id)" class="text-error text-xs">删除</button>
           </div>
         </div>
-        <div v-if="!salespersons.length" class="text-[#86868b] text-center py-2 text-sm">暂无销售员</div>
+        <div v-if="!salespersons.length" class="text-muted text-center py-2 text-sm">暂无销售员</div>
       </div>
       <!-- 新增销售员表单 -->
       <form @submit.prevent="handleCreateSalesperson" class="flex gap-2">

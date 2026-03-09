@@ -84,6 +84,9 @@ async def run_migrations():
     # 客户返利按账套隔离
     await migrate_customer_account_balance()
 
+    # 物流单号字段
+    await migrate_shipment_no()
+
     logger.info("数据库初始化完成")
 
 
@@ -413,7 +416,10 @@ async def migrate_accounting_phase1():
         logger.info("迁移: 检测到旧版 vouchers 表结构，重建为新版")
         await conn.execute_query("DROP TABLE IF EXISTS voucher_entries CASCADE")
         await conn.execute_query("DROP TABLE IF EXISTS vouchers CASCADE")
-        await Tortoise.generate_schemas(safe=True)
+        try:
+            await Tortoise.generate_schemas(safe=True)
+        except Exception:
+            pass
         logger.info("迁移: vouchers / voucher_entries 表已重建")
 
     # Warehouse: account_set_id
@@ -506,7 +512,10 @@ async def migrate_accounting_phase1():
 async def migrate_accounting_phase3():
     """阶段3应收应付迁移：7张新表 + 索引 + AR/AP权限（幂等）"""
     from tortoise import Tortoise
-    await Tortoise.generate_schemas(safe=True)
+    try:
+        await Tortoise.generate_schemas(safe=True)
+    except Exception:
+        pass  # Column already exists from init_db()
 
     conn = connections.get("default")
 
@@ -550,7 +559,10 @@ async def migrate_accounting_phase4():
     """阶段4迁移：出入库单+发票 6表 + 索引 + 科目补充"""
     conn = connections.get("default")
     from tortoise import Tortoise
-    await Tortoise.generate_schemas(safe=True)
+    try:
+        await Tortoise.generate_schemas(safe=True)
+    except Exception:
+        pass  # Column already exists from init_db()
 
     indexes = [
         ("idx_sdb_account_customer", "sales_delivery_bills", "account_set_id, customer_id"),
@@ -605,7 +617,10 @@ async def migrate_accounting_phase5():
 async def migrate_supplier_account_balance():
     """供应商返利按账套隔离迁移：新表 + RebateLog 新列 + 数据迁移 + 预置科目（幂等）"""
     from tortoise import Tortoise
-    await Tortoise.generate_schemas(safe=True)
+    try:
+        await Tortoise.generate_schemas(safe=True)
+    except Exception:
+        pass  # Column already exists from init_db()
 
     conn = connections.get("default")
 
@@ -682,7 +697,10 @@ async def migrate_supplier_account_balance():
 async def migrate_customer_account_balance():
     """客户返利按账套隔离迁移：新表 + 数据迁移（幂等）"""
     from tortoise import Tortoise
-    await Tortoise.generate_schemas(safe=True)
+    try:
+        await Tortoise.generate_schemas(safe=True)
+    except Exception:
+        pass  # Column already exists from init_db()
 
     conn = connections.get("default")
 
@@ -716,3 +734,17 @@ async def migrate_customer_account_balance():
                 logger.info(f"迁移: 客户 {row['name']} 返利余额已迁移到账套 {first_set.name}")
 
     logger.info("客户返利账套隔离迁移完成")
+
+
+async def migrate_shipment_no():
+    """为 shipments 表添加 shipment_no 列（幂等）"""
+    conn = connections.get("default")
+    columns = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'shipments'"
+    )
+    if not any(col["name"] == "shipment_no" for col in columns):
+        logger.info("迁移: 为 shipments 表添加 shipment_no 列")
+        await conn.execute_query(
+            "ALTER TABLE shipments ADD COLUMN shipment_no VARCHAR(30) UNIQUE"
+        )
+        logger.info("迁移完成: shipment_no 列已添加")

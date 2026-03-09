@@ -1,7 +1,9 @@
 """Dashboard路由 (PostgreSQL 专用 - 使用原生 SQL 聚合以获得最佳性能)"""
+from __future__ import annotations
+
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from tortoise import connections
 
 from app.auth.dependencies import get_current_user, require_permission
@@ -100,3 +102,128 @@ async def get_dashboard(user: User = Depends(require_permission("dashboard"))):
         result["consignment_value"] = consignment_value
 
     return result
+
+
+@router.get("/todo-counts")
+async def get_todo_counts(user: User = Depends(get_current_user)):
+    """返回各模块待办数量，按用户权限过滤"""
+    perms = user.permissions or []
+    is_admin = user.role == "admin"
+    conn = connections.get("default")
+    counts = {}
+
+    # 待发货（logistics 权限）
+    if is_admin or "logistics" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM orders WHERE shipping_status IN ('pending', 'partial')"
+            " AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_OUT')"
+        )
+        counts["pending_shipment"] = int(r[0]["c"]) if r else 0
+
+    # 待审核采购（purchase 权限）
+    if is_admin or "purchase" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM purchase_orders WHERE status = 'pending_review'"
+        )
+        counts["pending_review"] = int(r[0]["c"]) if r else 0
+
+    # 在途采购（purchase 权限）
+    if is_admin or "purchase" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM purchase_orders WHERE status IN ('paid', 'partial')"
+        )
+        counts["in_transit"] = int(r[0]["c"]) if r else 0
+
+    # 待收款（finance 权限）
+    if is_admin or "finance" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM customers WHERE balance > 0 AND is_active = true"
+        )
+        counts["pending_collection"] = int(r[0]["c"]) if r else 0
+
+    # 低库存预警（stock_view 权限）— 非虚拟仓合计 < 10 的活跃产品
+    if is_admin or "stock_view" in perms:
+        r = await conn.execute_query_dict("""
+            SELECT COUNT(*) as c FROM (
+                SELECT ws.product_id
+                FROM warehouse_stocks ws
+                JOIN warehouses w ON ws.warehouse_id = w.id
+                JOIN products p ON ws.product_id = p.id
+                WHERE NOT w.is_virtual AND p.is_active = true
+                GROUP BY ws.product_id
+                HAVING SUM(ws.quantity) < 10
+            ) sub
+        """)
+        counts["low_stock"] = int(r[0]["c"]) if r else 0
+
+    # 待处理应收（accounting_view 权限）
+    if is_admin or "accounting_view" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM receivable_bills WHERE status IN ('pending', 'partial')"
+        )
+        counts["pending_receivable"] = int(r[0]["c"]) if r else 0
+
+    return counts
+
+
+@router.get("/dashboard/sales-trend")
+async def get_sales_trend(
+    days: int = Query(default=30, ge=7, le=90),
+    user: User = Depends(require_permission("dashboard"))
+):
+    """返回最近 N 天的每日销售额趋势"""
+    start_date = now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)
+    conn = connections.get("default")
+    rows = await conn.execute_query_dict("""
+        SELECT DATE(created_at) as date,
+               COALESCE(SUM(total_amount), 0) as amount
+        FROM orders
+        WHERE created_at >= $1
+          AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
+        GROUP BY DATE(created_at)
+        ORDER BY date
+    """, [start_date])
+
+    # 填充没有数据的日期为 0
+    result = []
+    current = start_date
+    end = now().replace(hour=0, minute=0, second=0, microsecond=0)
+    date_map = {str(r["date"]): float(r["amount"]) for r in rows}
+    while current <= end:
+        d = str(current.date())
+        result.append({"date": d, "amount": date_map.get(d, 0)})
+        current += timedelta(days=1)
+
+    return result
+
+
+@router.get("/dashboard/recent-orders")
+async def get_recent_orders(
+    limit: int = Query(default=10, ge=1, le=50),
+    user: User = Depends(require_permission("dashboard"))
+):
+    """返回最近的销售订单"""
+    conn = connections.get("default")
+    rows = await conn.execute_query_dict("""
+        SELECT o.id, o.order_no, o.order_type, o.total_amount,
+               o.shipping_status, o.is_cleared, o.created_at,
+               c.name as customer_name
+        FROM orders o
+        LEFT JOIN customers c ON o.customer_id = c.id
+        ORDER BY o.created_at DESC
+        LIMIT $1
+    """, [limit])
+
+    return [
+        {
+            "id": r["id"],
+            "order_no": r["order_no"],
+            "order_type": r["order_type"],
+            "total_amount": float(r["total_amount"]),
+            "shipping_status": r["shipping_status"],
+            "is_cleared": r["is_cleared"],
+            "customer_name": r["customer_name"] or "-",
+            "created_at": str(r["created_at"])[:19].replace("T", " ") if r["created_at"] else "",
+        }
+        for r in rows
+    ]

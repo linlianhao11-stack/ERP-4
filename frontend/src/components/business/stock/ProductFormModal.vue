@@ -9,7 +9,7 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">{{ product ? '编辑商品' : '新增商品' }}</h3>
-          <button @click="close" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="close" class="text-muted text-xl">&times;</button>
         </div>
         <!-- 表单 -->
         <div class="p-4">

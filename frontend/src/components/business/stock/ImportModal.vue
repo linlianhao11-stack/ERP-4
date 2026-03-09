@@ -9,15 +9,15 @@
         <!-- 标题栏 -->
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-semibold">导入商品</h3>
-          <button @click="close" class="text-[#86868b] text-xl">&times;</button>
+          <button @click="close" class="text-muted text-xl">&times;</button>
         </div>
         <!-- 内容 -->
         <div class="p-4">
           <div class="space-y-4">
             <!-- 说明 -->
-            <div class="p-4 bg-[#e8f4fd] rounded-lg">
-              <h4 class="font-semibold text-[#0071e3] mb-2">导入说明</h4>
-              <ul class="text-sm text-[#0071e3] space-y-1">
+            <div class="p-4 bg-info-subtle rounded-lg">
+              <h4 class="font-semibold text-primary mb-2">导入说明</h4>
+              <ul class="text-sm text-primary space-y-1">
                 <li>支持 .xlsx 和 .xls 格式</li>
                 <li>SKU为必填字段，用于匹配商品</li>
                 <li>已存在的SKU将更新信息，新SKU将创建商品</li>

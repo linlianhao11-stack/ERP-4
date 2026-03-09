@@ -20,7 +20,7 @@
         </template>
       </select>
       <!-- 寄售开关 -->
-      <label class="flex items-center gap-1.5 text-xs text-[#86868b] cursor-pointer whitespace-nowrap select-none">
+      <label class="flex items-center gap-1.5 text-xs text-muted cursor-pointer whitespace-nowrap select-none">
         <span class="toggle">
           <input
             type="checkbox"
@@ -46,7 +46,7 @@
       <!-- 退货订单提示 -->
       <div
         v-if="orderType === 'RETURN' && selectedReturnOrder"
-        class="w-full text-sm px-3 py-2 bg-[#e8f4fd] rounded border border-[#b3d7f5] text-[#0071e3]"
+        class="w-full text-sm px-3 py-2 bg-info-subtle rounded border border-primary text-primary"
       >
         <span class="font-medium">退货订单：</span>{{ selectedReturnOrder.order_no }} - {{ selectedReturnOrder.customer_name }}
       </div>
@@ -56,7 +56,7 @@
     <div class="card">
       <div class="table-container">
         <table class="w-full text-sm">
-          <thead class="bg-[#f5f5f7]">
+          <thead class="bg-elevated">
             <tr>
               <th class="px-3 py-2 text-left w-24 md-hide">品牌</th>
               <th class="px-3 py-2 text-left">商品名称</th>
@@ -73,28 +73,28 @@
               v-for="p in displayProducts"
               :key="p.id + '-' + (p.stock_key || '')"
               @click="!p.is_virtual_stock && $emit('add-to-cart', p)"
-              class="hover:bg-[#f5f5f7]"
+              class="hover:bg-elevated"
               :class="{
-                'bg-[#e8f4fd]': !p.is_virtual_stock && cart.some(c => c.product_id === p.id),
-                'bg-[#f3eef8]': p.is_virtual_stock,
+                'bg-info-subtle': !p.is_virtual_stock && cart.some(c => c.product_id === p.id),
+                'bg-purple-subtle': p.is_virtual_stock,
                 'cursor-pointer': !p.is_virtual_stock
               }"
             >
-              <td class="px-3 py-2 text-[#6e6e73] text-xs md-hide">{{ p.brand || '-' }}</td>
+              <td class="px-3 py-2 text-secondary text-xs md-hide">{{ p.brand || '-' }}</td>
               <td class="px-3 py-2">
                 <div class="font-medium">{{ p.name }}</div>
-                <div class="text-xs text-[#86868b] font-mono mt-0.5">{{ p.sku }}</div>
+                <div class="text-xs text-muted font-mono mt-0.5">{{ p.sku }}</div>
               </td>
               <td class="px-3 py-2 md-hide">
                 <span v-if="p.is_virtual_stock" class="badge badge-purple text-xs">寄售</span>
                 <span v-else-if="p.location_code" class="badge badge-blue text-xs">{{ p.location_code }}</span>
-                <span v-else class="text-[#86868b] text-xs">-</span>
+                <span v-else class="text-muted text-xs">-</span>
               </td>
-              <td class="px-3 py-2 text-right text-[#0071e3] font-bold">&yen;{{ p.retail_price }}</td>
-              <td class="px-3 py-2 text-right text-[#6e6e73] md-hide" v-if="hasPermission('finance')">&yen;{{ p.cost_price }}</td>
+              <td class="px-3 py-2 text-right text-primary font-bold">&yen;{{ p.retail_price }}</td>
+              <td class="px-3 py-2 text-right text-secondary md-hide" v-if="hasPermission('finance')">&yen;{{ p.cost_price }}</td>
               <td
                 class="px-3 py-2 text-center font-semibold"
-                :class="p.is_virtual_stock ? 'text-[#af52de]' : getAgeClass(p.age_days)"
+                :class="p.is_virtual_stock ? 'text-purple-emphasis' : getAgeClass(p.age_days)"
               >
                 {{ p.display_stock !== undefined ? p.display_stock : getStock(p) }}
               </td>
@@ -103,13 +103,13 @@
                 <button
                   v-if="!p.is_virtual_stock"
                   @click.stop="$emit('add-to-cart', p)"
-                  class="text-[#0071e3] text-xs font-semibold hover:underline"
+                  class="text-primary text-xs font-semibold hover:underline"
                 >加入</button>
-                <span v-else class="text-xs text-[#86868b]">只读</span>
+                <span v-else class="text-xs text-muted">只读</span>
               </td>
             </tr>
             <tr v-if="!displayProducts.length">
-              <td :colspan="hasPermission('finance') ? 8 : 7" class="px-3 py-8 text-center text-[#86868b]">暂无商品</td>
+              <td :colspan="hasPermission('finance') ? 8 : 7" class="px-3 py-8 text-center text-muted">暂无商品</td>
             </tr>
           </tbody>
         </table>

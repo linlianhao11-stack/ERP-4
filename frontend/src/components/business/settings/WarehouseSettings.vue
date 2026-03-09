@@ -13,31 +13,31 @@
       <div class="space-y-3 mb-3">
         <div v-for="w in warehouses.filter(x => !x.is_virtual)" :key="w.id" class="border rounded-lg overflow-hidden">
           <!-- 仓库标题行 -->
-          <div class="flex justify-between items-center p-3 bg-[#f5f5f7] cursor-pointer" @click="toggleExpandWarehouse(w.id)">
+          <div class="flex justify-between items-center p-3 bg-elevated cursor-pointer" @click="toggleExpandWarehouse(w.id)">
             <div class="flex items-center gap-2">
-              <span class="text-xs text-[#86868b]">{{ expandedWarehouse === w.id ? '▼' : '▶' }}</span>
+              <span class="text-xs text-muted">{{ expandedWarehouse === w.id ? '▼' : '▶' }}</span>
               <span class="font-medium text-sm">{{ w.name }}</span>
-              <span v-if="w.is_default" class="text-xs text-[#0071e3] bg-[#e8f4fd] px-1.5 py-0.5 rounded">(默认)</span>
-              <span v-if="w.account_set_name" class="text-xs text-white bg-[#0071e3] px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
-              <span class="text-xs text-[#86868b]">{{ (w.locations || []).length }} 个仓位</span>
+              <span v-if="w.is_default" class="text-xs text-primary bg-info-subtle px-1.5 py-0.5 rounded">(默认)</span>
+              <span v-if="w.account_set_name" class="text-xs text-white bg-primary px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
+              <span class="text-xs text-muted">{{ (w.locations || []).length }} 个仓位</span>
             </div>
             <div class="flex gap-2" @click.stop>
-              <button v-if="!w.is_default" @click="handleSetDefaultWarehouse(w.id)" class="text-[#248a3d] text-xs">设为默认</button>
-              <button @click="editWarehouse(w)" class="text-[#0071e3] text-xs">改名</button>
-              <button v-if="!w.is_default" @click="handleDeleteWarehouse(w.id)" class="text-[#ff3b30] text-xs">删除</button>
+              <button v-if="!w.is_default" @click="handleSetDefaultWarehouse(w.id)" class="text-success-emphasis text-xs">设为默认</button>
+              <button @click="editWarehouse(w)" class="text-primary text-xs">改名</button>
+              <button v-if="!w.is_default" @click="handleDeleteWarehouse(w.id)" class="text-error text-xs">删除</button>
             </div>
           </div>
           <!-- 仓位列表（展开后显示） -->
-          <div v-if="expandedWarehouse === w.id" class="p-3 border-t bg-white">
+          <div v-if="expandedWarehouse === w.id" class="p-3 border-t bg-surface">
             <div class="space-y-1.5 mb-3 max-h-48 overflow-y-auto">
-              <div v-for="loc in (w.locations || [])" :key="loc.id" class="flex justify-between items-center px-3 py-1.5 bg-[#f5f5f7] rounded text-sm">
-                <span>{{ loc.code }} <span v-if="loc.name" class="text-xs text-[#86868b]">{{ loc.name }}</span></span>
+              <div v-for="loc in (w.locations || [])" :key="loc.id" class="flex justify-between items-center px-3 py-1.5 bg-elevated rounded text-sm">
+                <span>{{ loc.code }} <span v-if="loc.name" class="text-xs text-muted">{{ loc.name }}</span></span>
                 <div>
-                  <button @click="editLocation(loc, w.id)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-                  <button @click="handleDeleteLocation(loc.id)" class="text-[#ff3b30] text-xs">删除</button>
+                  <button @click="editLocation(loc, w.id)" class="text-primary text-xs mr-2">编辑</button>
+                  <button @click="handleDeleteLocation(loc.id)" class="text-error text-xs">删除</button>
                 </div>
               </div>
-              <div v-if="!(w.locations || []).length" class="text-[#86868b] text-center py-2 text-xs">暂无仓位</div>
+              <div v-if="!(w.locations || []).length" class="text-muted text-center py-2 text-xs">暂无仓位</div>
             </div>
             <!-- 新增仓位表单 -->
             <form @submit.prevent="handleCreateLocation(w.id)" class="flex gap-2">
@@ -58,13 +58,13 @@
     <!-- SN码管理配置卡片 -->
     <div class="card p-4">
       <h3 class="font-semibold mb-3 text-sm">SN码管理配置</h3>
-      <div class="text-xs text-[#86868b] mb-3">配置需要SN码追踪的"仓库+品牌"组合，启用后入库必填SN码</div>
+      <div class="text-xs text-muted mb-3">配置需要SN码追踪的"仓库+品牌"组合，启用后入库必填SN码</div>
       <div class="space-y-2 mb-3 max-h-48 overflow-y-auto">
-        <div v-for="c in snConfigs" :key="c.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
-          <span>{{ c.warehouse_name }} <span class="text-[#0071e3] font-medium">{{ c.brand }}</span></span>
-          <button @click="handleDeleteSnConfig(c.id)" class="text-[#ff3b30] text-xs">删除</button>
+        <div v-for="c in snConfigs" :key="c.id" class="flex justify-between items-center p-2 bg-elevated rounded text-sm">
+          <span>{{ c.warehouse_name }} <span class="text-primary font-medium">{{ c.brand }}</span></span>
+          <button @click="handleDeleteSnConfig(c.id)" class="text-error text-xs">删除</button>
         </div>
-        <div v-if="!snConfigs.length" class="text-[#86868b] text-center py-2 text-sm">暂无配置</div>
+        <div v-if="!snConfigs.length" class="text-muted text-center py-2 text-sm">暂无配置</div>
       </div>
       <div class="flex gap-2">
         <select v-model="newSnConfigWarehouse" class="input flex-1 text-sm">

@@ -1,20 +1,18 @@
 <template>
   <div>
-    <!-- 订单明细 Tab -->
+    <!-- 订单明细 / 欠款明细共用同一个组件 -->
     <FinanceOrdersTab
-      v-show="tab === 'orders'"
-      :active="tab === 'orders'"
+      :active="tab === 'orders' || tab === 'unpaid'"
+      :tab="tab"
       ref="ordersTab"
       @data-changed="emit('data-changed')"
       @open-payment="openPayment"
     />
-    <!-- 欠款明细 Tab -->
+    <!-- 收款弹窗（保留在 UnpaidTab 中） -->
     <FinanceUnpaidTab
-      v-show="tab === 'unpaid'"
-      :active="tab === 'unpaid'"
+      v-show="false"
       ref="unpaidTab"
       @data-changed="emit('data-changed')"
-      @view-order="viewOrder"
     />
   </div>
 </template>
@@ -22,10 +20,10 @@
 <script setup>
 /**
  * 财务订单面板 — 瘦容器
- * 负责在"订单明细"和"欠款明细"两个 Tab 之间切换，
- * 并将 FinanceView 的调用链转发到对应子组件。
+ * 订单明细和欠款明细共用 FinanceOrdersTab（通过 tab prop 区分）
+ * FinanceUnpaidTab 仅保留收款弹窗功能
  */
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import FinanceOrdersTab from './finance/FinanceOrdersTab.vue'
 import FinanceUnpaidTab from './finance/FinanceUnpaidTab.vue'
 
@@ -40,31 +38,20 @@ const emit = defineEmits(['data-changed'])
 const ordersTab = ref(null)
 const unpaidTab = ref(null)
 
-// --- Tab 切换时刷新对应子组件 ---
-watch(() => props.tab, (val) => {
-  if (val === 'orders') ordersTab.value?.refresh()
-  else if (val === 'unpaid') unpaidTab.value?.refresh()
-})
-
 // --- 转发方法 ---
-/** 查看订单详情（转发到订单 Tab） */
+/** 查看订单详情 */
 const viewOrder = (id) => {
   ordersTab.value?.viewOrder(id)
 }
 
-/** 打开收款弹窗（转发到欠款 Tab） */
+/** 打开收款弹窗（转发到 UnpaidTab） */
 const openPayment = () => {
   unpaidTab.value?.openPaymentModal()
 }
 
-/** 刷新指定或全部 Tab */
-const refresh = (tabName) => {
-  if (tabName === 'orders') ordersTab.value?.refresh()
-  else if (tabName === 'unpaid') unpaidTab.value?.refresh()
-  else {
-    ordersTab.value?.refresh()
-    unpaidTab.value?.refresh()
-  }
+/** 刷新 */
+const refresh = () => {
+  ordersTab.value?.refresh()
 }
 
 defineExpose({ refresh, viewOrder })

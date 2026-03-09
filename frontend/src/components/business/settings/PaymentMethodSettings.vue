@@ -9,28 +9,28 @@
     <div class="grid md:grid-cols-2 gap-5">
       <div class="card p-4">
         <h3 class="font-semibold mb-3 text-sm">收款方式管理</h3>
-        <div class="text-xs text-[#86868b] mb-3">管理收款时可选的付款方式，修改后全局生效</div>
+        <div class="text-xs text-muted mb-3">管理收款时可选的付款方式，修改后全局生效</div>
         <div class="space-y-2 mb-3">
-          <div v-for="m in paymentMethods" :key="m.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
+          <div v-for="m in paymentMethods" :key="m.id" class="flex justify-between items-center p-2 bg-elevated rounded text-sm">
             <!-- 编辑模式 -->
             <div v-if="editingPayMethodId === m.id" class="flex items-center gap-2 flex-1">
               <input v-model="editingPayMethodName" class="input text-sm flex-1" @keyup.enter="saveEditPaymentMethod" @keyup.escape="cancelEditPaymentMethod">
-              <button @click="saveEditPaymentMethod" class="text-[#248a3d] text-xs font-medium">保存</button>
-              <button @click="cancelEditPaymentMethod" class="text-[#86868b] text-xs">取消</button>
+              <button @click="saveEditPaymentMethod" class="text-success-emphasis text-xs font-medium">保存</button>
+              <button @click="cancelEditPaymentMethod" class="text-muted text-xs">取消</button>
             </div>
             <!-- 展示模式 -->
             <template v-else>
               <div>
                 <span class="font-medium">{{ m.name }}</span>
-                <span class="text-xs text-[#86868b] ml-1">({{ m.code }})</span>
+                <span class="text-xs text-muted ml-1">({{ m.code }})</span>
               </div>
               <div>
-                <button @click="editPaymentMethod(m)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-                <button @click="handleDeletePaymentMethod(m.id)" class="text-[#ff3b30] text-xs">删除</button>
+                <button @click="editPaymentMethod(m)" class="text-primary text-xs mr-2">编辑</button>
+                <button @click="handleDeletePaymentMethod(m.id)" class="text-error text-xs">删除</button>
               </div>
             </template>
           </div>
-          <div v-if="!paymentMethods.length" class="text-[#86868b] text-center py-2 text-sm">暂无收款方式</div>
+          <div v-if="!paymentMethods.length" class="text-muted text-center py-2 text-sm">暂无收款方式</div>
         </div>
         <!-- 新增收款方式 -->
         <form @submit.prevent="handleCreatePaymentMethod" class="flex gap-2">
@@ -45,28 +45,28 @@
     <div class="grid md:grid-cols-2 gap-5 mt-5">
       <div class="card p-4">
         <h3 class="font-semibold mb-3 text-sm">付款方式管理</h3>
-        <div class="text-xs text-[#86868b] mb-3">管理向供应商付款时可选的付款方式，修改后全局生效</div>
+        <div class="text-xs text-muted mb-3">管理向供应商付款时可选的付款方式，修改后全局生效</div>
         <div class="space-y-2 mb-3">
-          <div v-for="m in disbursementMethods" :key="m.id" class="flex justify-between items-center p-2 bg-[#f5f5f7] rounded text-sm">
+          <div v-for="m in disbursementMethods" :key="m.id" class="flex justify-between items-center p-2 bg-elevated rounded text-sm">
             <!-- 编辑模式 -->
             <div v-if="editingDisbMethodId === m.id" class="flex items-center gap-2 flex-1">
               <input v-model="editingDisbMethodName" class="input text-sm flex-1" @keyup.enter="saveEditDisbursementMethod" @keyup.escape="cancelEditDisbursementMethod">
-              <button @click="saveEditDisbursementMethod" class="text-[#248a3d] text-xs font-medium">保存</button>
-              <button @click="cancelEditDisbursementMethod" class="text-[#86868b] text-xs">取消</button>
+              <button @click="saveEditDisbursementMethod" class="text-success-emphasis text-xs font-medium">保存</button>
+              <button @click="cancelEditDisbursementMethod" class="text-muted text-xs">取消</button>
             </div>
             <!-- 展示模式 -->
             <template v-else>
               <div>
                 <span class="font-medium">{{ m.name }}</span>
-                <span class="text-xs text-[#86868b] ml-1">({{ m.code }})</span>
+                <span class="text-xs text-muted ml-1">({{ m.code }})</span>
               </div>
               <div>
-                <button @click="editDisbursementMethod(m)" class="text-[#0071e3] text-xs mr-2">编辑</button>
-                <button @click="handleDeleteDisbursementMethod(m.id)" class="text-[#ff3b30] text-xs">删除</button>
+                <button @click="editDisbursementMethod(m)" class="text-primary text-xs mr-2">编辑</button>
+                <button @click="handleDeleteDisbursementMethod(m.id)" class="text-error text-xs">删除</button>
               </div>
             </template>
           </div>
-          <div v-if="!disbursementMethods.length" class="text-[#86868b] text-center py-2 text-sm">暂无付款方式</div>
+          <div v-if="!disbursementMethods.length" class="text-muted text-center py-2 text-sm">暂无付款方式</div>
         </div>
         <!-- 新增付款方式 -->
         <form @submit.prevent="handleCreateDisbursementMethod" class="flex gap-2">

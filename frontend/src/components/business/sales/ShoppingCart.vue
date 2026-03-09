@@ -8,7 +8,7 @@
     <!-- 标题栏 -->
     <div class="p-3 border-b flex justify-between items-center">
       <h3 class="font-semibold text-sm">购物车({{ cart.length }})</h3>
-      <button @click="$emit('clear')" class="text-[#ff3b30] text-xs" v-show="cart.length">清空</button>
+      <button @click="$emit('clear')" class="text-error text-xs" v-show="cart.length">清空</button>
     </div>
 
     <!-- 购物车商品列表 -->
@@ -22,13 +22,13 @@
             <button
               v-if="orderType !== 'RETURN' && orderType !== 'CONSIGN_SETTLE'"
               @click="$emit('duplicate-line', idx)"
-              class="w-5 h-5 rounded-full bg-[#e8f4fd] text-[#0071e3] text-xs font-bold flex items-center justify-center hover:bg-[#d1e8f8]"
+              class="w-5 h-5 rounded-full bg-info-subtle text-primary text-xs font-bold flex items-center justify-center hover:bg-info-subtle"
               title="从其他仓库再出一行"
             >+</button>
             <!-- 删除按钮 -->
             <button
               @click="$emit('remove-item', idx)"
-              class="w-5 h-5 rounded-full bg-[#ffeaee] text-[#ff3b30] text-xs font-bold flex items-center justify-center hover:bg-[#ffd6d6]"
+              class="w-5 h-5 rounded-full bg-error-subtle text-error text-xs font-bold flex items-center justify-center hover:bg-error-subtle"
               title="删除"
             >-</button>
           </div>
@@ -36,9 +36,9 @@
 
         <!-- 价格和数量调整 -->
         <div class="flex items-center gap-2 text-sm">
-          <span class="text-[#86868b]">&yen;</span>
+          <span class="text-muted">&yen;</span>
           <input v-model.number="item.unit_price" type="number" step="0.01" class="input input-sm w-16 text-right">
-          <span class="text-[#86868b]">&times;</span>
+          <span class="text-muted">&times;</span>
           <button @click="item.quantity = Math.max(1, item.quantity - 1)" class="w-6 h-6 rounded border text-xs">-</button>
           <input
             v-model.number="item.quantity"
@@ -81,25 +81,25 @@
             >{{ loc.code }} (可用: {{ (s => s ? (s.available_qty ?? s.quantity) : 0)(item.stocks?.find(s => s.warehouse_id === parseInt(item.warehouse_id) && s.location_id === loc.id)) }})</option>
           </select>
           <!-- 库存提示 -->
-          <div v-if="item.warehouse_id && item.location_id" class="text-xs text-[#6e6e73]">
+          <div v-if="item.warehouse_id && item.location_id" class="text-xs text-secondary">
             可用库存:
-            <span :class="getCartStock(item) >= item.quantity ? 'text-[#34c759] font-semibold' : 'text-[#ff3b30] font-semibold'">
+            <span :class="getCartStock(item) >= item.quantity ? 'text-success font-semibold' : 'text-error font-semibold'">
               {{ getCartStock(item) }}
             </span> 件
           </div>
         </div>
 
         <!-- 退货数量上限提示 -->
-        <div v-if="orderType === 'RETURN' && item.max_return_qty" class="text-xs text-[#ff9f0a] mt-1">
+        <div v-if="orderType === 'RETURN' && item.max_return_qty" class="text-xs text-warning mt-1">
           最多可退: {{ item.max_return_qty }} 件
         </div>
 
         <!-- 行小计 -->
-        <div class="text-right text-[#0071e3] font-semibold text-sm mt-1">
+        <div class="text-right text-primary font-semibold text-sm mt-1">
           &yen;{{ (Math.round(item.unit_price * item.quantity * 100) / 100).toFixed(2) }}
         </div>
       </div>
-      <div v-if="!cart.length" class="text-[#86868b] text-center py-6 text-sm">空</div>
+      <div v-if="!cart.length" class="text-muted text-center py-6 text-sm">空</div>
     </div>
 
     <!-- 底栏：客户/销售员/订单类型/退货搜索/合计/提交 -->
@@ -155,17 +155,17 @@
           <!-- 退货订单下拉列表 -->
           <div
             v-if="returnOrderDropdown && filteredReturnOrders.length"
-            class="absolute bottom-full mb-1 w-full bg-white border rounded shadow-lg max-h-60 overflow-y-auto"
+            class="absolute bottom-full mb-1 w-full bg-surface border rounded shadow-lg max-h-60 overflow-y-auto"
             style="z-index: 30"
           >
             <div
               v-for="o in filteredReturnOrders"
               :key="o.id"
               @click="$emit('select-return-order', o)"
-              class="px-3 py-2 hover:bg-[#f5f5f7] cursor-pointer border-b"
+              class="px-3 py-2 hover:bg-elevated cursor-pointer border-b"
             >
               <div class="font-medium text-sm">{{ o.order_no }}</div>
-              <div class="text-xs text-[#86868b]">{{ o.customer_name }} &middot; {{ o.created_at.split('T')[0] }} &middot; &yen;{{ o.total_amount }}</div>
+              <div class="text-xs text-muted">{{ o.customer_name }} &middot; {{ o.created_at.split('T')[0] }} &middot; &yen;{{ o.total_amount }}</div>
             </div>
           </div>
           <!-- 关闭下拉的遮罩 -->
@@ -176,7 +176,7 @@
       <!-- 合计金额 -->
       <div class="flex justify-between mb-2">
         <span class="text-sm">合计</span>
-        <span class="text-lg font-bold text-[#0071e3]">&yen;{{ fmt(cartTotal) }}</span>
+        <span class="text-lg font-bold text-primary">&yen;{{ fmt(cartTotal) }}</span>
       </div>
       <!-- 提交按钮 -->
       <button @click="$emit('submit')" class="btn btn-primary w-full text-sm" :disabled="!cart.length">提交订单</button>
