@@ -13,6 +13,7 @@ from app.models import (
     Order, OrderItem, WarehouseStock, StockLog, Payment, PaymentOrder,
     Shipment, ShipmentItem, RebateLog
 )
+from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.order import OrderCreate, CancelRequest
 from app.services.order_service import (
     validate_order_entities, resolve_item_entities, process_item_stock,
@@ -152,7 +153,8 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                         creator=user,
                     )
                 except Exception as e:
-                    logger.warning(f"退货自动生成红字应收单失败: {e}")
+                    logger.error(f"退货自动生成红字应收单失败: {e}")
+                    raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
 
             # 7. 操作日志
             order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
@@ -178,7 +180,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 async def list_orders(order_type: Optional[str] = None, customer_id: Optional[int] = None,
                       start_date: Optional[str] = None, end_date: Optional[str] = None,
                       shipping_status: Optional[str] = None, account_set_id: Optional[int] = None,
-                      offset: int = 0, limit: int = 100, user: User = Depends(get_current_user)):
+                      offset: int = 0, limit: int = 100, user: User = Depends(require_permission("sales", "finance", "logistics"))):
     limit = min(limit, 1000)
     query = Order.all()
     if order_type:
@@ -224,7 +226,7 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
 
 
 @router.get("/{order_id}")
-async def get_order(order_id: int, user: User = Depends(get_current_user)):
+async def get_order(order_id: int, user: User = Depends(require_permission("sales", "finance", "logistics"))):
     order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "related_order", "salesperson").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
@@ -503,6 +505,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                 shipping_status="completed",
                 remark=f"由取消订单 {order.order_no} 拆分生成（已发货部分）",
                 salesperson_id=order.salesperson_id,
+                account_set_id=order.account_set_id,
                 creator=user
             )
 
@@ -560,14 +563,32 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
             refund_rebate = Decimal(str(data.refund_rebate or 0))
 
             if refund_rebate > 0:
-                await Customer.filter(id=customer.id).update(
-                    rebate_balance=F('rebate_balance') + refund_rebate
-                )
-                await customer.refresh_from_db()
+                account_set_id = order.account_set_id
+                if account_set_id:
+                    bal = await CustomerAccountBalance.filter(
+                        customer_id=customer.id, account_set_id=account_set_id
+                    ).first()
+                    if not bal:
+                        bal = await CustomerAccountBalance.create(
+                            customer_id=customer.id, account_set_id=account_set_id,
+                            rebate_balance=0
+                        )
+                    await CustomerAccountBalance.filter(id=bal.id).update(
+                        rebate_balance=F('rebate_balance') + refund_rebate
+                    )
+                    await bal.refresh_from_db()
+                    balance_after = bal.rebate_balance
+                else:
+                    await Customer.filter(id=customer.id).update(
+                        rebate_balance=F('rebate_balance') + refund_rebate
+                    )
+                    await customer.refresh_from_db()
+                    balance_after = customer.rebate_balance
                 await RebateLog.create(
                     target_type="customer", target_id=customer.id,
                     type="refund", amount=refund_rebate,
-                    balance_after=customer.rebate_balance,
+                    balance_after=balance_after,
+                    account_set_id=account_set_id,
                     reference_type="ORDER", reference_id=order.id,
                     remark=f"取消订单 {order.order_no} 退回返利",
                     creator=user
