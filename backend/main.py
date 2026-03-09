@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -202,6 +202,9 @@ async def spa_fallback(full_path: str):
     last_segment = full_path.rsplit('/', 1)[-1]
     dot_pos = last_segment.rfind('.')
     if dot_pos > 0 and last_segment[dot_pos:] in _STATIC_EXTENSIONS:
+        file_path = os.path.join(static_dir, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
         raise HTTPException(status_code=404, detail="Not found")
     return _html_response()
 

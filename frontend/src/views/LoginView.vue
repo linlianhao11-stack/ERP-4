@@ -176,22 +176,10 @@ const doChangePassword = async () => {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: url("https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1400&q=85");
-  background-size: cover;
-  background-position: center 40%;
-  filter: saturate(0.3) brightness(0.9);
-}
-.login-brand::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to right,
-    oklch(0.06 0.03 250 / 0.70) 0%,
-    oklch(0.08 0.02 250 / 0.45) 40%,
-    oklch(0.06 0.02 250 / 0.60) 70%,
-    oklch(0.05 0.02 250 / 0.85) 100%
-  );
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 50%, oklch(0.25 0.08 250 / 0.6) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 80% at 80% 30%, oklch(0.20 0.06 220 / 0.5) 0%, transparent 60%),
+    linear-gradient(135deg, oklch(0.08 0.04 250) 0%, oklch(0.12 0.03 240) 50%, oklch(0.07 0.02 260) 100%);
 }
 .login-brand-content {
   position: relative;
