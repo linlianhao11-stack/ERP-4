@@ -1,9 +1,10 @@
 """供应商返利按账套隔离测试"""
 import pytest
 from decimal import Decimal
-from app.models import Supplier, RebateLog, User
+from app.models import Supplier, RebateLog, User, Customer
 from app.models.accounting import AccountSet
 from app.models.supplier_balance import SupplierAccountBalance
+from app.models.customer_balance import CustomerAccountBalance
 
 
 @pytest.mark.asyncio
@@ -85,3 +86,47 @@ async def test_rebate_log_without_account_set():
         creator=user
     )
     assert log.account_set_id is None
+
+
+@pytest.mark.asyncio
+async def test_customer_account_balance_create():
+    """测试 CustomerAccountBalance 创建"""
+    customer = await Customer.create(name="测试客户A")
+    aset = await AccountSet.create(
+        code="CTEST01", name="客户测试账套1", start_year=2026, current_period="2026-01"
+    )
+    bal = await CustomerAccountBalance.create(
+        customer=customer, account_set=aset,
+        rebate_balance=Decimal("800")
+    )
+    assert bal.rebate_balance == Decimal("800")
+    assert bal.customer_id == customer.id
+    assert bal.account_set_id == aset.id
+
+
+@pytest.mark.asyncio
+async def test_customer_balance_isolation():
+    """测试不同账套的客户返利余额隔离"""
+    customer = await Customer.create(name="测试客户B")
+    aset1 = await AccountSet.create(
+        code="CSET_A", name="客户账套A", start_year=2026, current_period="2026-01"
+    )
+    aset2 = await AccountSet.create(
+        code="CSET_B", name="客户账套B", start_year=2026, current_period="2026-01"
+    )
+    await CustomerAccountBalance.create(
+        customer=customer, account_set=aset1,
+        rebate_balance=Decimal("500")
+    )
+    await CustomerAccountBalance.create(
+        customer=customer, account_set=aset2,
+        rebate_balance=Decimal("1200")
+    )
+    b1 = await CustomerAccountBalance.filter(
+        customer=customer, account_set=aset1
+    ).first()
+    b2 = await CustomerAccountBalance.filter(
+        customer=customer, account_set=aset2
+    ).first()
+    assert b1.rebate_balance == Decimal("500")
+    assert b2.rebate_balance == Decimal("1200")
