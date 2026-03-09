@@ -3,8 +3,8 @@
     <div class="p-3 border-b flex items-center gap-2 flex-wrap">
       <span @click="rebateTab = 'customer'; loadRebateSummaryData('customer')" :class="['tab', rebateTab === 'customer' ? 'active' : '']">客户返利</span>
       <span @click="rebateTab = 'supplier'; loadRebateSummaryData('supplier')" :class="['tab', rebateTab === 'supplier' ? 'active' : '']">供应商返利</span>
-      <!-- 账套选择器（仅供应商tab） -->
-      <select v-if="rebateTab === 'supplier' && accountSets.length" v-model="selectedAccountSetId" class="input text-sm w-40 ml-2" @change="loadRebateSummaryData('supplier')">
+      <!-- 账套选择器 -->
+      <select v-if="accountSets.length" v-model="selectedAccountSetId" class="input text-sm w-40 ml-2" @change="loadRebateSummaryData()">
         <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
       </select>
       <div class="flex-1"></div>
@@ -61,6 +61,13 @@
           <button @click="showRebateChargeModal = false" class="text-[#86868b] hover:text-[#6e6e73] text-xl">&times;</button>
         </div>
         <div class="modal-body space-y-4">
+          <!-- 弹窗内账套选择 -->
+          <div v-if="accountSets.length">
+            <label class="label">充值账套 *</label>
+            <select v-model="chargeAccountSetId" class="input" @change="onChargeAccountSetChange">
+              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
           <div v-if="rebateChargeForm.target_id" class="p-3 bg-[#e8f4fd] rounded-lg text-sm">
             <div class="font-semibold text-[#0071e3] mb-1">{{ rebateChargeForm.target_name }}</div>
             <div class="text-[#0071e3]">当前返利余额: <b>¥{{ fmt(rebateChargeForm.current_balance) }}</b></div>
@@ -69,7 +76,7 @@
             <label class="label">选择{{ rebateChargeForm.target_type === 'customer' ? '客户' : '供应商' }} *</label>
             <select v-model="rebateChargeForm.target_id" class="input" @change="onRebateChargeTargetChange">
               <option :value="null">请选择</option>
-              <option v-for="item in rebateSummary" :key="item.id" :value="item.id">{{ item.name }}（余额: ¥{{ fmt(item.rebate_balance) }}）</option>
+              <option v-for="item in chargeTargetList" :key="item.id" :value="item.id">{{ item.name }}（余额: ¥{{ fmt(item.rebate_balance) }}）</option>
             </select>
           </div>
           <div>
@@ -155,6 +162,8 @@ const submitting = ref(false)
 const rebateSummary = ref([])
 const rebateLogs = ref([])
 const selectedAccountSetId = ref(null)
+const chargeAccountSetId = ref(null)
+const chargeTargetList = ref([])
 
 const showRebateChargeModal = ref(false)
 const showRebateDetailModal = ref(false)
@@ -184,7 +193,7 @@ watch(() => props.accountSets, (sets) => {
 const loadRebateSummaryData = async (targetType) => {
   try {
     const params = { target_type: targetType || rebateTab.value }
-    if ((targetType || rebateTab.value) === 'supplier' && selectedAccountSetId.value) {
+    if (selectedAccountSetId.value) {
       params.account_set_id = selectedAccountSetId.value
     }
     const { data } = await getRebateSummary(params)
@@ -203,6 +212,8 @@ const openRebateCharge = (targetType, targetId, name) => {
   rebateChargeForm.current_balance = item?.rebate_balance || 0
   rebateChargeForm.amount = null
   rebateChargeForm.remark = ''
+  chargeAccountSetId.value = selectedAccountSetId.value
+  chargeTargetList.value = [...rebateSummary.value]
   showRebateChargeModal.value = true
 }
 
@@ -213,11 +224,13 @@ const openRebateChargeNew = () => {
   rebateChargeForm.current_balance = 0
   rebateChargeForm.amount = null
   rebateChargeForm.remark = ''
+  chargeAccountSetId.value = selectedAccountSetId.value
+  chargeTargetList.value = [...rebateSummary.value]
   showRebateChargeModal.value = true
 }
 
 const onRebateChargeTargetChange = () => {
-  const item = rebateSummary.value.find(x => x.id === rebateChargeForm.target_id)
+  const item = chargeTargetList.value.find(x => x.id === rebateChargeForm.target_id)
   if (item) {
     rebateChargeForm.target_name = item.name
     rebateChargeForm.current_balance = item.rebate_balance || 0
@@ -227,13 +240,30 @@ const onRebateChargeTargetChange = () => {
   }
 }
 
+const onChargeAccountSetChange = async () => {
+  try {
+    const params = {
+      target_type: rebateChargeForm.target_type,
+      account_set_id: chargeAccountSetId.value
+    }
+    const { data } = await getRebateSummary(params)
+    chargeTargetList.value = data
+    if (rebateChargeForm.target_id) {
+      const item = data.find(x => x.id === rebateChargeForm.target_id)
+      rebateChargeForm.current_balance = item?.rebate_balance || 0
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 const handleChargeRebate = async () => {
   if (!rebateChargeForm.amount || rebateChargeForm.amount <= 0) {
     appStore.showToast('请输入充值金额', 'error')
     return
   }
-  if (rebateChargeForm.target_type === 'supplier' && !selectedAccountSetId.value) {
-    appStore.showToast('请先选择账套', 'error')
+  if (!chargeAccountSetId.value) {
+    appStore.showToast('请选择充值账套', 'error')
     return
   }
   if (submitting.value) return
@@ -243,10 +273,8 @@ const handleChargeRebate = async () => {
       target_type: rebateChargeForm.target_type,
       target_id: rebateChargeForm.target_id,
       amount: rebateChargeForm.amount,
-      remark: rebateChargeForm.remark || null
-    }
-    if (rebateChargeForm.target_type === 'supplier') {
-      payload.account_set_id = selectedAccountSetId.value
+      remark: rebateChargeForm.remark || null,
+      account_set_id: chargeAccountSetId.value
     }
     await chargeRebate(payload)
     appStore.showToast('充值成功')
@@ -265,7 +293,7 @@ const viewRebateDetail = async (targetType, targetId, name) => {
     const item = rebateSummary.value.find(x => x.id === targetId)
     rebateDetailTarget.value = { name: name, balance: item?.rebate_balance || 0 }
     const params = { target_type: targetType, target_id: targetId }
-    if (targetType === 'supplier' && selectedAccountSetId.value) {
+    if (selectedAccountSetId.value) {
       params.account_set_id = selectedAccountSetId.value
     }
     const { data } = await getRebateLogs(params)
