@@ -1,6 +1,6 @@
 from typing import Optional
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -486,7 +486,8 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
         "default_new_rebate": float(default_new_rebate),
         "default_refund": float(default_refund),
         "default_refund_rebate": float(default_refund_rebate),
-        "is_partial": is_partial
+        "is_partial": is_partial,
+        "has_payment": float(paid) > 0 or float(rebate) > 0
     }
 
 
@@ -639,6 +640,29 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         creator=user,
                         account_set_id=order.account_set_id
                     )
+                    # 推送会计模块：创建收款退款单
+                    if order.account_set_id:
+                        try:
+                            from app.models.ar_ap import ReceiptBill, ReceiptRefundBill
+                            original_receipt = await ReceiptBill.filter(
+                                account_set_id=order.account_set_id,
+                                customer_id=customer.id,
+                                status="confirmed",
+                            ).order_by("-id").first()
+                            if original_receipt:
+                                await ReceiptRefundBill.create(
+                                    bill_no=generate_order_no("SKTK"),
+                                    account_set_id=order.account_set_id,
+                                    customer_id=customer.id,
+                                    original_receipt=original_receipt,
+                                    refund_date=date.today(),
+                                    amount=refund_amount,
+                                    reason=f"取消订单 {order.order_no} 退款",
+                                    status="draft",
+                                    creator=user,
+                                )
+                        except Exception as e:
+                            logger.error(f"取消订单自动生成收款退款单失败: {e}")
 
             if order.order_type == "CREDIT":
                 cancel_balance_amount = abs(order.total_amount) - (abs(new_order.total_amount) if new_order else Decimal("0"))

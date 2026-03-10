@@ -286,7 +286,7 @@
           </div>
 
           <!-- 第1步：确认商品 -->
-          <div v-show="cancelStep === 1" class="space-y-4">
+          <div v-show="cancelStep === 1 && cancelPreviewData?.is_partial" class="space-y-4">
             <!-- 已发货商品（部分取消时显示） -->
             <div v-if="cancelPreviewData.is_partial">
               <div class="flex items-center gap-2 mb-2">
@@ -374,7 +374,7 @@
           </div>
 
           <!-- 第3步：退款方式 -->
-          <div v-show="cancelStep === 3" class="space-y-4">
+          <div v-show="(cancelStepCount === 3 && cancelStep === 3) || (cancelStepCount === 1 && !cancelPreviewData?.is_partial)" class="space-y-4">
             <div class="text-center mb-2">
               <div class="text-sm font-semibold text-foreground">退还金额确认</div>
               <div class="text-xs text-muted mt-1">确认退款金额和退款方式</div>
@@ -522,9 +522,12 @@ const sortedOrders = computed(() => {
 const cancelStepCount = computed(() => {
   const preview = cancelPreviewData.value
   if (!preview) return 1
-  if (preview.order_type === 'CONSIGN_OUT') return 1
-  if (preview.is_partial && (preview.paid_amount > 0 || preview.rebate_used > 0)) return 3
-  return 2
+  if (preview.order_type === 'CONSIGN_OUT') return 0
+  const hasPaid = preview.paid_amount > 0 || preview.rebate_used > 0
+  if (!preview.is_partial && !hasPaid) return 0
+  if (!preview.is_partial && hasPaid) return 1
+  if (preview.is_partial && !hasPaid) return 1
+  return 3
 })
 
 // ===== 辅助函数 =====
@@ -623,6 +626,22 @@ const handleCancelOrder = async (orderId) => {
   try {
     const { data } = await cancelPreview(orderId)
     cancelPreviewData.value = data
+    const hasPaid = data.paid_amount > 0 || data.rebate_used > 0
+
+    if (data.order_type === 'CONSIGN_OUT' || (!data.is_partial && !hasPaid)) {
+      const confirmed = await appStore.customConfirm('确认取消', `确认取消订单 ${data.order_no}？`)
+      if (!confirmed) return
+      cancelForm.refund_amount = 0
+      cancelForm.refund_rebate = 0
+      cancelForm.refund_method = 'balance'
+      cancelForm.refund_payment_method = 'cash'
+      cancelForm.new_order_paid_amount = 0
+      cancelForm.new_order_rebate_used = 0
+      cancelForm.item_allocations = []
+      await confirmCancel()
+      return
+    }
+
     cancelForm.new_order_paid_amount = data.default_new_paid
     cancelForm.new_order_rebate_used = data.default_new_rebate
     cancelForm.item_allocations = (data.shipped_items || []).map(si => ({
@@ -679,16 +698,15 @@ const recalcCancelTotals = () => {
 const nextCancelStep = () => {
   const preview = cancelPreviewData.value
   if (!preview) return
+  const steps = cancelStepCount.value
+
+  if (steps === 1) {
+    confirmCancel()
+    return
+  }
+
   if (cancelStep.value === 1) {
-    if (!preview.is_partial || (preview.paid_amount <= 0 && preview.rebate_used <= 0)) {
-      if (preview.order_type === 'CONSIGN_OUT') {
-        confirmCancel()
-        return
-      }
-      cancelStep.value = 3
-    } else {
-      cancelStep.value = 2
-    }
+    cancelStep.value = 2
   } else if (cancelStep.value === 2) {
     const sum = cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used
     if (Math.abs(sum - preview.new_order_amount) > 0.01) {
@@ -701,14 +719,8 @@ const nextCancelStep = () => {
 
 /** 取消向导上一步 */
 const prevCancelStep = () => {
-  const preview = cancelPreviewData.value
-  if (!preview) return
   if (cancelStep.value === 3) {
-    if (preview.is_partial && (preview.paid_amount > 0 || preview.rebate_used > 0)) {
-      cancelStep.value = 2
-    } else {
-      cancelStep.value = 1
-    }
+    cancelStep.value = 2
   } else if (cancelStep.value === 2) {
     cancelStep.value = 1
   }
