@@ -1,5 +1,70 @@
 # 迭代记录
 
+## v4.20.0 — 全局筛选搜索增强 + 寄售库存销售价显示（2026-03-10）
+
+> 六个模块全面添加筛选/搜索/重置功能，新建 SearchableSelect 通用组件，寄售库存改为显示实际销售价。
+
+### 新增：SearchableSelect 通用组件
+
+- **新建 `SearchableSelect.vue`**：可搜索下拉选择框，支持 v-model 双向绑定、模糊搜索（label + sublabel）、清除选择、点击外部关闭、ESC 关闭、自动聚焦搜索框
+- 销售开单的客户选择从原生 `<select>` 升级为 SearchableSelect，支持按客户名/电话模糊搜索
+
+### 新增：六模块筛选/搜索/重置
+
+| 模块 | 新增筛选项 | 搜索关键字 |
+|------|-----------|-----------|
+| 订单明细 | 付款状态（已结清/未结清/待确认/已取消） | — |
+| 欠款明细 | 订单类型（赊销/寄售结算）+ 日期范围 | 订单号/客户名 |
+| 收款管理 | 确认状态（待确认/已确认）+ 日期范围 | 订单号/客户名 |
+| 付款管理 | 采购状态（7种）+ 日期范围 | 采购单号/供应商 |
+| 出入库日志 | 日期范围 | 商品名/SKU/仓库名 |
+
+- 所有搜索框 300ms 防抖，避免频繁请求
+- 所有模块统一添加重置按钮（lucide RotateCcw 图标）
+- 日期控件移动端隐藏（`hidden md:block`），适配小屏
+
+### 后端 API 扩展
+
+- `GET /finance/all-orders` 新增 `payment_status` 参数 + 响应新增 `shipping_status` 字段
+- `GET /finance/unpaid-orders` 新增 `order_type`、`start_date`、`end_date`、`search` 参数
+- `GET /finance/payments` 新增 `is_confirmed`、`start_date`、`end_date`、`search` 参数
+- `GET /finance/stock-logs` 新增 `search` 参数（商品名/SKU/仓库名）
+
+### 筛选栏 UI 统一
+
+- 所有筛选栏输入框统一为 `input-sm`（36px 高度、13px 字体），与会计模块标准一致
+- 独立筛选栏（欠款/收款/付款）去掉 `card` 包装，改为 `flex flex-wrap items-center gap-2 mb-3` 裸布局
+- 订单明细筛选栏从两行布局改为单行 `flex-wrap` 自动换行
+
+### 寄售库存销售价显示
+
+- 寄售库存列表改为显示实际销售价（来自 CONSIGN_OUT 订单的 unit_price），而非商品零售价
+- 同商品不同价格的寄售库存按价格批次分行显示，使用 FIFO 分配剩余数量
+- 后端 `/consignment/summary` 和 `/consignment/customer/{id}` 两个端点重写
+
+### 修改文件清单
+
+**新建：**
+- `frontend/src/components/common/SearchableSelect.vue` — 可搜索下拉组件
+- `docs/plans/2026-03-10-filter-search-design.md` — 筛选搜索设计文档
+- `docs/plans/2026-03-10-filter-search-enhancement.md` — 筛选搜索实现计划
+
+**后端：**
+- `backend/app/routers/finance.py` — 4 个端点参数扩展 + payment_status/search 筛选逻辑
+- `backend/app/routers/consignment.py` — 寄售库存 FIFO 价格批次重写
+
+**前端：**
+- `frontend/src/api/finance.js` — getPayments 接受 params
+- `frontend/src/components/business/sales/ShoppingCart.vue` — SearchableSelect 替换原生 select
+- `frontend/src/components/business/finance/FinanceOrdersTab.vue` — 付款状态筛选 + 重置 + UI 统一
+- `frontend/src/components/business/finance/FinanceUnpaidTab.vue` — 完整筛选栏 + 防抖搜索 + 重置
+- `frontend/src/components/business/FinancePaymentsPanel.vue` — 完整筛选栏 + 防抖搜索 + 重置
+- `frontend/src/components/business/FinancePayablesPanel.vue` — 服务端筛选替代客户端过滤 + 重置
+- `frontend/src/components/business/FinanceLogsPanel.vue` — 日期 + 搜索 + 重置
+- `frontend/src/views/ConsignmentView.vue` — 销售价显示 + 价格批次分行
+
+---
+
 ## v4.19.0 — 采购/销售退货会计联动 + 取消订单优化 + Bug 修复（2026-03-10）
 
 > 采购退货独立建模并推送会计模块，销售退货补齐收款退款单，取消订单流程按收款状态智能简化，全量代码审查修复 10 个 Bug。

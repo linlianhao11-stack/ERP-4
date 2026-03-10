@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.19.0
+# 轻量级 ERP 系统 v4.20.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -62,7 +62,7 @@ erp-4/
         ├── components/         # 组件（layout / business / common）
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
         │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
-        │   └── common/         # 通用组件（StatusBadge, FilterBar）
+        │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect）
         ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock 等 12 个）
         └── styles/             # 全局样式
 ```
@@ -77,7 +77,7 @@ erp-4/
 | 采购管理 | `/purchase` | 采购订单（创建→审核→付款→收货→退货）完整流程，供应商在账资金管理 |
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
 | 物流管理 | `/logistics` | 发货确认、拆单发货、包裹商品明细、SN码记录、快递100对接 |
-| 财务管理 | `/finance` | 收款、对账、欠款管理、返利管理（客户/供应商双向） |
+| 财务管理 | `/finance` | 收款、对账、欠款管理、返利管理（客户/供应商双向），各子模块支持筛选/搜索/重置 |
 | 会计管理 | `/accounting` | 10 个标签页：多账套、科目体系（32 预置科目）、会计期间、凭证管理（四级状态机）、账簿查询（总分类/明细/余额表）、应收管理（应收单/收款单/退款单/核销）、应付管理（应付单/付款单/退款单）、发票管理（销项/进项）、出入库单（销售出库/采购入库 + PDF 套打）、期末处理（损益结转/结账/年度结转）、财务报表（资产负债表/利润表/现金流量表 + Excel/PDF 导出） |
 | 客户管理 | `/customers` | 客户信息、余额、返利、欠款、交易明细 |
 | 系统设置 | `/settings` | 用户管理、权限管理、仓库/仓位、销售员、收款/付款方式、SN 码配置、备份管理 |
