@@ -35,6 +35,7 @@ export const useFinanceStore = defineStore('finance', () => {
       unpaidOrders.value = data
     } catch (e) {
       console.error('加载未付订单失败', e)
+      throw e
     }
   }
 
@@ -44,6 +45,7 @@ export const useFinanceStore = defineStore('finance', () => {
       payments.value = data
     } catch (e) {
       console.error('加载收款记录失败', e)
+      throw e
     }
   }
 
@@ -54,6 +56,7 @@ export const useFinanceStore = defineStore('finance', () => {
     if (_loadingPromise) return _loadingPromise
     _loadingPromise = Promise.all([loadUnpaidOrders(), loadPayments()])
       .then(() => { _loaded.value = true })
+      .catch(e => { console.error('加载财务数据失败', e) })
       .finally(() => { _loadingPromise = null })
     return _loadingPromise
   }

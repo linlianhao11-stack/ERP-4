@@ -483,6 +483,8 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
         if customer and order.order_type in ("CASH", "CREDIT"):
             if data.refund_amount is not None and Decimal(str(data.refund_amount)) > order.paid_amount:
                 raise HTTPException(status_code=400, detail="退款金额不能超过已收款金额")
+            if data.refund_rebate is not None and Decimal(str(data.refund_rebate)) > (order.rebate_used or Decimal("0")):
+                raise HTTPException(status_code=400, detail="退回返利金额不能超过订单已使用的返利金额")
 
         has_shipped = any(item.shipped_qty > 0 for item in items)
         new_order = None

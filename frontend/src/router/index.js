@@ -43,7 +43,18 @@ router.beforeEach(async (to, from, next) => {
       // Try to load user first
       try {
         await authStore.checkAuth()
-      } catch (e) {}
+      } catch (e) {
+        // checkAuth throws for non-auth errors (500, network).
+        // Only redirect to login for 401/403; for other errors,
+        // let the user continue if they have a token (assume still authenticated).
+        const status = e?.response?.status
+        if (status === 401 || status === 403) {
+          return next({ name: 'login' })
+        }
+        // For 500 / network errors, allow navigation to proceed
+        // (the page may show degraded state, but don't log the user out)
+        return checkPermAndNext(authStore, to.meta.perm, next)
+      }
 
       // After checking, if still no user, redirect to login
       if (!authStore.user) {

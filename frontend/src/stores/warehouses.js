@@ -17,6 +17,7 @@ export const useWarehousesStore = defineStore('warehouses', () => {
     } catch (e) {
       error.value = '加载仓库失败'
       console.error('加载仓库失败', e)
+      throw e
     } finally {
       loading.value = false
     }
@@ -31,6 +32,7 @@ export const useWarehousesStore = defineStore('warehouses', () => {
     } catch (e) {
       error.value = '加载仓位失败'
       console.error('加载仓位失败', e)
+      throw e
     } finally {
       loading.value = false
     }

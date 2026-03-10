@@ -106,6 +106,25 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  const resetTransientState = () => {
+    if (_toastTimer) clearTimeout(_toastTimer)
+    _toastTimer = null
+    _toastQueue.length = 0
+    toast.show = false
+    toast.msg = ''
+    toast.type = 'success'
+    modal.show = false
+    modal.type = ''
+    modal.title = ''
+    if (confirmDialog.resolve) confirmDialog.resolve(false)
+    confirmDialog.show = false
+    confirmDialog.message = ''
+    confirmDialog.detail = ''
+    confirmDialog.resolve = null
+    _submittingCount.value = 0
+    previousModal.value = null
+  }
+
   // Todo counts — sidebar badges
   const todoCounts = ref({})
 
@@ -123,6 +142,7 @@ export const useAppStore = defineStore('app', () => {
     toast, modal, confirmDialog, submitting, previousModal,
     showToast, openModal, closeModal,
     customConfirm, confirmDialogYes, confirmDialogNo,
+    resetTransientState,
     todoCounts, loadTodoCounts
   }
 })

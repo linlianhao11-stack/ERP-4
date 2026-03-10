@@ -319,9 +319,10 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
             if remaining <= 0:
                 break
             pay_this = min(remaining, unpaid)
-            await Order.filter(id=order.id).update(paid_amount=F('paid_amount') + pay_this)
-            # Reload with lock to check if cleared (prevents race with concurrent payments)
+            # Lock the row FIRST to prevent concurrent payment race condition
             order = await Order.filter(id=order.id).select_for_update().first()
+            await Order.filter(id=order.id).update(paid_amount=F('paid_amount') + pay_this)
+            await order.refresh_from_db()
             if order.paid_amount >= order.total_amount:
                 await Order.filter(id=order.id).update(is_cleared=True)
 

@@ -258,8 +258,8 @@ const submitOrder = () => {
 
   // 自动检测账套
   let autoAccountSetId = null
-  if (cart.value.length > 0 && cart.value[0].warehouse_id) {
-    const firstWarehouse = warehouses.value.find(w => w.id === parseInt(cart.value[0].warehouse_id))
+  if (cart.value.length > 0 && cart.value[0]?.warehouse_id) {
+    const firstWarehouse = warehouses.value.find(w => w.id === parseInt(cart.value[0]?.warehouse_id))
     if (firstWarehouse?.account_set_id) autoAccountSetId = firstWarehouse.account_set_id
   }
 

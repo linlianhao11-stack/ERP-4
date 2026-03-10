@@ -240,9 +240,9 @@
             <div class="grid detail-grid grid-cols-2 gap-2 text-sm">
               <div><span class="text-muted">客户:</span> {{ orderDetail.customer?.name || '-' }}</div>
               <div><span class="text-muted">仓库:</span> {{ orderDetail.warehouse?.name || '-' }}</div>
-              <div v-if="orderDetail.related_order" class="col-span-2">
+              <div v-if="orderDetail.related_order?.id" class="col-span-2">
                 <span class="text-muted">关联销售订单:</span>
-                <span @click="viewOrder(orderDetail.related_order.id)" class="text-primary hover:underline cursor-pointer font-mono">{{ orderDetail.related_order.order_no }}</span>
+                <span @click="viewOrder(orderDetail.related_order?.id)" class="text-primary hover:underline cursor-pointer font-mono">{{ orderDetail.related_order?.order_no }}</span>
               </div>
               <div><span class="text-muted">金额:</span> <span class="font-semibold">¥{{ fmt(orderDetail.total_amount) }}</span></div>
               <div v-if="hasPermission('finance')">

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getMe, logoutApi } from '../api/auth'
 import { IDLE_TIMEOUT } from '../utils/constants'
+import { useAppStore } from './app'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -27,6 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       localStorage.removeItem('erp_token')
       localStorage.removeItem('erp_last_active')
+      // Clear transient UI state (toasts, modals, confirm dialogs)
+      try { useAppStore().resetTransientState() } catch (e) { /* app store may not be initialized */ }
     })()
     try { return await _logoutPromise } finally { _logoutPromise = null }
   }
@@ -51,8 +54,14 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('erp_last_active', Date.now().toString())
         return true
       } catch (e) {
-        logout()
-        return false
+        // Only treat 401/403 as auth failures; other errors (500, network) should not log the user out
+        const status = e?.response?.status
+        if (status === 401 || status === 403) {
+          logout()
+          return false
+        }
+        // For server errors or network issues, keep existing auth state
+        throw e
       }
     })().finally(() => { _checkPromise = null })
     return _checkPromise

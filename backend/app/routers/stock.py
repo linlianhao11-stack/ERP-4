@@ -46,7 +46,7 @@ async def restock(data: RestockRequest, user: User = Depends(require_permission(
             if sn_required and not data.sn_codes:
                 raise HTTPException(status_code=400, detail="该仓库+品牌已启用SN管理，入库时必须填写SN码")
 
-            cost_price = Decimal(str(data.cost_price)) if data.cost_price and data.cost_price > 0 else product.cost_price
+            cost_price = Decimal(str(data.cost_price)) if data.cost_price and data.cost_price > 0 else (product.cost_price or Decimal('0'))
 
             if sn_required and data.sn_codes:
                 await validate_and_add_sn_codes(

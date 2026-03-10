@@ -115,6 +115,7 @@ api.get = function dedupGet(url, config = {}) {
   if (_pendingGets.has(key)) return _pendingGets.get(key)
   const promise = _originalGet(url, config).finally(() => _pendingGets.delete(key))
   _pendingGets.set(key, promise)
+  promise.catch(() => _pendingGets.delete(key))  // ensure cleanup on rejection
   return promise
 }
 
