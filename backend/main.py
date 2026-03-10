@@ -27,6 +27,7 @@ from app.routers import (
     ledgers,
     sales_delivery, purchase_receipt, invoices,
     period_end, financial_reports,
+    purchase_returns,
 )
 
 
@@ -133,6 +134,7 @@ app.include_router(purchase_receipt.router)
 app.include_router(invoices.router)
 app.include_router(period_end.router)
 app.include_router(financial_reports.router)
+app.include_router(purchase_returns.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
