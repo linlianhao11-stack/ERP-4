@@ -324,6 +324,7 @@ async def get_purchase_order(po_id: int, user: User = Depends(require_permission
         raise HTTPException(status_code=404, detail="采购订单不存在")
     items = await PurchaseOrderItem.filter(purchase_order_id=po.id).select_related(
         "product", "target_warehouse", "target_location")
+    returns = await PurchaseReturn.filter(purchase_order_id=po.id).order_by("-created_at")
     return {
         "id": po.id, "po_no": po.po_no,
         "supplier_id": po.supplier_id,
@@ -364,7 +365,14 @@ async def get_purchase_order(po_id: int, user: User = Depends(require_permission
                                        po.target_warehouse.name if po.target_warehouse else None),
             "target_location_code": (it.target_location.code if it.target_location else
                                       po.target_location.code if po.target_location else None),
-        } for it in items]
+        } for it in items],
+        "returns": [{
+            "id": r.id,
+            "return_no": r.return_no,
+            "total_amount": float(r.total_amount),
+            "refund_status": r.refund_status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        } for r in returns],
     }
 
 

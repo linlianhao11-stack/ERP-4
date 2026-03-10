@@ -35,6 +35,21 @@
             <div v-if="purchaseOrderDetail.returned_by_name"><span class="text-muted">处理人:</span> {{ purchaseOrderDetail.returned_by_name }} {{ fmtDate(purchaseOrderDetail.returned_at) }}</div>
           </div>
         </div>
+        <!-- 关联退货单 -->
+        <div v-if="purchaseOrderDetail.returns?.length" class="bg-elevated border rounded-lg p-3 mt-2">
+          <h4 class="font-semibold text-sm mb-2">关联退货单</h4>
+          <div v-for="r in purchaseOrderDetail.returns" :key="r.id"
+               class="flex justify-between items-center p-2 border-b last:border-0 text-sm">
+            <span class="font-mono text-primary">{{ r.return_no }}</span>
+            <span class="font-semibold text-warning">¥{{ fmt(r.total_amount) }}</span>
+            <span :class="{
+              'text-warning': r.refund_status === 'pending',
+              'text-success': r.refund_status === 'confirmed',
+              'text-muted': r.refund_status === 'n/a'
+            }">{{ r.refund_status === 'pending' ? '待退款' : r.refund_status === 'confirmed' ? '已到账' : '转为在账资金' }}</span>
+            <span class="text-muted text-xs">{{ fmtDate(r.created_at) }}</span>
+          </div>
+        </div>
         <!-- 商品明细表格 -->
         <div class="border-t pt-3">
           <h4 class="font-semibold text-sm mb-2">商品明细</h4>

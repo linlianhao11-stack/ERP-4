@@ -19,3 +19,6 @@ export const receivePurchaseOrder = (id, data) => api.post('/purchase-orders/' +
 export const returnPurchaseOrder = (id, data) => api.post('/purchase-orders/' + id + '/return', data)
 export const getSupplierTransactions = (id, params) => api.get('/suppliers/' + id + '/transactions', { params })
 export const refundSupplierCredit = (id, data) => api.post('/suppliers/' + id + '/credit-refund', data)
+
+export const getPurchaseReturns = (params) => api.get('/purchase-returns', { params })
+export const getPurchaseReturn = (id) => api.get('/purchase-returns/' + id)

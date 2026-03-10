@@ -3,6 +3,7 @@
     <!-- Tabs -->
     <AppTabs v-model="purchaseTab" :tabs="[
       { value: 'orders', label: '采购订单' },
+      { value: 'returns', label: '退货单' },
       { value: 'suppliers', label: '供应商管理' }
     ]" container-class="mb-4" />
 
@@ -13,6 +14,10 @@
         key="orders"
         ref="ordersPanel"
         @data-changed="onOrdersDataChanged"
+      />
+      <PurchaseReturnTab
+        v-else-if="purchaseTab === 'returns'"
+        key="returns"
       />
       <PurchaseSuppliersPanel
         v-else-if="purchaseTab === 'suppliers'"
@@ -31,6 +36,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppTabs from '../components/common/AppTabs.vue'
 import PurchaseOrdersPanel from '../components/business/PurchaseOrdersPanel.vue'
 import PurchaseSuppliersPanel from '../components/business/PurchaseSuppliersPanel.vue'
+import PurchaseReturnTab from '../components/business/purchase/PurchaseReturnTab.vue'
 
 const route = useRoute()
 const router = useRouter()
