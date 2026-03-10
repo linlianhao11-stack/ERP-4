@@ -50,56 +50,58 @@
       <div v-if="!unpaidOrders.length" class="p-8 text-center text-muted text-sm">暂无欠款</div>
     </div>
 
-    <!-- ============ 弹窗：收款 ============ -->
-    <div v-if="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3 class="font-semibold">收款</h3>
-          <button @click="showPaymentModal = false" class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <form @submit.prevent="savePayment" class="space-y-3">
-            <!-- 客户选择 -->
-            <div>
-              <label class="label">客户 *</label>
-              <select v-model="paymentForm.customer_id" @change="loadCustomerUnpaid" class="input" required>
-                <option value="">选择客户</option>
-                <option v-for="c in customers.filter(x => x.balance > 0)" :key="c.id" :value="c.id">{{ c.name }} (欠款 ¥{{ formatBalance(c.balance) }})</option>
-              </select>
-            </div>
-            <!-- 核销订单多选 -->
-            <div v-if="customerUnpaidOrders.length">
-              <label class="label">核销订单</label>
-              <div class="space-y-1 max-h-36 overflow-y-auto border rounded p-2">
-                <label v-for="o in customerUnpaidOrders" :key="o.id" class="flex items-center p-2 hover:bg-elevated rounded cursor-pointer text-sm">
-                  <input type="checkbox" v-model="paymentForm.order_ids" :value="o.id" class="mr-2">
-                  <span class="flex-1">{{ o.order_no }}</span>
-                  <span class="text-error font-semibold">¥{{ fmt(o.unpaid_amount) }}</span>
-                </label>
-              </div>
-            </div>
-            <!-- 金额和方式 -->
-            <div class="grid form-grid grid-cols-2 gap-3">
+    <!-- ============ 弹窗：收款（Teleport 到 body，避免父级 v-show="false" 导致不可见） ============ -->
+    <Teleport to="body">
+      <div v-if="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="font-semibold">收款</h3>
+            <button @click="showPaymentModal = false" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="savePayment" class="space-y-3">
+              <!-- 客户选择 -->
               <div>
-                <label class="label">金额 *</label>
-                <input v-model.number="paymentForm.amount" type="number" step="0.01" class="input" required>
-              </div>
-              <div>
-                <label class="label">方式</label>
-                <select v-model="paymentForm.payment_method" class="input">
-                  <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+                <label class="label">客户 *</label>
+                <select v-model="paymentForm.customer_id" @change="loadCustomerUnpaid" class="input" required>
+                  <option value="">选择客户</option>
+                  <option v-for="c in customers.filter(x => x.balance > 0)" :key="c.id" :value="c.id">{{ c.name }} (欠款 ¥{{ formatBalance(c.balance) }})</option>
                 </select>
               </div>
-            </div>
-            <!-- 操作按钮 -->
-            <div class="flex gap-3 pt-3">
-              <button type="button" @click="showPaymentModal = false" class="btn btn-secondary flex-1">取消</button>
-              <button type="submit" class="btn btn-success flex-1">确认收款</button>
-            </div>
-          </form>
+              <!-- 核销订单多选 -->
+              <div v-if="customerUnpaidOrders.length">
+                <label class="label">核销订单</label>
+                <div class="space-y-1 max-h-36 overflow-y-auto border rounded p-2">
+                  <label v-for="o in customerUnpaidOrders" :key="o.id" class="flex items-center p-2 hover:bg-elevated rounded cursor-pointer text-sm">
+                    <input type="checkbox" v-model="paymentForm.order_ids" :value="o.id" class="mr-2">
+                    <span class="flex-1">{{ o.order_no }}</span>
+                    <span class="text-error font-semibold">¥{{ fmt(o.unpaid_amount) }}</span>
+                  </label>
+                </div>
+              </div>
+              <!-- 金额和方式 -->
+              <div class="grid form-grid grid-cols-2 gap-3">
+                <div>
+                  <label class="label">金额 *</label>
+                  <input v-model.number="paymentForm.amount" type="number" step="0.01" class="input" required>
+                </div>
+                <div>
+                  <label class="label">方式</label>
+                  <select v-model="paymentForm.payment_method" class="input">
+                    <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+                  </select>
+                </div>
+              </div>
+              <!-- 操作按钮 -->
+              <div class="flex gap-3 pt-3">
+                <button type="button" @click="showPaymentModal = false" class="btn btn-secondary flex-1">取消</button>
+                <button type="submit" class="btn btn-success flex-1">确认收款</button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
