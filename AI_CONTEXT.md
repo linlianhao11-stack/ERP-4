@@ -1,6 +1,6 @@
 # AI_CONTEXT.md — ERP-4 技术架构索引
 
-> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-09 / v4.18.0
+> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-10 / v4.19.0
 
 ---
 
@@ -10,7 +10,7 @@
 
 - **用户规模**: 小团队多角色协作（admin / user），RBAC 权限控制 21 个粒度
 - **部署方式**: `docker compose up -d`，PostgreSQL 16 + FastAPI + 前端静态文件打包进同一镜像
-- **数据特征**: 单数据库，38 张核心表，支持 SN 码追溯、加权成本核算、应收应付管理、期末结转、三张财务报表
+- **数据特征**: 单数据库，40 张核心表，支持 SN 码追溯、加权成本核算、应收应付管理、期末结转、三张财务报表
 
 ---
 
@@ -77,7 +77,7 @@ erp-4/
 │       │   ├── jwt.py          # create_access_token / verify_token
 │       │   └── dependencies.py # get_current_user / require_permission
 │       │
-│       ├── models/             # Tortoise ORM 模型（38 个类）
+│       ├── models/             # Tortoise ORM 模型（40 个类）
 │       │   ├── user.py         # User
 │       │   ├── product.py      # Product
 │       │   ├── customer.py     # Customer
@@ -86,7 +86,7 @@ erp-4/
 │       │   ├── stock.py        # WarehouseStock, StockLog
 │       │   ├── order.py        # Order, OrderItem
 │       │   ├── payment.py      # Payment, PaymentOrder, PaymentMethod, DisbursementMethod
-│       │   ├── purchase.py     # PurchaseOrder, PurchaseOrderItem
+│       │   ├── purchase.py     # PurchaseOrder, PurchaseOrderItem, PurchaseReturn, PurchaseReturnItem
 │       │   ├── shipment.py     # Shipment, ShipmentItem
 │       │   ├── voucher.py      # Voucher, VoucherEntry, SystemSetting
 │       │   ├── accounting.py   # AccountSet, ChartOfAccount, AccountingPeriod
@@ -99,7 +99,7 @@ erp-4/
 │       │   ├── operation_log.py # OperationLog
 │       │   └── salesperson.py  # Salesperson
 │       │
-│       ├── routers/            # API 路由（35 个模块）
+│       ├── routers/            # API 路由（36 个模块）
 │       │   ├── auth.py         # /api/auth   — 登录、登出、修改密码
 │       │   ├── users.py        # /api/users  — 用户 CRUD
 │       │   ├── products.py     # /api/products — 产品 CRUD、Excel 导入
@@ -108,9 +108,10 @@ erp-4/
 │       │   ├── warehouses.py   # /api/warehouses
 │       │   ├── locations.py    # /api/locations
 │       │   ├── stock.py        # /api/stock — 库存查询、入库、调拨、SN 导出
-│       │   ├── orders.py       # /api/orders — 销售/退货/寄售开单（含退货→红字应收钩子）
+│       │   ├── orders.py       # /api/orders — 销售/退货/寄售开单（含退货→红字应收+收款退款单钩子）
 │       │   ├── finance.py      # /api/finance — 应收、收款确认、凭证
-│       │   ├── purchase_orders.py # /api/purchase-orders — 采购全流程（含收货→应付、付款→付款单钩子）
+│       │   ├── purchase_orders.py # /api/purchase-orders — 采购全流程（含收货→应付、付款→付款单、退货→退货单+红字应付+付款退款单钩子）
+│       │   ├── purchase_returns.py # /api/purchase-returns — 采购退货单 CRUD
 │       │   ├── consignment.py  # /api/consignment — 寄售管理
 │       │   ├── logistics.py    # /api/logistics — 物流/快递100（含发货→应收钩子）
 │       │   ├── dashboard.py    # /api/dashboard — 统计看板
@@ -224,7 +225,8 @@ erp-4/
 │       │   │   │   └── OrderConfirmModal.vue  # 224 行 — 下单确认弹窗
 │       │   │   ├── purchase/                 # 采购子组件
 │       │   │   │   ├── PurchaseOrderForm.vue  # 490 行 — 新建/编辑采购单
-│       │   │   │   └── PurchaseOrderDetail.vue # 594 行 — 采购单详情+收货+退货
+│       │   │   │   ├── PurchaseOrderDetail.vue # 采购单详情+收货+退货+关联退货单
+│       │   │   │   └── PurchaseReturnTab.vue  # 采购退货单列表+详情弹窗
 │       │   │   ├── finance/                  # 财务子组件
 │       │   │   │   ├── FinanceOrdersTab.vue   # 733 行 — 订单列表+详情+取消
 │       │   │   │   └── FinanceUnpaidTab.vue   # 249 行 — 未收款+收款弹窗

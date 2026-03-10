@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.18.0
+# 轻量级 ERP 系统 v4.19.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -84,14 +84,14 @@ erp-4/
 
 ## 数据模型
 
-核心模型共 42 个：
+核心模型共 44 个：
 
 - **用户与权限**: User
 - **商品**: Product, ProductBrand
 - **仓储**: Warehouse, Location, WarehouseStock, StockLog
 - **SN 管理**: SnConfig, SnCode
 - **销售**: Customer, Salesperson, Order, OrderItem
-- **采购**: Supplier, PurchaseOrder, PurchaseOrderItem
+- **采购**: Supplier, PurchaseOrder, PurchaseOrderItem, PurchaseReturn, PurchaseReturnItem
 - **财务**: Payment, PaymentOrder, PaymentMethod, DisbursementMethod, RebateLog
 - **会计基础**: AccountSet, ChartOfAccount, AccountingPeriod, Voucher, VoucherEntry
 - **应收**: ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff

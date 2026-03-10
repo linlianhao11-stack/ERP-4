@@ -1,5 +1,94 @@
 # 迭代记录
 
+## v4.19.0 — 采购/销售退货会计联动 + 取消订单优化 + Bug 修复（2026-03-10）
+
+> 采购退货独立建模并推送会计模块，销售退货补齐收款退款单，取消订单流程按收款状态智能简化，全量代码审查修复 10 个 Bug。
+
+### 采购退货 → 会计联动（核心新功能）
+
+- **新增 PurchaseReturn + PurchaseReturnItem 独立模型**，退货信息不再散落在原采购单字段上
+- 退货单号规则 `PR-YYYYMMDD-NNN`，关联原采购单 + 供应商 + 账套
+- 采购退货时自动推送会计模块：
+  - 红字应付单 PayableBill（负金额）
+  - 付款退款单 DisbursementRefundBill（draft，出纳确认）
+- 退款的退到收款管理生成待确认收款记录（is_refunded=true 时）
+- **新增 API**：`GET /api/purchase-returns`（分页列表）、`GET /api/purchase-returns/{id}`（详情）
+- **采购导出增强**：CSV 新增 3 列（退货数量、退货金额、退款状态）
+
+### 销售退货 → 会计联动
+
+- 销售退货订单（refunded=true）自动生成 ReceiptRefundBill（收款退款单）
+- 关联最近一笔已确认的 ReceiptBill，推送到收款管理
+
+### 前端：采购退货 UI
+
+- **PurchaseView 新增「退货单」Tab**：退货单列表 + 供应商筛选 + 分页 + 详情弹窗
+- **PurchaseOrderDetail 新增「关联退货单」区域**：展示该采购单的所有退货记录、退款状态
+
+### 取消订单流程优化
+
+- **未发货 + 未收款** → 直接弹确认对话框取消，不再强制走 3 步向导
+- **未发货 + 已收款** → 1 步向导（退款金额 + 退款方式选择）
+- **部分发货 + 未收款** → 1 步向导（商品确认）
+- **部分发货 + 已收款** → 3 步完整向导（不变）
+- 现金退款时自动创建 ReceiptRefundBill 推送到收款管理
+
+### 财务模块 Bug 修复
+
+- **收款弹窗无响应**：FinanceUnpaidTab 被 `v-show="false"` 隐藏，弹窗也被一起隐藏。修复：`<Teleport to="body">` 将弹窗传送到 body 层级
+
+### 全量代码审查修复（10 个 Bug）
+
+- GET 请求去重 `.catch()` 未清理 Map
+- `stores/warehouses.js`、`stores/finance.js`：catch 后未 throw，_loaded 标志异常
+- `stores/app.js`：新增 `resetTransientState()` 方法
+- `stores/auth.js`：logout 时清理瞬态状态；checkAuth 只在 401/403 时登出
+- `router/index.js`：500 视为服务器错误而非认证失败
+- `views/SalesView.vue`：`cart.value[0]` 可选链保护
+- `views/CustomersView.vue`：`related_order` 可选链保护
+- `routers/finance.py`：UPDATE 前加 `select_for_update` 防并发
+- `routers/orders.py`：`refund_rebate` 上界校验
+- `routers/stock.py`：`cost_price` 空值兜底 `Decimal('0')`
+- `routers/product_brands.py`：新增 `require_permission("stock_view")`
+
+### 其他修复
+
+- **Dashboard**：`shipped_at` 字段不存在 → 改为 `updated_at`
+- **登录页图片**：logo.png 404 修复（SPA fallback 增加静态文件 FileResponse）；外部 Unsplash 背景图替换为 CSS 渐变
+- **Docker 镜像源**：OrbStack 配置国内镜像（腾讯云/中科大/网易）
+
+### 修改文件清单
+
+**新建：**
+- `backend/app/models/purchase.py` — PurchaseReturn + PurchaseReturnItem 模型
+- `backend/app/routers/purchase_returns.py` — 退货单 CRUD API
+- `frontend/src/components/business/purchase/PurchaseReturnTab.vue` — 退货单 Tab
+- `frontend/src/api/purchase.js` — 退货单 API 函数
+- `docs/plans/2026-03-10-purchase-sales-return-accounting-design.md`
+- `docs/plans/2026-03-10-purchase-sales-return-accounting.md`
+- `docs/plans/2026-03-10-cancel-order-refund-design.md`
+- `docs/plans/2026-03-10-cancel-order-refund.md`
+
+**后端核心：**
+- `backend/app/routers/orders.py` — 销售退货 ReceiptRefundBill + 取消订单优化
+- `backend/app/routers/purchase_orders.py` — 采购退货重构 + 导出增强
+- `backend/app/migrations.py` — PurchaseReturn 建表迁移
+- `backend/app/models/__init__.py` — 注册新模型
+- `backend/main.py` — 注册退货路由 + 静态文件 FileResponse
+
+**前端核心：**
+- `frontend/src/components/business/finance/FinanceOrdersTab.vue` — 取消向导重写
+- `frontend/src/components/business/finance/FinanceUnpaidTab.vue` — 收款弹窗 Teleport
+- `frontend/src/components/business/purchase/PurchaseOrderDetail.vue` — 关联退货单
+- `frontend/src/views/PurchaseView.vue` — 退货单 Tab
+- `frontend/src/views/LoginView.vue` — CSS 渐变背景
+
+**Bug 修复（10 个文件）：**
+- `frontend/src/api/index.js`、`stores/warehouses.js`、`stores/finance.js`、`stores/app.js`、`stores/auth.js`、`router/index.js`、`views/SalesView.vue`、`views/CustomersView.vue`
+- `backend/app/routers/finance.py`、`routers/stock.py`、`routers/product_brands.py`、`routers/dashboard.py`
+
+---
+
 ## v4.18.0 — 架构级性能优化：分页 + GET 去重 + 动画修复（2026-03-09）
 
 > 全部大表格接入服务端分页（每页50条），GET 请求去重防止并发重复加载，Tab/页面快速切换不再白屏。
