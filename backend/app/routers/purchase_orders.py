@@ -108,7 +108,8 @@ async def export_purchase_orders(
     output = io.StringIO()
     output.write('\ufeff')
     headers = ["采购单号", "供应商", "状态", "总金额", "目标仓库", "备注", "创建人", "审核人", "审核时间", "付款人", "付款时间", "创建时间",
-               "商品SKU", "商品名称", "数量", "含税单价", "税率", "不含税单价", "小计金额", "已收货数量"]
+               "商品SKU", "商品名称", "数量", "含税单价", "税率", "不含税单价", "小计金额", "已收货数量",
+               "退货数量", "退货金额", "退款状态"]
     output.write(','.join(headers) + '\n')
 
     # 批量查询所有采购明细（避免 N+1）
@@ -134,6 +135,15 @@ async def export_purchase_orders(
             o.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         ]
         items = po_items_by_order.get(o.id, [])
+        # Derive refund status at PO level
+        po_return_amount = float(o.return_amount) if o.return_amount else 0
+        if po_return_amount > 0 and o.is_refunded:
+            refund_status = "已退款"
+        elif po_return_amount > 0 and not o.is_refunded:
+            refund_status = "转为在账资金"
+        else:
+            refund_status = ""
+
         if items:
             for it in items:
                 row = order_base + [
@@ -145,10 +155,13 @@ async def export_purchase_orders(
                     f"{float(it.tax_exclusive_price):.2f}",
                     f"{float(it.amount):.2f}",
                     str(it.received_quantity),
+                    str(it.returned_quantity),
+                    f"{po_return_amount:.2f}",
+                    refund_status,
                 ]
                 output.write(','.join(csv_safe(item) for item in row) + '\n')
         else:
-            row = order_base + ["-"] * 8
+            row = order_base + ["-"] * 11
             output.write(','.join(csv_safe(item) for item in row) + '\n')
 
     output.seek(0)

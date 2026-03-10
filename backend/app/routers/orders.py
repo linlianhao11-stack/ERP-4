@@ -156,6 +156,32 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     logger.error(f"退货自动生成红字应收单失败: {e}")
                     raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
 
+            # 6.6 钩子：销售退货 + 已退款 → 自动生成收款退款单（draft状态，待确认）
+            if data.order_type == "RETURN" and data.refunded and getattr(order, "account_set_id", None):
+                try:
+                    from app.models.ar_ap import ReceiptBill, ReceiptRefundBill
+                    # Find the most recent confirmed receipt bill for this customer/account set
+                    original_receipt = await ReceiptBill.filter(
+                        account_set_id=order.account_set_id,
+                        customer_id=order.customer_id,
+                        status="confirmed",
+                    ).order_by("-id").first()
+                    if original_receipt:
+                        refund_no = generate_order_no("SKTK")
+                        await ReceiptRefundBill.create(
+                            bill_no=refund_no,
+                            account_set_id=order.account_set_id,
+                            customer_id=order.customer_id,
+                            original_receipt=original_receipt,
+                            refund_date=datetime.now().date(),
+                            amount=abs(total_amount),
+                            reason=f"销售退货 {order.order_no}",
+                            status="draft",
+                            creator=user,
+                        )
+                except Exception as e:
+                    logger.error(f"销售退货自动生成收款退款单失败: {e}")
+
             # 7. 操作日志
             order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
             await log_operation(user, "ORDER_CREATE", "ORDER", order.id,
