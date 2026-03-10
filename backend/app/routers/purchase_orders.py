@@ -18,6 +18,7 @@ from app.models import (
     User, Product, Warehouse, Location, Supplier,
     PurchaseOrder, PurchaseOrderItem, WarehouseStock, StockLog, RebateLog, SnConfig
 )
+from app.models.purchase import PurchaseReturn, PurchaseReturnItem
 from app.models.supplier_balance import SupplierAccountBalance
 from app.schemas.purchase import PurchaseOrderCreate, PurchaseReturnRequest, ReceiveRequest, PurchasePayRequest
 from app.services.operation_log_service import log_operation
@@ -706,6 +707,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
     async with transactions.in_transaction():
         total_return_amount = Decimal("0")
         return_details = []
+        return_items_data = []
 
         for ret_item in data.items:
             poi = await PurchaseOrderItem.filter(id=ret_item.item_id, purchase_order_id=po.id).select_related("product").first()
@@ -754,6 +756,13 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
             poi.returned_quantity += ret_item.return_quantity
             await poi.save()
             return_details.append(f"{poi.product.name}×{ret_item.return_quantity}")
+            return_items_data.append({
+                "item_id": poi.id,
+                "product_id": poi.product_id,
+                "return_quantity": ret_item.return_quantity,
+                "unit_price": unit_amount,
+                "amount": item_return_amount,
+            })
 
         # 更新 PO
         po.return_amount = (po.return_amount or Decimal("0")) + total_return_amount
@@ -793,7 +802,74 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
                 creator=user
             )
 
-        await log_operation(user, "PURCHASE_RETURN", "PURCHASE_ORDER", po.id,
-            f"采购退货 {po.po_no}，{', '.join(return_details)}，退货金额 ¥{float(total_return_amount):.2f}，{'已退款' if data.is_refunded else '转为在账资金'}，状态→{po.status}")
+        # --- 创建采购退货单 ---
+        return_no = await generate_sequential_no("PR", "purchase_returns", "return_no")
+        pr = await PurchaseReturn.create(
+            return_no=return_no,
+            purchase_order=po,
+            supplier_id=po.supplier_id,
+            account_set_id=getattr(po, 'account_set_id', None),
+            total_amount=total_return_amount,
+            is_refunded=data.is_refunded,
+            refund_status="pending" if data.is_refunded else "n/a",
+            tracking_no=data.tracking_no or None,
+            created_by=user,
+        )
+        for ri in return_items_data:
+            await PurchaseReturnItem.create(
+                purchase_return=pr,
+                purchase_item_id=ri["item_id"],
+                product_id=ri["product_id"],
+                quantity=ri["return_quantity"],
+                unit_price=ri["unit_price"],
+                amount=ri["amount"],
+            )
 
-    return {"message": "退货成功", "status": po.status, "return_amount": float(total_return_amount)}
+        # --- 推送会计模块 ---
+        if getattr(po, 'account_set_id', None):
+            # 红字应付单（负金额冲销）
+            try:
+                from app.services.ap_service import create_payable_bill
+                await create_payable_bill(
+                    account_set_id=po.account_set_id,
+                    supplier_id=po.supplier_id,
+                    purchase_order_id=po.id,
+                    total_amount=-total_return_amount,
+                    status="completed",
+                    creator=user,
+                    remark=f"采购退货 {return_no}",
+                )
+            except Exception as e:
+                logger.error(f"采购退货会计推送失败: {e}")
+
+            # 付款退款单（草稿状态，待确认）
+            try:
+                from app.models.ar_ap import DisbursementBill, DisbursementRefundBill
+                from datetime import date
+                original_disb = await DisbursementBill.filter(
+                    account_set_id=po.account_set_id,
+                    supplier_id=po.supplier_id,
+                ).order_by("-id").first()
+                if original_disb:
+                    refund_no = generate_order_no("FKTK")
+                    await DisbursementRefundBill.create(
+                        bill_no=refund_no,
+                        account_set_id=po.account_set_id,
+                        supplier_id=po.supplier_id,
+                        original_disbursement=original_disb,
+                        refund_date=date.today(),
+                        amount=total_return_amount,
+                        reason=f"采购退货退款 {return_no}",
+                        status="draft",
+                        creator=user,
+                    )
+            except Exception as e:
+                logger.error(f"采购退货付款退款单创建失败: {e}")
+
+        # NOTE: 财务收款推送跳过 — Payment 模型仅支持客户收款，不适用于供应商退款场景
+        # TODO: 后续如需供应商退款确认流程，可扩展 Payment 模型或新建 SupplierRefund 模型
+
+        await log_operation(user, "PURCHASE_RETURN", "PURCHASE_ORDER", po.id,
+            f"采购退货 {po.po_no}，{', '.join(return_details)}，退货金额 ¥{float(total_return_amount):.2f}，{'已退款' if data.is_refunded else '转为在账资金'}，退货单号 {return_no}，状态→{po.status}")
+
+    return {"message": "退货成功", "status": po.status, "return_amount": float(total_return_amount), "return_no": return_no}
