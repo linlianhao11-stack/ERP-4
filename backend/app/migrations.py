@@ -21,6 +21,7 @@ async def run_migrations():
     await migrate_accounting_phase3()
     await migrate_accounting_phase4()
     await migrate_accounting_phase5()
+    await migrate_purchase_returns()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -734,6 +735,41 @@ async def migrate_customer_account_balance():
                 logger.info(f"迁移: 客户 {row['name']} 返利余额已迁移到账套 {first_set.name}")
 
     logger.info("客户返利账套隔离迁移完成")
+
+
+async def migrate_purchase_returns():
+    """创建采购退货单表"""
+    conn = connections.get("default")
+    await conn.execute_script("""
+        CREATE TABLE IF NOT EXISTS purchase_returns (
+            id SERIAL PRIMARY KEY,
+            return_no VARCHAR(30) UNIQUE NOT NULL,
+            purchase_order_id INT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+            supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+            account_set_id INT REFERENCES account_sets(id) ON DELETE SET NULL,
+            total_amount DECIMAL(12,2) DEFAULT 0,
+            is_refunded BOOLEAN DEFAULT FALSE,
+            refund_status VARCHAR(20) DEFAULT 'pending',
+            tracking_no VARCHAR(100),
+            reason TEXT,
+            created_by_id INT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pr_po ON purchase_returns(purchase_order_id);
+        CREATE INDEX IF NOT EXISTS idx_pr_supplier ON purchase_returns(supplier_id);
+
+        CREATE TABLE IF NOT EXISTS purchase_return_items (
+            id SERIAL PRIMARY KEY,
+            purchase_return_id INT NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE,
+            purchase_item_id INT REFERENCES purchase_order_items(id) ON DELETE SET NULL,
+            product_id INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+            quantity INT NOT NULL,
+            unit_price DECIMAL(12,2) NOT NULL,
+            amount DECIMAL(12,2) NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pri_return ON purchase_return_items(purchase_return_id);
+    """)
+    logger.info("采购退货单表迁移完成")
 
 
 async def migrate_shipment_no():

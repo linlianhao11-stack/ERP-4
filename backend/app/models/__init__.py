@@ -6,7 +6,7 @@ from app.models.customer import Customer
 from app.models.order import Order, OrderItem
 from app.models.payment import Payment, PaymentOrder, PaymentMethod, DisbursementMethod
 from app.models.supplier import Supplier
-from app.models.purchase import PurchaseOrder, PurchaseOrderItem
+from app.models.purchase import PurchaseOrder, PurchaseOrderItem, PurchaseReturn, PurchaseReturnItem
 from app.models.rebate import RebateLog
 from app.models.sn import SnConfig, SnCode
 from app.models.shipment import Shipment, ShipmentItem
@@ -30,6 +30,7 @@ __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
     "Customer", "Salesperson", "Order", "OrderItem", "Payment", "PaymentOrder",
     "PaymentMethod", "DisbursementMethod", "OperationLog", "Supplier", "PurchaseOrder", "PurchaseOrderItem",
+    "PurchaseReturn", "PurchaseReturnItem",
     "RebateLog", "SnConfig", "SnCode", "Shipment",
     "ShipmentItem", "SystemSetting",
     "AccountSet", "ChartOfAccount", "AccountingPeriod", "Voucher", "VoucherEntry",

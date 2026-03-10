@@ -52,3 +52,36 @@ class PurchaseOrderItem(models.Model):
     class Meta:
         table = "purchase_order_items"
         indexes = (("purchase_order_id",),)
+
+
+class PurchaseReturn(models.Model):
+    id = fields.IntField(pk=True)
+    return_no = fields.CharField(max_length=30, unique=True)
+    purchase_order = fields.ForeignKeyField("models.PurchaseOrder", related_name="returns", on_delete=fields.CASCADE)
+    supplier = fields.ForeignKeyField("models.Supplier", related_name="purchase_returns", on_delete=fields.RESTRICT)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="purchase_returns", null=True, on_delete=fields.SET_NULL)
+    total_amount = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
+    is_refunded = fields.BooleanField(default=False)
+    refund_status = fields.CharField(max_length=20, default="pending")
+    tracking_no = fields.CharField(max_length=100, null=True)
+    reason = fields.TextField(null=True)
+    created_by = fields.ForeignKeyField("models.User", related_name="created_purchase_returns", null=True, on_delete=fields.SET_NULL)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "purchase_returns"
+        indexes = (("purchase_order_id",), ("supplier_id",),)
+
+
+class PurchaseReturnItem(models.Model):
+    id = fields.IntField(pk=True)
+    purchase_return = fields.ForeignKeyField("models.PurchaseReturn", related_name="items", on_delete=fields.CASCADE)
+    purchase_item = fields.ForeignKeyField("models.PurchaseOrderItem", related_name="return_items", null=True, on_delete=fields.SET_NULL)
+    product = fields.ForeignKeyField("models.Product", related_name="purchase_return_items", on_delete=fields.RESTRICT)
+    quantity = fields.IntField()
+    unit_price = fields.DecimalField(max_digits=12, decimal_places=2)
+    amount = fields.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        table = "purchase_return_items"
+        indexes = (("purchase_return_id",),)
