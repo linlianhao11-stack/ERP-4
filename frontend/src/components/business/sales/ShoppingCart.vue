@@ -106,14 +106,13 @@
     <div class="p-3 border-t">
       <!-- 客户选择 -->
       <div class="mb-2">
-        <select
-          :value="customerId"
-          @change="$emit('update:customerId', $event.target.value)"
-          class="input text-sm"
-        >
-          <option value="">选客户({{ needCustomer ? '必选' : '可选' }})</option>
-          <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
+        <SearchableSelect
+          :options="customerOptions"
+          :modelValue="customerId"
+          @update:modelValue="$emit('update:customerId', $event)"
+          :placeholder="'选客户(' + (needCustomer ? '必选' : '可选') + ')'"
+          searchPlaceholder="搜索客户名/电话"
+        />
       </div>
       <!-- 销售员选择 -->
       <div class="mb-2">
@@ -189,8 +188,10 @@
  * 购物车组件
  * 通过 props 接收数据，emit 事件回传操作
  */
+import { computed } from 'vue'
 import { useFormat } from '../../../composables/useFormat'
 import { useWarehousesStore } from '../../../stores/warehouses'
+import SearchableSelect from '../../common/SearchableSelect.vue'
 
 const props = defineProps({
   /** 购物车数据 */
@@ -234,6 +235,14 @@ const emit = defineEmits([
 
 const { fmt } = useFormat()
 const warehousesStore = useWarehousesStore()
+
+const customerOptions = computed(() =>
+  (props.customers || []).map(c => ({
+    id: c.id,
+    label: c.name,
+    sublabel: c.phone || ''
+  }))
+)
 
 /**
  * 获取购物车商品可选仓位列表

@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/finance", tags=["财务管理"])
 @router.get("/all-orders")
 async def get_all_orders(
     order_type: Optional[str] = None,
+    payment_status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
@@ -52,6 +53,24 @@ async def get_all_orders(
             query = query.filter(is_cleared=False)
     if order_type:
         query = query.filter(order_type=order_type)
+    if payment_status:
+        if payment_status == "cancelled":
+            query = query.filter(shipping_status="cancelled")
+        elif payment_status == "cleared":
+            query = query.filter(is_cleared=True).exclude(shipping_status="cancelled")
+        elif payment_status == "uncleared":
+            query = query.filter(is_cleared=False).exclude(shipping_status="cancelled")
+        elif payment_status == "unconfirmed":
+            uc_ids = set()
+            for p in await Payment.filter(is_confirmed=False).all():
+                if p.order_id:
+                    uc_ids.add(p.order_id)
+            for po in await PaymentOrder.filter(payment__is_confirmed=False).all():
+                uc_ids.add(po.order_id)
+            if uc_ids:
+                query = query.filter(id__in=list(uc_ids))
+            else:
+                query = query.filter(id=-1)
     if account_set_id:
         query = query.filter(account_set_id=account_set_id)
     if start_date:
@@ -109,6 +128,7 @@ async def get_all_orders(
             "paid_amount": float(o.paid_amount),
             "is_cleared": o.is_cleared,
             "has_unconfirmed_payment": o.id in unconfirmed_order_ids,
+            "shipping_status": o.shipping_status,
             "refunded": o.refunded,
             "remark": o.remark,
             "salesperson_name": o.salesperson.name if o.salesperson else "-",
@@ -210,6 +230,7 @@ async def get_finance_stock_logs(
     change_type: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 200,
     user: User = Depends(require_permission("finance"))
 ):
@@ -239,6 +260,11 @@ async def get_finance_stock_logs(
     if end_date:
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
 
+    if search:
+        query = query.filter(
+            Q(product__name__icontains=search) | Q(product__sku__icontains=search) | Q(warehouse__name__icontains=search)
+        )
+
     logs = await query.order_by("-created_at").limit(limit).select_related("product", "warehouse", "creator")
 
     return [{
@@ -262,6 +288,10 @@ async def get_finance_stock_logs(
 @router.get("/unpaid-orders")
 async def get_unpaid_orders(
     customer_id: Optional[int] = None,
+    order_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
     user: User = Depends(require_permission("finance"))
 ):
     """获取未结清的账期/寄售结算订单（仅显示实际欠款 > 0 的订单）"""
@@ -272,6 +302,14 @@ async def get_unpaid_orders(
     )
     if customer_id:
         query = query.filter(customer_id=customer_id)
+    if order_type:
+        query = query.filter(order_type=order_type)
+    if start_date:
+        query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
+    if end_date:
+        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+    if search:
+        query = query.filter(Q(order_no__icontains=search) | Q(customer__name__icontains=search))
     orders = await query.order_by("created_at").select_related("customer", "salesperson")
     return [{
         "id": o.id, "order_no": o.order_no, "order_type": o.order_type,
@@ -341,6 +379,10 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
 async def list_payments(
     customer_id: Optional[int] = None,
     source: Optional[str] = None,
+    is_confirmed: Optional[bool] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 100,
     user: User = Depends(require_permission("finance"))
 ):
@@ -350,6 +392,23 @@ async def list_payments(
         query = query.filter(customer_id=customer_id)
     if source:
         query = query.filter(source=source)
+    if is_confirmed is not None:
+        query = query.filter(is_confirmed=is_confirmed)
+    if start_date:
+        query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
+    if end_date:
+        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+    if search:
+        matching_order_ids = set()
+        order_matches = await Order.filter(order_no__icontains=search).values_list("id", flat=True)
+        matching_order_ids.update(order_matches)
+        po_links = await PaymentOrder.filter(order_id__in=list(matching_order_ids)).values_list("payment_id", flat=True) if matching_order_ids else []
+        direct_payment_ids = await Payment.filter(order_id__in=list(matching_order_ids)).values_list("id", flat=True) if matching_order_ids else []
+        search_payment_ids = set(po_links) | set(direct_payment_ids)
+        if search_payment_ids:
+            query = query.filter(Q(customer__name__icontains=search) | Q(id__in=list(search_payment_ids)))
+        else:
+            query = query.filter(customer__name__icontains=search)
     payments = await query.order_by("-created_at").limit(limit).select_related(
         "customer", "creator", "confirmed_by", "order")
 

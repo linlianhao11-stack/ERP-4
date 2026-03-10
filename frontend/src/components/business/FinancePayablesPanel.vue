@@ -1,8 +1,25 @@
 <template>
   <div>
+    <!-- 筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <select v-model="poFilter.status" @change="loadPurchaseOrdersData" class="input input-sm w-auto">
+        <option value="">全部状态</option>
+        <option value="pending_review">待审核</option>
+        <option value="pending">待付款</option>
+        <option value="paid">已付款</option>
+        <option value="completed">已完成</option>
+        <option value="cancelled">已取消</option>
+        <option value="rejected">已拒绝</option>
+        <option value="returned">已退货</option>
+      </select>
+      <input v-model="poFilter.start" @change="loadPurchaseOrdersData" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="poFilter.end" @change="loadPurchaseOrdersData" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="poFilter.search" @input="debouncedLoadPO" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索采购单号/供应商">
+      <button @click="resetPOFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
+    </div>
     <!-- Mobile cards -->
     <div class="md:hidden space-y-2">
-      <div v-for="o in filteredPurchaseOrders" :key="'pay' + o.id" class="card p-3 cursor-pointer" @click="viewPurchaseOrder(o.id)">
+      <div v-for="o in purchaseOrders" :key="'pay' + o.id" class="card p-3 cursor-pointer" @click="viewPurchaseOrder(o.id)">
         <div class="flex justify-between items-start mb-1">
           <div class="font-medium text-sm font-mono text-primary">{{ o.po_no }}</div>
           <div class="text-lg font-bold">¥{{ fmt(o.total_amount) }}</div>
@@ -24,7 +41,7 @@
           <div v-else class="text-xs text-success">已付款 {{ o.paid_by_name }} {{ fmtDate(o.paid_at) }}<span v-if="o.payment_method"> · {{ getDisbursementMethodName(o.payment_method) }}</span></div>
         </div>
       </div>
-      <div v-if="!filteredPurchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无应付记录</div>
+      <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无应付记录</div>
     </div>
     <!-- Desktop table -->
     <div class="card hidden md:block">
@@ -42,7 +59,7 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in filteredPurchaseOrders" :key="'pay' + o.id" class="hover:bg-elevated cursor-pointer" @click="viewPurchaseOrder(o.id)">
+            <tr v-for="o in purchaseOrders" :key="'pay' + o.id" class="hover:bg-elevated cursor-pointer" @click="viewPurchaseOrder(o.id)">
               <td class="px-3 py-2 font-mono text-sm text-primary">{{ o.po_no }}</td>
               <td class="px-3 py-2">{{ o.supplier_name }}</td>
               <td class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
@@ -68,7 +85,7 @@
           </tbody>
         </table>
       </div>
-      <div v-if="!filteredPurchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无应付记录</div>
+      <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无应付记录</div>
     </div>
 
     <!-- Modal: Payable Payment Confirm -->
@@ -151,7 +168,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { RotateCcw } from 'lucide-vue-next'
 import { useAppStore } from '../../stores/app'
 import { useSettingsStore } from '../../stores/settings'
 import { useFormat } from '../../composables/useFormat'
@@ -167,15 +185,12 @@ const { hasPermission } = usePermission()
 const disbursementMethods = computed(() => settingsStore.disbursementMethods)
 
 const purchaseOrders = ref([])
+const poFilter = reactive({ status: '', start: '', end: '', search: '' })
 const submitting = ref(false)
 const showPayablePayModal = ref(false)
 const showPurchaseDetailModal = ref(false)
 const purchaseOrderDetail = ref(null)
 const payablePayForm = reactive({ po_id: null, po_no: '', amount: 0, payment_method: '' })
-
-const filteredPurchaseOrders = computed(() => {
-  return purchaseOrders.value.filter(x => ['pending_review', 'pending', 'paid', 'partial', 'completed', 'cancelled', 'rejected', 'returned'].includes(x.status))
-})
 
 const getDisbursementMethodName = (m) => {
   const found = disbursementMethods.value.find(p => p.code === m)
@@ -185,7 +200,12 @@ const getDisbursementMethodName = (m) => {
 
 const loadPurchaseOrdersData = async () => {
   try {
-    const { data } = await getPurchaseOrders({})
+    const params = {}
+    if (poFilter.status) params.status = poFilter.status
+    if (poFilter.start) params.start_date = poFilter.start
+    if (poFilter.end) params.end_date = poFilter.end
+    if (poFilter.search) params.search = poFilter.search
+    const { data } = await getPurchaseOrders(params)
     purchaseOrders.value = data.items || data
   } catch (e) {
     console.error(e)
@@ -265,7 +285,22 @@ const handleCancelPO = async (id) => {
   }
 }
 
+let _poSearchTimer = null
+const debouncedLoadPO = () => {
+  clearTimeout(_poSearchTimer)
+  _poSearchTimer = setTimeout(loadPurchaseOrdersData, 300)
+}
+
+const resetPOFilters = () => {
+  poFilter.status = ''
+  poFilter.start = ''
+  poFilter.end = ''
+  poFilter.search = ''
+  loadPurchaseOrdersData()
+}
+
 defineExpose({ refresh: loadPurchaseOrdersData })
 
 onMounted(() => { loadPurchaseOrdersData() })
+onUnmounted(() => clearTimeout(_poSearchTimer))
 </script>

@@ -1,11 +1,20 @@
 <template>
   <div>
-    <!-- 客户筛选 -->
-    <div class="card mb-2 p-3">
-      <select v-model="financeCustomerId" @change="loadUnpaid" class="input text-sm">
+    <!-- 筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <select v-model="financeCustomerId" @change="loadUnpaid" class="input input-sm w-auto">
         <option value="">全部客户</option>
         <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }} ({{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }})</option>
       </select>
+      <select v-model="unpaidFilter.order_type" @change="loadUnpaid" class="input input-sm w-auto">
+        <option value="">全部类型</option>
+        <option value="CREDIT">赊销</option>
+        <option value="CONSIGN_SETTLE">寄售结算</option>
+      </select>
+      <input v-model="unpaidFilter.start" @change="loadUnpaid" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="unpaidFilter.end" @change="loadUnpaid" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="unpaidFilter.search" @input="debouncedLoadUnpaid" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索订单号/客户名">
+      <button @click="resetUnpaidFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
     </div>
     <!-- 移动端欠款卡片列表 -->
     <div class="md:hidden space-y-2">
@@ -110,7 +119,7 @@
  * 欠款明细 Tab
  * 包含欠款列表（客户筛选）+ 收款弹窗
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { useCustomersStore } from '../../../stores/customers'
 import { useSettingsStore } from '../../../stores/settings'
@@ -118,6 +127,7 @@ import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import { getUnpaidOrders, createPayment } from '../../../api/finance'
 import { orderTypeNames, orderTypeBadges } from '../../../utils/constants'
+import { RotateCcw } from 'lucide-vue-next'
 import StatusBadge from '../../common/StatusBadge.vue'
 
 // --- Props & Emits ---
@@ -150,6 +160,7 @@ const paymentMethods = computed(() => settingsStore.paymentMethods)
 const submitting = ref(false)
 /** 客户筛选选中值 */
 const financeCustomerId = ref('')
+const unpaidFilter = reactive({ order_type: '', start: '', end: '', search: '' })
 
 /** 欠款订单列表 */
 const unpaidOrders = ref([])
@@ -165,12 +176,32 @@ const paymentForm = reactive({ customer_id: '', order_ids: [], amount: 0, paymen
 /** 加载欠款订单列表 */
 const loadUnpaid = async () => {
   try {
-    const p = financeCustomerId.value ? { customer_id: financeCustomerId.value } : {}
+    const p = {}
+    if (financeCustomerId.value) p.customer_id = financeCustomerId.value
+    if (unpaidFilter.order_type) p.order_type = unpaidFilter.order_type
+    if (unpaidFilter.start) p.start_date = unpaidFilter.start
+    if (unpaidFilter.end) p.end_date = unpaidFilter.end
+    if (unpaidFilter.search) p.search = unpaidFilter.search
     const { data } = await getUnpaidOrders(p)
     unpaidOrders.value = data
   } catch (e) {
     console.error(e)
   }
+}
+
+let _unpaidSearchTimer = null
+const debouncedLoadUnpaid = () => {
+  clearTimeout(_unpaidSearchTimer)
+  _unpaidSearchTimer = setTimeout(loadUnpaid, 300)
+}
+
+const resetUnpaidFilters = () => {
+  financeCustomerId.value = ''
+  unpaidFilter.order_type = ''
+  unpaidFilter.start = ''
+  unpaidFilter.end = ''
+  unpaidFilter.search = ''
+  loadUnpaid()
 }
 
 /** 加载指定客户的欠款订单（收款弹窗用） */
@@ -242,6 +273,9 @@ const refresh = () => {
 
 // 暴露给父组件的方法
 defineExpose({ refresh, openPaymentModal })
+
+// ===== 清理 =====
+onUnmounted(() => clearTimeout(_unpaidSearchTimer))
 
 // ===== 初始化 =====
 onMounted(() => {

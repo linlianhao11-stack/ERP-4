@@ -2,43 +2,40 @@
   <div>
   <div class="card">
     <!-- 订单筛选栏 -->
-    <div class="p-3 border-b flex flex-col gap-2">
-      <!-- 第一行：类型筛选 + 日期 + 按钮 -->
-      <div class="flex items-center gap-2 justify-between">
-        <div class="flex items-center gap-1 flex-1 min-w-0">
-          <!-- 订单类型下拉 -->
-          <select v-model="orderFilter.type" @change="resetPage(); loadOrders()" class="input w-auto text-sm" style="flex-shrink:0">
-            <option value="">全部类型</option>
-            <option value="CASH">现款</option>
-            <option value="CREDIT">账期</option>
-            <option value="CONSIGN_OUT">寄售调拨</option>
-            <option value="CONSIGN_SETTLE">寄售结算</option>
-            <option value="RETURN">退货</option>
-          </select>
-          <!-- 账套下拉 -->
-          <select v-if="accountSets.length" v-model="orderFilter.account_set_id" @change="resetPage(); loadOrders()" class="input w-auto text-sm" style="flex-shrink:0">
-            <option value="">全部账套</option>
-            <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-          <!-- 桌面端日期输入 -->
-          <input v-model="orderFilter.start" @change="resetPage(); loadOrders()" type="date" class="input w-auto text-sm hidden md:block">
-          <input v-model="orderFilter.end" @change="resetPage(); loadOrders()" type="date" class="input w-auto text-sm hidden md:block">
-          <!-- 移动端日期预设 -->
-          <div class="flex gap-1 md:hidden">
-            <span @click="setOrderDatePreset('')" :class="['tab', !orderDatePreset ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">全部</span>
-            <span @click="setOrderDatePreset('today')" :class="['tab', orderDatePreset === 'today' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">今天</span>
-            <span @click="setOrderDatePreset('week')" :class="['tab', orderDatePreset === 'week' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">本周</span>
-            <span @click="setOrderDatePreset('month')" :class="['tab', orderDatePreset === 'month' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">本月</span>
-            <span @click="setOrderDatePreset('custom')" :class="['tab', orderDatePreset === 'custom' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">自定义</span>
-          </div>
-        </div>
-        <!-- 收款按钮（需权限） -->
-        <button v-if="hasPermission('finance')" @click="emit('open-payment')" class="btn btn-success btn-sm hidden md:block">收款</button>
-        <!-- 导出按钮 -->
-        <button @click="handleExportOrders" class="btn btn-primary btn-sm hidden md:block">导出Excel</button>
+    <div class="p-3 border-b flex flex-wrap items-center gap-2">
+      <select v-model="orderFilter.type" @change="resetPage(); loadOrders()" class="input input-sm w-auto">
+        <option value="">全部类型</option>
+        <option value="CASH">现款</option>
+        <option value="CREDIT">账期</option>
+        <option value="CONSIGN_OUT">寄售调拨</option>
+        <option value="CONSIGN_SETTLE">寄售结算</option>
+        <option value="RETURN">退货</option>
+      </select>
+      <select v-model="orderFilter.payment_status" @change="resetPage(); loadOrders()" class="input input-sm w-auto">
+        <option value="">全部状态</option>
+        <option value="cleared">已结清</option>
+        <option value="uncleared">未结清</option>
+        <option value="unconfirmed">待确认</option>
+        <option value="cancelled">已取消</option>
+      </select>
+      <select v-if="accountSets.length" v-model="orderFilter.account_set_id" @change="resetPage(); loadOrders()" class="input input-sm w-auto">
+        <option value="">全部账套</option>
+        <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
+      <input v-model="orderFilter.start" @change="resetPage(); loadOrders()" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="orderFilter.end" @change="resetPage(); loadOrders()" type="date" class="input input-sm w-auto hidden md:block">
+      <!-- 移动端日期预设 -->
+      <div class="flex gap-1 md:hidden">
+        <span @click="setOrderDatePreset('')" :class="['tab', !orderDatePreset ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">全部</span>
+        <span @click="setOrderDatePreset('today')" :class="['tab', orderDatePreset === 'today' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">今天</span>
+        <span @click="setOrderDatePreset('week')" :class="['tab', orderDatePreset === 'week' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">本周</span>
+        <span @click="setOrderDatePreset('month')" :class="['tab', orderDatePreset === 'month' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">本月</span>
+        <span @click="setOrderDatePreset('custom')" :class="['tab', orderDatePreset === 'custom' ? 'active' : '']" style="padding:6px 8px;font-size:12px;min-height:auto">自定义</span>
       </div>
-      <!-- 第二行：搜索框 -->
-      <input v-model="orderFilter.search" @input="debouncedLoadOrders" class="input w-full md:w-auto text-sm" placeholder="搜索订单号/客户/SN码/快递单号">
+      <input v-model="orderFilter.search" @input="debouncedLoadOrders" class="input input-sm flex-1 min-w-[180px]" placeholder="搜索订单号/客户/SN码/快递单号">
+      <button @click="resetOrderFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
+      <button v-if="hasPermission('finance')" @click="emit('open-payment')" class="btn btn-success btn-sm hidden md:block">收款</button>
+      <button @click="handleExportOrders" class="btn btn-primary btn-sm hidden md:block">导出Excel</button>
     </div>
     <!-- 移动端自定义日期展开 -->
     <div v-if="orderDatePreset === 'custom'" class="px-3 pb-3 flex gap-2 md:hidden">
@@ -482,6 +479,7 @@ import { getOrder, cancelOrder, cancelPreview, createOrder } from '../../../api/
 import { getLocations } from '../../../api/warehouses'
 import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import StatusBadge from '../../common/StatusBadge.vue'
+import { RotateCcw } from 'lucide-vue-next'
 
 // --- Props & Emits ---
 const props = defineProps({
@@ -519,7 +517,7 @@ const paymentMethods = computed(() => settingsStore.paymentMethods)
 const orderDatePreset = ref('')
 
 /** 订单筛选条件 */
-const orderFilter = reactive({ type: '', start: '', end: '', search: '', account_set_id: '' })
+const orderFilter = reactive({ type: '', payment_status: '', start: '', end: '', search: '', account_set_id: '' })
 /** 账套列表 */
 const accountSets = ref([])
 
@@ -645,12 +643,26 @@ const setOrderDatePreset = (preset) => {
   loadOrders()
 }
 
+/** 重置所有订单筛选条件 */
+const resetOrderFilters = () => {
+  orderFilter.type = ''
+  orderFilter.payment_status = ''
+  orderFilter.start = ''
+  orderFilter.end = ''
+  orderFilter.search = ''
+  orderFilter.account_set_id = ''
+  orderDatePreset.value = ''
+  resetPage()
+  loadOrders()
+}
+
 // ===== 数据加载 =====
 /** 加载订单列表 */
 const loadOrders = async () => {
   try {
     const params = { ...paginationParams.value }
     if (orderFilter.type) params.order_type = orderFilter.type
+    if (orderFilter.payment_status) params.payment_status = orderFilter.payment_status
     if (orderFilter.start) params.start_date = orderFilter.start
     if (orderFilter.end) params.end_date = orderFilter.end
     if (orderFilter.search) params.search = orderFilter.search

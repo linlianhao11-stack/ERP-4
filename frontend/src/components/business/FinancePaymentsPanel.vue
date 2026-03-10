@@ -1,5 +1,17 @@
 <template>
   <div>
+    <!-- 筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <select v-model="payFilter.is_confirmed" @change="loadPaymentsData" class="input input-sm w-auto">
+        <option value="">全部状态</option>
+        <option value="false">待确认</option>
+        <option value="true">已确认</option>
+      </select>
+      <input v-model="payFilter.start" @change="loadPaymentsData" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="payFilter.end" @change="loadPaymentsData" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="payFilter.search" @input="debouncedLoadPayments" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索订单号/客户名">
+      <button @click="resetPayFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
+    </div>
     <!-- Mobile cards -->
     <div class="md:hidden space-y-2">
       <div v-for="p in payments" :key="p.id" class="card p-3 cursor-pointer" @click="p.order_nos && p.order_nos.length ? $emit('view-order', p.order_nos[0].id) : null">
@@ -70,7 +82,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { RotateCcw } from 'lucide-vue-next'
 import { useAppStore } from '../../stores/app'
 import { useSettingsStore } from '../../stores/settings'
 import { useFormat } from '../../composables/useFormat'
@@ -84,6 +97,7 @@ const { hasPermission } = usePermission()
 
 const paymentMethods = computed(() => settingsStore.paymentMethods)
 const payments = ref([])
+const payFilter = reactive({ is_confirmed: '', start: '', end: '', search: '' })
 
 const emit = defineEmits(['view-order'])
 
@@ -95,7 +109,12 @@ const getPaymentMethodName = (m) => {
 
 const loadPaymentsData = async () => {
   try {
-    const { data } = await getPayments()
+    const params = {}
+    if (payFilter.is_confirmed !== '') params.is_confirmed = payFilter.is_confirmed
+    if (payFilter.start) params.start_date = payFilter.start
+    if (payFilter.end) params.end_date = payFilter.end
+    if (payFilter.search) params.search = payFilter.search
+    const { data } = await getPayments(params)
     payments.value = data
   } catch (e) {
     console.error(e)
@@ -115,7 +134,22 @@ const confirmPaymentRecord = async (id, amount) => {
   }
 }
 
+let _paySearchTimer = null
+const debouncedLoadPayments = () => {
+  clearTimeout(_paySearchTimer)
+  _paySearchTimer = setTimeout(loadPaymentsData, 300)
+}
+
+const resetPayFilters = () => {
+  payFilter.is_confirmed = ''
+  payFilter.start = ''
+  payFilter.end = ''
+  payFilter.search = ''
+  loadPaymentsData()
+}
+
 defineExpose({ refresh: loadPaymentsData })
 
 onMounted(() => { loadPaymentsData() })
+onUnmounted(() => clearTimeout(_paySearchTimer))
 </script>

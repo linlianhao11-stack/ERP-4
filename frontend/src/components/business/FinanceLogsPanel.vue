@@ -1,7 +1,7 @@
 <template>
   <div class="card">
-    <div class="p-3 border-b flex flex-wrap gap-2">
-      <select v-model="logFilter.type" @change="loadLogs" class="input w-auto text-sm">
+    <div class="p-3 border-b flex flex-wrap items-center gap-2">
+      <select v-model="logFilter.type" @change="loadLogs" class="input input-sm w-auto">
         <option value="">全部类型</option>
         <option value="RESTOCK">入库</option>
         <option value="SALE">销售出库</option>
@@ -17,6 +17,10 @@
         <option value="RESERVE">库存预留</option>
         <option value="RESERVE_CANCEL">取消预留</option>
       </select>
+      <input v-model="logFilter.start" @change="loadLogs" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="logFilter.end" @change="loadLogs" type="date" class="input input-sm w-auto hidden md:block">
+      <input v-model="logFilter.search" @input="debouncedLoadLogs" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索商品名/SKU/仓库名">
+      <button @click="resetLogFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
     </div>
     <div class="overflow-x-auto table-container">
       <table class="w-full text-sm">
@@ -51,7 +55,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { RotateCcw } from 'lucide-vue-next'
 import { useFormat } from '../../composables/useFormat'
 import { useSort } from '../../composables/useSort'
 import { getStockLogs } from '../../api/finance'
@@ -61,7 +66,7 @@ const { fmtDate } = useFormat()
 const { sortState: logSort, toggleSort: toggleLogSort, genericSort: genericSortLog } = useSort()
 
 const stockLogs = ref([])
-const logFilter = reactive({ type: '' })
+const logFilter = reactive({ type: '', start: '', end: '', search: '' })
 
 const sortedLogs = computed(() => {
   return genericSortLog(stockLogs.value, {
@@ -77,6 +82,9 @@ const loadLogs = async () => {
   try {
     const params = {}
     if (logFilter.type) params.change_type = logFilter.type
+    if (logFilter.start) params.start_date = logFilter.start
+    if (logFilter.end) params.end_date = logFilter.end
+    if (logFilter.search) params.search = logFilter.search
     const { data } = await getStockLogs(params)
     stockLogs.value = data
   } catch (e) {
@@ -84,7 +92,22 @@ const loadLogs = async () => {
   }
 }
 
+let _logSearchTimer = null
+const debouncedLoadLogs = () => {
+  clearTimeout(_logSearchTimer)
+  _logSearchTimer = setTimeout(loadLogs, 300)
+}
+
+const resetLogFilters = () => {
+  logFilter.type = ''
+  logFilter.start = ''
+  logFilter.end = ''
+  logFilter.search = ''
+  loadLogs()
+}
+
 defineExpose({ refresh: loadLogs })
 
 onMounted(() => { loadLogs() })
+onUnmounted(() => clearTimeout(_logSearchTimer))
 </script>
