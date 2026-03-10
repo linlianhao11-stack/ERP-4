@@ -140,7 +140,22 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
             actual_amount_due = total_amount - order.paid_amount
 
-            # 6.5 钩子：退货 → 红字应收单
+            # 6.5 钩子：寄售结算 → 应收单（pending，无发货流程所以在此创建）
+            if data.order_type == "CONSIGN_SETTLE" and getattr(order, "account_set_id", None):
+                try:
+                    from app.services.ar_service import create_receivable_bill
+                    await create_receivable_bill(
+                        account_set_id=order.account_set_id,
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        total_amount=abs(total_amount),
+                        status="pending",
+                        creator=user,
+                    )
+                except Exception as e:
+                    logger.error(f"寄售结算自动生成应收单失败: {e}")
+
+            # 6.5b 钩子：退货 → 红字应收单
             if data.order_type == "RETURN" and getattr(order, "account_set_id", None):
                 try:
                     from app.services.ar_service import create_receivable_bill

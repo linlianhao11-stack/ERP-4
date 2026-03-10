@@ -6,3 +6,6 @@ class CustomerCreate(BaseModel):
     contact_person: Optional[str] = None
     phone: Optional[str] = Field(default=None, max_length=50)
     address: Optional[str] = None
+    tax_id: Optional[str] = Field(default=None, max_length=50)
+    bank_name: Optional[str] = Field(default=None, max_length=100)
+    bank_account: Optional[str] = Field(default=None, max_length=50)

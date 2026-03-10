@@ -9,8 +9,8 @@
         <div class="text-xl font-bold text-purple-emphasis">¥{{ fmt(consignSummary.total_cost_value) }}</div>
       </div>
       <div class="card p-3">
-        <div class="text-xs text-muted">寄售库存(零售)</div>
-        <div class="text-xl font-bold text-primary">¥{{ fmt(consignSummary.total_retail_value) }}</div>
+        <div class="text-xs text-muted">寄售库存(销售)</div>
+        <div class="text-xl font-bold text-primary">¥{{ fmt(consignSummary.total_sales_value) }}</div>
       </div>
       <div class="card p-3">
         <div class="text-xs text-muted">结算欠款</div>
@@ -56,16 +56,16 @@
               <th class="px-3 py-2 text-left">商品</th>
               <th class="px-3 py-2 text-right">数量</th>
               <th v-if="hasPermission('finance')" class="px-3 py-2 text-right">成本</th>
-              <th class="px-3 py-2 text-right">零售价</th>
+              <th class="px-3 py-2 text-right">销售价</th>
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="s in consignSummary.stock_details" :key="s.product_id">
+            <tr v-for="s in consignSummary.stock_details" :key="s.product_id + '-' + s.unit_price">
               <td class="px-3 py-2 font-mono text-xs">{{ s.product_sku }}</td>
               <td class="px-3 py-2">{{ s.product_name }}</td>
               <td class="px-3 py-2 text-right font-semibold">{{ s.quantity }}</td>
               <td v-if="hasPermission('finance')" class="px-3 py-2 text-right">{{ fmt(s.cost_price) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(s.retail_price) }}</td>
+              <td class="px-3 py-2 text-right">{{ fmt(s.unit_price) }}</td>
             </tr>
           </tbody>
         </table>
@@ -113,8 +113,8 @@
                 <div class="font-semibold mb-2 text-sm">待结算商品</div>
                 <div class="space-y-1 max-h-40 overflow-y-auto">
                   <div
-                    v-for="p in consignDetail.remaining_products"
-                    :key="p.product_id"
+                    v-for="(p, idx) in consignDetail.remaining_products"
+                    :key="p.product_id + '-' + p.unit_price"
                     class="flex justify-between items-center p-2 bg-elevated rounded text-sm"
                   >
                     <div>
@@ -123,7 +123,7 @@
                     </div>
                     <div class="text-right">
                       <div class="font-semibold">{{ p.remaining_quantity }}件</div>
-                      <div class="text-xs text-muted">¥{{ p.retail_price }}/件</div>
+                      <div class="text-xs text-muted">¥{{ p.unit_price }}/件</div>
                     </div>
                   </div>
                   <div v-if="!consignDetail.remaining_products?.length" class="text-muted text-center py-3 text-sm">无待结算商品</div>
@@ -141,8 +141,8 @@
               </div>
               <div class="space-y-2 max-h-64 overflow-y-auto mb-3">
                 <div
-                  v-for="item in consignSettleItems"
-                  :key="item.product_id"
+                  v-for="(item, idx) in consignSettleItems"
+                  :key="item.product_id + '-' + item.unit_price"
                   class="p-3 bg-elevated rounded border"
                 >
                   <div class="flex justify-between items-start mb-2">
@@ -209,8 +209,8 @@
               <div class="font-semibold mb-2 text-sm">可退商品列表</div>
               <div class="space-y-2 max-h-64 overflow-y-auto">
                 <div
-                  v-for="p in consignReturnItems"
-                  :key="p.product_id"
+                  v-for="(p, idx) in consignReturnItems"
+                  :key="p.product_id + '-' + (p.unit_price || idx)"
                   class="p-3 bg-elevated rounded border"
                 >
                   <div class="flex justify-between items-start mb-2">
@@ -292,7 +292,7 @@ const { hasPermission } = usePermission()
 // Local state
 const consignSummary = ref({
   total_cost_value: 0,
-  total_retail_value: 0,
+  total_sales_value: 0,
   total_settle_unpaid: 0,
   total_quantity: 0,
   stock_details: []
@@ -374,7 +374,7 @@ const enterConsignSettle = () => {
     product_sku: p.product_sku,
     remaining_quantity: p.remaining_quantity,
     settle_quantity: 0,
-    unit_price: p.retail_price
+    unit_price: p.unit_price
   }))
 }
 

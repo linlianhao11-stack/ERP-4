@@ -193,7 +193,7 @@ const searchReturnOrders = async () => {
   _returnOrderAbort = controller
   try {
     const { data } = await getOrders({ limit: 200 }, { signal: controller.signal })
-    salesOrders.value = data.filter(o => ['CASH', 'CREDIT'].includes(o.order_type))
+    salesOrders.value = (data.items || data).filter(o => ['CASH', 'CREDIT'].includes(o.order_type))
   } catch (e) {
     if (e?.code === 'ERR_CANCELED') return
     appStore.showToast(e.response?.data?.detail || '加载订单失败', 'error')

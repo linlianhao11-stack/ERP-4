@@ -170,7 +170,7 @@ async def export_orders(
             f"{float(o.total_cost):.2f}",
             f"{float(o.total_profit):.2f}",
             f"{float(o.paid_amount):.2f}",
-            "已结清" if o.is_cleared else "未结清",
+            "已取消" if o.shipping_status == "cancelled" else ("已结清" if o.is_cleared else "未结清"),
             ("已退款" if o.refunded else "未退款") if o.order_type == "RETURN" else "-",
             (o.remark or "").replace('\n', ' '),
             o.salesperson.name if o.salesperson else "-",

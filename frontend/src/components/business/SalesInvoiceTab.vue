@@ -93,6 +93,16 @@
                   <div><span class="text-muted">关联应收单：</span>{{ detail.receivable_bill_no || '-' }}</div>
                   <div><span class="text-muted">备注：</span>{{ detail.remark || '-' }}</div>
                 </div>
+                <!-- 购方开票信息 -->
+                <div v-if="detail.customer_tax_id || detail.customer_bank_name" class="border border-line rounded-xl p-3 mb-3">
+                  <div class="text-xs font-semibold text-secondary mb-2">购方开票信息</div>
+                  <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px]">
+                    <div v-if="detail.customer_name" class="col-span-2"><span class="text-muted">名称：</span>{{ detail.customer_name }}</div>
+                    <div v-if="detail.customer_tax_id" class="col-span-2"><span class="text-muted">纳税人识别号：</span><span class="font-mono">{{ detail.customer_tax_id }}</span></div>
+                    <div v-if="detail.customer_address || detail.customer_phone" class="col-span-2"><span class="text-muted">地址电话：</span>{{ [detail.customer_address, detail.customer_phone].filter(Boolean).join(' ') }}</div>
+                    <div v-if="detail.customer_bank_name || detail.customer_bank_account" class="col-span-2"><span class="text-muted">开户行及账号：</span>{{ [detail.customer_bank_name, detail.customer_bank_account].filter(Boolean).join(' ') }}</div>
+                  </div>
+                </div>
                 <div class="bg-elevated rounded-xl p-3 mb-3">
                   <div class="grid grid-cols-3 gap-2 text-[13px]">
                     <div>不含税：<span class="font-medium">{{ fmtMoney(detail.amount_without_tax) }}</span></div>

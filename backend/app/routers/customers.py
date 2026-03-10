@@ -17,7 +17,8 @@ async def list_customers(keyword: Optional[str] = None, limit: int = 200, offset
         keyword_fields=["name", "phone"], order_by="name", offset=offset, limit=limit
     )
     return {"items": [{"id": c.id, "name": c.name, "contact_person": c.contact_person, "phone": c.phone,
-             "address": c.address, "balance": float(c.balance), "rebate_balance": float(c.rebate_balance)} for c in customers], "total": total}
+             "address": c.address, "tax_id": c.tax_id, "bank_name": c.bank_name, "bank_account": c.bank_account,
+             "balance": float(c.balance), "rebate_balance": float(c.rebate_balance)} for c in customers], "total": total}
 
 
 @router.post("")

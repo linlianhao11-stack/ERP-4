@@ -114,11 +114,11 @@
   </div>
 
   <!-- ============ 弹窗：订单详情 ============ -->
-  <div v-if="showOrderDetailModal" class="modal-overlay" @click.self="showOrderDetailModal = false">
+  <div v-if="showOrderDetailModal" class="modal-overlay" @click.self="showOrderDetailModal = false; showReturnForm = false">
     <div class="modal-content" style="max-width:920px">
       <div class="modal-header">
         <h3 class="font-semibold">订单详情</h3>
-        <button @click="showOrderDetailModal = false" class="modal-close">&times;</button>
+        <button @click="showOrderDetailModal = false; showReturnForm = false" class="modal-close">&times;</button>
       </div>
       <div class="modal-body" v-if="orderDetail.order_no">
         <!-- 订单基本信息 -->
@@ -259,10 +259,56 @@
             <div v-if="sh.last_info" class="px-3.5 py-2 border-t border-line text-[11px] text-muted">{{ sh.last_info }}</div>
           </div>
         </div>
+
+        <!-- 退货表单 -->
+        <div v-if="showReturnForm" class="mb-2">
+          <div class="flex items-center gap-2 mb-2.5">
+            <span class="text-[13px] font-semibold text-secondary">退货商品</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[13px]">
+              <thead class="bg-elevated">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">可退</th>
+                  <th class="px-3 py-2 text-center text-xs font-semibold text-secondary" style="width:100px">退货数量</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-line">
+                <tr v-for="item in returnForm.items" :key="item.product_id">
+                  <td class="px-3 py-2.5">
+                    <div class="font-medium">{{ item.product_name }}</div>
+                    <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
+                  </td>
+                  <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                  <td class="px-3 py-2.5 text-right text-muted">{{ item.max_qty }}</td>
+                  <td class="px-3 py-2.5 text-center">
+                    <input type="number" v-model.number="item.qty" :min="0" :max="item.max_qty" class="input text-center" style="width:80px" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-3 px-1">
+            <label class="flex items-center gap-2 cursor-pointer text-[13px]">
+              <input type="checkbox" v-model="returnForm.refunded" class="rounded" />
+              <span>已退款给客户</span>
+              <span class="text-[11px] text-muted">（不勾选则形成在账资金）</span>
+            </label>
+          </div>
+          <div class="flex gap-3 pt-4 mt-4 border-t border-line">
+            <button type="button" @click="cancelReturnForm" class="btn btn-secondary flex-1">取消</button>
+            <button type="button" @click="submitReturn" :disabled="!canSubmitReturn || returnSubmitting" class="btn btn-primary flex-1">
+              {{ returnSubmitting ? '提交中...' : '确认退货' }}
+            </button>
+          </div>
+        </div>
       </div>
       <!-- 底部操作按钮（独立于滚动区域） -->
-      <div class="flex gap-3 px-6 py-4 border-t border-line">
-        <button type="button" @click="showOrderDetailModal = false" class="btn btn-secondary flex-1">关闭</button>
+      <div v-if="!showReturnForm" class="flex gap-3 px-6 py-4 border-t border-line">
+        <button type="button" @click="showOrderDetailModal = false; showReturnForm = false" class="btn btn-secondary flex-1">关闭</button>
+        <button v-if="canReturn" type="button" @click="openReturnForm" class="btn btn-primary flex-1">销售退货</button>
         <button v-if="orderDetail.shipping_status && ['pending', 'partial'].includes(orderDetail.shipping_status)" type="button" @click="handleCancelOrder(orderDetail.id)" class="btn flex-1" style="background:var(--error);color:#fff">取消订单</button>
       </div>
     </div>
@@ -432,7 +478,8 @@ import { useSort } from '../../../composables/useSort'
 import { usePagination } from '../../../composables/usePagination'
 import { getAllOrders, exportOrders } from '../../../api/finance'
 import { getAccountSets } from '../../../api/accounting'
-import { getOrder, cancelOrder, cancelPreview } from '../../../api/orders'
+import { getOrder, cancelOrder, cancelPreview, createOrder } from '../../../api/orders'
+import { getLocations } from '../../../api/warehouses'
 import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import StatusBadge from '../../common/StatusBadge.vue'
 
@@ -484,6 +531,17 @@ const showOrderDetailModal = ref(false)
 /** 订单详情数据 */
 const orderDetail = reactive({})
 
+// --- 退货相关状态 ---
+/** 是否显示退货表单 */
+const showReturnForm = ref(false)
+/** 退货表单数据 */
+const returnForm = reactive({
+  items: [],
+  refunded: false,
+})
+/** 退货提交中 */
+const returnSubmitting = ref(false)
+
 // --- 取消订单相关状态 ---
 /** 取消弹窗可见性 */
 const showCancelModal = ref(false)
@@ -530,9 +588,23 @@ const cancelStepCount = computed(() => {
   return 3
 })
 
+/** 当前订单是否可发起退货 */
+const canReturn = computed(() => {
+  if (!orderDetail.order_type) return false
+  if (!['CASH', 'CREDIT'].includes(orderDetail.order_type)) return false
+  if (orderDetail.shipping_status === 'cancelled') return false
+  return orderDetail.items?.some(i => i.available_return_quantity > 0)
+})
+
+/** 退货表单是否可提交 */
+const canSubmitReturn = computed(() => {
+  return returnForm.items.some(i => i.qty > 0)
+})
+
 // ===== 辅助函数 =====
 /** 获取订单付款状态徽标 */
 const getOrderPayStatus = (o) => {
+  if (o.shipping_status === 'cancelled') return { text: '已取消', badge: 'badge badge-gray' }
   if (!o.is_cleared) return { text: '未结清', badge: 'badge badge-red' }
   if (o.has_unconfirmed_payment) return { text: '待确认', badge: 'badge badge-orange' }
   return { text: '已结清', badge: 'badge badge-green' }
@@ -618,6 +690,85 @@ const viewOrder = async (id) => {
   } catch (e) {
     appStore.showToast('加载订单详情失败', 'error')
   }
+}
+
+// ===== 销售退货 =====
+/** 打开退货表单 */
+const openReturnForm = () => {
+  returnForm.items = orderDetail.items
+    .filter(i => i.available_return_quantity > 0)
+    .map(i => ({
+      product_id: i.product_id,
+      product_name: i.product_name,
+      product_sku: i.product_sku,
+      unit_price: i.unit_price,
+      cost_price: i.cost_price,
+      max_qty: i.available_return_quantity,
+      qty: 0
+    }))
+  returnForm.refunded = false
+  showReturnForm.value = true
+}
+
+/** 提交退货 */
+const submitReturn = async () => {
+  const items = returnForm.items.filter(i => i.qty > 0)
+  if (!items.length) {
+    appStore.showToast('请至少选择一件退货商品', 'error')
+    return
+  }
+  for (const item of items) {
+    if (item.qty > item.max_qty) {
+      appStore.showToast(`${item.product_name} 最多可退 ${item.max_qty} 件`, 'error')
+      return
+    }
+  }
+
+  returnSubmitting.value = true
+  try {
+    const warehouseId = orderDetail.warehouse?.id
+    if (!warehouseId) {
+      appStore.showToast('原订单无仓库信息，无法退货', 'error')
+      returnSubmitting.value = false
+      return
+    }
+    let locationId = null
+    try {
+      const { data: locs } = await getLocations({ warehouse_id: warehouseId })
+      if (locs.length) locationId = locs[0].id
+    } catch (e) {
+      console.warn('获取仓位失败:', e)
+    }
+
+    await createOrder({
+      order_type: 'RETURN',
+      customer_id: orderDetail.customer?.id,
+      warehouse_id: warehouseId,
+      related_order_id: orderDetail.id,
+      refunded: returnForm.refunded,
+      items: items.map(i => ({
+        product_id: i.product_id,
+        quantity: i.qty,
+        unit_price: i.unit_price,
+        warehouse_id: warehouseId,
+        location_id: locationId,
+      }))
+    })
+
+    appStore.showToast('退货单创建成功')
+    showReturnForm.value = false
+    showOrderDetailModal.value = false
+    loadOrders()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '退货失败', 'error')
+  } finally {
+    returnSubmitting.value = false
+  }
+}
+
+/** 取消退货表单 */
+const cancelReturnForm = () => {
+  showReturnForm.value = false
 }
 
 // ===== 取消订单 =====

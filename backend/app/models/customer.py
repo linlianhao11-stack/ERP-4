@@ -7,6 +7,9 @@ class Customer(models.Model):
     contact_person = fields.CharField(max_length=100, null=True)
     phone = fields.CharField(max_length=50, null=True)
     address = fields.TextField(null=True)
+    tax_id = fields.CharField(max_length=50, null=True)       # 纳税人识别号
+    bank_name = fields.CharField(max_length=100, null=True)   # 开户行
+    bank_account = fields.CharField(max_length=50, null=True) # 银行账号
     balance = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     rebate_balance = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = fields.BooleanField(default=True)

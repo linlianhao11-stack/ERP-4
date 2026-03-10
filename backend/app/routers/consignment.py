@@ -1,4 +1,5 @@
 """寄售管理路由"""
+from collections import defaultdict
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -83,31 +84,89 @@ async def get_consignment_summary(user: User = Depends(require_permission("sales
                 "balance": float(customer.balance)
             }
 
-    product_stock_map = {}
+    # --- 库存明细：按 (product_id, unit_price) 分组，显示实际销售价 ---
+    # 实际剩余库存（ground truth）
+    product_remaining = {}
     for s in stocks:
         pid = s.product_id
-        if pid not in product_stock_map:
-            product_stock_map[pid] = {
-                "product_id": pid,
-                "product_sku": s.product.sku,
-                "product_name": s.product.name,
-                "quantity": 0,
-                "cost_price": float(s.product.cost_price),
-                "retail_price": float(s.product.retail_price),
+        if pid not in product_remaining:
+            product_remaining[pid] = {"quantity": 0, "product": s.product}
+        product_remaining[pid]["quantity"] += s.quantity
+
+    # 获取所有 CONSIGN_OUT 订单明细，按订单时间排序（用于 FIFO 分配）
+    out_items = await OrderItem.filter(
+        order__order_type="CONSIGN_OUT"
+    ).select_related("product", "order").order_by("order__created_at")
+
+    # 按 (product_id, unit_price) 分组
+    price_batches = {}  # pid -> {unit_price: {out_qty, earliest_date, product}}
+    for item in out_items:
+        pid = item.product_id
+        up = float(item.unit_price)
+        if pid not in price_batches:
+            price_batches[pid] = {}
+        if up not in price_batches[pid]:
+            price_batches[pid][up] = {
+                "out_qty": 0,
+                "earliest_date": item.order.created_at,
+                "product": item.product,
             }
-        product_stock_map[pid]["quantity"] += s.quantity
+        price_batches[pid][up]["out_qty"] += item.quantity
+        if item.order.created_at < price_batches[pid][up]["earliest_date"]:
+            price_batches[pid][up]["earliest_date"] = item.order.created_at
+
+    # FIFO 分配剩余库存到各价格批次
     stock_details = []
-    for item in product_stock_map.values():
-        item["total_cost"] = item["quantity"] * item["cost_price"]
-        item["total_retail"] = item["quantity"] * item["retail_price"]
-        stock_details.append(item)
+    for pid, info in product_remaining.items():
+        remaining_qty = info["quantity"]
+        product = info["product"]
+
+        if pid not in price_batches:
+            # 有库存但无调拨记录，用零售价兜底
+            stock_details.append({
+                "product_id": pid,
+                "product_sku": product.sku,
+                "product_name": product.name,
+                "quantity": remaining_qty,
+                "cost_price": float(product.cost_price),
+                "unit_price": float(product.retail_price),
+                "total_cost": remaining_qty * float(product.cost_price),
+                "total_sales": remaining_qty * float(product.retail_price),
+            })
+            continue
+
+        batches = price_batches[pid]
+        sorted_batches = sorted(batches.items(), key=lambda x: x[1]["earliest_date"])
+        total_out = sum(b["out_qty"] for _, b in sorted_batches)
+        total_deducted = total_out - remaining_qty
+        # FIFO：从最早批次开始扣减已结算/退货量
+        deduction_left = max(0, total_deducted)
+        for up, batch in sorted_batches:
+            deduct = min(deduction_left, batch["out_qty"])
+            batch["remaining"] = batch["out_qty"] - deduct
+            deduction_left -= deduct
+
+        for up, batch in sorted_batches:
+            qty = batch.get("remaining", batch["out_qty"])
+            if qty > 0:
+                p = batch["product"]
+                stock_details.append({
+                    "product_id": pid,
+                    "product_sku": p.sku,
+                    "product_name": p.name,
+                    "quantity": qty,
+                    "cost_price": float(p.cost_price),
+                    "unit_price": up,
+                    "total_cost": qty * float(p.cost_price),
+                    "total_sales": qty * up,
+                })
 
     total_cost_value = sum(item["total_cost"] for item in stock_details)
-    total_retail_value = sum(item["total_retail"] for item in stock_details)
+    total_sales_value = sum(item["total_sales"] for item in stock_details)
 
     return {
         "total_cost_value": total_cost_value,
-        "total_retail_value": total_retail_value,
+        "total_sales_value": total_sales_value,
         "total_settle_unpaid": total_settle_unpaid,
         "total_items": len(stock_details),
         "total_quantity": sum(s.quantity for s in stocks),
@@ -128,7 +187,7 @@ async def get_customer_consignment(customer_id: int, user: User = Depends(requir
     out_orders = await Order.filter(customer_id=customer_id, order_type="CONSIGN_OUT").order_by("-created_at")
     settle_orders = await Order.filter(customer_id=customer_id, order_type="CONSIGN_SETTLE").order_by("-created_at")
 
-    product_stats = {}
+    product_stats = {}  # key: (product_id, unit_price)
 
     # 批量查询所有订单的明细（避免 N+1）
     all_order_ids = [o.id for o in out_orders] + [o.id for o in settle_orders]
@@ -140,52 +199,63 @@ async def get_customer_consignment(customer_id: int, user: User = Depends(requir
     for item in all_items:
         items_by_order.setdefault(item.order_id, []).append(item)
 
+    # 按 (product_id, unit_price) 分组调拨记录
     for order in out_orders:
         for item in items_by_order.get(order.id, []):
             pid = item.product_id
-            if pid not in product_stats:
-                product_stats[pid] = {
+            up = float(item.unit_price)
+            key = (pid, up)
+            if key not in product_stats:
+                product_stats[key] = {
                     "product_id": pid,
                     "product_sku": item.product.sku,
                     "product_name": item.product.name,
                     "out_quantity": 0,
-                    "settle_quantity": 0,
-                    "return_quantity": 0,
                     "remaining_quantity": 0,
                     "cost_price": float(item.cost_price),
-                    "retail_price": float(item.product.retail_price)
+                    "unit_price": up,
+                    "earliest_date": order.created_at,
                 }
-            product_stats[pid]["out_quantity"] += item.quantity
+            product_stats[key]["out_quantity"] += item.quantity
+            if order.created_at < product_stats[key]["earliest_date"]:
+                product_stats[key]["earliest_date"] = order.created_at
 
+    # 按 product_id 汇总结算/退货总量（结算退货不区分价格批次）
+    deductions_by_product = defaultdict(int)
     for order in settle_orders:
         for item in items_by_order.get(order.id, []):
-            pid = item.product_id
-            if pid in product_stats:
-                product_stats[pid]["settle_quantity"] += abs(item.quantity)
+            deductions_by_product[item.product_id] += abs(item.quantity)
 
     for order in return_orders:
         for item in items_by_order.get(order.id, []):
-            pid = item.product_id
-            if pid in product_stats:
-                product_stats[pid]["return_quantity"] += abs(item.quantity)
+            deductions_by_product[item.product_id] += abs(item.quantity)
 
     return_logs = await StockLog.filter(
         change_type="CONSIGN_RETURN", reference_type="CONSIGN_RETURN",
         reference_id=customer_id, warehouse__is_virtual=True, quantity__lt=0
     ).select_related("product")
     for log in return_logs:
-        pid = log.product_id
-        if pid in product_stats:
-            product_stats[pid]["return_quantity"] += abs(log.quantity)
+        deductions_by_product[log.product_id] += abs(log.quantity)
 
-    for pid in product_stats:
-        product_stats[pid]["remaining_quantity"] = (
-            product_stats[pid]["out_quantity"]
-            - product_stats[pid]["settle_quantity"]
-            - product_stats[pid]["return_quantity"]
-        )
+    # FIFO 分配扣减量到各价格批次
+    product_keys = defaultdict(list)
+    for key in product_stats:
+        product_keys[key[0]].append(key)
 
-    remaining_products = [p for p in product_stats.values() if p["remaining_quantity"] > 0]
+    for pid, keys in product_keys.items():
+        keys.sort(key=lambda k: product_stats[k]["earliest_date"])
+        deduction_left = deductions_by_product.get(pid, 0)
+        for key in keys:
+            stats = product_stats[key]
+            deduct = min(deduction_left, stats["out_quantity"])
+            stats["remaining_quantity"] = stats["out_quantity"] - deduct
+            deduction_left -= deduct
+
+    remaining_products = [
+        {k: v for k, v in p.items() if k != "earliest_date"}
+        for p in product_stats.values()
+        if p["remaining_quantity"] > 0
+    ]
 
     return {
         "customer": {

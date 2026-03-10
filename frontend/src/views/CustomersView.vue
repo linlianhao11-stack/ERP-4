@@ -79,6 +79,21 @@
               <label class="label">地址</label>
               <input v-model="customerForm.address" class="input">
             </div>
+            <div class="text-xs font-semibold text-secondary mt-2 mb-1">开票信息</div>
+            <div>
+              <label class="label">纳税人识别号</label>
+              <input v-model="customerForm.tax_id" class="input" placeholder="统一社会信用代码">
+            </div>
+            <div class="grid form-grid grid-cols-2 gap-3">
+              <div>
+                <label class="label">开户行</label>
+                <input v-model="customerForm.bank_name" class="input">
+              </div>
+              <div>
+                <label class="label">银行账号</label>
+                <input v-model="customerForm.bank_account" class="input">
+              </div>
+            </div>
             <div class="flex gap-3 pt-3">
               <button type="button" @click="closeModal" class="btn btn-secondary flex-1">取消</button>
               <button type="submit" class="btn btn-primary flex-1">保存</button>
@@ -383,7 +398,7 @@ const { previousModal } = storeToRefs(appStore)
 
 // Local state
 const customerTab = ref('transactions')
-const customerForm = reactive({ id: null, name: '', contact_person: '', phone: '', address: '' })
+const customerForm = reactive({ id: null, name: '', contact_person: '', phone: '', address: '', tax_id: '', bank_name: '', bank_account: '' })
 const customerTrans = ref({ customer: null, stats: null, transactions: [], available_months: [] })
 const transMonth = ref('')
 const transType = ref('')
@@ -400,14 +415,15 @@ const filteredTransactions = computed(() => {
 
 // Methods
 const openCustomerModal = () => {
-  Object.assign(customerForm, { id: null, name: '', contact_person: '', phone: '', address: '' })
+  Object.assign(customerForm, { id: null, name: '', contact_person: '', phone: '', address: '', tax_id: '', bank_name: '', bank_account: '' })
   openModal('customer', '新增客户')
 }
 
 const editCustomer = (c) => {
   Object.assign(customerForm, {
     id: c.id, name: c.name, contact_person: c.contact_person,
-    phone: c.phone, address: c.address
+    phone: c.phone, address: c.address,
+    tax_id: c.tax_id || '', bank_name: c.bank_name || '', bank_account: c.bank_account || ''
   })
   openModal('customer', '编辑客户')
 }
