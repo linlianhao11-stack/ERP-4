@@ -81,7 +81,10 @@
       "Bash(uvx --version)",
       "Bash(uvx docker-mcp --help)",
       "Bash(uvx mcp-docker --help)",
-      "Bash(gtimeout 10 /Users/lin/.local/bin/uvx mcp-docker)"
+      "Bash(gtimeout 10 /Users/lin/.local/bin/uvx mcp-docker)",
+      "Bash(git checkout --theirs backend/app/routers/dashboard.py backend/app/routers/products.py backend/app/routers/warehouses.py backend/app/schemas/warehouse.py frontend/package-lock.json frontend/src/components/business/FinancePayablesPanel.vue frontend/src/components/business/settings/WarehouseSettings.vue frontend/src/components/layout/Sidebar.vue frontend/src/views/DashboardView.vue)",
+      "Bash(git -C /Users/lin/Desktop/ERP-4-main add -A)",
+      "Bash(git rebase --continue)"
     ]
   }
 }

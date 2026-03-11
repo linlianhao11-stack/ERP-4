@@ -142,6 +142,13 @@ async def get_todo_counts(user: User = Depends(get_current_user)):
         )
         counts["in_transit"] = int(r[0]["c"]) if r else 0
 
+    # 待付款采购单（finance 权限）
+    if is_admin or "finance" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM purchase_orders WHERE status = 'pending'"
+        )
+        counts["pending_payment"] = int(r[0]["c"]) if r else 0
+
     # 待收款（finance 权限）
     if is_admin or "finance" in perms:
         r = await conn.execute_query_dict(

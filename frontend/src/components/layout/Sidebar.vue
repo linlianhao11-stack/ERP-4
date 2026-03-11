@@ -86,7 +86,7 @@ const groupedItems = computed(() => {
 const badgeMap = {
   logistics: ['pending_shipment'],
   purchase: ['pending_review', 'in_transit'],
-  finance: ['pending_collection'],
+  finance: ['pending_collection', 'pending_payment'],
   stock: ['low_stock'],
   accounting: ['pending_receivable']
 }

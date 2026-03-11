@@ -21,7 +21,7 @@
     <div class="md:hidden space-y-2">
       <div v-for="o in purchaseOrders" :key="'pay' + o.id" class="card p-3 cursor-pointer" @click="viewPurchaseOrder(o.id)">
         <div class="flex justify-between items-start mb-1">
-          <div class="font-medium text-sm font-mono text-primary">{{ o.po_no }}</div>
+          <div class="font-medium text-sm font-mono text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1 align-middle" title="待付款"></span>{{ o.po_no }}</div>
           <div class="text-lg font-bold">¥{{ fmt(o.total_amount) }}</div>
         </div>
         <div class="flex justify-between items-center">
@@ -60,7 +60,7 @@
           </thead>
           <tbody class="divide-y">
             <tr v-for="o in purchaseOrders" :key="'pay' + o.id" class="hover:bg-elevated cursor-pointer" @click="viewPurchaseOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm text-primary">{{ o.po_no }}</td>
+              <td class="px-3 py-2 font-mono text-sm text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1.5 align-middle" title="待付款"></span>{{ o.po_no }}</td>
               <td class="px-3 py-2">{{ o.supplier_name }}</td>
               <td class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
               <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>

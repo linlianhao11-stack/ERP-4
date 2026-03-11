@@ -35,7 +35,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
 
     # 批量查询所有库存（避免 N+1）
     product_ids = [p.id for p in products]
-    stock_query = WarehouseStock.filter(product_id__in=product_ids) if product_ids else WarehouseStock.none()
+    stock_query = WarehouseStock.filter(product_id__in=product_ids) if product_ids else WarehouseStock.filter(id=0)
     if warehouse_id:
         stock_query = stock_query.filter(warehouse_id=warehouse_id)
     all_stocks = await stock_query.select_related("warehouse", "location")

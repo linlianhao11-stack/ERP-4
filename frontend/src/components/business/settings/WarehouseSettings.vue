@@ -19,11 +19,12 @@
               <span class="font-medium text-sm">{{ w.name }}</span>
               <span v-if="w.is_default" class="text-xs text-primary bg-info-subtle px-1.5 py-0.5 rounded">(默认)</span>
               <span v-if="w.account_set_name" class="text-xs text-white bg-primary px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
+              <span v-else-if="accountSets.length" class="text-xs text-muted bg-elevated px-1.5 py-0.5 rounded border border-dashed">未关联账套</span>
               <span class="text-xs text-muted">{{ (w.locations || []).length }} 个仓位</span>
             </div>
             <div class="flex gap-2" @click.stop>
               <button v-if="!w.is_default" @click="handleSetDefaultWarehouse(w.id)" class="text-success-emphasis text-xs">设为默认</button>
-              <button @click="editWarehouse(w)" class="text-primary text-xs">改名</button>
+              <button @click="editWarehouse(w)" class="text-primary text-xs">编辑</button>
               <button v-if="!w.is_default" @click="handleDeleteWarehouse(w.id)" class="text-error text-xs">删除</button>
             </div>
           </div>
@@ -48,11 +49,8 @@
           </div>
         </div>
       </div>
-      <!-- 新增仓库表单 -->
-      <form @submit.prevent="handleCreateWarehouse" class="flex gap-2">
-        <input v-model="newWarehouseName" class="input flex-1 text-sm" placeholder="新仓库名">
-        <button type="submit" class="btn btn-primary btn-sm">添加仓库</button>
-      </form>
+      <!-- 新增仓库按钮 -->
+      <button @click="openCreateWarehouse" class="btn btn-primary btn-sm">添加仓库</button>
     </div>
 
     <!-- SN码管理配置卡片 -->
@@ -83,7 +81,7 @@
     <div v-if="showWarehouseModal" class="modal-overlay active" @click.self="showWarehouseModal = false">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">{{ warehouseForm.id ? '仓库改名 - ' + warehouseForm.name : '新建仓库' }}</h3>
+          <h3 class="modal-title">{{ warehouseForm.id ? '编辑仓库 - ' + warehouseForm.name : '新建仓库' }}</h3>
           <button @click="showWarehouseModal = false" class="modal-close">&times;</button>
         </div>
         <form @submit.prevent="saveWarehouse" class="space-y-3 p-4">
@@ -153,7 +151,6 @@ const productBrands = computed(() => settingsStore.productBrands)
 const accountSets = ref([])
 
 // 仓库相关状态
-const newWarehouseName = ref('')
 const showWarehouseModal = ref(false)
 const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null })
 const expandedWarehouse = ref(null)
@@ -179,6 +176,11 @@ const toggleExpandWarehouse = (id) => {
 }
 
 // === 仓库操作 ===
+const openCreateWarehouse = () => {
+  Object.assign(warehouseForm, { id: null, name: '', is_default: false, account_set_id: null })
+  showWarehouseModal.value = true
+}
+
 const editWarehouse = (w) => {
   Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null })
   showWarehouseModal.value = true
@@ -192,30 +194,17 @@ const saveWarehouse = async () => {
   if (appStore.submitting) return
   appStore.submitting = true
   try {
-    await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
-    appStore.showToast('保存成功')
+    if (warehouseForm.id) {
+      await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
+    } else {
+      await createWarehouse({ name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
+    }
+    appStore.showToast(warehouseForm.id ? '保存成功' : '创建成功')
     showWarehouseModal.value = false
     warehousesStore.loadWarehouses()
     emit('data-changed')
   } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '保存失败', 'error')
-  } finally {
-    appStore.submitting = false
-  }
-}
-
-const handleCreateWarehouse = async () => {
-  if (!newWarehouseName.value) return
-  if (appStore.submitting) return
-  appStore.submitting = true
-  try {
-    await createWarehouse({ name: newWarehouseName.value })
-    appStore.showToast('创建成功')
-    newWarehouseName.value = ''
-    warehousesStore.loadWarehouses()
-    emit('data-changed')
-  } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '创建失败', 'error')
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
   } finally {
     appStore.submitting = false
   }

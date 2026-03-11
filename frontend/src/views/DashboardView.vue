@@ -150,7 +150,7 @@ import { usePermission } from '../composables/usePermission'
 import {
   TrendingUp, CircleDollarSign, Package, Receipt,
   Truck, ClipboardCheck, PackageSearch, CreditCard, AlertTriangle, FileText,
-  ChevronRight, CheckCircle
+  Wallet, ChevronRight, CheckCircle
 } from 'lucide-vue-next'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
@@ -178,6 +178,7 @@ const todoItemDefs = [
   { key: 'pending_shipment', label: '待发货订单', route: '/logistics', perm: 'logistics', icon: Truck, iconBg: 'bg-info-subtle', iconColor: 'text-info' },
   { key: 'pending_review', label: '待审核采购', route: '/purchase', perm: 'purchase', icon: ClipboardCheck, iconBg: 'bg-purple-subtle', iconColor: 'text-purple-emphasis' },
   { key: 'in_transit', label: '在途采购', route: '/purchase', perm: 'purchase', icon: PackageSearch, iconBg: 'bg-info-subtle', iconColor: 'text-info' },
+  { key: 'pending_payment', label: '待付款采购', route: '/finance', perm: 'finance', icon: Wallet, iconBg: 'bg-error-subtle', iconColor: 'text-error' },
   { key: 'pending_collection', label: '待收款客户', route: '/finance', perm: 'finance', icon: CreditCard, iconBg: 'bg-warning-subtle', iconColor: 'text-warning' },
   { key: 'low_stock', label: '低库存预警', route: '/stock', perm: 'stock_view', icon: AlertTriangle, iconBg: 'bg-error-subtle', iconColor: 'text-error' },
   { key: 'pending_receivable', label: '待处理应收', route: '/accounting', perm: 'accounting_view', icon: FileText, iconBg: 'bg-orange-subtle', iconColor: 'text-orange-emphasis' },

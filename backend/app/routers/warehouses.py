@@ -48,7 +48,10 @@ async def create_warehouse(data: WarehouseCreate, user: User = Depends(require_p
     async with transactions.in_transaction():
         if data.is_default:
             await Warehouse.filter(is_default=True).update(is_default=False)
-        wh = await Warehouse.create(name=data.name, is_default=data.is_default)
+        create_kwargs = dict(name=data.name, is_default=data.is_default)
+        if data.account_set_id is not None:
+            create_kwargs["account_set_id"] = data.account_set_id
+        wh = await Warehouse.create(**create_kwargs)
     return {"id": wh.id, "message": "创建成功"}
 
 
