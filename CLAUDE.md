@@ -9,8 +9,7 @@
 - **路由**: Vue Router 4
 
 ## 开发规范
-- **必须使用 superpowers skill**：所有代码开发任务必须遵循 superpowers skill 流程。在执行任何任务（包括编码、调试、重构等）之前，必须先检查并调用相关 skill。即使只有 1% 的可能性某个 skill 适用，也必须先调用该 skill。skill 的调用优先于任何其他操作，包括提问和代码探索
-- **全程使用中文沟通**：与用户的所有交流必须使用中文，包括提问、解释、文档、注释说明等
+- **所有代码开发必须使用 superpowers skill 流程**：brainstorming → writing-plans → subagent-driven-development / executing-plans → verification-before-completion → requesting-code-review
 - Docker/容器管理统一通过 OrbStack，启动前先 `orb start`，不使用 Docker Desktop 或其他工具
 - 前端代码在 `frontend/src/`，构建输出到 `backend/static/`
 - 样式系统在 `frontend/src/styles/base.css`，使用 Tailwind `@layer` 组织
