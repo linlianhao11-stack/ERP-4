@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.20.0
+# 轻量级 ERP 系统 v4.21.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -62,8 +62,8 @@ erp-4/
         ├── components/         # 组件（layout / business / common）
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
         │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
-        │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect）
-        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock 等 12 个）
+        │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect, DateRangePicker, ColumnMenu）
+        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig 等 13 个）
         └── styles/             # 全局样式
 ```
 

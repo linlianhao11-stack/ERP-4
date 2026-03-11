@@ -1,8 +1,8 @@
 <template>
   <div>
-    <!-- 筛选栏 -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="poFilter.status" @change="loadPurchaseOrdersData" class="input input-sm w-auto">
+    <!-- 移动端筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-3 md:hidden">
+      <select v-model="poFilter.status" @change="loadPurchaseOrdersData" class="toolbar-select flex-1">
         <option value="">全部状态</option>
         <option value="pending_review">待审核</option>
         <option value="pending">待付款</option>
@@ -12,10 +12,10 @@
         <option value="rejected">已拒绝</option>
         <option value="returned">已退货</option>
       </select>
-      <input v-model="poFilter.start" @change="loadPurchaseOrdersData" type="date" class="input input-sm w-auto hidden md:block">
-      <input v-model="poFilter.end" @change="loadPurchaseOrdersData" type="date" class="input input-sm w-auto hidden md:block">
-      <input v-model="poFilter.search" @input="debouncedLoadPO" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索采购单号/供应商">
-      <button @click="resetPOFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
+      <div class="toolbar-search-wrapper flex-1" style="max-width:none">
+        <Search :size="14" class="toolbar-search-icon" />
+        <input v-model="poFilter.search" @input="debouncedLoadPO" class="toolbar-search" placeholder="搜索采购单号/供应商">
+      </div>
     </div>
     <!-- Mobile cards -->
     <div class="md:hidden space-y-2">
@@ -44,29 +44,53 @@
       <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无应付记录</div>
     </div>
     <!-- Desktop table -->
-    <div class="card hidden md:block">
+    <div class="card hidden md:block" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="poFilter.status" @change="loadPurchaseOrdersData" class="toolbar-select">
+            <option value="">全部状态</option>
+            <option value="pending_review">待审核</option>
+            <option value="pending">待付款</option>
+            <option value="paid">已付款</option>
+            <option value="completed">已完成</option>
+            <option value="cancelled">已取消</option>
+            <option value="rejected">已拒绝</option>
+            <option value="returned">已退货</option>
+          </select>
+          <DateRangePicker v-model:start="poFilter.start" v-model:end="poFilter.end" @change="loadPurchaseOrdersData" />
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="poFilter.search" @input="debouncedLoadPO" class="toolbar-search" placeholder="搜索采购单号/供应商">
+          </div>
+        </template>
+      </PageToolbar>
       <div class="table-container">
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">采购单号</th>
-              <th class="px-3 py-2 text-left">供应商</th>
-              <th class="px-3 py-2 text-right">总金额(含税)</th>
-              <th class="px-3 py-2 text-left">创建时间</th>
-              <th class="px-3 py-2 text-left">付款方式</th>
-              <th class="px-3 py-2 text-center">状态</th>
-              <th class="px-3 py-2 text-center">操作</th>
+              <th v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left">采购单号</th>
+              <th v-if="isColumnVisible('supplier')" class="px-3 py-2 text-left">供应商</th>
+              <th v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right">总金额(含税)</th>
+              <th v-if="isColumnVisible('created_at')" class="px-3 py-2 text-left">创建时间</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
+              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center">状态</th>
+              <th v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">操作</th>
+              <!-- 列选择器 -->
+              <th class="col-selector-th">
+                <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="po_no"
+                  @toggle="toggleColumn" @reset="resetColumns" />
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="o in purchaseOrders" :key="'pay' + o.id" class="hover:bg-elevated cursor-pointer" @click="viewPurchaseOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1.5 align-middle" title="待付款"></span>{{ o.po_no }}</td>
-              <td class="px-3 py-2">{{ o.supplier_name }}</td>
-              <td class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
-              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
-              <td class="px-3 py-2">{{ o.payment_method ? getDisbursementMethodName(o.payment_method) : '-' }}</td>
-              <td class="px-3 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
-              <td class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('po_no')" class="px-3 py-2 font-mono text-sm text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1.5 align-middle" title="待付款"></span>{{ o.po_no }}</td>
+              <td v-if="isColumnVisible('supplier')" class="px-3 py-2">{{ o.supplier_name }}</td>
+              <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
+              <td v-if="isColumnVisible('created_at')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ o.payment_method ? getDisbursementMethodName(o.payment_method) : '-' }}</td>
+              <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
+              <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
                 <div v-if="o.status === 'pending_review' && hasPermission('purchase_approve')" class="flex gap-1 justify-center">
                   <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm text-xs" style="background:#1677FF;color:#fff">通过</button>
                   <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">拒绝</button>
@@ -81,6 +105,7 @@
                 <span v-else-if="o.status === 'returned'" class="text-xs text-warning">已退货</span>
                 <span v-else class="text-xs text-success">{{ o.paid_by_name }} {{ fmtDate(o.paid_at) }}</span>
               </td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -169,13 +194,17 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw, Search } from 'lucide-vue-next'
+import ColumnMenu from '../common/ColumnMenu.vue'
 import { useAppStore } from '../../stores/app'
 import { useSettingsStore } from '../../stores/settings'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
+import { useColumnConfig } from '../../composables/useColumnConfig'
 import { getPurchaseOrders, getPurchaseOrder, approvePurchaseOrder as apiApprovePO, rejectPurchaseOrder as apiRejectPO, payPurchaseOrder, cancelPurchaseOrder as apiCancelPO } from '../../api/purchase'
 import StatusBadge from '../common/StatusBadge.vue'
+import PageToolbar from '../common/PageToolbar.vue'
+import DateRangePicker from '../common/DateRangePicker.vue'
 
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
@@ -186,6 +215,22 @@ const disbursementMethods = computed(() => settingsStore.disbursementMethods)
 
 const purchaseOrders = ref([])
 const poFilter = reactive({ status: '', start: '', end: '', search: '' })
+
+const payableColumnDefs = {
+  po_no: { label: '采购单号', defaultVisible: true },
+  supplier: { label: '供应商', defaultVisible: true },
+  total_amount: { label: '总金额(含税)', defaultVisible: true, align: 'right' },
+  created_at: { label: '创建时间', defaultVisible: true },
+  payment_method: { label: '付款方式', defaultVisible: true },
+  status: { label: '状态', defaultVisible: true, align: 'center' },
+  actions: { label: '操作', defaultVisible: true, align: 'center' },
+}
+
+const {
+  columnLabels, visibleColumns, showColumnMenu, menuAttr,
+  toggleColumn, isColumnVisible, resetColumns,
+} = useColumnConfig('payable_columns', payableColumnDefs)
+
 const submitting = ref(false)
 const showPayablePayModal = ref(false)
 const showPurchaseDetailModal = ref(false)

@@ -1,5 +1,67 @@
 # 迭代记录
 
+## v4.21.0 — 日历式日期选择器 + 列选择器修复（2026-03-11）
+
+> DateRangePicker 重写为日历弹窗式交互（双击选择日期范围），新建 ColumnMenu 组件修复列选择器溢出问题，全站 9 个面板统一升级。
+
+### 重写：DateRangePicker 日历式交互
+
+- **完全重写 `DateRangePicker.vue`**：从两个独立 `<input type="date">` 升级为单一日历弹窗
+- 点击触发器展开日历面板，显示 Calendar 图标 + 当前日期范围文字
+- **双击式范围选择**：第一次点击选定开始日期，鼠标悬停实时预览范围，第二次点击确定结束日期
+- 日历网格 7×6（周一起始），中文星期表头（一二三四五六日）
+- 范围高亮：渐变半圆起止 + 蓝色中间色带，视觉清晰
+- 今日指示器：加粗文字 + 蓝色圆点
+- 快捷预设保留：今天、本周、本月、上月、近7天、近30天、本季度
+- 月份导航：ChevronLeft/ChevronRight 切换月份
+- Teleport 定位 + 点击外部关闭
+- 完整暗色模式支持（CSS 变量）
+
+### 新建：ColumnMenu 通用组件
+
+- **新建 `ColumnMenu.vue`**：解决列选择器（⋮）下拉菜单被 `.card overflow:hidden` 和 `.table-container overflow-x:auto` 裁切的问题
+- 使用 `<Teleport to="body">` + `position: fixed` 完全脱离父级裁切上下文
+- **视口感知定位**：优先下方显示 → 空间不足切上方 → 都不够则贴顶+可滚动
+- 动态 `max-height`（视口高度 - 16px 安全边距）+ `overflow-y: auto` 滚动
+- 水平方向右对齐按钮，自动防超出左右边界
+- Props: `labels`（列标签映射）、`visible`（列可见性映射）、`pinned`（固定列不可隐藏）
+- Emits: `toggle`（切换列）、`reset`（重置列）
+
+### 全站 9 个面板统一升级 ColumnMenu
+
+| 面板 | pinned 列 |
+|------|-----------|
+| PurchaseOrdersPanel | `po_no` |
+| FinanceOrdersTab | `order_no` |
+| LogisticsView | （无） |
+| StockView | `name` |
+| FinancePaymentsPanel | `payment_no` |
+| FinancePayablesPanel | `po_no` |
+| VoucherPanel | `voucher_no` |
+| ReceivableBillsTab | `bill_no` |
+| ReceiptBillsTab | `bill_no` |
+
+### 修改文件清单
+
+**重写：**
+- `frontend/src/components/common/DateRangePicker.vue` — 日历弹窗式日期范围选择器
+
+**新建：**
+- `frontend/src/components/common/ColumnMenu.vue` — 通用列选择器下拉组件（Teleport + 视口定位）
+
+**前端（9 个面板迁移 ColumnMenu）：**
+- `frontend/src/components/business/PurchaseOrdersPanel.vue`
+- `frontend/src/components/business/finance/FinanceOrdersTab.vue`
+- `frontend/src/views/LogisticsView.vue`
+- `frontend/src/views/StockView.vue`
+- `frontend/src/components/business/FinancePaymentsPanel.vue`
+- `frontend/src/components/business/FinancePayablesPanel.vue`
+- `frontend/src/components/business/VoucherPanel.vue`
+- `frontend/src/components/business/ReceivableBillsTab.vue`
+- `frontend/src/components/business/ReceiptBillsTab.vue`
+
+---
+
 ## v4.20.0 — 全局筛选搜索增强 + 寄售库存销售价显示（2026-03-10）
 
 > 六个模块全面添加筛选/搜索/重置功能，新建 SearchableSelect 通用组件，寄售库存改为显示实际销售价。

@@ -1,27 +1,33 @@
 <template>
   <div>
     <!-- 筛选栏 -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.period_name" class="input input-sm w-32" @change="loadList">
-        <option value="">全部期间</option>
-        <option v-for="p in periodOptions" :key="p" :value="p">{{ p }}</option>
-      </select>
-      <select v-model="filters.voucher_type" class="input input-sm w-24" @change="loadList">
-        <option value="">全部</option>
-        <option value="记">记</option>
-        <option value="收">收</option>
-        <option value="付">付</option>
-        <option value="转">转</option>
-      </select>
-      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
-        <option value="">全部状态</option>
-        <option value="draft">草稿</option>
-        <option value="pending">待审核</option>
-        <option value="approved">已审核</option>
-        <option value="posted">已过账</option>
-      </select>
-      <button v-if="selectedIds.length > 0" @click="handleBatchPdf" class="btn btn-secondary btn-sm ml-auto">批量打印({{ selectedIds.length }})</button>
-      <button v-if="hasPermission('accounting_edit')" @click="openCreateForm" class="btn btn-primary btn-sm" :class="{ 'ml-auto': selectedIds.length === 0 }">新增凭证</button>
+    <div class="page-toolbar">
+      <div class="page-toolbar-inner">
+        <div class="page-toolbar-filters">
+          <select v-model="filters.period_name" class="toolbar-select" @change="loadList">
+            <option value="">全部期间</option>
+            <option v-for="p in periodOptions" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <select v-model="filters.voucher_type" class="toolbar-select" @change="loadList">
+            <option value="">全部</option>
+            <option value="记">记</option>
+            <option value="收">收</option>
+            <option value="付">付</option>
+            <option value="转">转</option>
+          </select>
+          <select v-model="filters.status" class="toolbar-select" @change="loadList">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="pending">待审核</option>
+            <option value="approved">已审核</option>
+            <option value="posted">已过账</option>
+          </select>
+        </div>
+        <div class="page-toolbar-actions">
+          <button v-if="selectedIds.length > 0" @click="handleBatchPdf" class="btn btn-secondary btn-sm">批量打印({{ selectedIds.length }})</button>
+          <button v-if="hasPermission('accounting_edit')" @click="openCreateForm" class="btn btn-primary btn-sm">新增凭证</button>
+        </div>
+      </div>
     </div>
 
     <!-- 凭证列表 -->
@@ -29,26 +35,31 @@
       <table class="w-full">
         <thead>
           <tr>
-            <th class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
-            <th>凭证号</th>
-            <th>日期</th>
-            <th>摘要</th>
-            <th>借方合计</th>
-            <th>贷方合计</th>
-            <th>状态</th>
-            <th>操作</th>
+            <th v-if="voucherIsColumnVisible('checkbox')" class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
+            <th v-if="voucherIsColumnVisible('voucher_no')">凭证号</th>
+            <th v-if="voucherIsColumnVisible('voucher_date')">日期</th>
+            <th v-if="voucherIsColumnVisible('summary')">摘要</th>
+            <th v-if="voucherIsColumnVisible('total_debit')">借方合计</th>
+            <th v-if="voucherIsColumnVisible('total_credit')">贷方合计</th>
+            <th v-if="voucherIsColumnVisible('status')">状态</th>
+            <th v-if="voucherIsColumnVisible('actions')">操作</th>
+            <!-- 列选择器 -->
+            <th class="col-selector-th">
+              <ColumnMenu :labels="voucherColumnLabels" :visible="voucherVisibleColumns" pinned="voucher_no"
+                @toggle="voucherToggleColumn" @reset="voucherResetColumns" />
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer">
-            <td @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
-            <td class="font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
-            <td>{{ v.voucher_date }}</td>
-            <td>{{ v.summary || '-' }}</td>
-            <td class="text-right">{{ formatAmount(v.total_debit) }}</td>
-            <td class="text-right">{{ formatAmount(v.total_credit) }}</td>
-            <td><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
-            <td @click.stop>
+            <td v-if="voucherIsColumnVisible('checkbox')" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
+            <td v-if="voucherIsColumnVisible('voucher_no')" class="font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
+            <td v-if="voucherIsColumnVisible('voucher_date')">{{ v.voucher_date }}</td>
+            <td v-if="voucherIsColumnVisible('summary')">{{ v.summary || '-' }}</td>
+            <td v-if="voucherIsColumnVisible('total_debit')" class="text-right">{{ formatAmount(v.total_debit) }}</td>
+            <td v-if="voucherIsColumnVisible('total_credit')" class="text-right">{{ formatAmount(v.total_credit) }}</td>
+            <td v-if="voucherIsColumnVisible('status')"><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
+            <td v-if="voucherIsColumnVisible('actions')" @click.stop>
               <div class="flex items-center gap-1.5 justify-end">
                 <!-- 主操作按钮（外露） -->
                 <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px">提交</button>
@@ -67,9 +78,10 @@
                 </div>
               </div>
             </td>
+            <td></td>
           </tr>
           <tr v-if="vouchers.length === 0">
-            <td colspan="8">
+            <td colspan="100">
               <div class="text-center py-12 text-muted">
                 <div class="text-3xl mb-3">📋</div>
                 <p class="text-sm font-medium mb-1">暂无凭证</p>
@@ -194,6 +206,9 @@ import { useAccountingStore } from '../../stores/accounting'
 import { usePermission } from '../../composables/usePermission'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
+import ColumnMenu from '../common/ColumnMenu.vue'
+import { useColumnConfig } from '../../composables/useColumnConfig'
+import PageToolbar from '../common/PageToolbar.vue'
 import {
   getVouchers, getVoucher, createVoucher, updateVoucher,
   deleteVoucher, submitVoucher, approveVoucher, rejectVoucher,
@@ -218,6 +233,24 @@ const leafAccounts = ref([])
 
 const selectedIds = ref([])
 const openMenuId = ref(null)
+
+const voucherColumnDefs = {
+  checkbox: { label: '选择', defaultVisible: true },
+  voucher_no: { label: '凭证号', defaultVisible: true },
+  voucher_date: { label: '日期', defaultVisible: true },
+  summary: { label: '摘要', defaultVisible: true },
+  total_debit: { label: '借方合计', defaultVisible: true, align: 'right' },
+  total_credit: { label: '贷方合计', defaultVisible: true, align: 'right' },
+  status: { label: '状态', defaultVisible: true },
+  actions: { label: '操作', defaultVisible: true },
+}
+
+const {
+  columnLabels: voucherColumnLabels, visibleColumns: voucherVisibleColumns,
+  showColumnMenu: voucherShowColumnMenu, menuAttr: voucherMenuAttr,
+  toggleColumn: voucherToggleColumn, isColumnVisible: voucherIsColumnVisible,
+  resetColumns: voucherResetColumns,
+} = useColumnConfig('voucher_columns', voucherColumnDefs)
 
 const toggleActionMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id

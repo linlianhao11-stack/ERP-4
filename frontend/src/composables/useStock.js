@@ -10,11 +10,30 @@ import { getProducts } from '../api/products'
 import { exportStock as apiExportStock } from '../api/stock'
 import { getWarehouses } from '../api/warehouses'
 import { usePagination } from './usePagination'
+import { useColumnConfig } from './useColumnConfig'
+
+const stockColumnDefs = {
+  brand: { label: '品牌', defaultVisible: true },
+  name: { label: '商品名称', defaultVisible: true },
+  warehouse: { label: '仓位', defaultVisible: true },
+  retail_price: { label: '零售价', defaultVisible: true, align: 'right' },
+  cost_price: { label: '成本', defaultVisible: true, align: 'right' },
+  quantity: { label: '库存', defaultVisible: true, align: 'right' },
+  reserved_qty: { label: '预留', defaultVisible: true, align: 'right' },
+  available_qty: { label: '可用', defaultVisible: true, align: 'right' },
+  age_days: { label: '库龄', defaultVisible: true, align: 'center' },
+  actions: { label: '操作', defaultVisible: true, align: 'center' },
+}
 
 export function useStock() {
   const appStore = useAppStore()
   const warehousesStore = useWarehousesStore()
   const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
+
+  const {
+    columnLabels, visibleColumns, showColumnMenu, menuAttr,
+    toggleColumn, isColumnVisible, resetColumns,
+  } = useColumnConfig('stock_columns', stockColumnDefs)
 
   // 本地商品数据（分页加载，非全量）
   const stockProducts = ref([])
@@ -161,5 +180,8 @@ export function useStock() {
     loadVirtualWarehouses,
     onToggleVirtualStock,
     handleExportStock,
+    // 列配置
+    columnLabels, visibleColumns, showColumnMenu, menuAttr,
+    toggleColumn, isColumnVisible, resetColumns,
   }
 }

@@ -1,16 +1,16 @@
 <template>
   <div>
-    <!-- 筛选栏 -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="payFilter.is_confirmed" @change="loadPaymentsData" class="input input-sm w-auto">
+    <!-- 移动端筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-3 md:hidden">
+      <select v-model="payFilter.is_confirmed" @change="loadPaymentsData" class="toolbar-select flex-1">
         <option value="">全部状态</option>
         <option value="false">待确认</option>
         <option value="true">已确认</option>
       </select>
-      <input v-model="payFilter.start" @change="loadPaymentsData" type="date" class="input input-sm w-auto hidden md:block">
-      <input v-model="payFilter.end" @change="loadPaymentsData" type="date" class="input input-sm w-auto hidden md:block">
-      <input v-model="payFilter.search" @input="debouncedLoadPayments" class="input input-sm flex-1 min-w-[120px]" placeholder="搜索订单号/客户名">
-      <button @click="resetPayFilters" class="btn btn-secondary btn-sm flex-shrink-0" title="重置筛选"><RotateCcw :size="14" /></button>
+      <div class="toolbar-search-wrapper flex-1" style="max-width:none">
+        <Search :size="14" class="toolbar-search-icon" />
+        <input v-model="payFilter.search" @input="debouncedLoadPayments" class="toolbar-search" placeholder="搜索订单号/客户名">
+      </div>
     </div>
     <!-- Mobile cards -->
     <div class="md:hidden space-y-2">
@@ -34,44 +34,64 @@
       <div v-if="!payments.length" class="p-8 text-center text-muted text-sm">暂无记录</div>
     </div>
     <!-- Desktop table -->
-    <div class="card hidden md:block">
+    <div class="card hidden md:block" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="payFilter.is_confirmed" @change="loadPaymentsData" class="toolbar-select">
+            <option value="">全部状态</option>
+            <option value="false">待确认</option>
+            <option value="true">已确认</option>
+          </select>
+          <DateRangePicker v-model:start="payFilter.start" v-model:end="payFilter.end" @change="loadPaymentsData" />
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="payFilter.search" @input="debouncedLoadPayments" class="toolbar-search" placeholder="搜索订单号/客户名">
+          </div>
+        </template>
+      </PageToolbar>
       <div class="table-container">
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">收款单号</th>
-              <th class="px-3 py-2 text-left">客户</th>
-              <th class="px-3 py-2 text-center">类型</th>
-              <th class="px-3 py-2 text-left">付款方式</th>
-              <th class="px-3 py-2 text-right">金额</th>
-              <th class="px-3 py-2 text-left">关联订单</th>
-              <th class="px-3 py-2 text-center">状态</th>
-              <th class="px-3 py-2 text-left">时间</th>
-              <th class="px-3 py-2 text-center">操作</th>
+              <th v-if="isColumnVisible('payment_no')" class="px-3 py-2 text-left">收款单号</th>
+              <th v-if="isColumnVisible('customer')" class="px-3 py-2 text-left">客户</th>
+              <th v-if="isColumnVisible('source')" class="px-3 py-2 text-center">类型</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
+              <th v-if="isColumnVisible('amount')" class="px-3 py-2 text-right">金额</th>
+              <th v-if="isColumnVisible('order_nos')" class="px-3 py-2 text-left">关联订单</th>
+              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center">状态</th>
+              <th v-if="isColumnVisible('created_at')" class="px-3 py-2 text-left">时间</th>
+              <th v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">操作</th>
+              <!-- 列选择器 -->
+              <th class="col-selector-th">
+                <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="payment_no"
+                  @toggle="toggleColumn" @reset="resetColumns" />
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="p in payments" :key="p.id" class="hover:bg-elevated cursor-pointer" @click="p.order_nos && p.order_nos.length ? $emit('view-order', p.order_nos[0].id) : null">
-              <td class="px-3 py-2 font-mono text-sm">{{ p.payment_no }}</td>
-              <td class="px-3 py-2">{{ p.customer_name }}</td>
-              <td class="px-3 py-2 text-center"><span :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></td>
-              <td class="px-3 py-2">{{ getPaymentMethodName(p.payment_method) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-success">+¥{{ fmt(p.amount) }}</td>
-              <td class="px-3 py-2">
+              <td v-if="isColumnVisible('payment_no')" class="px-3 py-2 font-mono text-sm">{{ p.payment_no }}</td>
+              <td v-if="isColumnVisible('customer')" class="px-3 py-2">{{ p.customer_name }}</td>
+              <td v-if="isColumnVisible('source')" class="px-3 py-2 text-center"><span :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></td>
+              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ getPaymentMethodName(p.payment_method) }}</td>
+              <td v-if="isColumnVisible('amount')" class="px-3 py-2 text-right font-semibold text-success">+¥{{ fmt(p.amount) }}</td>
+              <td v-if="isColumnVisible('order_nos')" class="px-3 py-2">
                 <span v-if="p.order_nos && p.order_nos.length">
                   <span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-primary font-mono text-xs">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span>
                 </span>
                 <span v-else class="text-muted text-xs">-</span>
               </td>
-              <td class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center">
                 <span v-if="p.is_confirmed" class="text-xs text-success">已确认</span>
                 <span v-else class="text-xs text-warning">待确认</span>
               </td>
-              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(p.created_at) }}</td>
-              <td class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('created_at')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(p.created_at) }}</td>
+              <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
                 <span v-if="p.is_confirmed" class="text-xs text-muted">{{ p.confirmed_by_name }}</span>
                 <button v-else-if="hasPermission('finance_confirm')" @click.stop="confirmPaymentRecord(p.id, p.amount)" class="btn btn-warning btn-sm text-xs">确认到账</button>
               </td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -83,12 +103,16 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { RotateCcw } from 'lucide-vue-next'
+import { Search } from 'lucide-vue-next'
+import ColumnMenu from '../common/ColumnMenu.vue'
 import { useAppStore } from '../../stores/app'
 import { useSettingsStore } from '../../stores/settings'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
+import { useColumnConfig } from '../../composables/useColumnConfig'
 import { getPayments, confirmPayment } from '../../api/finance'
+import PageToolbar from '../common/PageToolbar.vue'
+import DateRangePicker from '../common/DateRangePicker.vue'
 
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
@@ -98,6 +122,24 @@ const { hasPermission } = usePermission()
 const paymentMethods = computed(() => settingsStore.paymentMethods)
 const payments = ref([])
 const payFilter = reactive({ is_confirmed: '', start: '', end: '', search: '' })
+
+// 列定义
+const paymentColumnDefs = {
+  payment_no: { label: '收款单号', defaultVisible: true },
+  customer: { label: '客户', defaultVisible: true },
+  source: { label: '类型', defaultVisible: true, align: 'center' },
+  payment_method: { label: '付款方式', defaultVisible: true },
+  amount: { label: '金额', defaultVisible: true, align: 'right' },
+  order_nos: { label: '关联订单', defaultVisible: true },
+  status: { label: '状态', defaultVisible: true, align: 'center' },
+  created_at: { label: '时间', defaultVisible: true },
+  actions: { label: '操作', defaultVisible: true, align: 'center' },
+}
+
+const {
+  columnLabels, visibleColumns, showColumnMenu, menuAttr,
+  toggleColumn, isColumnVisible, resetColumns,
+} = useColumnConfig('payment_columns', paymentColumnDefs)
 
 const emit = defineEmits(['view-order'])
 
@@ -138,14 +180,6 @@ let _paySearchTimer = null
 const debouncedLoadPayments = () => {
   clearTimeout(_paySearchTimer)
   _paySearchTimer = setTimeout(loadPaymentsData, 300)
-}
-
-const resetPayFilters = () => {
-  payFilter.is_confirmed = ''
-  payFilter.start = ''
-  payFilter.end = ''
-  payFilter.search = ''
-  loadPaymentsData()
 }
 
 defineExpose({ refresh: loadPaymentsData })

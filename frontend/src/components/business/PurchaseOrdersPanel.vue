@@ -1,32 +1,24 @@
 <template>
   <div>
-    <!-- 筛选栏 -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="purchaseStatusFilter" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:120px">
-        <option value="">全部状态</option>
-        <option value="pending_review">待审核</option>
-        <option value="pending">待付款</option>
-        <option value="paid">在途</option>
-        <option value="partial">部分到货</option>
-        <option value="completed">已完成</option>
-        <option value="returned">已退货</option>
-        <option value="rejected">已拒绝</option>
-      </select>
-      <select v-if="accountSets.length" v-model="purchaseAccountSetFilter" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:120px">
-        <option value="">全部账套</option>
-        <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-      <input type="date" v-model="purchaseDateStart" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:130px">
-      <input type="date" v-model="purchaseDateEnd" @change="resetPage(); loadPurchaseOrders()" class="input text-sm" style="width:130px">
-      <input v-model="purchaseSearch" @input="debouncedLoad" class="input text-sm flex-1" placeholder="搜索单号/供应商..." style="min-width:120px">
-      <button v-if="hasPermission('stock_edit')" @click="formRef?.openProductModal()" class="btn btn-success btn-sm">新建商品</button>
-      <button @click="showPOCreateModal = true" class="btn btn-primary btn-sm" v-if="hasPermission('purchase')">新建采购单</button>
-      <button @click="detailRef?.openReceive()" class="btn btn-success btn-sm" v-if="hasPermission('purchase_receive')">采购收货</button>
-      <button @click="handleExport" class="btn btn-secondary btn-sm hidden md:inline-block">导出Excel</button>
-    </div>
-
     <!-- 移动端卡片列表 -->
     <div class="md:hidden space-y-2">
+      <!-- 移动端筛选 -->
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <select v-model="purchaseStatusFilter" @change="resetPage(); loadPurchaseOrders()" class="toolbar-select flex-1">
+          <option value="">全部状态</option>
+          <option value="pending_review">待审核</option>
+          <option value="pending">待付款</option>
+          <option value="paid">在途</option>
+          <option value="partial">部分到货</option>
+          <option value="completed">已完成</option>
+          <option value="returned">已退货</option>
+          <option value="rejected">已拒绝</option>
+        </select>
+        <div class="toolbar-search-wrapper flex-1" style="max-width:none">
+          <Search :size="14" class="toolbar-search-icon" />
+          <input v-model="purchaseSearch" @input="debouncedLoad" class="toolbar-search" placeholder="搜索单号/供应商...">
+        </div>
+      </div>
       <div v-for="o in purchaseOrders" :key="o.id" class="card p-3" @click="detailRef?.viewPurchaseOrder(o.id)">
         <div class="flex justify-between items-start mb-1">
           <div class="font-medium text-sm font-mono">
@@ -44,32 +36,132 @@
     </div>
 
     <!-- 桌面端表格 -->
-    <div class="card hidden md:block">
+    <div class="card hidden md:block" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="purchaseStatusFilter" @change="resetPage(); loadPurchaseOrders()" class="toolbar-select">
+            <option value="">全部状态</option>
+            <option value="pending_review">待审核</option>
+            <option value="pending">待付款</option>
+            <option value="paid">在途</option>
+            <option value="partial">部分到货</option>
+            <option value="completed">已完成</option>
+            <option value="returned">已退货</option>
+            <option value="rejected">已拒绝</option>
+          </select>
+          <select v-if="accountSets.length" v-model="purchaseAccountSetFilter" @change="resetPage(); loadPurchaseOrders()" class="toolbar-select">
+            <option value="">全部账套</option>
+            <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+          <DateRangePicker v-model:start="purchaseDateStart" v-model:end="purchaseDateEnd" @change="resetPage(); loadPurchaseOrders()" />
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="purchaseSearch" @input="debouncedLoad" class="toolbar-search" placeholder="搜索单号/供应商...">
+          </div>
+        </template>
+        <template #actions>
+          <SegmentedControl v-model="viewMode" :options="viewModeOptions" @update:model-value="setViewMode($event)" />
+          <button v-if="hasPermission('purchase')" @click="showPOCreateModal = true" class="btn btn-primary btn-sm">
+            <Plus :size="14" /> 新建
+          </button>
+          <button v-if="hasPermission('purchase_receive')" @click="detailRef?.openReceive()" class="btn btn-success btn-sm">采购收货</button>
+          <button @click="handleExport" class="btn btn-secondary btn-sm">导出</button>
+        </template>
+      </PageToolbar>
       <div class="table-container">
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">采购单号</th>
-              <th class="px-3 py-2 text-left">供应商</th>
-              <th class="px-3 py-2 text-right">总金额</th>
-              <th class="px-3 py-2 text-center">状态</th>
-              <th class="px-3 py-2 text-left">创建人</th>
-              <th class="px-3 py-2 text-left">创建时间</th>
+              <th v-if="viewMode === 'summary'" class="px-3 py-2 w-6"></th>
+              <th v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('po_no')">采购单号 <span v-if="purchaseSort.key === 'po_no'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('supplier')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('supplier')">供应商 <span v-if="purchaseSort.key === 'supplier'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('date')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('date')">采购日期 <span v-if="purchaseSort.key === 'date'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('total_amount')">总金额 <span v-if="purchaseSort.key === 'total_amount'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">含税金额</th>
+              <th v-if="isColumnVisible('item_count')" class="px-3 py-2 text-center">品项数</th>
+              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('status')">状态 <span v-if="purchaseSort.key === 'status'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('remark')" class="px-3 py-2 text-left">备注</th>
+              <th v-if="isColumnVisible('creator')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('creator')">创建人 <span v-if="purchaseSort.key === 'creator'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('account_set')" class="px-3 py-2 text-left">账套</th>
+              <th v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">退货金额</th>
+              <th v-if="isColumnVisible('target_warehouse')" class="px-3 py-2 text-left">目标仓库</th>
+              <th v-if="isColumnVisible('target_location')" class="px-3 py-2 text-left">目标仓位</th>
+              <th v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">返利已用</th>
+              <th v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">在账资金</th>
+              <th v-if="isColumnVisible('reviewer')" class="px-3 py-2 text-left">审核人</th>
+              <th v-if="isColumnVisible('reviewed_at')" class="px-3 py-2 text-left">审核时间</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
+              <!-- 列选择器 -->
+              <th class="col-selector-th">
+                <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="po_no"
+                  @toggle="toggleColumn" @reset="resetColumns" />
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in purchaseOrders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="detailRef?.viewPurchaseOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm">
-                <span v-if="['pending_review','paid','partial'].includes(o.status)" class="todo-dot mr-1.5"></span>{{ o.po_no }}
-              </td>
-              <td class="px-3 py-2">{{ o.supplier_name }}</td>
-              <td class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
-              <td class="px-3 py-2 text-center">
-                <StatusBadge type="purchaseStatus" :status="o.status" />
-              </td>
-              <td class="px-3 py-2 text-secondary">{{ o.creator_name }}</td>
-              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
-            </tr>
+            <template v-for="o in sortedPurchaseOrders" :key="o.id">
+              <tr class="hover:bg-elevated cursor-pointer" @click="detailRef?.viewPurchaseOrder(o.id)">
+                <td v-if="viewMode === 'summary'" class="px-1 py-2 text-center text-muted" @click="toggleExpand(o.id, $event)">
+                  <span class="cursor-pointer">{{ expandedRows[o.id] ? '▼' : '▶' }}</span>
+                </td>
+                <td v-if="isColumnVisible('po_no')" class="px-3 py-2 font-mono text-sm">
+                  <span v-if="['pending_review','paid','partial'].includes(o.status)" class="todo-dot mr-1.5"></span>{{ o.po_no }}
+                </td>
+                <td v-if="isColumnVisible('supplier')" class="px-3 py-2">{{ o.supplier_name }}</td>
+                <td v-if="isColumnVisible('date')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+                <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
+                <td v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">¥{{ fmt(o.tax_amount) }}</td>
+                <td v-if="isColumnVisible('item_count')" class="px-3 py-2 text-center">{{ o.item_count }}</td>
+                <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
+                <td v-if="isColumnVisible('remark')" class="px-3 py-2 text-muted text-xs max-w-[150px] truncate">{{ o.remark || '-' }}</td>
+                <td v-if="isColumnVisible('creator')" class="px-3 py-2 text-secondary">{{ o.creator_name }}</td>
+                <td v-if="isColumnVisible('account_set')" class="px-3 py-2">{{ o.account_set_name || '-' }}</td>
+                <td v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">{{ o.return_amount ? '¥' + fmt(o.return_amount) : '-' }}</td>
+                <td v-if="isColumnVisible('target_warehouse')" class="px-3 py-2">{{ o.target_warehouse_name || '-' }}</td>
+                <td v-if="isColumnVisible('target_location')" class="px-3 py-2">{{ o.target_location_code || '-' }}</td>
+                <td v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">{{ o.rebate_used ? '¥' + fmt(o.rebate_used) : '-' }}</td>
+                <td v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">{{ o.credit_used ? '¥' + fmt(o.credit_used) : '-' }}</td>
+                <td v-if="isColumnVisible('reviewer')" class="px-3 py-2">{{ o.reviewed_by_name || '-' }}</td>
+                <td v-if="isColumnVisible('reviewed_at')" class="px-3 py-2 text-xs text-muted">{{ o.reviewed_at ? fmtDate(o.reviewed_at) : '-' }}</td>
+                <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ o.payment_method || '-' }}</td>
+                <td></td>
+              </tr>
+              <!-- 展开行：物料明细子表 -->
+              <tr v-if="(viewMode === 'summary' && expandedRows[o.id]) || viewMode === 'detail'">
+                <td :colspan="100" class="bg-elevated/50 px-6 py-3">
+                  <div v-if="loadingItems[o.id]" class="text-center text-muted text-sm py-2">加载中...</div>
+                  <table v-else-if="expandedItems[o.id]?.length" class="w-full text-xs">
+                    <thead>
+                      <tr class="text-muted border-b">
+                        <th class="px-2 py-1.5 text-left font-medium">物料编码</th>
+                        <th class="px-2 py-1.5 text-left font-medium">物料名称</th>
+                        <th class="px-2 py-1.5 text-left font-medium">规格型号</th>
+                        <th class="px-2 py-1.5 text-center font-medium">数量</th>
+                        <th class="px-2 py-1.5 text-right font-medium">单价</th>
+                        <th class="px-2 py-1.5 text-right font-medium">含税单价</th>
+                        <th class="px-2 py-1.5 text-right font-medium">价税合计</th>
+                        <th class="px-2 py-1.5 text-center font-medium">已收货</th>
+                        <th class="px-2 py-1.5 text-center font-medium">已退货</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border-light">
+                      <tr v-for="item in expandedItems[o.id]" :key="item.id">
+                        <td class="px-2 py-1.5 text-primary font-mono">{{ item.product_sku }}</td>
+                        <td class="px-2 py-1.5">{{ item.product_name }}</td>
+                        <td class="px-2 py-1.5 text-muted">{{ item.spec || '-' }}</td>
+                        <td class="px-2 py-1.5 text-center">{{ item.quantity }}</td>
+                        <td class="px-2 py-1.5 text-right">¥{{ fmt(item.tax_exclusive_price) }}</td>
+                        <td class="px-2 py-1.5 text-right">¥{{ fmt(item.tax_inclusive_price) }}</td>
+                        <td class="px-2 py-1.5 text-right font-medium">¥{{ fmt(item.amount) }}</td>
+                        <td class="px-2 py-1.5 text-center">{{ item.received_quantity }}</td>
+                        <td class="px-2 py-1.5 text-center">{{ item.returned_quantity || '-' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-else class="text-muted text-sm text-center py-2">暂无明细</div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -104,14 +196,20 @@
  * 采购订单面板（瘦容器）
  * 负责筛选栏、列表展示，将弹窗逻辑委托给子组件
  */
-import { ref, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
+import { Search, Plus } from 'lucide-vue-next'
+import ColumnMenu from '../common/ColumnMenu.vue'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
 import { usePurchaseOrder } from '../../composables/usePurchaseOrder'
+import { getPurchaseOrderItems } from '../../api/purchase'
 import { getAccountSets } from '../../api/accounting'
 import { useProductsStore } from '../../stores/products'
 import { useWarehousesStore } from '../../stores/warehouses'
 import StatusBadge from '../common/StatusBadge.vue'
+import PageToolbar from '../common/PageToolbar.vue'
+import DateRangePicker from '../common/DateRangePicker.vue'
+import SegmentedControl from '../common/SegmentedControl.vue'
 import PurchaseOrderForm from './purchase/PurchaseOrderForm.vue'
 import PurchaseOrderDetail from './purchase/PurchaseOrderDetail.vue'
 
@@ -122,13 +220,68 @@ const { hasPermission } = usePermission()
 const productsStore = useProductsStore()
 const warehousesStore = useWarehousesStore()
 
+const viewModeOptions = [
+  { value: 'summary', label: '汇总' },
+  { value: 'detail', label: '明细' }
+]
+
 // 使用 composable 管理列表逻辑
 const {
   purchaseOrders, purchaseStatusFilter, purchaseAccountSetFilter,
   purchaseDateStart, purchaseDateEnd, purchaseSearch,
   loadPurchaseOrders, debouncedLoad, handleExport,
-  page, totalPages, hasPagination, resetPage, prevPage, nextPage
+  page, totalPages, hasPagination, resetPage, prevPage, nextPage,
+  // 排序
+  purchaseSort, togglePurchaseSort, sortedPurchaseOrders,
+  // 列配置
+  columnLabels, visibleColumns, showColumnMenu, menuAttr,
+  toggleColumn, isColumnVisible, resetColumns,
+  viewMode, setViewMode,
 } = usePurchaseOrder()
+
+// 展开行状态
+const expandedRows = reactive({})
+const expandedItems = reactive({})
+const loadingItems = reactive({})
+
+const toggleExpand = async (orderId, e) => {
+  e?.stopPropagation()
+  if (expandedRows[orderId]) {
+    delete expandedRows[orderId]
+    return
+  }
+  expandedRows[orderId] = true
+  if (!expandedItems[orderId]) {
+    loadingItems[orderId] = true
+    try {
+      const { data } = await getPurchaseOrderItems(orderId)
+      expandedItems[orderId] = data
+    } catch (err) {
+      console.error(err)
+    } finally {
+      loadingItems[orderId] = false
+    }
+  }
+}
+
+/** 明细模式：自动加载所有订单的物料明细 */
+const loadAllItems = async () => {
+  const orders = sortedPurchaseOrders.value
+  await Promise.all(orders.map(async (o) => {
+    if (!expandedItems[o.id]) {
+      loadingItems[o.id] = true
+      try {
+        const { data } = await getPurchaseOrderItems(o.id)
+        expandedItems[o.id] = data
+      } catch (err) { console.error(err) }
+      finally { loadingItems[o.id] = false }
+    }
+  }))
+}
+
+watch(viewMode, (mode) => {
+  if (mode === 'detail') loadAllItems()
+})
 
 // 财务账套列表
 const accountSets = ref([])
@@ -155,16 +308,12 @@ const onDetailChanged = () => {
 
 // 暴露给父组件（PurchaseView）的方法，保持接口不变
 defineExpose({
-  /** 刷新采购订单列表 */
   refresh: loadPurchaseOrders,
-  /** 查看采购订单详情（转发到详情子组件） */
   viewPurchaseOrder: (id) => detailRef.value?.viewPurchaseOrder(id),
-  /** 打开采购收货弹窗（转发到详情子组件） */
   openPurchaseReceive: () => detailRef.value?.openReceive()
 })
 
 onMounted(async () => {
-  // 并行加载各项数据
   loadPurchaseOrders()
   productsStore.loadProducts()
   warehousesStore.loadWarehouses()

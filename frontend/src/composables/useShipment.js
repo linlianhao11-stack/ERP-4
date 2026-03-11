@@ -5,6 +5,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useSort } from './useSort'
 import { usePagination } from './usePagination'
+import { useColumnConfig } from './useColumnConfig'
 import { getShipments, getCarriers } from '../api/logistics'
 
 export function useShipment() {
@@ -60,74 +61,47 @@ export function useShipment() {
       customer: s => s.customer_name || '',
       carrier: s => s.carrier_name || '',
       shipped_at: s => s.created_at || '',
-      status: s => s.status || ''
+      status: s => s.status || '',
+      order_amount: s => Number(s.total_amount) || 0,
+      salesperson: s => s.salesperson_name || ''
     })
   })
 
-  // ---- 列可见性配置（localStorage 持久化）----
-  const defaultColumns = {
-    order_no: true,
-    order_type: true,
-    customer: true,
-    shipping_status: true,
-    carrier: true,
-    tracking_no: true,
-    sn: false,
-    shipped_at: false,
-    status: true,
-    last_info: false,
-    actions: true
+  // ---- 列可见性配置（useColumnConfig 管理，localStorage 持久化）----
+  // Task 2 仅迁移现有列定义；新列在 Task 11 添加（需后端 + 模板支持）
+  const shipmentColumnDefs = {
+    order_no: { label: '订单号', defaultVisible: true },
+    order_type: { label: '类型', defaultVisible: true },
+    customer: { label: '客户', defaultVisible: true },
+    shipping_status: { label: '发货状态', defaultVisible: true },
+    carrier: { label: '快递公司', defaultVisible: true },
+    tracking_no: { label: '快递单号', defaultVisible: true },
+    sn: { label: 'SN码', defaultVisible: false },
+    shipped_at: { label: '发货时间', defaultVisible: false },
+    status: { label: '物流状态', defaultVisible: true },
+    last_info: { label: '物流信息', defaultVisible: false },
+    // 新增列（Task 11 添加，与后端 Task 5 和模板同步）
+    order_amount: { label: '订单金额', defaultVisible: true, align: 'right' },
+    remark: { label: '备注', defaultVisible: true },
+    salesperson: { label: '业务员', defaultVisible: false },
+    phone: { label: '收件电话', defaultVisible: false },
+    order_created_at: { label: '创建时间', defaultVisible: false },
+    actions: { label: '操作', defaultVisible: true }
   }
 
-  /** 列名中文标签 */
-  const columnLabels = {
-    order_no: '订单号',
-    order_type: '类型',
-    customer: '客户',
-    shipping_status: '发货状态',
-    carrier: '快递公司',
-    tracking_no: '快递单号',
-    sn: 'SN码',
-    shipped_at: '发货时间',
-    status: '物流状态',
-    last_info: '物流信息',
-    actions: '操作'
-  }
-
-  // 从 localStorage 恢复列可见性
-  let _savedColumns = null
-  try { _savedColumns = JSON.parse(localStorage.getItem('logistics_columns')) } catch (e) { /* 忽略损坏数据 */ }
-  const visibleColumns = reactive({ ...defaultColumns, ...(_savedColumns || {}) })
-
-  /** 列设置菜单是否展开 */
-  const showColumnMenu = ref(false)
-
-  /** 切换某列的可见性 */
-  const toggleColumn = (key) => {
-    visibleColumns[key] = !visibleColumns[key]
-    localStorage.setItem('logistics_columns', JSON.stringify(visibleColumns))
-  }
-
-  /** 判断某列是否可见 */
-  const isColumnVisible = (key) => visibleColumns[key]
-
-  // ---- 点击外部关闭列菜单 ----
-  const handleDocClick = (e) => {
-    if (showColumnMenu.value && !e.target.closest('[data-column-menu]')) {
-      showColumnMenu.value = false
-    }
-  }
+  const {
+    columnLabels, visibleColumns, showColumnMenu,
+    toggleColumn, isColumnVisible, resetColumns, menuAttr
+  } = useColumnConfig('logistics_columns', shipmentColumnDefs)
 
   // ---- 生命周期 ----
   onMounted(() => {
     loadShipments()
     loadCarriers()
-    document.addEventListener('click', handleDocClick)
   })
 
   onUnmounted(() => {
     clearTimeout(_searchTimer)
-    document.removeEventListener('click', handleDocClick)
   })
 
   return {
@@ -143,6 +117,8 @@ export function useShipment() {
     showColumnMenu,
     toggleColumn,
     isColumnVisible,
+    resetColumns,
+    menuAttr,
     // 排序
     toggleSort,
     // 分页

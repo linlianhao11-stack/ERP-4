@@ -28,29 +28,24 @@
       >异常</span>
     </div>
 
-    <!-- 搜索栏 + 列设置菜单 -->
-    <div class="mb-3 flex items-center gap-2">
-      <input
-        v-model="shipmentFilter.search"
-        @input="debouncedLoadShipments"
-        class="input input-sm flex-1 md:max-w-64"
-        placeholder="搜索订单号/快递单号/客户"
-      >
-      <div class="relative hidden md:block" data-column-menu>
-        <button @click="showColumnMenu = !showColumnMenu" class="btn btn-secondary btn-sm text-lg px-2" title="列设置">⋯</button>
-        <div v-if="showColumnMenu" class="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border p-2 z-50 min-w-[140px]">
-          <div v-for="(label, key) in columnLabels" :key="key"
-            @click="toggleColumn(key)"
-            class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-elevated cursor-pointer text-sm select-none">
-            <span class="w-4 text-center">{{ visibleColumns[key] ? '✓' : '' }}</span>
-            <span>{{ label }}</span>
-          </div>
-        </div>
+    <!-- 移动端搜索栏 -->
+    <div class="mb-3 md:hidden">
+      <div class="toolbar-search-wrapper flex-1" style="max-width:none">
+        <Search :size="14" class="toolbar-search-icon" />
+        <input v-model="shipmentFilter.search" @input="debouncedLoadShipments" class="toolbar-search" placeholder="搜索订单号/快递单号...">
       </div>
     </div>
 
     <!-- 桌面端表格 -->
-    <div class="card hidden md:block">
+    <div class="card hidden md:block" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <div class="toolbar-search-wrapper" style="max-width:360px">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="shipmentFilter.search" @input="debouncedLoadShipments" class="toolbar-search" placeholder="搜索订单号/快递单号...">
+          </div>
+        </template>
+      </PageToolbar>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" style="min-width:900px">
           <thead>
@@ -83,7 +78,17 @@
                 <span v-if="shipmentSort.key === 'status'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
               <th v-if="isColumnVisible('last_info')" class="p-3">物流信息</th>
+              <th v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('order_amount')">订单金额 <span v-if="shipmentSort.key === 'order_amount'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('remark')" class="px-2 py-2 text-left whitespace-nowrap">备注</th>
+              <th v-if="isColumnVisible('salesperson')" class="px-2 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('salesperson')">业务员 <span v-if="shipmentSort.key === 'salesperson'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('phone')" class="px-2 py-2 text-left whitespace-nowrap">收件电话</th>
+              <th v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-left whitespace-nowrap">创建时间</th>
               <th v-if="isColumnVisible('actions')" class="p-3">操作</th>
+              <!-- 列选择器 -->
+              <th class="col-selector-th">
+                <ColumnMenu :labels="columnLabels" :visible="visibleColumns"
+                  @toggle="toggleColumn" @reset="resetColumns" />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -122,6 +127,11 @@
                 <span :class="['text-xs px-2 py-1 rounded-full', getShipmentStatusBadge(s.status)]">{{ getShipmentStatusName(s.status, s.status_text) }}</span>
               </td>
               <td v-if="isColumnVisible('last_info')" class="p-3 text-xs text-secondary max-w-[200px] truncate" :title="s.last_info">{{ s.last_info || '-' }}</td>
+              <td v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right font-semibold whitespace-nowrap">¥{{ fmt(s.total_amount) }}</td>
+              <td v-if="isColumnVisible('remark')" class="px-2 py-2 text-muted text-xs max-w-[150px] truncate">{{ s.remark || '-' }}</td>
+              <td v-if="isColumnVisible('salesperson')" class="px-2 py-2 whitespace-nowrap">{{ s.salesperson_name || '-' }}</td>
+              <td v-if="isColumnVisible('phone')" class="px-2 py-2 text-xs whitespace-nowrap">{{ s.phone || '-' }}</td>
+              <td v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-muted text-xs whitespace-nowrap">{{ fmtDate(s.created_at) }}</td>
               <td v-if="isColumnVisible('actions')" class="p-3" @click.stop>
                 <button
                   v-if="s.all_tracking?.length"
@@ -129,6 +139,7 @@
                   class="btn btn-secondary btn-sm text-xs"
                 >复制</button>
               </td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -199,14 +210,17 @@
  * 使用 useShipment composable 获取列表数据，ShipmentDetailModal 处理详情弹窗
  */
 import { ref } from 'vue'
+import { Search } from 'lucide-vue-next'
+import ColumnMenu from '../components/common/ColumnMenu.vue'
 import { useFormat } from '../composables/useFormat'
 import { useShipment } from '../composables/useShipment'
 import { useAppStore } from '../stores/app'
 import { orderTypeNames, orderTypeBadges, shipmentStatusNames, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../utils/constants'
 import ShipmentDetailModal from '../components/business/logistics/ShipmentDetailModal.vue'
+import PageToolbar from '../components/common/PageToolbar.vue'
 
 const appStore = useAppStore()
-const { fmtDate } = useFormat()
+const { fmt, fmtDate } = useFormat()
 
 // 从 composable 获取列表数据和操作
 const {
@@ -220,6 +234,8 @@ const {
   showColumnMenu,
   toggleColumn,
   isColumnVisible,
+  resetColumns,
+  menuAttr,
   toggleSort,
   loadShipments,
   debouncedLoadShipments,

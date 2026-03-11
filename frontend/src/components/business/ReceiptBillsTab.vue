@@ -13,20 +13,24 @@
       <table class="w-full text-[13px]">
         <thead>
           <tr>
-            <th>单号</th>
-            <th>日期</th>
-            <th>客户</th>
-            <th class="text-right">金额</th>
-            <th>收款方式</th>
-            <th>预收</th>
-            <th>状态</th>
-            <th>凭证号</th>
-            <th>操作</th>
+            <th v-if="rcIsColumnVisible('bill_no')">单号</th>
+            <th v-if="rcIsColumnVisible('receipt_date')">日期</th>
+            <th v-if="rcIsColumnVisible('customer')">客户</th>
+            <th v-if="rcIsColumnVisible('amount')" class="text-right">金额</th>
+            <th v-if="rcIsColumnVisible('payment_method')">收款方式</th>
+            <th v-if="rcIsColumnVisible('is_advance')">预收</th>
+            <th v-if="rcIsColumnVisible('status')">状态</th>
+            <th v-if="rcIsColumnVisible('voucher_no')">凭证号</th>
+            <th v-if="rcIsColumnVisible('actions')">操作</th>
+            <th class="col-selector-th">
+              <ColumnMenu :labels="rcColumnLabels" :visible="rcVisibleColumns" pinned="bill_no"
+                @toggle="rcToggleColumn" @reset="rcResetColumns" />
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="9">
+            <td colspan="100">
               <div class="text-center py-12 text-muted">
                 <div class="text-3xl mb-3">📋</div>
                 <p class="text-sm font-medium mb-1">暂无收款单数据</p>
@@ -35,17 +39,18 @@
             </td>
           </tr>
           <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span></td>
-            <td>{{ b.receipt_date }}</td>
-            <td>{{ b.customer_name }}</td>
-            <td class="text-right">{{ fmtMoney(b.amount) }}</td>
-            <td>{{ b.payment_method }}</td>
-            <td>{{ b.is_advance ? '是' : '否' }}</td>
-            <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-            <td @click.stop>
+            <td v-if="rcIsColumnVisible('bill_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span></td>
+            <td v-if="rcIsColumnVisible('receipt_date')">{{ b.receipt_date }}</td>
+            <td v-if="rcIsColumnVisible('customer')">{{ b.customer_name }}</td>
+            <td v-if="rcIsColumnVisible('amount')" class="text-right">{{ fmtMoney(b.amount) }}</td>
+            <td v-if="rcIsColumnVisible('payment_method')">{{ b.payment_method }}</td>
+            <td v-if="rcIsColumnVisible('is_advance')">{{ b.is_advance ? '是' : '否' }}</td>
+            <td v-if="rcIsColumnVisible('status')"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
+            <td v-if="rcIsColumnVisible('voucher_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+            <td v-if="rcIsColumnVisible('actions')" @click.stop>
               <button v-if="b.status === 'draft' && hasPermission('accounting_ar_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
             </td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -113,11 +118,13 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import ColumnMenu from '../common/ColumnMenu.vue'
 import { getReceiptBills, createReceiptBill, confirmReceiptBill } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
+import { useColumnConfig } from '../../composables/useColumnConfig'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -134,6 +141,25 @@ const showCreate = ref(false)
 const submitting = ref(false)
 const customers = ref([])
 const form = ref({ customer_id: '', receipt_date: new Date().toISOString().slice(0, 10), amount: '', payment_method: '', receivable_bill_id: null, is_advance: false, remark: '' })
+
+const receiptColumnDefs = {
+  bill_no: { label: '单号', defaultVisible: true },
+  receipt_date: { label: '日期', defaultVisible: true },
+  customer: { label: '客户', defaultVisible: true },
+  amount: { label: '金额', defaultVisible: true, align: 'right' },
+  payment_method: { label: '收款方式', defaultVisible: true },
+  is_advance: { label: '预收', defaultVisible: true },
+  status: { label: '状态', defaultVisible: true },
+  voucher_no: { label: '凭证号', defaultVisible: true },
+  actions: { label: '操作', defaultVisible: true },
+}
+
+const {
+  columnLabels: rcColumnLabels, visibleColumns: rcVisibleColumns,
+  showColumnMenu: rcShowColumnMenu, menuAttr: rcMenuAttr,
+  toggleColumn: rcToggleColumn, isColumnVisible: rcIsColumnVisible,
+  resetColumns: rcResetColumns,
+} = useColumnConfig('receipt_bill_columns', receiptColumnDefs)
 
 async function loadList() {
   if (!accountingStore.currentAccountSetId) return

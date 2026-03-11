@@ -59,6 +59,22 @@ async def list_purchase_orders(
     total = await query.count()
     orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related(
         "supplier", "creator", "paid_by", "reviewed_by", "target_warehouse", "target_location")
+
+    # 批量预取采购项（用于 item_count 和 tax_amount 计算）
+    po_ids = [o.id for o in orders]
+    all_items = await PurchaseOrderItem.filter(purchase_order_id__in=po_ids).all() if po_ids else []
+    items_by_po = {}
+    for item in all_items:
+        items_by_po.setdefault(item.purchase_order_id, []).append(item)
+
+    # 批量查询账套名称
+    as_ids = list(set(o.account_set_id for o in orders if o.account_set_id))
+    as_map = {}
+    if as_ids:
+        from app.models import AccountSet
+        for a in await AccountSet.filter(id__in=as_ids):
+            as_map[a.id] = a.name
+
     return {"items": [{
         "id": o.id, "po_no": o.po_no, "supplier_id": o.supplier_id,
         "supplier_name": o.supplier.name if o.supplier else "",
@@ -75,6 +91,12 @@ async def list_purchase_orders(
         "payment_method": o.payment_method,
         "created_at": o.created_at.isoformat(),
         "account_set_id": o.account_set_id,
+        # 新增字段
+        "item_count": len(items_by_po.get(o.id, [])),
+        "tax_amount": float(sum(i.amount for i in items_by_po.get(o.id, []))),
+        "rebate_used": float(o.rebate_used) if o.rebate_used else 0,
+        "credit_used": float(o.credit_used) if o.credit_used else 0,
+        "account_set_name": as_map.get(o.account_set_id) if o.account_set_id else None,
     } for o in orders], "total": total}
 
 
@@ -314,6 +336,28 @@ async def list_receivable_orders(user: User = Depends(require_permission("purcha
                 "items": item_list
             })
     return result
+
+
+@router.get("/{po_id}/items")
+async def get_purchase_order_items(po_id: int, user: User = Depends(require_permission("purchase", "purchase_approve", "purchase_pay", "purchase_receive"))):
+    """获取采购订单的物料明细（用于列表行展开）"""
+    po = await PurchaseOrder.filter(id=po_id).first()
+    if not po:
+        raise HTTPException(status_code=404, detail="采购单不存在")
+    items = await PurchaseOrderItem.filter(purchase_order_id=po_id).select_related("product", "target_warehouse", "target_location")
+    return [{
+        "id": i.id,
+        "product_sku": i.product.sku if i.product else "",
+        "product_name": i.product.name if i.product else "",
+        "spec": getattr(i.product, 'spec', '') if i.product else "",
+        "quantity": i.quantity,
+        "tax_inclusive_price": float(i.tax_inclusive_price),
+        "tax_rate": float(i.tax_rate),
+        "tax_exclusive_price": float(i.tax_exclusive_price),
+        "amount": float(i.amount),
+        "received_quantity": i.received_quantity,
+        "returned_quantity": i.returned_quantity,
+    } for i in items]
 
 
 @router.get("/{po_id}")

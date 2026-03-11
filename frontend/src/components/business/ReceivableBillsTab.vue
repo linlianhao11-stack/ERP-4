@@ -15,21 +15,25 @@
       <table class="w-full text-[13px]">
         <thead>
           <tr>
-            <th>单号</th>
-            <th>日期</th>
-            <th>客户</th>
-            <th class="text-right">应收金额</th>
-            <th class="text-right">已收金额</th>
-            <th class="text-right">未收金额</th>
-            <th>状态</th>
-            <th>凭证号</th>
-            <th>来源订单</th>
-            <th>操作</th>
+            <th v-if="arIsColumnVisible('bill_no')">单号</th>
+            <th v-if="arIsColumnVisible('bill_date')">日期</th>
+            <th v-if="arIsColumnVisible('customer')">客户</th>
+            <th v-if="arIsColumnVisible('total_amount')" class="text-right">应收金额</th>
+            <th v-if="arIsColumnVisible('received_amount')" class="text-right">已收金额</th>
+            <th v-if="arIsColumnVisible('unreceived_amount')" class="text-right">未收金额</th>
+            <th v-if="arIsColumnVisible('status')">状态</th>
+            <th v-if="arIsColumnVisible('voucher_no')">凭证号</th>
+            <th v-if="arIsColumnVisible('order_no')">来源订单</th>
+            <th v-if="arIsColumnVisible('actions')">操作</th>
+            <th class="col-selector-th">
+              <ColumnMenu :labels="arColumnLabels" :visible="arVisibleColumns" pinned="bill_no"
+                @toggle="arToggleColumn" @reset="arResetColumns" />
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td colspan="10">
+            <td colspan="100">
               <div class="text-center py-12 text-muted">
                 <div class="text-3xl mb-3">📋</div>
                 <p class="text-sm font-medium mb-1">暂无应收单数据</p>
@@ -38,23 +42,24 @@
             </td>
           </tr>
           <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px]">
+            <td v-if="arIsColumnVisible('bill_no')" class="font-mono text-[12px]">
               <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
             </td>
-            <td>{{ b.bill_date }}</td>
-            <td>{{ b.customer_name }}</td>
-            <td class="text-right">{{ fmtMoney(b.total_amount) }}</td>
-            <td class="text-right">{{ fmtMoney(b.received_amount) }}</td>
-            <td class="text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
-            <td><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
-            <td @click.stop>
+            <td v-if="arIsColumnVisible('bill_date')">{{ b.bill_date }}</td>
+            <td v-if="arIsColumnVisible('customer')">{{ b.customer_name }}</td>
+            <td v-if="arIsColumnVisible('total_amount')" class="text-right">{{ fmtMoney(b.total_amount) }}</td>
+            <td v-if="arIsColumnVisible('received_amount')" class="text-right">{{ fmtMoney(b.received_amount) }}</td>
+            <td v-if="arIsColumnVisible('unreceived_amount')" class="text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
+            <td v-if="arIsColumnVisible('status')"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
+            <td v-if="arIsColumnVisible('voucher_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+            <td v-if="arIsColumnVisible('order_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
+            <td v-if="arIsColumnVisible('actions')" @click.stop>
               <div class="flex gap-1">
                 <button @click="viewDetail(b)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
                 <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">取消</button>
               </div>
             </td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -142,11 +147,13 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import ColumnMenu from '../common/ColumnMenu.vue'
 import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
+import { useColumnConfig } from '../../composables/useColumnConfig'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -166,6 +173,26 @@ const form = ref({ customer_id: '', bill_date: new Date().toISOString().slice(0,
 const showDetail = ref(false)
 const detail = ref(null)
 const detailLoading = ref(false)
+
+const receivableColumnDefs = {
+  bill_no: { label: '单号', defaultVisible: true },
+  bill_date: { label: '日期', defaultVisible: true },
+  customer: { label: '客户', defaultVisible: true },
+  total_amount: { label: '应收金额', defaultVisible: true, align: 'right' },
+  received_amount: { label: '已收金额', defaultVisible: true, align: 'right' },
+  unreceived_amount: { label: '未收金额', defaultVisible: true, align: 'right' },
+  status: { label: '状态', defaultVisible: true },
+  voucher_no: { label: '凭证号', defaultVisible: true },
+  order_no: { label: '来源订单', defaultVisible: true },
+  actions: { label: '操作', defaultVisible: true },
+}
+
+const {
+  columnLabels: arColumnLabels, visibleColumns: arVisibleColumns,
+  showColumnMenu: arShowColumnMenu, menuAttr: arMenuAttr,
+  toggleColumn: arToggleColumn, isColumnVisible: arIsColumnVisible,
+  resetColumns: arResetColumns,
+} = useColumnConfig('receivable_bill_columns', receivableColumnDefs)
 
 async function viewDetail(b) {
   showDetail.value = true

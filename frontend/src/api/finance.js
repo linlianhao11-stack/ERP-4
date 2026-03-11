@@ -7,3 +7,4 @@ export const getStockLogs = (params) => api.get('/finance/stock-logs', { params 
 export const createPayment = (data) => api.post('/finance/payment', data)
 export const getPayments = (params) => api.get('/finance/payments', { params })
 export const confirmPayment = (id) => api.post('/finance/payment/' + id + '/confirm')
+export const getOrderItems = (orderId) => api.get(`/finance/all-orders/${orderId}/items`)

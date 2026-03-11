@@ -136,7 +136,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
                 return []
             query = query.filter(order_id__in=matching_order_ids)
 
-    all_shipments = await query.order_by("id").select_related("order", "order__customer")
+    all_shipments = await query.order_by("id").select_related("order", "order__customer", "order__salesperson")
 
     order_map = OrderedDict()
     for s in all_shipments:
@@ -198,7 +198,10 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
             "all_tracking": all_tracking,
             "sn_status": "已添加" if any(s.sn_code for s in slist) else "未添加",
             "created_at": order.created_at.isoformat(),
-            "updated_at": first.updated_at.isoformat()
+            "updated_at": first.updated_at.isoformat(),
+            "remark": order.remark,
+            "salesperson_name": order.salesperson.name if order.salesperson else None,
+            "phone": first.phone if hasattr(first, 'phone') and first.phone else None,
         })
 
     # 补充没有 Shipment 记录的待发货订单（全部 或 待发货 tab）
@@ -207,7 +210,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
         pending_query = Order.filter(
             shipping_status__in=["pending", "partial"],
             order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
-        ).select_related("customer")
+        ).select_related("customer", "salesperson")
         if existing_order_ids:
             pending_query = pending_query.exclude(id__in=list(existing_order_ids))
         pending_orders = await pending_query.order_by("-created_at").limit(200)
@@ -240,7 +243,10 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
                 "all_tracking": [],
                 "sn_status": "未添加",
                 "created_at": o.created_at.isoformat(),
-                "updated_at": o.created_at.isoformat()
+                "updated_at": o.created_at.isoformat(),
+                "remark": o.remark,
+                "salesperson_name": o.salesperson.name if o.salesperson else None,
+                "phone": None,
             })
 
     result.sort(key=lambda x: x["updated_at"], reverse=True)

@@ -115,6 +115,20 @@ async def get_all_orders(
             if not po.payment.is_confirmed:
                 unconfirmed_order_ids.add(po.order_id)
 
+    # 批量查询品项数
+    from app.models import AccountSet
+    item_counts = {}
+    if order_ids:
+        for oi in await OrderItem.filter(order_id__in=order_ids).all():
+            item_counts[oi.order_id] = item_counts.get(oi.order_id, 0) + 1
+
+    # 批量查询账套名称（account_set_id 直接可用，无需 select_related）
+    as_ids = list(set(o.account_set_id for o in filtered_orders if o.account_set_id))
+    as_map = {}
+    if as_ids:
+        for a in await AccountSet.filter(id__in=as_ids):
+            as_map[a.id] = a.name
+
     result = []
     for o in filtered_orders:
         result.append({
@@ -135,9 +149,33 @@ async def get_all_orders(
             "creator_name": o.creator.display_name if o.creator else "-",
             "created_at": o.created_at.isoformat(),
             "related_order_no": o.related_order.order_no if o.related_order else None,
-            "related_order_id": o.related_order_id
+            "related_order_id": o.related_order_id,
+            # 新增字段
+            "item_count": item_counts.get(o.id, 0),
+            "rebate_used": float(o.rebate_used) if o.rebate_used else 0,
+            "account_set_name": as_map.get(o.account_set_id) if o.account_set_id else None,
         })
     return {"items": result, "total": total}
+
+
+@router.get("/all-orders/{order_id}/items")
+async def get_order_items(order_id: int, user: User = Depends(require_permission("finance"))):
+    """获取订单商品明细（用于列表行展开）"""
+    order = await Order.filter(id=order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    items = await OrderItem.filter(order_id=order_id).select_related("product")
+    return [{
+        "id": i.id,
+        "product_sku": i.product.sku if i.product else "",
+        "product_name": i.product.name if i.product else "",
+        "quantity": i.quantity,
+        "unit_price": float(i.unit_price),
+        "cost_price": float(i.cost_price),
+        "amount": float(i.amount),
+        "profit": float(i.profit),
+        "shipped_qty": i.shipped_qty,
+    } for i in items]
 
 
 @router.get("/all-orders/export")
