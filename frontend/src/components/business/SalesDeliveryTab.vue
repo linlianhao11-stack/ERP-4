@@ -1,58 +1,63 @@
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.customer_id" class="input input-sm w-36" @change="loadList">
-        <option value="">全部客户</option>
-        <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
-      </select>
-      <input v-model="filters.date_from" type="date" class="input input-sm w-36" @change="loadList" placeholder="开始日期" />
-      <input v-model="filters.date_to" type="date" class="input input-sm w-36" @change="loadList" placeholder="结束日期" />
-      <button v-if="selectedIds.length" @click="handleBatchPdf" class="btn btn-secondary btn-sm ml-auto">批量下载PDF ({{ selectedIds.length }})</button>
-    </div>
-
-    <div class="table-container">
-      <table class="w-full text-[13px]">
-        <thead>
-          <tr>
-            <th class="w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" aria-label="全选" /></th>
-            <th>单号</th>
-            <th>日期</th>
-            <th>客户</th>
-            <th>仓库</th>
-            <th class="text-right">成本合计</th>
-            <th class="text-right">销售合计</th>
-            <th>凭证号</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!items.length">
-            <td colspan="9">
-              <div class="text-center py-12 text-muted">
-                <div class="text-3xl mb-3">📋</div>
-                <p class="text-sm font-medium mb-1">暂无出库单数据</p>
-                <p class="text-xs text-muted">出库单数据由销售订单发货时自动生成</p>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="d in items" :key="d.id">
-            <td><input type="checkbox" :value="d.id" v-model="selectedIds" aria-label="选择此行" /></td>
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.delivery_no || d.bill_no">{{ d.delivery_no || d.bill_no }}</span></td>
-            <td>{{ d.delivery_date || d.bill_date }}</td>
-            <td>{{ d.customer_name }}</td>
-            <td>{{ d.warehouse_name }}</td>
-            <td class="text-right">{{ fmtMoney(d.cost_total) }}</td>
-            <td class="text-right">{{ fmtMoney(d.sales_total) }}</td>
-            <td class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.voucher_no">{{ d.voucher_no || '-' }}</span></td>
-            <td @click.stop>
-              <div class="flex gap-1">
-                <button @click="viewDetail(d)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
-                <button @click="handleDownloadPdf(d)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">PDF</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="filters.customer_id" class="toolbar-select" @change="loadList">
+            <option value="">全部客户</option>
+            <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+          <input v-model="filters.date_from" type="date" class="toolbar-select" @change="loadList" placeholder="开始日期" />
+          <input v-model="filters.date_to" type="date" class="toolbar-select" @change="loadList" placeholder="结束日期" />
+        </template>
+        <template #actions>
+          <button v-if="selectedIds.length" @click="handleBatchPdf" class="btn btn-secondary btn-sm">批量下载PDF ({{ selectedIds.length }})</button>
+        </template>
+      </PageToolbar>
+      <div class="table-container">
+        <table class="w-full text-[13px]">
+          <thead class="bg-elevated">
+            <tr>
+              <th class="px-3 py-2 w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" aria-label="全选" /></th>
+              <th class="px-3 py-2">单号</th>
+              <th class="px-3 py-2">日期</th>
+              <th class="px-3 py-2">客户</th>
+              <th class="px-3 py-2">仓库</th>
+              <th class="px-3 py-2 text-right">成本合计</th>
+              <th class="px-3 py-2 text-right">销售合计</th>
+              <th class="px-3 py-2">凭证号</th>
+              <th class="px-3 py-2">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-if="!items.length">
+              <td colspan="9" class="px-3 py-2">
+                <div class="text-center py-12 text-muted">
+                  <div class="text-3xl mb-3">📋</div>
+                  <p class="text-sm font-medium mb-1">暂无出库单数据</p>
+                  <p class="text-xs text-muted">出库单数据由销售订单发货时自动生成</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="d in items" :key="d.id" class="hover:bg-elevated">
+              <td class="px-3 py-2"><input type="checkbox" :value="d.id" v-model="selectedIds" aria-label="选择此行" /></td>
+              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.delivery_no || d.bill_no">{{ d.delivery_no || d.bill_no }}</span></td>
+              <td class="px-3 py-2">{{ d.delivery_date || d.bill_date }}</td>
+              <td class="px-3 py-2">{{ d.customer_name }}</td>
+              <td class="px-3 py-2">{{ d.warehouse_name }}</td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(d.cost_total) }}</td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(d.sales_total) }}</td>
+              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.voucher_no">{{ d.voucher_no || '-' }}</span></td>
+              <td class="px-3 py-2" @click.stop>
+                <div class="flex gap-1">
+                  <button @click="viewDetail(d)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
+                  <button @click="handleDownloadPdf(d)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">PDF</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
@@ -113,6 +118,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import PageToolbar from '../common/PageToolbar.vue'
 import { getSalesDeliveries, getSalesDelivery, getSalesDeliveryPdf, batchSalesDeliveryPdf } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'

@@ -5,7 +5,7 @@
       <!-- 期间选择器 -->
       <div class="flex items-center gap-2">
         <label class="label mb-0">选择期间</label>
-        <select v-model="selectedPeriod" class="input input-sm w-36" @change="onPeriodChange">
+        <select v-model="selectedPeriod" class="toolbar-select" @change="onPeriodChange">
           <option value="">请选择</option>
           <option v-for="p in periodOptions" :key="p.period_name" :value="p.period_name">{{ p.period_name }}</option>
         </select>
@@ -194,38 +194,38 @@
         <h4 class="text-[15px] font-semibold text-foreground">期间列表</h4>
         <div class="flex items-center gap-2">
           <label class="label mb-0 text-[12px]">年度</label>
-          <select v-model.number="listYear" class="input input-sm w-24" @change="loadPeriodList">
+          <select v-model.number="listYear" class="toolbar-select" @change="loadPeriodList">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
           </select>
         </div>
       </div>
-      <div class="table-container">
+      <div class="card" style="overflow: visible">
         <table class="w-full text-[13px]">
-          <thead>
+          <thead class="bg-elevated">
             <tr>
-              <th>期间</th>
-              <th>年</th>
-              <th>月</th>
-              <th>状态</th>
-              <th>结账时间</th>
-              <th>结账人</th>
+              <th class="px-3 py-2">期间</th>
+              <th class="px-3 py-2">年</th>
+              <th class="px-3 py-2">月</th>
+              <th class="px-3 py-2">状态</th>
+              <th class="px-3 py-2">结账时间</th>
+              <th class="px-3 py-2">结账人</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y">
             <tr v-for="p in periodList" :key="p.period_name">
-              <td class="font-medium">{{ p.period_name }}</td>
-              <td>{{ p.year }}</td>
-              <td>{{ p.month }}</td>
-              <td>
+              <td class="px-3 py-2 font-medium">{{ p.period_name }}</td>
+              <td class="px-3 py-2">{{ p.year }}</td>
+              <td class="px-3 py-2">{{ p.month }}</td>
+              <td class="px-3 py-2">
                 <span :class="p.is_closed ? 'badge badge-red' : 'badge badge-green'">
                   {{ p.is_closed ? '已结账' : '未结账' }}
                 </span>
               </td>
-              <td>{{ p.closed_at ? formatDate(p.closed_at) : '-' }}</td>
-              <td>{{ p.closed_by || '-' }}</td>
+              <td class="px-3 py-2">{{ p.closed_at ? formatDate(p.closed_at) : '-' }}</td>
+              <td class="px-3 py-2">{{ p.closed_by || '-' }}</td>
             </tr>
             <tr v-if="periodList.length === 0">
-              <td colspan="6" class="text-center text-muted py-8">暂无期间数据</td>
+              <td colspan="6" class="px-3 py-2 text-center text-muted py-8">暂无期间数据</td>
             </tr>
           </tbody>
         </table>

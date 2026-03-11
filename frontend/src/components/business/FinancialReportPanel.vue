@@ -3,11 +3,11 @@
     <!-- 查询栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-4">
       <label class="label mb-0">期间</label>
-      <select v-model.number="queryYear" class="input input-sm w-24">
+      <select v-model.number="queryYear" class="toolbar-select">
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
       </select>
       <span class="text-[13px] text-muted">年</span>
-      <select v-model.number="queryMonth" class="input input-sm w-20">
+      <select v-model.number="queryMonth" class="toolbar-select">
         <option v-for="m in 12" :key="m" :value="m">{{ m }}</option>
       </select>
       <span class="text-[13px] text-muted">月</span>
@@ -17,12 +17,8 @@
     </div>
 
     <!-- 子Tab -->
-    <div class="flex gap-2 mb-3 border-b pb-2">
-      <button role="tab" :aria-selected="sub === 'balance-sheet'" @click="sub = 'balance-sheet'" :class="['tab', sub === 'balance-sheet' ? 'active' : '']">资产负债表</button>
-      <button role="tab" :aria-selected="sub === 'income'" @click="sub = 'income'" :class="['tab', sub === 'income' ? 'active' : '']">利润表</button>
-      <button role="tab" :aria-selected="sub === 'cash-flow'" @click="sub = 'cash-flow'" :class="['tab', sub === 'cash-flow' ? 'active' : '']">现金流量表</button>
-
-      <!-- 导出按钮 -->
+    <div class="flex items-center gap-2 mb-3 border-b pb-2">
+      <AppTabs v-model="sub" :tabs="reportTabs" container-class="" />
       <div class="ml-auto relative" v-if="hasData">
         <button @click="showExportMenu = !showExportMenu" class="btn btn-secondary btn-sm flex items-center gap-1">
           导出 <span class="text-[10px]" aria-hidden="true">&#9660;</span>
@@ -58,11 +54,17 @@ import {
 import BalanceSheetTab from './BalanceSheetTab.vue'
 import IncomeStatementTab from './IncomeStatementTab.vue'
 import CashFlowTab from './CashFlowTab.vue'
+import AppTabs from '../common/AppTabs.vue'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 
 const sub = ref('balance-sheet')
+const reportTabs = [
+  { value: 'balance-sheet', label: '资产负债表' },
+  { value: 'income', label: '利润表' },
+  { value: 'cash-flow', label: '现金流量表' },
+]
 const loading = ref(false)
 
 const now = new Date()

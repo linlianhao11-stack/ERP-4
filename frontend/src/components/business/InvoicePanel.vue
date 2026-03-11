@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="flex gap-2 mb-3 border-b pb-2">
-      <button role="tab" :aria-selected="sub === 'sales'" @click="sub = 'sales'" :class="['tab', sub === 'sales' ? 'active' : '']">销项发票</button>
-      <button role="tab" :aria-selected="sub === 'purchase'" @click="sub = 'purchase'" :class="['tab', sub === 'purchase' ? 'active' : '']">进项发票</button>
-    </div>
+    <AppTabs v-model="sub" :tabs="[
+      { value: 'sales', label: '销项发票' },
+      { value: 'purchase', label: '进项发票' },
+    ]" container-class="mb-4" />
     <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
       <SalesInvoiceTab v-if="sub === 'sales'" key="sales" />
       <PurchaseInvoiceTab v-else-if="sub === 'purchase'" key="purchase" />
@@ -13,6 +13,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import AppTabs from '../common/AppTabs.vue'
 import SalesInvoiceTab from './SalesInvoiceTab.vue'
 import PurchaseInvoiceTab from './PurchaseInvoiceTab.vue'
 

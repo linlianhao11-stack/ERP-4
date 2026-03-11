@@ -27,17 +27,7 @@
     </div>
 
     <!-- Tab Navigation -->
-    <div class="flex flex-wrap gap-2 mb-3 border-b pb-2">
-      <button role="tab" :aria-selected="tab === 'vouchers'" @click="tab = 'vouchers'" :class="['tab', tab === 'vouchers' ? 'active' : '']">凭证管理</button>
-      <button role="tab" :aria-selected="tab === 'accounts'" @click="tab = 'accounts'" :class="['tab', tab === 'accounts' ? 'active' : '']">科目管理</button>
-      <button role="tab" :aria-selected="tab === 'periods'" @click="tab = 'periods'" :class="['tab', tab === 'periods' ? 'active' : '']">会计期间</button>
-      <button role="tab" :aria-selected="tab === 'ledgers'" @click="tab = 'ledgers'" :class="['tab', tab === 'ledgers' ? 'active' : '']">账簿查询</button>
-      <button role="tab" :aria-selected="tab === 'receivables'" @click="tab = 'receivables'" :class="['tab', tab === 'receivables' ? 'active' : '']">应收管理</button>
-      <button role="tab" :aria-selected="tab === 'payables'" @click="tab = 'payables'" :class="['tab', tab === 'payables' ? 'active' : '']">应付管理</button>
-      <button role="tab" :aria-selected="tab === 'invoices'" @click="tab = 'invoices'" :class="['tab', tab === 'invoices' ? 'active' : '']">发票管理</button>
-      <button role="tab" :aria-selected="tab === 'period-end'" @click="tab = 'period-end'" :class="['tab', tab === 'period-end' ? 'active' : '']">期末处理</button>
-      <button role="tab" :aria-selected="tab === 'reports'" @click="tab = 'reports'" :class="['tab', tab === 'reports' ? 'active' : '']">财务报表</button>
-    </div>
+    <AppTabs v-model="tab" :tabs="accountingTabs" container-class="mb-4" />
 
     <!-- 首次进入引导卡片（无账套） -->
     <div v-if="!accountingStore.currentAccountSetId && accountingStore.accountSets.length === 0" class="flex flex-col items-center justify-center py-20">
@@ -199,6 +189,7 @@ import { useAccountingStore } from '../stores/accounting'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import { createAccountSet, updateAccountSet, getAccountSet } from '../api/accounting'
+import AppTabs from '../components/common/AppTabs.vue'
 import VoucherPanel from '../components/business/VoucherPanel.vue'
 import ChartOfAccountsPanel from '../components/business/ChartOfAccountsPanel.vue'
 import AccountingPeriodsPanel from '../components/business/AccountingPeriodsPanel.vue'
@@ -213,6 +204,17 @@ const accountingStore = useAccountingStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const tab = ref('vouchers')
+const accountingTabs = [
+  { value: 'vouchers', label: '凭证管理' },
+  { value: 'accounts', label: '科目管理' },
+  { value: 'periods', label: '会计期间' },
+  { value: 'ledgers', label: '账簿查询' },
+  { value: 'receivables', label: '应收管理' },
+  { value: 'payables', label: '应付管理' },
+  { value: 'invoices', label: '发票管理' },
+  { value: 'period-end', label: '期末处理' },
+  { value: 'reports', label: '财务报表' },
+]
 
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 

@@ -2,29 +2,31 @@
   <div>
     <div v-if="!data || !data.rows || data.rows.length === 0" class="text-center py-12 text-muted text-[13px]">暂无数据</div>
     <template v-else>
-      <div class="table-container">
-        <table class="w-full text-[13px]">
-          <thead>
-            <tr>
-              <th class="text-left">项目</th>
-              <th class="text-right w-40">本期金额</th>
-              <th class="text-right w-40">本年累计</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in data.rows" :key="idx" :class="isHeader(row.name) ? 'bg-elevated' : ''">
-              <td :class="[isHeader(row.name) ? 'font-semibold text-foreground' : 'text-secondary', isSubItem(row.name) ? 'pl-6' : '']">
-                {{ row.name }}
-              </td>
-              <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
-                {{ fmt(row.current) }}
-              </td>
-              <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
-                {{ fmt(row.ytd) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="card" style="overflow: visible">
+        <div class="table-container">
+          <table class="w-full text-[13px]">
+            <thead>
+              <tr>
+                <th class="text-left">项目</th>
+                <th class="text-right w-40">本期金额</th>
+                <th class="text-right w-40">本年累计</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr v-for="(row, idx) in data.rows" :key="idx" :class="isHeader(row.name) ? 'bg-elevated' : ''">
+                <td :class="[isHeader(row.name) ? 'font-semibold text-foreground' : 'text-secondary', isSubItem(row.name) ? 'pl-6' : '']">
+                  {{ row.name }}
+                </td>
+                <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
+                  {{ fmt(row.current) }}
+                </td>
+                <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
+                  {{ fmt(row.ytd) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
   </div>

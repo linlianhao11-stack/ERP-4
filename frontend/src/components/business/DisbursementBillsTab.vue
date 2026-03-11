@@ -1,52 +1,57 @@
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
-        <option value="">全部状态</option>
-        <option value="draft">草稿</option>
-        <option value="confirmed">已确认</option>
-      </select>
-      <button v-if="hasPermission('accounting_ap_edit')" @click="openCreate" class="btn btn-primary btn-sm ml-auto">新增付款单</button>
-    </div>
-
-    <div class="table-container">
-      <table class="w-full text-[13px]">
-        <thead>
-          <tr>
-            <th>单号</th>
-            <th>日期</th>
-            <th>供应商</th>
-            <th class="text-right">金额</th>
-            <th>付款方式</th>
-            <th>状态</th>
-            <th>凭证号</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!items.length">
-            <td colspan="8">
-              <div class="text-center py-12 text-muted">
-                <div class="text-3xl mb-3">📋</div>
-                <p class="text-sm font-medium mb-1">暂无付款单数据</p>
-                <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="b in items" :key="b.id">
-            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.bill_no">{{ b.bill_no }}</td>
-            <td>{{ b.disbursement_date }}</td>
-            <td>{{ b.supplier_name }}</td>
-            <td class="text-right">{{ fmtMoney(b.amount) }}</td>
-            <td>{{ b.disbursement_method }}</td>
-            <td><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-            <td class="font-mono text-[12px] max-w-48 truncate" :title="b.voucher_no">{{ b.voucher_no || '-' }}</td>
-            <td @click.stop>
-              <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="filters.status" class="toolbar-select" @change="loadList">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="confirmed">已确认</option>
+          </select>
+        </template>
+        <template #actions>
+          <button v-if="hasPermission('accounting_ap_edit')" @click="openCreate" class="btn btn-primary btn-sm">新增付款单</button>
+        </template>
+      </PageToolbar>
+      <div class="table-container">
+        <table class="w-full text-[13px]">
+          <thead class="bg-elevated">
+            <tr>
+              <th class="px-3 py-2">单号</th>
+              <th class="px-3 py-2">日期</th>
+              <th class="px-3 py-2">供应商</th>
+              <th class="px-3 py-2 text-right">金额</th>
+              <th class="px-3 py-2">付款方式</th>
+              <th class="px-3 py-2">状态</th>
+              <th class="px-3 py-2">凭证号</th>
+              <th class="px-3 py-2">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-if="!items.length">
+              <td colspan="8">
+                <div class="text-center py-12 text-muted">
+                  <div class="text-3xl mb-3">📋</div>
+                  <p class="text-sm font-medium mb-1">暂无付款单数据</p>
+                  <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
+              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="b.bill_no">{{ b.bill_no }}</td>
+              <td class="px-3 py-2">{{ b.disbursement_date }}</td>
+              <td class="px-3 py-2">{{ b.supplier_name }}</td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(b.amount) }}</td>
+              <td class="px-3 py-2">{{ b.disbursement_method }}</td>
+              <td class="px-3 py-2"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
+              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="b.voucher_no">{{ b.voucher_no || '-' }}</td>
+              <td class="px-3 py-2" @click.stop>
+                <button v-if="b.status === 'draft' && hasPermission('accounting_ap_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
@@ -106,6 +111,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import PageToolbar from '../common/PageToolbar.vue'
 import { getDisbursementBills, createDisbursementBill, confirmDisbursementBill } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'

@@ -1,68 +1,73 @@
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
-        <option value="">全部状态</option>
-        <option value="pending">待收款</option>
-        <option value="partial">部分收款</option>
-        <option value="completed">已收齐</option>
-        <option value="cancelled">已取消</option>
-      </select>
-      <button v-if="hasPermission('accounting_ar_edit')" @click="showCreate = true" class="btn btn-primary btn-sm ml-auto">手动新增</button>
-    </div>
-
-    <div class="table-container">
-      <table class="w-full text-[13px]">
-        <thead>
-          <tr>
-            <th v-if="arIsColumnVisible('bill_no')">单号</th>
-            <th v-if="arIsColumnVisible('bill_date')">日期</th>
-            <th v-if="arIsColumnVisible('customer')">客户</th>
-            <th v-if="arIsColumnVisible('total_amount')" class="text-right">应收金额</th>
-            <th v-if="arIsColumnVisible('received_amount')" class="text-right">已收金额</th>
-            <th v-if="arIsColumnVisible('unreceived_amount')" class="text-right">未收金额</th>
-            <th v-if="arIsColumnVisible('status')">状态</th>
-            <th v-if="arIsColumnVisible('voucher_no')">凭证号</th>
-            <th v-if="arIsColumnVisible('order_no')">来源订单</th>
-            <th v-if="arIsColumnVisible('actions')">操作</th>
-            <th class="col-selector-th">
-              <ColumnMenu :labels="arColumnLabels" :visible="arVisibleColumns" pinned="bill_no"
-                @toggle="arToggleColumn" @reset="arResetColumns" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!items.length">
-            <td colspan="100">
-              <div class="text-center py-12 text-muted">
-                <div class="text-3xl mb-3">📋</div>
-                <p class="text-sm font-medium mb-1">暂无应收单数据</p>
-                <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="b in items" :key="b.id">
-            <td v-if="arIsColumnVisible('bill_no')" class="font-mono text-[12px]">
-              <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
-            </td>
-            <td v-if="arIsColumnVisible('bill_date')">{{ b.bill_date }}</td>
-            <td v-if="arIsColumnVisible('customer')">{{ b.customer_name }}</td>
-            <td v-if="arIsColumnVisible('total_amount')" class="text-right">{{ fmtMoney(b.total_amount) }}</td>
-            <td v-if="arIsColumnVisible('received_amount')" class="text-right">{{ fmtMoney(b.received_amount) }}</td>
-            <td v-if="arIsColumnVisible('unreceived_amount')" class="text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
-            <td v-if="arIsColumnVisible('status')"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
-            <td v-if="arIsColumnVisible('voucher_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-            <td v-if="arIsColumnVisible('order_no')" class="font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
-            <td v-if="arIsColumnVisible('actions')" @click.stop>
-              <div class="flex gap-1">
-                <button @click="viewDetail(b)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
-                <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">取消</button>
-              </div>
-            </td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="filters.status" class="toolbar-select" @change="loadList">
+            <option value="">全部状态</option>
+            <option value="pending">待收款</option>
+            <option value="partial">部分收款</option>
+            <option value="completed">已收齐</option>
+            <option value="cancelled">已取消</option>
+          </select>
+        </template>
+        <template #actions>
+          <button v-if="hasPermission('accounting_ar_edit')" @click="showCreate = true" class="btn btn-primary btn-sm">手动新增</button>
+        </template>
+      </PageToolbar>
+      <div class="table-container">
+        <table class="w-full text-[13px]">
+          <thead class="bg-elevated">
+            <tr>
+              <th v-if="arIsColumnVisible('bill_no')" class="px-3 py-2">单号</th>
+              <th v-if="arIsColumnVisible('bill_date')" class="px-3 py-2">日期</th>
+              <th v-if="arIsColumnVisible('customer')" class="px-3 py-2">客户</th>
+              <th v-if="arIsColumnVisible('total_amount')" class="px-3 py-2 text-right">应收金额</th>
+              <th v-if="arIsColumnVisible('received_amount')" class="px-3 py-2 text-right">已收金额</th>
+              <th v-if="arIsColumnVisible('unreceived_amount')" class="px-3 py-2 text-right">未收金额</th>
+              <th v-if="arIsColumnVisible('status')" class="px-3 py-2">状态</th>
+              <th v-if="arIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
+              <th v-if="arIsColumnVisible('order_no')" class="px-3 py-2">来源订单</th>
+              <th v-if="arIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+              <th class="col-selector-th">
+                <ColumnMenu :labels="arColumnLabels" :visible="arVisibleColumns" pinned="bill_no"
+                  @toggle="arToggleColumn" @reset="arResetColumns" />
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-if="!items.length">
+              <td colspan="100">
+                <div class="text-center py-12 text-muted">
+                  <div class="text-3xl mb-3">📋</div>
+                  <p class="text-sm font-medium mb-1">暂无应收单数据</p>
+                  <p class="text-xs text-muted">点击"手动新增"按钮创建第一条记录</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
+              <td v-if="arIsColumnVisible('bill_no')" class="px-3 py-2 font-mono text-[12px]">
+                <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
+              </td>
+              <td v-if="arIsColumnVisible('bill_date')" class="px-3 py-2">{{ b.bill_date }}</td>
+              <td v-if="arIsColumnVisible('customer')" class="px-3 py-2">{{ b.customer_name }}</td>
+              <td v-if="arIsColumnVisible('total_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.total_amount) }}</td>
+              <td v-if="arIsColumnVisible('received_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.received_amount) }}</td>
+              <td v-if="arIsColumnVisible('unreceived_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
+              <td v-if="arIsColumnVisible('status')" class="px-3 py-2"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
+              <td v-if="arIsColumnVisible('voucher_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+              <td v-if="arIsColumnVisible('order_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
+              <td v-if="arIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
+                <div class="flex gap-1">
+                  <button @click="viewDetail(b)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
+                  <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">取消</button>
+                </div>
+              </td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
@@ -148,6 +153,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import ColumnMenu from '../common/ColumnMenu.vue'
+import PageToolbar from '../common/PageToolbar.vue'
 import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'

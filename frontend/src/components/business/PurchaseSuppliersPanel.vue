@@ -1,12 +1,15 @@
 <template>
   <div>
-    <div class="flex justify-end mb-3">
-      <button @click="openSupplierForm(null)" class="btn btn-primary btn-sm">新增供应商</button>
-    </div>
-
     <!-- Mobile cards -->
     <div class="md:hidden space-y-2">
-      <div v-for="s in suppliers" :key="s.id" class="card p-3 cursor-pointer" @click="openSupplierDetail(s)">
+      <!-- 移动端搜索 -->
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <div class="toolbar-search-wrapper flex-1" style="max-width:none">
+          <Search :size="14" class="toolbar-search-icon" />
+          <input v-model="supplierSearch" class="toolbar-search" placeholder="搜索供应商...">
+        </div>
+      </div>
+      <div v-for="s in filteredSuppliers" :key="s.id" class="card p-3 cursor-pointer" @click="openSupplierDetail(s)">
         <div class="flex justify-between items-start mb-1">
           <div class="font-medium text-sm">{{ s.name }}</div>
           <div class="flex gap-2 text-xs" @click.stop>
@@ -20,11 +23,22 @@
           <span v-if="s.credit_balance > 0" class="text-primary">在账资金: ¥{{ fmt(s.credit_balance) }}</span>
         </div>
       </div>
-      <div v-if="!suppliers.length" class="p-8 text-center text-muted text-sm">暂无供应商</div>
+      <div v-if="!filteredSuppliers.length" class="p-8 text-center text-muted text-sm">暂无供应商</div>
     </div>
 
     <!-- Desktop table -->
-    <div class="card hidden md:block">
+    <div class="card hidden md:block" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="supplierSearch" class="toolbar-search" placeholder="搜索供应商...">
+          </div>
+        </template>
+        <template #actions>
+          <button @click="openSupplierForm(null)" class="btn btn-primary btn-sm">新增供应商</button>
+        </template>
+      </PageToolbar>
       <div class="table-container">
         <table class="w-full text-sm">
           <thead class="bg-elevated">
@@ -38,7 +52,7 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="s in suppliers" :key="s.id" class="hover:bg-elevated cursor-pointer" @click="openSupplierDetail(s)">
+            <tr v-for="s in filteredSuppliers" :key="s.id" class="hover:bg-elevated cursor-pointer" @click="openSupplierDetail(s)">
               <td class="px-3 py-2 font-medium">{{ s.name }}</td>
               <td class="px-3 py-2 text-secondary">{{ s.contact_person || '-' }}</td>
               <td class="px-3 py-2 text-secondary">{{ s.phone || '-' }}</td>
@@ -58,38 +72,42 @@
           </tbody>
         </table>
       </div>
-      <div v-if="!suppliers.length" class="p-8 text-center text-muted text-sm">暂无供应商</div>
+      <div v-if="!filteredSuppliers.length" class="p-8 text-center text-muted text-sm">暂无供应商</div>
     </div>
 
     <!-- Supplier Edit Modal -->
-    <div v-if="showSupplierModal" class="modal-overlay active" @click.self="showSupplierModal = false">
-      <div class="modal-content">
+    <div v-if="showSupplierModal" class="modal-backdrop" @click.self="showSupplierModal = false">
+      <div class="modal max-w-lg">
         <div class="modal-header">
-          <h3 class="modal-title">{{ supplierForm.id ? '编辑供应商' : '新增供应商' }}</h3>
+          <h3>{{ supplierForm.id ? '编辑供应商' : '新增供应商' }}</h3>
           <button @click="showSupplierModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveSupplier" class="space-y-3 p-4">
-          <div>
-            <label class="label">供应商名称 *</label>
-            <input v-model="supplierForm.name" class="input" required placeholder="供应商名称">
+        <form @submit.prevent="saveSupplier">
+          <div class="modal-body">
+            <div class="space-y-3">
+              <div>
+                <label class="label">供应商名称 *</label>
+                <input v-model="supplierForm.name" class="input" required placeholder="供应商名称">
+              </div>
+              <div class="grid form-grid grid-cols-2 gap-3">
+                <div><label class="label">联系人</label><input v-model="supplierForm.contact_person" class="input"></div>
+                <div><label class="label">电话</label><input v-model="supplierForm.phone" class="input"></div>
+              </div>
+              <div>
+                <label class="label">税号</label>
+                <input v-model="supplierForm.tax_id" class="input" placeholder="纳税人识别号">
+              </div>
+              <div class="grid form-grid grid-cols-2 gap-3">
+                <div><label class="label">银行账号</label><input v-model="supplierForm.bank_account" class="input"></div>
+                <div><label class="label">开户行</label><input v-model="supplierForm.bank_name" class="input"></div>
+              </div>
+              <div>
+                <label class="label">地址</label>
+                <input v-model="supplierForm.address" class="input">
+              </div>
+            </div>
           </div>
-          <div class="grid form-grid grid-cols-2 gap-3">
-            <div><label class="label">联系人</label><input v-model="supplierForm.contact_person" class="input"></div>
-            <div><label class="label">电话</label><input v-model="supplierForm.phone" class="input"></div>
-          </div>
-          <div>
-            <label class="label">税号</label>
-            <input v-model="supplierForm.tax_id" class="input" placeholder="纳税人识别号">
-          </div>
-          <div class="grid form-grid grid-cols-2 gap-3">
-            <div><label class="label">银行账号</label><input v-model="supplierForm.bank_account" class="input"></div>
-            <div><label class="label">开户行</label><input v-model="supplierForm.bank_name" class="input"></div>
-          </div>
-          <div>
-            <label class="label">地址</label>
-            <input v-model="supplierForm.address" class="input">
-          </div>
-          <div class="flex gap-3 pt-3">
+          <div class="modal-footer">
             <button type="button" @click="showSupplierModal = false" class="btn btn-secondary flex-1">取消</button>
             <button type="submit" class="btn btn-primary flex-1">保存</button>
           </div>
@@ -98,141 +116,144 @@
     </div>
 
     <!-- Supplier Detail Modal -->
-    <div v-if="showSupplierDetailModal" class="modal-overlay active" @click.self="showSupplierDetailModal = false">
-      <div class="modal-content" style="max-width:750px">
+    <div v-if="showSupplierDetailModal" class="modal-backdrop" @click.self="showSupplierDetailModal = false">
+      <div class="modal max-w-3xl">
         <div class="modal-header">
-          <h3 class="modal-title">供应商详情 - {{ supplierDetail?.supplier?.name }}</h3>
+          <h3>供应商详情 - {{ supplierDetail?.supplier?.name }}</h3>
           <button @click="showSupplierDetailModal = false" class="modal-close">&times;</button>
         </div>
-        <div v-if="supplierDetail" class="space-y-4 p-4">
-          <!-- 摘要 -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-info-subtle rounded-lg p-3 text-center">
-              <div class="text-xs text-muted">采购单数</div>
-              <div class="text-lg font-bold text-primary">{{ supplierDetail.stats.total_count }}</div>
+        <div v-if="supplierDetail" class="modal-body">
+          <div class="space-y-4">
+            <!-- 摘要 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="bg-info-subtle rounded-lg p-3 text-center">
+                <div class="text-xs text-muted">采购单数</div>
+                <div class="text-lg font-bold text-primary">{{ supplierDetail.stats.total_count }}</div>
+              </div>
+              <div class="bg-success-subtle rounded-lg p-3 text-center">
+                <div class="text-xs text-muted">采购总额</div>
+                <div class="text-lg font-bold text-success">¥{{ fmt(supplierDetail.stats.total_amount) }}</div>
+              </div>
+              <div class="bg-purple-subtle rounded-lg p-3 text-center">
+                <div class="text-xs text-muted">返利余额</div>
+                <div class="text-lg font-bold text-purple-emphasis">¥{{ fmt(supplierDetail.supplier.rebate_balance) }}</div>
+              </div>
+              <div class="bg-orange-subtle rounded-lg p-3 text-center">
+                <div class="text-xs text-muted">在账资金</div>
+                <div class="text-lg font-bold text-warning">¥{{ fmt(supplierDetail.supplier.credit_balance) }}</div>
+                <button v-if="supplierDetail.supplier.credit_balance > 0 && hasPermission('purchase')"
+                  @click="openCreditRefund" class="text-xs text-warning underline mt-1">退款</button>
+              </div>
             </div>
-            <div class="bg-success-subtle rounded-lg p-3 text-center">
-              <div class="text-xs text-muted">采购总额</div>
-              <div class="text-lg font-bold text-success">¥{{ fmt(supplierDetail.stats.total_amount) }}</div>
-            </div>
-            <div class="bg-purple-subtle rounded-lg p-3 text-center">
-              <div class="text-xs text-muted">返利余额</div>
-              <div class="text-lg font-bold text-purple-emphasis">¥{{ fmt(supplierDetail.supplier.rebate_balance) }}</div>
-            </div>
-            <div class="bg-orange-subtle rounded-lg p-3 text-center">
-              <div class="text-xs text-muted">在账资金</div>
-              <div class="text-lg font-bold text-warning">¥{{ fmt(supplierDetail.supplier.credit_balance) }}</div>
-              <button v-if="supplierDetail.supplier.credit_balance > 0 && hasPermission('purchase')"
-                @click="openCreditRefund" class="text-xs text-warning underline mt-1">退款</button>
-            </div>
-          </div>
 
-          <!-- 月份筛选 -->
-          <div class="flex items-center gap-2">
-            <select v-model="supplierTransMonth" @change="loadSupplierDetail(supplierDetail.supplier.id)" class="input text-sm" style="width:140px">
-              <option value="">全部月份</option>
-              <option v-for="m in supplierDetail.available_months" :key="m" :value="m">{{ m }}</option>
-            </select>
-            <span class="text-xs text-muted">已完成 {{ supplierDetail.stats.completed_count }} 单，退货 {{ supplierDetail.stats.returned_count }} 单(¥{{ fmt(supplierDetail.stats.returned_amount) }})</span>
-          </div>
-
-          <!-- 采购记录 -->
-          <div>
-            <h4 class="font-semibold text-sm mb-2">采购记录</h4>
-            <div class="table-container" style="max-height:200px;overflow-y:auto">
-              <table class="w-full text-xs">
-                <thead class="bg-elevated sticky top-0">
-                  <tr>
-                    <th class="px-2 py-1 text-left">单号</th>
-                    <th class="px-2 py-1 text-center">状态</th>
-                    <th class="px-2 py-1 text-right">金额</th>
-                    <th class="px-2 py-1 text-right">退货</th>
-                    <th class="px-2 py-1 text-left">日期</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <tr v-for="o in supplierDetail.orders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="showSupplierDetailModal = false; emit('view-order', o.id)">
-                    <td class="px-2 py-1 font-mono">{{ o.po_no }}</td>
-                    <td class="px-2 py-1 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
-                    <td class="px-2 py-1 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
-                    <td class="px-2 py-1 text-right">
-                      <span v-if="o.return_amount > 0" class="text-warning">¥{{ fmt(o.return_amount) }}</span>
-                      <span v-else class="text-muted">-</span>
-                    </td>
-                    <td class="px-2 py-1 text-muted">{{ fmtDate(o.created_at) }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- 月份筛选 -->
+            <div class="flex items-center gap-2">
+              <select v-model="supplierTransMonth" @change="loadSupplierDetail(supplierDetail.supplier.id)" class="input text-sm" style="width:140px">
+                <option value="">全部月份</option>
+                <option v-for="m in supplierDetail.available_months" :key="m" :value="m">{{ m }}</option>
+              </select>
+              <span class="text-xs text-muted">已完成 {{ supplierDetail.stats.completed_count }} 单，退货 {{ supplierDetail.stats.returned_count }} 单(¥{{ fmt(supplierDetail.stats.returned_amount) }})</span>
             </div>
-            <div v-if="!supplierDetail.orders.length" class="text-center text-muted text-xs py-4">暂无采购记录</div>
-          </div>
 
-          <!-- 在账资金流水 -->
-          <div v-if="supplierDetail.credit_logs.length">
-            <h4 class="font-semibold text-sm mb-2">在账资金流水</h4>
-            <div class="table-container" style="max-height:180px;overflow-y:auto">
-              <table class="w-full text-xs">
-                <thead class="bg-elevated sticky top-0">
-                  <tr>
-                    <th class="px-2 py-1 text-left">时间</th>
-                    <th class="px-2 py-1 text-center">类型</th>
-                    <th class="px-2 py-1 text-right">金额</th>
-                    <th class="px-2 py-1 text-right">余额</th>
-                    <th class="px-2 py-1 text-left">备注</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <tr v-for="log in supplierDetail.credit_logs" :key="log.id">
-                    <td class="px-2 py-1 text-muted">{{ fmtDate(log.created_at) }}</td>
-                    <td class="px-2 py-1 text-center">
-                      <span v-if="log.type === 'credit_charge'" class="badge badge-green">退货转入</span>
-                      <span v-else-if="log.type === 'credit_use'" class="badge badge-blue">采购抵扣</span>
-                      <span v-else-if="log.type === 'credit_refund'" class="badge badge-orange">退款</span>
-                    </td>
-                    <td class="px-2 py-1 text-right" :class="log.amount > 0 ? 'text-success' : 'text-error'">
-                      {{ log.amount > 0 ? '+' : '' }}¥{{ fmt(Math.abs(log.amount)) }}
-                    </td>
-                    <td class="px-2 py-1 text-right">¥{{ fmt(log.balance_after) }}</td>
-                    <td class="px-2 py-1 text-muted truncate" style="max-width:150px">{{ log.remark }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- 采购记录 -->
+            <div>
+              <h4 class="font-semibold text-sm mb-2">采购记录</h4>
+              <div class="table-container" style="max-height:200px;overflow-y:auto">
+                <table class="w-full text-xs">
+                  <thead class="bg-elevated sticky top-0">
+                    <tr>
+                      <th class="px-2 py-1 text-left">单号</th>
+                      <th class="px-2 py-1 text-center">状态</th>
+                      <th class="px-2 py-1 text-right">金额</th>
+                      <th class="px-2 py-1 text-right">退货</th>
+                      <th class="px-2 py-1 text-left">日期</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <tr v-for="o in supplierDetail.orders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="showSupplierDetailModal = false; emit('view-order', o.id)">
+                      <td class="px-2 py-1 font-mono">{{ o.po_no }}</td>
+                      <td class="px-2 py-1 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
+                      <td class="px-2 py-1 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
+                      <td class="px-2 py-1 text-right">
+                        <span v-if="o.return_amount > 0" class="text-warning">¥{{ fmt(o.return_amount) }}</span>
+                        <span v-else class="text-muted">-</span>
+                      </td>
+                      <td class="px-2 py-1 text-muted">{{ fmtDate(o.created_at) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-if="!supplierDetail.orders.length" class="text-center text-muted text-xs py-4">暂无采购记录</div>
+            </div>
+
+            <!-- 在账资金流水 -->
+            <div v-if="supplierDetail.credit_logs.length">
+              <h4 class="font-semibold text-sm mb-2">在账资金流水</h4>
+              <div class="table-container" style="max-height:180px;overflow-y:auto">
+                <table class="w-full text-xs">
+                  <thead class="bg-elevated sticky top-0">
+                    <tr>
+                      <th class="px-2 py-1 text-left">时间</th>
+                      <th class="px-2 py-1 text-center">类型</th>
+                      <th class="px-2 py-1 text-right">金额</th>
+                      <th class="px-2 py-1 text-right">余额</th>
+                      <th class="px-2 py-1 text-left">备注</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <tr v-for="log in supplierDetail.credit_logs" :key="log.id">
+                      <td class="px-2 py-1 text-muted">{{ fmtDate(log.created_at) }}</td>
+                      <td class="px-2 py-1 text-center">
+                        <span v-if="log.type === 'credit_charge'" class="badge badge-green">退货转入</span>
+                        <span v-else-if="log.type === 'credit_use'" class="badge badge-blue">采购抵扣</span>
+                        <span v-else-if="log.type === 'credit_refund'" class="badge badge-orange">退款</span>
+                      </td>
+                      <td class="px-2 py-1 text-right" :class="log.amount > 0 ? 'text-success' : 'text-error'">
+                        {{ log.amount > 0 ? '+' : '' }}¥{{ fmt(Math.abs(log.amount)) }}
+                      </td>
+                      <td class="px-2 py-1 text-right">¥{{ fmt(log.balance_after) }}</td>
+                      <td class="px-2 py-1 text-muted truncate" style="max-width:150px">{{ log.remark }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-
-          <div class="flex gap-3 pt-2">
-            <button @click="showSupplierDetailModal = false" class="btn btn-secondary flex-1">关闭</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showSupplierDetailModal = false" class="btn btn-secondary flex-1">关闭</button>
         </div>
       </div>
     </div>
 
     <!-- Credit Refund Modal -->
-    <div v-if="showCreditRefundModal" class="modal-overlay active" @click.self="showCreditRefundModal = false">
-      <div class="modal-content" style="max-width:400px">
+    <div v-if="showCreditRefundModal" class="modal-backdrop" @click.self="showCreditRefundModal = false">
+      <div class="modal" style="max-width:400px">
         <div class="modal-header">
-          <h3 class="modal-title">在账资金退款</h3>
+          <h3>在账资金退款</h3>
           <button @click="showCreditRefundModal = false" class="modal-close">&times;</button>
         </div>
-        <div class="space-y-3 p-4">
-          <div class="text-sm text-secondary">
-            供应商: <b>{{ supplierDetail?.supplier?.name }}</b><br>
-            可退金额: <b class="text-warning">¥{{ fmt(supplierDetail?.supplier?.credit_balance || 0) }}</b>
+        <div class="modal-body">
+          <div class="space-y-3">
+            <div class="text-sm text-secondary">
+              供应商: <b>{{ supplierDetail?.supplier?.name }}</b><br>
+              可退金额: <b class="text-warning">¥{{ fmt(supplierDetail?.supplier?.credit_balance || 0) }}</b>
+            </div>
+            <div>
+              <label class="label">退款金额 *</label>
+              <input v-model.number="creditRefundForm.amount" type="number" step="0.01" min="0.01"
+                :max="supplierDetail?.supplier?.credit_balance" class="input" placeholder="输入退款金额">
+            </div>
+            <div>
+              <label class="label">备注</label>
+              <input v-model="creditRefundForm.remark" class="input" placeholder="退款原因（选填）">
+            </div>
           </div>
-          <div>
-            <label class="label">退款金额 *</label>
-            <input v-model.number="creditRefundForm.amount" type="number" step="0.01" min="0.01"
-              :max="supplierDetail?.supplier?.credit_balance" class="input" placeholder="输入退款金额">
-          </div>
-          <div>
-            <label class="label">备注</label>
-            <input v-model="creditRefundForm.remark" class="input" placeholder="退款原因（选填）">
-          </div>
-          <div class="flex gap-3 pt-2">
-            <button @click="showCreditRefundModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button @click="confirmCreditRefund" class="btn flex-1" style="background:#ff9f0a;color:#fff"
-              :disabled="appStore.submitting">{{ appStore.submitting ? '处理中...' : '确认退款' }}</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showCreditRefundModal = false" class="btn btn-secondary flex-1">取消</button>
+          <button @click="confirmCreditRefund" class="btn flex-1" style="background:#ff9f0a;color:#fff"
+            :disabled="appStore.submitting">{{ appStore.submitting ? '处理中...' : '确认退款' }}</button>
         </div>
       </div>
     </div>
@@ -240,7 +261,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Search } from 'lucide-vue-next'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
@@ -249,6 +271,7 @@ import {
   getSupplierTransactions, refundSupplierCredit
 } from '../../api/purchase'
 import StatusBadge from '../common/StatusBadge.vue'
+import PageToolbar from '../common/PageToolbar.vue'
 
 const emit = defineEmits(['view-order', 'data-changed'])
 
@@ -258,6 +281,7 @@ const { hasPermission } = usePermission()
 
 // State
 const suppliers = ref([])
+const supplierSearch = ref('')
 const showSupplierModal = ref(false)
 const showSupplierDetailModal = ref(false)
 const showCreditRefundModal = ref(false)
@@ -270,6 +294,13 @@ const supplierForm = reactive({
 })
 
 const creditRefundForm = reactive({ amount: null, remark: '' })
+
+// 搜索过滤
+const filteredSuppliers = computed(() => {
+  const q = supplierSearch.value.trim().toLowerCase()
+  if (!q) return suppliers.value
+  return suppliers.value.filter(s => s.name.toLowerCase().includes(q))
+})
 
 // Data loading
 const loadSuppliers = async () => {

@@ -1,9 +1,9 @@
 <template>
   <div>
-    <!-- 筛选栏 -->
-    <div class="page-toolbar">
-      <div class="page-toolbar-inner">
-        <div class="page-toolbar-filters">
+    <!-- 凭证列表 -->
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
           <select v-model="filters.period_name" class="toolbar-select" @change="loadList">
             <option value="">全部期间</option>
             <option v-for="p in periodOptions" :key="p" :value="p">{{ p }}</option>
@@ -22,75 +22,74 @@
             <option value="approved">已审核</option>
             <option value="posted">已过账</option>
           </select>
-        </div>
-        <div class="page-toolbar-actions">
+        </template>
+        <template #actions>
           <button v-if="selectedIds.length > 0" @click="handleBatchPdf" class="btn btn-secondary btn-sm">批量打印({{ selectedIds.length }})</button>
           <button v-if="hasPermission('accounting_edit')" @click="openCreateForm" class="btn btn-primary btn-sm">新增凭证</button>
-        </div>
-      </div>
-    </div>
+        </template>
+      </PageToolbar>
 
-    <!-- 凭证列表 -->
-    <div class="table-container">
-      <table class="w-full">
-        <thead>
-          <tr>
-            <th v-if="voucherIsColumnVisible('checkbox')" class="w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
-            <th v-if="voucherIsColumnVisible('voucher_no')">凭证号</th>
-            <th v-if="voucherIsColumnVisible('voucher_date')">日期</th>
-            <th v-if="voucherIsColumnVisible('summary')">摘要</th>
-            <th v-if="voucherIsColumnVisible('total_debit')">借方合计</th>
-            <th v-if="voucherIsColumnVisible('total_credit')">贷方合计</th>
-            <th v-if="voucherIsColumnVisible('status')">状态</th>
-            <th v-if="voucherIsColumnVisible('actions')">操作</th>
-            <!-- 列选择器 -->
-            <th class="col-selector-th">
-              <ColumnMenu :labels="voucherColumnLabels" :visible="voucherVisibleColumns" pinned="voucher_no"
-                @toggle="voucherToggleColumn" @reset="voucherResetColumns" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer">
-            <td v-if="voucherIsColumnVisible('checkbox')" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
-            <td v-if="voucherIsColumnVisible('voucher_no')" class="font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
-            <td v-if="voucherIsColumnVisible('voucher_date')">{{ v.voucher_date }}</td>
-            <td v-if="voucherIsColumnVisible('summary')">{{ v.summary || '-' }}</td>
-            <td v-if="voucherIsColumnVisible('total_debit')" class="text-right">{{ formatAmount(v.total_debit) }}</td>
-            <td v-if="voucherIsColumnVisible('total_credit')" class="text-right">{{ formatAmount(v.total_credit) }}</td>
-            <td v-if="voucherIsColumnVisible('status')"><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
-            <td v-if="voucherIsColumnVisible('actions')" @click.stop>
-              <div class="flex items-center gap-1.5 justify-end">
-                <!-- 主操作按钮（外露） -->
-                <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px">提交</button>
-                <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--success-subtle);color:var(--success-emphasis);border:none">审核</button>
-                <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--purple-subtle);color:var(--purple-emphasis);border:none">过账</button>
-                <!-- 更多操作下拉 -->
-                <div class="voucher-action-menu" v-if="getSecondaryActions(v).length > 0">
-                  <button @click.stop="toggleActionMenu(v.id)" class="voucher-action-trigger">
-                    ··· <span class="text-[10px]">▾</span>
-                  </button>
-                  <div v-if="openMenuId === v.id" class="voucher-action-dropdown">
-                    <button v-for="act in getSecondaryActions(v)" :key="act.label" @click="act.handler(v); openMenuId = null" :class="{ 'voucher-action-danger': act.danger }">
-                      {{ act.label }}
+      <div class="table-container">
+        <table class="w-full">
+          <thead class="bg-elevated">
+            <tr>
+              <th v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2 w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
+              <th v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
+              <th v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">日期</th>
+              <th v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">摘要</th>
+              <th v-if="voucherIsColumnVisible('total_debit')" class="px-3 py-2">借方合计</th>
+              <th v-if="voucherIsColumnVisible('total_credit')" class="px-3 py-2">贷方合计</th>
+              <th v-if="voucherIsColumnVisible('status')" class="px-3 py-2">状态</th>
+              <th v-if="voucherIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+              <!-- 列选择器 -->
+              <th class="col-selector-th">
+                <ColumnMenu :labels="voucherColumnLabels" :visible="voucherVisibleColumns" pinned="voucher_no"
+                  @toggle="voucherToggleColumn" @reset="voucherResetColumns" />
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer hover:bg-elevated">
+              <td v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
+              <td v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2 font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
+              <td v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">{{ v.voucher_date }}</td>
+              <td v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">{{ v.summary || '-' }}</td>
+              <td v-if="voucherIsColumnVisible('total_debit')" class="px-3 py-2 text-right">{{ formatAmount(v.total_debit) }}</td>
+              <td v-if="voucherIsColumnVisible('total_credit')" class="px-3 py-2 text-right">{{ formatAmount(v.total_credit) }}</td>
+              <td v-if="voucherIsColumnVisible('status')" class="px-3 py-2"><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
+              <td v-if="voucherIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
+                <div class="flex items-center gap-1.5 justify-end">
+                  <!-- 主操作按钮（外露） -->
+                  <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px">提交</button>
+                  <button v-if="v.status === 'pending' && hasPermission('accounting_approve')" @click="handleApprove(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--success-subtle);color:var(--success-emphasis);border:none">审核</button>
+                  <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--purple-subtle);color:var(--purple-emphasis);border:none">过账</button>
+                  <!-- 更多操作下拉 -->
+                  <div class="voucher-action-menu" v-if="getSecondaryActions(v).length > 0">
+                    <button @click.stop="toggleActionMenu(v.id)" class="voucher-action-trigger">
+                      ··· <span class="text-[10px]">▾</span>
                     </button>
+                    <div v-if="openMenuId === v.id" class="voucher-action-dropdown">
+                      <button v-for="act in getSecondaryActions(v)" :key="act.label" @click="act.handler(v); openMenuId = null" :class="{ 'voucher-action-danger': act.danger }">
+                        {{ act.label }}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </td>
-            <td></td>
-          </tr>
-          <tr v-if="vouchers.length === 0">
-            <td colspan="100">
-              <div class="text-center py-12 text-muted">
-                <div class="text-3xl mb-3">📋</div>
-                <p class="text-sm font-medium mb-1">暂无凭证</p>
-                <p class="text-xs text-muted">点击「新增凭证」按钮创建凭证</p>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+              <td class="px-3 py-2"></td>
+            </tr>
+            <tr v-if="vouchers.length === 0">
+              <td colspan="100">
+                <div class="text-center py-12 text-muted">
+                  <div class="text-3xl mb-3">📋</div>
+                  <p class="text-sm font-medium mb-1">暂无凭证</p>
+                  <p class="text-xs text-muted">点击「新增凭证」按钮创建凭证</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 分页 -->

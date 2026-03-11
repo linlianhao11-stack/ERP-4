@@ -1,43 +1,46 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-[15px] font-semibold text-foreground">会计科目</h3>
-      <button v-if="hasPermission('accounting_edit')" @click="openAddForm" class="btn btn-primary btn-sm">新增子科目</button>
-    </div>
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #actions>
+          <button v-if="hasPermission('accounting_edit')" @click="openAddForm" class="btn btn-primary btn-sm">新增子科目</button>
+        </template>
+      </PageToolbar>
 
-    <div class="table-container">
-      <table class="w-full">
-        <thead>
-          <tr>
-            <th>科目编码</th>
-            <th>科目名称</th>
-            <th>类别</th>
-            <th>方向</th>
-            <th>末级</th>
-            <th>辅助核算</th>
-            <th v-if="hasPermission('accounting_edit')">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="a in accounts" :key="a.id">
-            <td>{{ a.code }}</td>
-            <td>{{ a.name }}</td>
-            <td><span :class="categoryBadge(a.category)">{{ categoryName(a.category) }}</span></td>
-            <td>{{ a.direction === 'debit' ? '借' : '贷' }}</td>
-            <td>{{ a.is_leaf ? '是' : '否' }}</td>
-            <td>
-              <span v-if="a.aux_customer" class="badge badge-blue">客户</span>
-              <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
-            </td>
-            <td v-if="hasPermission('accounting_edit')">
-              <div class="flex gap-1">
-                <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">编辑</button>
-                <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">停用</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-container">
+        <table class="w-full">
+          <thead class="bg-elevated">
+            <tr>
+              <th class="px-3 py-2">科目编码</th>
+              <th class="px-3 py-2">科目名称</th>
+              <th class="px-3 py-2">类别</th>
+              <th class="px-3 py-2">方向</th>
+              <th class="px-3 py-2">末级</th>
+              <th class="px-3 py-2">辅助核算</th>
+              <th v-if="hasPermission('accounting_edit')" class="px-3 py-2">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-for="a in accounts" :key="a.id" class="hover:bg-elevated">
+              <td class="px-3 py-2">{{ a.code }}</td>
+              <td class="px-3 py-2">{{ a.name }}</td>
+              <td class="px-3 py-2"><span :class="categoryBadge(a.category)">{{ categoryName(a.category) }}</span></td>
+              <td class="px-3 py-2">{{ a.direction === 'debit' ? '借' : '贷' }}</td>
+              <td class="px-3 py-2">{{ a.is_leaf ? '是' : '否' }}</td>
+              <td class="px-3 py-2">
+                <span v-if="a.aux_customer" class="badge badge-blue">客户</span>
+                <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
+              </td>
+              <td v-if="hasPermission('accounting_edit')" class="px-3 py-2">
+                <div class="flex gap-1">
+                  <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">编辑</button>
+                  <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">停用</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 新增/编辑科目弹窗 -->
@@ -105,6 +108,7 @@ import { useAccountingStore } from '../../stores/accounting'
 import { usePermission } from '../../composables/usePermission'
 import { useAppStore } from '../../stores/app'
 import { createChartOfAccount, updateChartOfAccount, deleteChartOfAccount } from '../../api/accounting'
+import PageToolbar from '../common/PageToolbar.vue'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()

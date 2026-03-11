@@ -1,13 +1,15 @@
 <template>
-  <div>
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <input type="month" v-model="periodName" class="input input-sm w-36">
-      <button @click="query" class="btn btn-primary btn-sm">查询</button>
-      <button v-if="data" @click="handleExport" class="btn btn-secondary btn-sm">导出 Excel</button>
-      <span v-if="data" :class="data.is_balanced ? 'text-green-600' : 'text-red-500'" class="text-[13px] font-medium ml-2">
-        {{ data.is_balanced ? '试算平衡' : '试算不平衡！' }}
-      </span>
-    </div>
+  <div class="card" style="overflow: visible">
+    <PageToolbar>
+      <template #filters>
+        <input type="month" v-model="periodName" class="toolbar-select w-36">
+        <button @click="query" class="btn btn-primary btn-sm">查询</button>
+        <button v-if="data" @click="handleExport" class="btn btn-secondary btn-sm">导出 Excel</button>
+        <span v-if="data" :class="data.is_balanced ? 'text-success' : 'text-error'" class="text-[13px] font-medium ml-2">
+          {{ data.is_balanced ? '试算平衡' : '试算不平衡！' }}
+        </span>
+      </template>
+    </PageToolbar>
 
     <div v-if="data" class="table-container">
       <table class="w-full text-[13px]">
@@ -28,7 +30,7 @@
             <th class="w-28 text-right">贷方</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="divide-y">
           <tr v-for="a in data.accounts" :key="a.code" :class="{ 'font-semibold bg-canvas': !a.is_leaf }">
             <td>{{ a.code }}</td>
             <td :style="{ paddingLeft: (a.level - 1) * 16 + 8 + 'px' }">{{ a.name }}</td>
@@ -65,6 +67,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import PageToolbar from '../common/PageToolbar.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { getTrialBalance, exportTrialBalance } from '../../api/accounting'

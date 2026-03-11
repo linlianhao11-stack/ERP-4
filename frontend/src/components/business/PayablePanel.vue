@@ -1,11 +1,13 @@
 <template>
   <div>
     <div class="flex items-center gap-2 mb-3 border-b pb-2">
-      <button role="tab" :aria-selected="sub === 'bills'" @click="sub = 'bills'" :class="['tab', sub === 'bills' ? 'active' : '']">应付单</button>
-      <button role="tab" :aria-selected="sub === 'disbursements'" @click="sub = 'disbursements'" :class="['tab', sub === 'disbursements' ? 'active' : '']">付款单</button>
-      <button role="tab" :aria-selected="sub === 'refunds'" @click="sub = 'refunds'" :class="['tab', sub === 'refunds' ? 'active' : '']">付款退款</button>
-      <button role="tab" :aria-selected="sub === 'receipt'" @click="sub = 'receipt'" :class="['tab', sub === 'receipt' ? 'active' : '']">入库单</button>
-      <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors">
+      <AppTabs v-model="sub" :tabs="[
+        { value: 'bills', label: '应付单' },
+        { value: 'disbursements', label: '付款单' },
+        { value: 'refunds', label: '付款退款' },
+        { value: 'receipt', label: '入库单' },
+      ]" container-class="" />
+      <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors shrink-0">
         {{ generating ? '生成中...' : '批量生成凭证' }}
       </button>
     </div>
@@ -20,6 +22,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import AppTabs from '../common/AppTabs.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { generateApVouchers } from '../../api/accounting'

@@ -1,65 +1,70 @@
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <select v-model="filters.status" class="input input-sm w-28" @change="loadList">
-        <option value="">全部状态</option>
-        <option value="draft">草稿</option>
-        <option value="confirmed">已确认</option>
-        <option value="cancelled">已作废</option>
-      </select>
-      <select v-model="filters.supplier_id" class="input input-sm w-36" @change="loadList">
-        <option value="">全部供应商</option>
-        <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
-      <input v-model="filters.date_from" type="date" class="input input-sm w-36" @change="loadList" placeholder="开始日期" />
-      <input v-model="filters.date_to" type="date" class="input input-sm w-36" @change="loadList" placeholder="结束日期" />
-      <button @click="openCreateModal" class="btn btn-primary btn-sm ml-auto">新增进项发票</button>
-    </div>
-
-    <div class="table-container">
-      <table class="w-full text-[13px]">
-        <thead>
-          <tr>
-            <th>发票号</th>
-            <th>日期</th>
-            <th>供应商</th>
-            <th>类型</th>
-            <th class="text-right">不含税金额</th>
-            <th class="text-right">税额</th>
-            <th class="text-right">价税合计</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!items.length">
-            <td colspan="9">
-              <div class="text-center py-12 text-muted">
-                <div class="text-3xl mb-3">📋</div>
-                <p class="text-sm font-medium mb-1">暂无进项发票</p>
-                <p class="text-xs text-muted">点击「手动新增」或「从应付单推送」创建发票</p>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="inv in items" :key="inv.id">
-            <td class="font-mono text-[12px] max-w-48 truncate" :title="inv.invoice_no">{{ inv.invoice_no }}</td>
-            <td>{{ inv.invoice_date }}</td>
-            <td>{{ inv.supplier_name || inv.counterparty_name }}</td>
-            <td><span :class="inv.invoice_type === 'special' ? 'badge badge-blue' : 'badge badge-gray'">{{ inv.invoice_type === 'special' ? '专票' : '普票' }}</span></td>
-            <td class="text-right">{{ fmtMoney(inv.amount_without_tax) }}</td>
-            <td class="text-right">{{ fmtMoney(inv.tax_amount) }}</td>
-            <td class="text-right">{{ fmtMoney(inv.total_amount) }}</td>
-            <td><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
-            <td @click.stop>
-              <div class="flex gap-1">
-                <button @click="viewDetail(inv)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
-                <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
-                <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">作废</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card" style="overflow: visible">
+      <PageToolbar>
+        <template #filters>
+          <select v-model="filters.status" class="toolbar-select" @change="loadList">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="confirmed">已确认</option>
+            <option value="cancelled">已作废</option>
+          </select>
+          <select v-model="filters.supplier_id" class="toolbar-select" @change="loadList">
+            <option value="">全部供应商</option>
+            <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+          <input v-model="filters.date_from" type="date" class="toolbar-select" @change="loadList" placeholder="开始日期" />
+          <input v-model="filters.date_to" type="date" class="toolbar-select" @change="loadList" placeholder="结束日期" />
+        </template>
+        <template #actions>
+          <button @click="openCreateModal" class="btn btn-primary btn-sm">新增进项发票</button>
+        </template>
+      </PageToolbar>
+      <div class="table-container">
+        <table class="w-full text-[13px]">
+          <thead class="bg-elevated">
+            <tr>
+              <th class="px-3 py-2">发票号</th>
+              <th class="px-3 py-2">日期</th>
+              <th class="px-3 py-2">供应商</th>
+              <th class="px-3 py-2">类型</th>
+              <th class="px-3 py-2 text-right">不含税金额</th>
+              <th class="px-3 py-2 text-right">税额</th>
+              <th class="px-3 py-2 text-right">价税合计</th>
+              <th class="px-3 py-2">状态</th>
+              <th class="px-3 py-2">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr v-if="!items.length">
+              <td colspan="9" class="px-3 py-2">
+                <div class="text-center py-12 text-muted">
+                  <div class="text-3xl mb-3">📋</div>
+                  <p class="text-sm font-medium mb-1">暂无进项发票</p>
+                  <p class="text-xs text-muted">点击「手动新增」或「从应付单推送」创建发票</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="inv in items" :key="inv.id" class="hover:bg-elevated">
+              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.invoice_no">{{ inv.invoice_no }}</td>
+              <td class="px-3 py-2">{{ inv.invoice_date }}</td>
+              <td class="px-3 py-2">{{ inv.supplier_name || inv.counterparty_name }}</td>
+              <td class="px-3 py-2"><span :class="inv.invoice_type === 'special' ? 'badge badge-blue' : 'badge badge-gray'">{{ inv.invoice_type === 'special' ? '专票' : '普票' }}</span></td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.amount_without_tax) }}</td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.tax_amount) }}</td>
+              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.total_amount) }}</td>
+              <td class="px-3 py-2"><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
+              <td class="px-3 py-2" @click.stop>
+                <div class="flex gap-1">
+                  <button @click="viewDetail(inv)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
+                  <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
+                  <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">作废</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="total > pageSize" class="flex justify-center mt-3 gap-2">
@@ -246,6 +251,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import PageToolbar from '../common/PageToolbar.vue'
 import { getInvoices, getInvoice, updateInvoice, createInputInvoice, confirmInvoice, cancelInvoice } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
