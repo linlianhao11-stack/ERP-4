@@ -22,6 +22,7 @@ async def run_migrations():
     await migrate_accounting_phase4()
     await migrate_accounting_phase5()
     await migrate_purchase_returns()
+    await migrate_invoice_pdf_files()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -770,6 +771,19 @@ async def migrate_purchase_returns():
         CREATE INDEX IF NOT EXISTS idx_pri_return ON purchase_return_items(purchase_return_id);
     """)
     logger.info("采购退货单表迁移完成")
+
+
+async def migrate_invoice_pdf_files():
+    """为 invoices 表添加 pdf_files 列（幂等）"""
+    conn = connections.get("default")
+    columns = await conn.execute_query_dict(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name = 'invoices'"
+    )
+    if not any(col["name"] == "pdf_files" for col in columns):
+        await conn.execute_query(
+            "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pdf_files JSONB DEFAULT '[]'"
+        )
+        logger.info("迁移: invoices 表添加 pdf_files 列")
 
 
 async def migrate_shipment_no():

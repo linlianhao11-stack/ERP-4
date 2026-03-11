@@ -17,7 +17,8 @@ class InvoiceFromReceivable(BaseModel):
     receivable_bill_id: int
     invoice_type: str = "special"
     invoice_date: Optional[date] = None
-    items: list[InvoiceItemCreate]
+    tax_rate: Decimal = Field(max_digits=5, decimal_places=2, default=Decimal("13"))
+    items: list[InvoiceItemCreate] = []
     remark: str = ""
 
 

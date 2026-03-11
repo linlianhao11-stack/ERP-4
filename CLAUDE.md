@@ -9,6 +9,7 @@
 - **路由**: Vue Router 4
 
 ## 开发规范
+- **全程使用中文沟通**，包括代码注释、commit message 描述、文档更新等
 - **所有代码开发必须使用 superpowers skill 流程**：brainstorming → writing-plans → subagent-driven-development / executing-plans → verification-before-completion → requesting-code-review
 - Docker/容器管理统一通过 OrbStack，启动前先 `orb start`，不使用 Docker Desktop 或其他工具
 - 前端代码在 `frontend/src/`，构建输出到 `backend/static/`
@@ -16,6 +17,15 @@
 - 组件使用 Vue 3 `<script setup>` 语法
 - API 模块在 `frontend/src/api/`，通过 Axios 实例统一管理
 - Python 3.9 兼容需用 `from __future__ import annotations`
+
+## 变更验证策略（节省 Token）
+- **首选 `npm run build`** — 编译通过即可覆盖 90% 问题（语法、import、模板错误），大部分改动到此即可
+- **用 `preview_snapshot` 代替 `preview_screenshot`** — snapshot 返回文本格式的可访问性树，token 消耗远小于截图，用于验证页面结构和内容
+- **只在视觉/CSS 变更时才截图** — 如颜色、间距、布局调整，拍 1-2 张关键截图即可，不要逐页逐 tab 截图
+- **用 `preview_inspect` 检查具体 CSS** — 比截全图更精准，用于验证特定样式属性
+- **机械性改动跳过 preview** — 批量替换 class 名、重命名等，build 通过即可
+- **`preview_console_logs` + `preview_logs`** — 检查运行时错误，比截图更高效
+- **禁止**：逐页面、逐 tab 循环截图验证
 
 ## Design Context
 

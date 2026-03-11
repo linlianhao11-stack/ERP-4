@@ -1,6 +1,7 @@
 """发票服务层"""
 from __future__ import annotations
 
+import os
 from datetime import date
 from decimal import Decimal
 from tortoise import transactions
@@ -11,6 +12,7 @@ from app.models.accounting import AccountSet, ChartOfAccount
 from app.models.voucher import Voucher, VoucherEntry
 from app.utils.generators import generate_order_no
 from app.logger import get_logger
+from app.config import UPLOAD_ROOT
 
 logger = get_logger("invoice_service")
 
@@ -33,6 +35,7 @@ async def push_invoice_from_receivable(
     items: list[dict],
     creator=None,
     invoice_date: date | None = None,
+    tax_rate: Decimal = Decimal("13"),
     remark: str = "",
 ) -> Invoice:
     """从应收单推送生成销项发票（草稿状态）"""
@@ -42,6 +45,18 @@ async def push_invoice_from_receivable(
 
     if invoice_date is None:
         invoice_date = date.today()
+
+    # 若未传入明细行，根据应收单总金额自动生成一条汇总行
+    if not items:
+        total = rb.total_amount
+        rate = tax_rate / Decimal("100")
+        without_tax = (total / (1 + rate)).quantize(Decimal("0.01"))
+        items = [{
+            "product_name": f"应收单 {rb.bill_no} 汇总",
+            "quantity": 1,
+            "unit_price": str(without_tax),
+            "tax_rate": str(tax_rate),
+        }]
 
     total_without_tax = Decimal("0")
     total_tax = Decimal("0")
@@ -279,6 +294,19 @@ async def cancel_invoice(invoice_id: int) -> Invoice:
             inv.voucher_id = None
             inv.voucher_no = None
         inv.status = "cancelled"
+        # 清理 PDF 文件
+        for pdf in (inv.pdf_files or []):
+            try:
+                fpath = os.path.join(UPLOAD_ROOT, pdf["path"])
+                # 路径遍历防护
+                if not os.path.realpath(fpath).startswith(os.path.realpath(UPLOAD_ROOT)):
+                    logger.warning(f"跳过异常路径: {pdf.get('path')}")
+                    continue
+                if os.path.exists(fpath):
+                    os.remove(fpath)
+            except Exception as e:
+                logger.warning(f"清理发票PDF失败: {pdf.get('path')}, {e}")
+        inv.pdf_files = []
         await inv.save()
     logger.info(f"作废发票: {inv.invoice_no}")
     return inv

@@ -22,6 +22,7 @@ class Invoice(models.Model):
     voucher_no = fields.CharField(max_length=30, null=True)
     remark = fields.TextField(default="")
     creator = fields.ForeignKeyField("models.User", related_name="created_invoices", null=True, on_delete=fields.SET_NULL)
+    pdf_files = fields.JSONField(default=list)  # [{path, name, size, uploaded_at}]
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

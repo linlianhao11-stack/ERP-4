@@ -79,7 +79,7 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="label" for="ar-rcpt-customer">客户</label>
-                <select id="ar-rcpt-customer" v-model="form.customer_id" class="input text-sm">
+                <select id="ar-rcpt-customer" v-model="form.customer_id" class="input text-sm" @change="form.receivable_bill_id = null">
                   <option value="">请选择</option>
                   <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
@@ -94,11 +94,19 @@
               </div>
               <div>
                 <label class="label" for="ar-rcpt-payment-method">收款方式</label>
-                <input id="ar-rcpt-payment-method" v-model="form.payment_method" class="input text-sm" placeholder="如：银行转账" />
+                <select id="ar-rcpt-payment-method" v-model="form.payment_method" class="input text-sm">
+                  <option value="">请选择</option>
+                  <option v-for="m in settingsStore.paymentMethods" :key="m.id" :value="m.name">{{ m.name }}</option>
+                </select>
               </div>
               <div>
-                <label class="label" for="ar-rcpt-receivable-bill-id">关联应收单ID</label>
-                <input id="ar-rcpt-receivable-bill-id" v-model="form.receivable_bill_id" type="number" class="input text-sm" placeholder="可选" />
+                <label class="label" for="ar-rcpt-receivable-bill-id">关联应收单</label>
+                <select id="ar-rcpt-receivable-bill-id" v-model="form.receivable_bill_id" class="input text-sm">
+                  <option :value="null">不关联</option>
+                  <option v-for="rb in customerReceivables" :key="rb.id" :value="rb.id">
+                    {{ rb.bill_no }} — ¥{{ rb.total_amount }}（未收 ¥{{ rb.unreceived_amount }}）
+                  </option>
+                </select>
               </div>
               <div class="flex items-end gap-2">
                 <label class="flex items-center gap-1 text-[13px]" for="ar-rcpt-is-advance">
@@ -122,11 +130,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
-import { getReceiptBills, createReceiptBill, confirmReceiptBill } from '../../api/accounting'
+import { getReceiptBills, createReceiptBill, confirmReceiptBill, getReceivableBills } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
+import { useSettingsStore } from '../../stores/settings'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
@@ -134,9 +143,17 @@ import { useColumnConfig } from '../../composables/useColumnConfig'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
+const settingsStore = useSettingsStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
 const { fmtMoney } = useFormat()
+
+// 该客户的待收/部分收款应收单
+const receivableBillsList = ref([])
+const customerReceivables = computed(() => {
+  if (!form.value.customer_id) return []
+  return receivableBillsList.value.filter(rb => rb.customer_id === form.value.customer_id)
+})
 
 const items = ref([])
 const total = ref(0)
@@ -181,8 +198,21 @@ async function loadCustomers() {
   customers.value = res.data.items || res.data || []
 }
 
+async function loadReceivables() {
+  if (!accountingStore.currentAccountSetId) return
+  try {
+    const res = await getReceivableBills({
+      account_set_id: accountingStore.currentAccountSetId,
+      page_size: 200,
+    })
+    // 只保留待收款和部分收款的
+    receivableBillsList.value = (res.data.items || []).filter(rb => ['pending', 'partial'].includes(rb.status))
+  } catch { receivableBillsList.value = [] }
+}
+
 function openCreate() {
   form.value = { customer_id: '', receipt_date: new Date().toISOString().slice(0, 10), amount: '', payment_method: '', receivable_bill_id: null, is_advance: false, remark: '' }
+  loadReceivables()
   showCreate.value = true
 }
 
@@ -194,8 +224,15 @@ async function handleCreate() {
   }
   submitting.value = true
   try {
-    const data = { ...form.value }
-    if (!data.receivable_bill_id) delete data.receivable_bill_id
+    const data = {
+      customer_id: Number(form.value.customer_id),
+      receipt_date: form.value.receipt_date,
+      amount: String(form.value.amount),
+      payment_method: form.value.payment_method,
+      is_advance: form.value.is_advance,
+      remark: form.value.remark || '',
+    }
+    if (form.value.receivable_bill_id) data.receivable_bill_id = Number(form.value.receivable_bill_id)
     await createReceiptBill(accountingStore.currentAccountSetId, data)
     appStore.showToast('创建成功', 'success')
     showCreate.value = false

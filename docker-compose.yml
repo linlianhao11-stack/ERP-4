@@ -37,6 +37,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ./backups:/app/backups
+      - ./uploads:/app/uploads
     logging:
       driver: json-file
       options:

@@ -1,5 +1,72 @@
 # 迭代记录
 
+## v4.22.0 — 发票 PDF 附件管理 + 备份系统升级 + 安全加固（2026-03-11）
+
+> 发票支持 PDF 附件上传/预览/下载/删除，备份格式从 SQL 升级为 tar.gz（数据库 + 上传文件完整打包），全量代码审查修复 5 个安全漏洞。
+
+### 新增：发票 PDF 附件管理
+
+- **上传**：每张发票支持上传最多 5 个 PDF 附件（单文件 ≤ 10MB），文件头魔数校验（`%PDF`）
+- **预览/下载**：详情弹窗内直接预览 PDF（浏览器内联），支持下载
+- **删除**：删除附件同步清理磁盘文件
+- **存储**：`uploads/invoices/{year}/{month}/` 按年月归档，Docker volume 持久化挂载
+
+### 新增 API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/invoices/{id}/upload-pdf` | POST | 上传 PDF 附件 |
+| `/api/invoices/{id}/pdf/{index}` | GET | 下载/预览 PDF |
+| `/api/invoices/{id}/pdf/{index}` | DELETE | 删除 PDF 附件 |
+
+### 升级：备份系统 SQL → tar.gz
+
+- **备份格式**：从单一 `pg_dump` SQL 文件升级为 `tar.gz` 归档（包含 SQL dump + `uploads/` 目录）
+- **恢复兼容**：自动识别 `.sql` 和 `.tar.gz` 格式，兼容旧备份恢复
+- **上传恢复**：支持上传 `.sql` 或 `.tar.gz` 备份文件恢复（流式写入，≤ 100MB）
+- **自动备份**：每日定时备份同步升级为 tar.gz 格式
+- Docker volume 新增 `./uploads:/app/uploads` 挂载
+
+### 安全加固（代码审查 5 项 RED 修复）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | `Invoice.pdf_files` 使用可变默认值 `default=[]` | 改为 `default=list` |
+| 2 | PDF 下载/删除端点未校验文件路径 | 新增 `_safe_filepath()` 防路径遍历攻击 |
+| 3 | 上传文件名直接使用发票号（可能含特殊字符） | `re.sub` 净化 + UUID 片段防并发冲突 |
+| 4 | `tar.extractall()` 未设 filter（CVE-2007-4559） | 所有 3 处添加 `filter="data"` |
+| 5 | SalesInvoiceTab 事件监听器泄漏 + setTimeout 竞态 | `onBeforeUnmount` 清理 + `await` 替代 |
+
+### 其他修复
+
+- 上传超限（10MB）时自动清理已写入的临时文件
+- 备份上传超限（100MB）时同样清理临时文件
+- `invoice_service.py` 作废发票 PDF 清理增加路径遍历防护
+- `backup_service.py` 中 `import tempfile, shutil` 从函数作用域提升到模块顶层
+- SalesInvoiceTab 操作列按钮样式对齐 VoucherPanel（统一边框/间距/悬停效果）
+- 操作列表头与按钮居中对齐
+
+### 修改文件清单
+
+**后端（7 文件）：**
+- `backend/app/config.py` — 修复 UPLOAD_ROOT 路径计算（2 级 dirname），启动时创建 `uploads/invoices/`
+- `backend/app/models/invoice.py` — `pdf_files` 字段 `default=list`
+- `backend/app/routers/invoices.py` — 新增 3 个 PDF 端点 + `_safe_filepath()` + 文件名净化
+- `backend/app/routers/backup.py` — 上传超限清理
+- `backend/app/services/backup_service.py` — tar.gz 备份/恢复 + `filter="data"` + 顶层 import
+- `backend/app/services/invoice_service.py` — 作废清理路径校验
+- `backend/app/schemas/invoice.py` — 无变更（已有完整 schema）
+
+**前端（2 文件）：**
+- `frontend/src/components/business/SalesInvoiceTab.vue` — PDF 上传/预览/删除 UI + 操作列样式统一 + 事件泄漏修复
+- `frontend/src/api/accounting.js` — 新增 `uploadInvoicePdf`、`deleteInvoicePdf`、`getInvoicePdfUrl` 函数
+
+**基础设施（2 文件）：**
+- `docker-compose.yml` — 新增 `./uploads:/app/uploads` volume 挂载
+- `Dockerfile` — 新增 `mkdir -p /app/uploads/invoices`
+
+---
+
 ## v4.21.0 — 日历式日期选择器 + 列选择器修复（2026-03-11）
 
 > DateRangePicker 重写为日历弹窗式交互（双击选择日期范围），新建 ColumnMenu 组件修复列选择器溢出问题，全站 9 个面板统一升级。

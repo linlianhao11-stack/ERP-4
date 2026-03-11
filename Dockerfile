@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir -r requirements.txt -i ${PYPI_MIRROR}
 COPY backend/ .
 COPY --from=frontend-builder /build/dist /app/static
 
-RUN mkdir -p /app/backups \
+RUN mkdir -p /app/backups /app/uploads/invoices \
     && adduser --disabled-password --no-create-home appuser \
     && chown -R appuser:appuser /app
 

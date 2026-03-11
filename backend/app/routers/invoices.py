@@ -1,8 +1,14 @@
 """发票管理 API"""
 from __future__ import annotations
 
+import os
+import re
+import uuid
+from datetime import datetime
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
+from urllib.parse import quote
 from tortoise import transactions
 from app.auth.dependencies import require_permission
 from app.models import User
@@ -11,8 +17,20 @@ from app.schemas.invoice import InvoiceFromReceivable, InvoiceCreate, InvoiceUpd
 from app.services.invoice_service import (
     push_invoice_from_receivable, create_input_invoice, confirm_invoice, cancel_invoice,
 )
+from app.config import UPLOAD_ROOT
+from app.logger import get_logger
+
+logger = get_logger("invoices")
 
 router = APIRouter(prefix="/api/invoices", tags=["发票管理"])
+
+
+def _safe_filepath(base_dir: str, relative_path: str) -> str:
+    """拼接路径并校验不会逃逸出 base_dir（防止路径遍历攻击）"""
+    full = os.path.join(base_dir, relative_path)
+    if not os.path.realpath(full).startswith(os.path.realpath(base_dir)):
+        raise HTTPException(status_code=400, detail="非法文件路径")
+    return full
 
 
 @router.get("")
@@ -65,6 +83,7 @@ async def list_invoices(
             "voucher_no": inv.voucher_no,
             "remark": inv.remark,
             "created_at": inv.created_at.isoformat() if inv.created_at else None,
+            "pdf_count": len(inv.pdf_files or []),
         })
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -113,6 +132,7 @@ async def get_invoice(
         "creator_id": inv.creator_id,
         "created_at": inv.created_at.isoformat() if inv.created_at else None,
         "updated_at": inv.updated_at.isoformat() if inv.updated_at else None,
+        "pdf_files": inv.pdf_files or [],
         "items": [
             {
                 "id": it.id,
@@ -141,9 +161,10 @@ async def create_invoice_from_receivable(
             account_set_id=account_set_id,
             receivable_bill_id=data.receivable_bill_id,
             invoice_type=data.invoice_type,
-            items=[it.model_dump() for it in data.items],
+            items=[it.model_dump() for it in data.items] if data.items else [],
             creator=user,
             invoice_date=data.invoice_date,
+            tax_rate=data.tax_rate,
             remark=data.remark,
         )
     except ValueError as e:
@@ -255,3 +276,132 @@ async def cancel_invoice_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"message": "已作废", "invoice_no": inv.invoice_no}
+
+
+@router.post("/{invoice_id}/upload-pdf")
+async def upload_invoice_pdf(
+    invoice_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(require_permission("accounting_edit")),
+):
+    inv = await Invoice.filter(id=invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="发票不存在")
+    if inv.status == "cancelled":
+        raise HTTPException(status_code=400, detail="已作废的发票不能上传附件")
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
+
+    header = await file.read(5)
+    if not header.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="文件内容不是有效的 PDF")
+    await file.seek(0)
+
+    current_files = inv.pdf_files or []
+    if len(current_files) >= 5:
+        raise HTTPException(status_code=400, detail="每张发票最多上传 5 个 PDF 文件")
+
+    year = str(inv.invoice_date.year)
+    month = f"{inv.invoice_date.month:02d}"
+    save_dir = os.path.join(UPLOAD_ROOT, "invoices", year, month)
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 文件名净化：只保留字母数字下划线短横线，加 UUID 片段防并发冲突
+    safe_no = re.sub(r'[^a-zA-Z0-9_\-]', '_', inv.invoice_no)
+    seq = len(current_files) + 1
+    unique_id = uuid.uuid4().hex[:8]
+    filename = f"{safe_no}_{seq}_{unique_id}.pdf"
+    filepath = os.path.join(save_dir, filename)
+    # 最终路径校验
+    _safe_filepath(UPLOAD_ROOT, f"invoices/{year}/{month}/{filename}")
+
+    MAX_SIZE = 10 * 1024 * 1024
+    total_size = 0
+    try:
+        with open(filepath, "wb") as f:
+            while True:
+                chunk = await file.read(8192)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_SIZE:
+                    raise HTTPException(status_code=400, detail="文件过大，最大支持 10MB")
+                f.write(chunk)
+    except HTTPException:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        raise
+
+    relative_path = f"invoices/{year}/{month}/{filename}"
+    current_files.append({
+        "path": relative_path,
+        "name": file.filename,
+        "size": total_size,
+        "uploaded_at": datetime.now().isoformat(),
+    })
+    inv.pdf_files = current_files
+    await inv.save()
+
+    return {"message": "上传成功", "pdf_count": len(current_files), "index": seq - 1}
+
+
+@router.get("/{invoice_id}/pdf/{index}")
+async def download_invoice_pdf(
+    invoice_id: int,
+    index: int,
+    user: User = Depends(require_permission("accounting_view")),
+):
+    inv = await Invoice.filter(id=invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="发票不存在")
+    files = inv.pdf_files or []
+    if index < 0 or index >= len(files):
+        raise HTTPException(status_code=404, detail="PDF 文件不存在")
+
+    file_info = files[index]
+    filepath = _safe_filepath(UPLOAD_ROOT, file_info["path"])
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="PDF 文件已丢失")
+
+    def iter_file():
+        with open(filepath, "rb") as f:
+            while chunk := f.read(8192):
+                yield chunk
+
+    original_name = file_info.get("name", f"invoice_{index}.pdf")
+    return StreamingResponse(
+        iter_file(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(original_name)}",
+        },
+    )
+
+
+@router.delete("/{invoice_id}/pdf/{index}")
+async def delete_invoice_pdf(
+    invoice_id: int,
+    index: int,
+    user: User = Depends(require_permission("accounting_edit")),
+):
+    inv = await Invoice.filter(id=invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="发票不存在")
+    files = inv.pdf_files or []
+    if index < 0 or index >= len(files):
+        raise HTTPException(status_code=404, detail="PDF 文件不存在")
+
+    file_info = files[index]
+    filepath = _safe_filepath(UPLOAD_ROOT, file_info["path"])
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception as e:
+        logger.warning(f"删除 PDF 文件失败: {file_info.get('path')}, {e}")
+
+    files.pop(index)
+    inv.pdf_files = files
+    await inv.save()
+
+    return {"message": "删除成功", "pdf_count": len(files)}

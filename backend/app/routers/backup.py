@@ -52,7 +52,7 @@ async def list_backups(user: User = Depends(require_permission("admin"))):
     backup_dir = get_backup_dir()
     if not backup_dir:
         return []
-    files = glob.glob(os.path.join(backup_dir, "erp_*.db")) + glob.glob(os.path.join(backup_dir, "erp_*.sql"))
+    files = glob.glob(os.path.join(backup_dir, "erp_*.db")) + glob.glob(os.path.join(backup_dir, "erp_*.sql")) + glob.glob(os.path.join(backup_dir, "erp_*.tar.gz"))
     result = []
     for f in sorted(files, key=os.path.getmtime, reverse=True):
         stat = os.stat(f)
@@ -67,7 +67,7 @@ async def list_backups(user: User = Depends(require_permission("admin"))):
 @router.get("/backups/{filename}")
 async def download_backup(filename: str, user: User = Depends(require_permission("admin"))):
     """下载备份文件"""
-    if not re.match(r'^erp_[\w]+\.(sql|db)$', filename):
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
     backup_dir = get_backup_dir()
     if not backup_dir:
@@ -90,15 +90,18 @@ async def upload_restore_backup(file: UploadFile = File(...), user: User = Depen
     """上传备份文件并恢复数据库"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="未选择文件")
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in (".sql", ".db"):
-        raise HTTPException(status_code=400, detail="仅支持 .sql 或 .db 备份文件")
+    fname = file.filename.lower()
+    if fname.endswith(".tar.gz"):
+        ext = ".tar.gz"
+    else:
+        ext = os.path.splitext(fname)[1]
+    if ext not in (".sql", ".db", ".tar.gz"):
+        raise HTTPException(status_code=400, detail="仅支持 .sql、.db 或 .tar.gz 备份文件")
 
-    # 校验备份格式与当前数据库类型是否匹配
     if is_postgres() and ext == ".db":
-        raise HTTPException(status_code=400, detail="当前使用 PostgreSQL 数据库，无法恢复 SQLite (.db) 备份文件，请上传 .sql 格式的备份")
-    if not is_postgres() and ext == ".sql":
-        raise HTTPException(status_code=400, detail="当前使用 SQLite 数据库，无法恢复 PostgreSQL (.sql) 备份文件，请上传 .db 格式的备份")
+        raise HTTPException(status_code=400, detail="当前使用 PostgreSQL 数据库，无法恢复 SQLite (.db) 备份文件")
+    if not is_postgres() and ext in (".sql", ".tar.gz"):
+        raise HTTPException(status_code=400, detail="当前使用 SQLite 数据库，无法恢复 PostgreSQL 备份文件，请上传 .db 格式的备份")
 
     backup_dir = get_backup_dir()
     if not backup_dir:
@@ -110,15 +113,20 @@ async def upload_restore_backup(file: UploadFile = File(...), user: User = Depen
     try:
         MAX_SIZE = 100 * 1024 * 1024
         total_size = 0
-        with open(saved_path, "wb") as f:
-            while True:
-                chunk = await file.read(8192)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-                if total_size > MAX_SIZE:
-                    raise HTTPException(status_code=400, detail="备份文件过大，最大支持 100MB")
-                f.write(chunk)
+        try:
+            with open(saved_path, "wb") as f:
+                while True:
+                    chunk = await file.read(8192)
+                    if not chunk:
+                        break
+                    total_size += len(chunk)
+                    if total_size > MAX_SIZE:
+                        raise HTTPException(status_code=400, detail="备份文件过大，最大支持 100MB")
+                    f.write(chunk)
+        except HTTPException:
+            if os.path.exists(saved_path):
+                os.remove(saved_path)
+            raise
         # 执行恢复
         pre_backup = do_restore(saved_name)
         # 恢复后运行迁移，确保 schema 兼容
@@ -140,11 +148,14 @@ async def upload_restore_backup(file: UploadFile = File(...), user: User = Depen
 @router.post("/backups/{filename}/restore")
 async def restore_backup(filename: str, user: User = Depends(require_permission("admin"))):
     """从已有备份恢复数据库"""
-    if not re.match(r'^erp_[\w]+\.(sql|db)$', filename):
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
 
     # 校验备份格式与当前数据库类型是否匹配
-    ext = os.path.splitext(filename)[1].lower()
+    if filename.endswith(".tar.gz"):
+        ext = ".tar.gz"
+    else:
+        ext = os.path.splitext(filename)[1].lower()
     if is_postgres() and ext == ".db":
         raise HTTPException(status_code=400, detail="当前使用 PostgreSQL 数据库，无法恢复 SQLite (.db) 备份文件")
     if not is_postgres() and ext == ".sql":
@@ -170,7 +181,7 @@ async def restore_backup(filename: str, user: User = Depends(require_permission(
 @router.delete("/backups/{filename}")
 async def delete_backup(filename: str, user: User = Depends(require_permission("admin"))):
     """删除备份文件"""
-    if not re.match(r'^erp_[\w]+\.(sql|db)$', filename):
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
     backup_dir = get_backup_dir()
     if not backup_dir:

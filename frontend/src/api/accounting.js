@@ -108,7 +108,10 @@ export const batchPurchaseReceiptPdf = (ids) => api.post('/purchase-receipt/batc
 // ========== 发票管理 ==========
 export const getInvoices = (params) => api.get('/invoices', { params })
 export const getInvoice = (id) => api.get(`/invoices/${id}`)
-export const pushInvoiceFromReceivable = (data) => api.post('/invoices/from-receivable', data)
+export const pushInvoiceFromReceivable = (data) => {
+  const { account_set_id, ...body } = data
+  return api.post('/invoices/from-receivable', body, { params: { account_set_id } })
+}
 export const createInputInvoice = (data) => api.post('/invoices', data)
 export const updateInvoice = (id, data) => api.put(`/invoices/${id}`, data)
 export const confirmInvoice = (id) => api.post(`/invoices/${id}/confirm`)
@@ -142,3 +145,16 @@ export const exportIncomeStatement = (params) =>
   api.get('/financial-reports/income-statement/export', { params, responseType: 'blob' })
 export const exportCashFlow = (params) =>
   api.get('/financial-reports/cash-flow/export', { params, responseType: 'blob' })
+
+// ========== 发票 PDF 管理 ==========
+export const uploadInvoicePdf = (invoiceId, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post(`/invoices/${invoiceId}/upload-pdf`, formData)
+}
+
+export const getInvoicePdfUrl = (invoiceId, index) =>
+  `/api/invoices/${invoiceId}/pdf/${index}`
+
+export const deleteInvoicePdf = (invoiceId, index) =>
+  api.delete(`/invoices/${invoiceId}/pdf/${index}`)

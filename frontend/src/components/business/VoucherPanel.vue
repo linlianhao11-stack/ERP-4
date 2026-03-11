@@ -65,14 +65,16 @@
                   <button v-if="v.status === 'approved' && hasPermission('accounting_post')" @click="handlePost(v)" class="btn btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px;background:var(--purple-subtle);color:var(--purple-emphasis);border:none">过账</button>
                   <!-- 更多操作下拉 -->
                   <div class="voucher-action-menu" v-if="getSecondaryActions(v).length > 0">
-                    <button @click.stop="toggleActionMenu(v.id)" class="voucher-action-trigger">
+                    <button ref="menuTriggerRefs" :data-vid="v.id" @click.stop="toggleActionMenu(v.id, $event)" class="voucher-action-trigger">
                       ··· <span class="text-[10px]">▾</span>
                     </button>
-                    <div v-if="openMenuId === v.id" class="voucher-action-dropdown">
-                      <button v-for="act in getSecondaryActions(v)" :key="act.label" @click="act.handler(v); openMenuId = null" :class="{ 'voucher-action-danger': act.danger }">
-                        {{ act.label }}
-                      </button>
-                    </div>
+                    <Teleport to="body">
+                      <div v-if="openMenuId === v.id" class="voucher-action-dropdown" :style="menuPosition">
+                        <button v-for="act in getSecondaryActions(v)" :key="act.label" @click="act.handler(v); openMenuId = null" :class="{ 'voucher-action-danger': act.danger }">
+                          {{ act.label }}
+                        </button>
+                      </div>
+                    </Teleport>
                   </div>
                 </div>
               </td>
@@ -232,6 +234,8 @@ const leafAccounts = ref([])
 
 const selectedIds = ref([])
 const openMenuId = ref(null)
+const menuPosition = ref({})
+const menuTriggerRefs = ref([])
 
 const voucherColumnDefs = {
   checkbox: { label: '选择', defaultVisible: true },
@@ -251,8 +255,21 @@ const {
   resetColumns: voucherResetColumns,
 } = useColumnConfig('voucher_columns', voucherColumnDefs)
 
-const toggleActionMenu = (id) => {
-  openMenuId.value = openMenuId.value === id ? null : id
+const toggleActionMenu = (id, event) => {
+  if (openMenuId.value === id) {
+    openMenuId.value = null
+    return
+  }
+  // 计算触发按钮的位置，让下拉菜单用 fixed 定位
+  const btn = event.currentTarget
+  const rect = btn.getBoundingClientRect()
+  menuPosition.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+    zIndex: 9999,
+  }
+  openMenuId.value = id
 }
 
 const getSecondaryActions = (v) => {
@@ -515,17 +532,18 @@ onUnmounted(() => {
   border-color: var(--border-strong);
   background: var(--elevated);
 }
+
+</style>
+
+<style>
+/* Teleport 到 body 的下拉菜单，不能用 scoped */
 .voucher-action-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow-md);
   min-width: 120px;
   padding: 4px;
-  z-index: 50;
 }
 .voucher-action-dropdown button {
   display: flex;

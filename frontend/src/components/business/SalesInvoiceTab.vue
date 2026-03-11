@@ -33,7 +33,7 @@
               <th class="px-3 py-2 text-right">价税合计</th>
               <th class="px-3 py-2">状态</th>
               <th class="px-3 py-2">凭证号</th>
-              <th class="px-3 py-2">操作</th>
+              <th class="px-3 py-2 text-center">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -57,10 +57,18 @@
               <td class="px-3 py-2"><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
               <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.voucher_no || ''">{{ inv.voucher_no || '-' }}</td>
               <td class="px-3 py-2" @click.stop>
-                <div class="flex gap-1">
-                  <button @click="viewDetail(inv)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
-                  <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
-                  <button v-if="inv.status === 'draft' || inv.status === 'confirmed'" @click="handleCancel(inv)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">作废</button>
+                <div class="flex items-center gap-1.5 justify-center">
+                  <!-- 主操作按钮（外露） -->
+                  <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="btn btn-sm si-action-btn" style="background:var(--success-subtle);color:var(--success-emphasis);border:none">确认</button>
+                  <button v-else-if="inv.status === 'confirmed' && inv.pdf_count > 0" @click="downloadFirstPdf(inv)" class="btn btn-sm si-action-btn">下载</button>
+                  <button v-else-if="inv.status === 'confirmed' && !inv.pdf_count" @click="triggerUpload(inv)" class="btn btn-primary btn-sm si-action-btn">上传</button>
+                  <button v-else @click="viewDetail(inv)" class="btn btn-sm si-action-btn">查看</button>
+                  <!-- 更多操作下拉 -->
+                  <div class="si-action-menu">
+                    <button @click.stop="toggleActionMenu(inv, $event)" class="si-action-trigger">
+                      ··· <span class="text-[10px]">▾</span>
+                    </button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -99,14 +107,35 @@
                   <div><span class="text-muted">备注：</span>{{ detail.remark || '-' }}</div>
                 </div>
                 <!-- 购方开票信息 -->
-                <div v-if="detail.customer_tax_id || detail.customer_bank_name" class="border border-line rounded-xl p-3 mb-3">
+                <div v-if="detail.customer_name" class="border border-line rounded-xl p-3 mb-3">
                   <div class="text-xs font-semibold text-secondary mb-2">购方开票信息</div>
                   <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px]">
-                    <div v-if="detail.customer_name" class="col-span-2"><span class="text-muted">名称：</span>{{ detail.customer_name }}</div>
-                    <div v-if="detail.customer_tax_id" class="col-span-2"><span class="text-muted">纳税人识别号：</span><span class="font-mono">{{ detail.customer_tax_id }}</span></div>
-                    <div v-if="detail.customer_address || detail.customer_phone" class="col-span-2"><span class="text-muted">地址电话：</span>{{ [detail.customer_address, detail.customer_phone].filter(Boolean).join(' ') }}</div>
-                    <div v-if="detail.customer_bank_name || detail.customer_bank_account" class="col-span-2"><span class="text-muted">开户行及账号：</span>{{ [detail.customer_bank_name, detail.customer_bank_account].filter(Boolean).join(' ') }}</div>
+                    <div class="col-span-2"><span class="text-muted">名称：</span>{{ detail.customer_name }}</div>
+                    <div class="col-span-2"><span class="text-muted">纳税人识别号：</span><span class="font-mono">{{ detail.customer_tax_id || '未填写' }}</span></div>
+                    <div class="col-span-2"><span class="text-muted">地址电话：</span>{{ [detail.customer_address, detail.customer_phone].filter(Boolean).join(' ') || '未填写' }}</div>
+                    <div class="col-span-2"><span class="text-muted">开户行及账号：</span>{{ [detail.customer_bank_name, detail.customer_bank_account].filter(Boolean).join(' ') || '未填写' }}</div>
                   </div>
+                </div>
+                <!-- 电子发票 -->
+                <div class="border border-line rounded-xl p-3 mb-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs font-semibold text-secondary">电子发票</div>
+                    <button v-if="detail.status !== 'cancelled'" @click="triggerUploadForDetail" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:24px;font-size:12px">上传 PDF</button>
+                  </div>
+                  <div v-if="detail.pdf_files && detail.pdf_files.length">
+                    <div v-for="(pdf, idx) in detail.pdf_files" :key="idx" class="flex items-center justify-between py-1.5 text-[13px]" :class="idx > 0 ? 'border-t border-line' : ''">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-muted shrink-0">📄</span>
+                        <span class="truncate max-w-48" :title="pdf.name">{{ pdf.name }}</span>
+                        <span class="text-muted text-[11px] shrink-0">{{ (pdf.size / 1024).toFixed(0) }}KB</span>
+                      </div>
+                      <div class="flex gap-1.5 shrink-0">
+                        <button @click="previewPdf(detail.id, idx)" class="btn btn-sm" style="padding:3px 10px;min-height:24px;font-size:12px">预览</button>
+                        <button v-if="detail.status !== 'cancelled'" @click="handleDeletePdf(detail.id, idx)" class="btn btn-sm" style="padding:3px 10px;min-height:24px;font-size:12px;background:var(--error-subtle);color:var(--error-emphasis);border:none">删除</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="text-[13px] text-muted py-2">暂未上传电子发票</div>
                 </div>
                 <div class="bg-elevated rounded-xl p-3 mb-3">
                   <div class="grid grid-cols-3 gap-2 text-[13px]">
@@ -236,13 +265,37 @@
         </div>
       </div>
     </Transition>
+
+    <!-- 操作下拉菜单 -->
+    <Teleport to="body">
+      <div v-if="openMenuId" class="si-action-dropdown" :style="menuStyle" @click.stop>
+        <button @click="viewDetailById(openMenuId); closeMenu()" class="si-action-item">查看</button>
+        <button v-if="menuInv?.status === 'draft'" @click="startEditById(openMenuId); closeMenu()" class="si-action-item">编辑</button>
+        <button v-if="menuInv?.status !== 'cancelled'" @click="triggerUpload(menuInv); closeMenu()" class="si-action-item">上传发票</button>
+        <button v-if="menuInv?.pdf_count > 0" @click="downloadFirstPdf(menuInv); closeMenu()" class="si-action-item">下载发票</button>
+        <button v-if="menuInv?.status === 'draft' || menuInv?.status === 'confirmed'" @click="handleCancel(menuInv); closeMenu()" class="si-action-item text-error">作废</button>
+      </div>
+    </Teleport>
+
+    <!-- PDF 预览弹窗 -->
+    <Transition name="fade">
+      <div v-if="showPdfPreview" class="modal-backdrop" @click.self="showPdfPreview = false">
+        <div class="modal max-w-4xl" style="height: 80vh; display: flex; flex-direction: column;">
+          <div class="modal-header">
+            <h3>预览电子发票</h3>
+            <button @click="showPdfPreview = false" class="modal-close">&times;</button>
+          </div>
+          <iframe :src="pdfPreviewUrl" class="w-full flex-1 border-0"></iframe>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import PageToolbar from '../common/PageToolbar.vue'
-import { getInvoices, getInvoice, updateInvoice, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills } from '../../api/accounting'
+import { getInvoices, getInvoice, updateInvoice, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills, uploadInvoicePdf, getInvoicePdfUrl, deleteInvoicePdf } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
@@ -266,6 +319,11 @@ const detailLoading = ref(false)
 const editing = ref(false)
 const editForm = ref({ invoice_type: '', invoice_date: '', remark: '', items: [] })
 const editSubmitting = ref(false)
+const openMenuId = ref(null)
+const menuStyle = ref({})
+const menuInv = ref(null)
+const showPdfPreview = ref(false)
+const pdfPreviewUrl = ref('')
 
 async function viewDetail(inv) {
   showDetail.value = true
@@ -374,7 +432,7 @@ async function loadReceivableBills() {
     const res = await getReceivableBills({
       account_set_id: accountingStore.currentAccountSetId,
       status: 'completed',
-      page_size: 500,
+      page_size: 200,
     })
     receivableBills.value = res.data.items || []
   } catch {
@@ -431,6 +489,10 @@ async function handleConfirm(inv) {
     await confirmInvoice(inv.id)
     appStore.showToast('确认成功', 'success')
     loadList()
+    const doUpload = await appStore.customConfirm('上传电子发票', '发票已确认，是否立即上传电子发票 PDF？')
+    if (doUpload) {
+      triggerUpload(inv)
+    }
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '确认失败', 'error')
   }
@@ -447,6 +509,180 @@ async function handleCancel(inv) {
   }
 }
 
+// ---- 操作菜单 ----
+function toggleActionMenu(inv, event) {
+  if (openMenuId.value === inv.id) {
+    closeMenu()
+    return
+  }
+  const btn = event.currentTarget
+  const rect = btn.getBoundingClientRect()
+  menuStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+    zIndex: 9999,
+  }
+  openMenuId.value = inv.id
+  menuInv.value = inv
+}
+
+function closeMenu() {
+  openMenuId.value = null
+  menuInv.value = null
+}
+
+function viewDetailById(id) {
+  const inv = items.value.find(i => i.id === id)
+  if (inv) viewDetail(inv)
+}
+
+async function startEditById(id) {
+  const inv = items.value.find(i => i.id === id)
+  if (inv) {
+    await viewDetail(inv)
+    startEdit()
+  }
+}
+
+// ---- PDF 操作 ----
+function triggerUpload(inv) {
+  if (!inv) return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.pdf'
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      await uploadInvoicePdf(inv.id, file)
+      appStore.showToast('上传成功', 'success')
+      loadList()
+    } catch (err) {
+      appStore.showToast(err.response?.data?.detail || '上传失败', 'error')
+    }
+  }
+  input.click()
+}
+
+function triggerUploadForDetail() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.pdf'
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      await uploadInvoicePdf(detail.value.id, file)
+      appStore.showToast('上传成功', 'success')
+      const res = await getInvoice(detail.value.id)
+      detail.value = res.data
+      loadList()
+    } catch (err) {
+      appStore.showToast(err.response?.data?.detail || '上传失败', 'error')
+    }
+  }
+  input.click()
+}
+
+function downloadFirstPdf(inv) {
+  if (!inv || !inv.pdf_count) return
+  window.open(getInvoicePdfUrl(inv.id, 0), '_blank')
+}
+
+function previewPdf(invoiceId, index) {
+  pdfPreviewUrl.value = getInvoicePdfUrl(invoiceId, index)
+  showPdfPreview.value = true
+}
+
+async function handleDeletePdf(invoiceId, index) {
+  if (!await appStore.customConfirm('删除确认', '确认删除此 PDF 文件？')) return
+  try {
+    await deleteInvoicePdf(invoiceId, index)
+    appStore.showToast('删除成功', 'success')
+    const res = await getInvoice(invoiceId)
+    detail.value = res.data
+    loadList()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
+  }
+}
+
 watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
-onMounted(() => { loadList(); loadCustomers() })
+onMounted(() => {
+  loadList()
+  loadCustomers()
+  document.addEventListener('click', closeMenu)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMenu)
+})
 </script>
+
+<style scoped>
+.si-action-menu {
+  position: relative;
+  display: inline-block;
+}
+.si-action-trigger {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+  min-height: 28px;
+}
+.si-action-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--elevated);
+}
+.si-action-btn {
+  padding: 4px 12px;
+  min-height: 28px;
+  font-size: 12px;
+}
+</style>
+
+<style>
+/* Teleport 到 body 的下拉菜单，不能用 scoped */
+.si-action-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  min-width: 120px;
+  padding: 4px;
+}
+.si-action-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 6px;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.1s;
+}
+.si-action-item:hover {
+  background: var(--elevated);
+}
+.si-action-item.text-error {
+  color: var(--error-emphasis) !important;
+}
+.si-action-item.text-error:hover {
+  background: var(--error-subtle) !important;
+}
+</style>

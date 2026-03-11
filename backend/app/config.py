@@ -28,6 +28,10 @@ CONSIGNMENT_WAREHOUSE_NAME = "__寄售虚拟仓__"
 BACKUP_KEEP_DAYS = int(os.environ.get("BACKUP_KEEP_DAYS", "30"))
 BACKUP_HOUR = int(os.environ.get("BACKUP_HOUR", "3"))
 
+# 文件上传根目录
+UPLOAD_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(os.path.join(UPLOAD_ROOT, "invoices"), exist_ok=True)
+
 # 快递100配置
 KD100_KEY = os.environ.get("KD100_KEY", "")
 KD100_CUSTOMER = os.environ.get("KD100_CUSTOMER", "")

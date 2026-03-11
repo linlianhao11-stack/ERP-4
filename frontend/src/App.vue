@@ -105,9 +105,15 @@ const moreMenuItems = computed(() =>
   menuItems.filter(item => authStore.hasPermission(item.perm))
 )
 
+// 待办轮询定时器
+let todoPollTimer = null
+
 // 注册 API 全局错误处理（500+ 错误自动 toast）
 setApiErrorHandler((msg, type) => appStore.showToast(msg, type))
-setApiUnauthorizedHandler(() => authStore.logout())
+setApiUnauthorizedHandler(() => {
+  if (todoPollTimer) { clearInterval(todoPollTimer); todoPollTimer = null }
+  authStore.logout()
+})
 
 // 仅加载全局必需的轻量数据
 const loadEssentials = () => {
@@ -146,6 +152,15 @@ const loadForRoute = (routeName) => {
 router.afterEach((to, from) => {
   if (authStore.user && from.name === 'login') {
     loadEssentials()
+    // 登录后启动待办轮询（每 30 秒刷新一次 badge）
+    if (!todoPollTimer) {
+      todoPollTimer = setInterval(() => {
+        if (authStore.user) appStore.loadTodoCounts()
+      }, 30000)
+    }
+  }
+  if (authStore.user) {
+    appStore.loadTodoCounts()
   }
   loadForRoute(to.name)
 })

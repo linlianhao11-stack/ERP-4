@@ -65,24 +65,24 @@
               <label class="label">名称 *</label>
               <input v-model="customerForm.name" class="input" required>
             </div>
-            <div class="grid form-grid grid-cols-2 gap-3">
-              <div>
-                <label class="label">联系人</label>
-                <input v-model="customerForm.contact_person" class="input">
-              </div>
-              <div>
-                <label class="label">电话</label>
-                <input v-model="customerForm.phone" class="input">
-              </div>
-            </div>
             <div>
-              <label class="label">地址</label>
-              <input v-model="customerForm.address" class="input">
+              <label class="label">联系人</label>
+              <input v-model="customerForm.contact_person" class="input">
             </div>
-            <div class="text-xs font-semibold text-secondary mt-2 mb-1">开票信息</div>
+            <div class="text-xs font-semibold text-secondary mt-3 mb-1">开票信息</div>
             <div>
               <label class="label">纳税人识别号</label>
               <input v-model="customerForm.tax_id" class="input" placeholder="统一社会信用代码">
+            </div>
+            <div class="grid form-grid grid-cols-2 gap-3">
+              <div>
+                <label class="label">地址</label>
+                <input v-model="customerForm.address" class="input" placeholder="注册地址">
+              </div>
+              <div>
+                <label class="label">电话</label>
+                <input v-model="customerForm.phone" class="input" placeholder="固定电话">
+              </div>
             </div>
             <div class="grid form-grid grid-cols-2 gap-3">
               <div>
