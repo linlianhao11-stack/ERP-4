@@ -48,7 +48,7 @@
 | `backend/main.py` | 注册 AI 路由 + lifespan 管理 AI 连接池 |
 | `backend/app/config.py` | 添加 AI_DB_PASSWORD 配置 |
 | `backend/app/services/logistics_service.py` | KD100 配置迁移到 SystemSetting |
-| `backend/docker-compose.yml` | 添加 API_KEYS_ENCRYPTION_SECRET + AI_DB_PASSWORD |
+| `docker-compose.yml`（项目根目录） | 添加 API_KEYS_ENCRYPTION_SECRET + AI_DB_PASSWORD |
 
 ### Frontend — 新建文件
 
@@ -428,6 +428,9 @@ BLOCKED_STATEMENT_TYPES = (
     exp.Drop, exp.AlterTable, exp.Create,
 )
 
+# 额外的关键词级别拦截（处理 sqlglot 解析差异）
+BLOCKED_KEYWORDS = frozenset({"truncate", "grant", "revoke", "copy", "execute", "call"})
+
 MAX_LIMIT = 1000
 
 
@@ -441,6 +444,11 @@ def validate_sql(sql: str) -> tuple[bool, str, str]:
     """
     if not sql or not sql.strip():
         return False, "", "空 SQL"
+
+    # 关键词级拦截（在解析前处理 sqlglot 可能不识别的语句）
+    first_word = sql.strip().split()[0].lower() if sql.strip() else ""
+    if first_word in BLOCKED_KEYWORDS:
+        return False, "", f"禁止 {first_word.upper()} 语句"
 
     # 分号检测（多语句注入）
     stripped = sql.strip().rstrip(";")
@@ -1091,8 +1099,10 @@ async def call_deepseek(
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"},
     }
+    # response_format 仅 deepseek-chat (V3) 支持，deepseek-reasoner (R1) 不支持
+    if "reasoner" not in model:
+        payload["response_format"] = {"type": "json_object"}
 
     for attempt in range(2):  # 最多重试 1 次
         try:
@@ -1342,6 +1352,7 @@ Create `backend/app/services/ai_chat_service.py`:
 ```python
 """NL2SQL 主流程编排 — AI 聊天核心服务"""
 from __future__ import annotations
+import asyncio
 import json
 import uuid
 import asyncpg
@@ -1360,6 +1371,9 @@ logger = get_logger("ai.chat_service")
 # AI 专用连接池（与 Tortoise ORM 完全分离）
 _ai_pool: asyncpg.Pool | None = None
 _pool_dsn: str | None = None
+
+# 并发限制 — 防止同时向 DeepSeek API 发送过多请求
+_ai_semaphore = asyncio.Semaphore(5)
 
 # 配置缓存
 _config_cache: dict | None = None
@@ -1403,34 +1417,23 @@ async def _get_config() -> dict:
         return _config_cache
 
     config = {}
-    settings = await SystemSetting.filter(
-        key__startswith="ai."
-    ).all()
-    for s in settings:
-        config[s.key] = s.value
+    # 一次性批量查询所有 ai.* 配置
+    settings = await SystemSetting.filter(key__startswith="ai.").all()
+    settings_map = {s.key: s.value for s in settings}
 
-    # 也读取 api.kd100.* 但这里只管 ai.* 配置
-    api_key_setting = await SystemSetting.filter(key="ai.deepseek.api_key").first()
-    if api_key_setting and api_key_setting.value:
-        config["api_key"] = decrypt_value(api_key_setting.value)
-    else:
-        config["api_key"] = None
-
-    base_url_setting = await SystemSetting.filter(key="ai.deepseek.base_url").first()
-    config["base_url"] = (base_url_setting.value if base_url_setting and base_url_setting.value else DEFAULT_BASE_URL)
-
-    model_sql_setting = await SystemSetting.filter(key="ai.deepseek.model_sql").first()
-    config["model_sql"] = (model_sql_setting.value if model_sql_setting and model_sql_setting.value else DEFAULT_MODEL_SQL)
-
-    model_analysis_setting = await SystemSetting.filter(key="ai.deepseek.model_analysis").first()
-    config["model_analysis"] = (model_analysis_setting.value if model_analysis_setting and model_analysis_setting.value else DEFAULT_MODEL_ANALYSIS)
+    # DeepSeek 配置（从批量结果中提取）
+    raw_key = settings_map.get("ai.deepseek.api_key", "")
+    config["api_key"] = decrypt_value(raw_key) if raw_key else None
+    config["base_url"] = settings_map.get("ai.deepseek.base_url") or DEFAULT_BASE_URL
+    config["model_sql"] = settings_map.get("ai.deepseek.model_sql") or DEFAULT_MODEL_SQL
+    config["model_analysis"] = settings_map.get("ai.deepseek.model_analysis") or DEFAULT_MODEL_ANALYSIS
 
     # JSON 配置
     for json_key in ["ai.business_dict", "ai.few_shots", "ai.preset_queries"]:
-        setting = await SystemSetting.filter(key=json_key).first()
-        if setting and setting.value:
+        raw = settings_map.get(json_key)
+        if raw:
             try:
-                config[json_key] = json.loads(setting.value)
+                config[json_key] = json.loads(raw)
             except json.JSONDecodeError:
                 config[json_key] = None
         else:
@@ -1438,8 +1441,7 @@ async def _get_config() -> dict:
 
     # 自定义提示词
     for prompt_key in ["ai.prompt.system", "ai.prompt.analysis"]:
-        setting = await SystemSetting.filter(key=prompt_key).first()
-        config[prompt_key] = setting.value if setting and setting.value else None
+        config[prompt_key] = settings_map.get(prompt_key)
 
     _config_cache = config
     _config_cache_time = now
@@ -1474,6 +1476,18 @@ async def process_chat(
     """
     message_id = str(uuid.uuid4())
 
+    # 并发限制：防止同时过多 AI 请求耗尽 API 配额
+    async with _ai_semaphore:
+        return await _process_chat_inner(message, history, user_id, db_dsn, message_id)
+
+
+async def _process_chat_inner(
+    message: str,
+    history: list[dict],
+    user_id: int,
+    db_dsn: str,
+    message_id: str,
+) -> dict:
     try:
         config = await _get_config()
         api_key = config.get("api_key")
@@ -1717,11 +1731,10 @@ MANAGED_KEYS = {
     "ai.deepseek.model_analysis",
     "api.kd100.key",
     "api.kd100.customer",
-    "api.kd100.secret",
 }
 
 # 需要加密存储的 key
-ENCRYPTED_KEYS = {"ai.deepseek.api_key", "api.kd100.key", "api.kd100.secret"}
+ENCRYPTED_KEYS = {"ai.deepseek.api_key", "api.kd100.key"}
 
 
 @router.get("")
@@ -1909,12 +1922,12 @@ async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
         if len(h.get("content", "")) > 5000:
             h["content"] = h["content"][:5000]
 
-    # 限流检查
+    # 限流检查（spec 要求返回 HTTP 429）
     user_key = f"user:{user.id}"
     if not user_limiter.allow(user_key):
-        return {"type": "error", "message": "请求过于频繁，请稍后再试"}
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     if not global_limiter.allow("global"):
-        return {"type": "error", "message": "系统繁忙，请稍后再试"}
+        raise HTTPException(status_code=429, detail="系统繁忙，请稍后再试")
 
     # 清洗输入
     clean_msg = body.message.strip()
@@ -2228,7 +2241,9 @@ async def migrate_ai_readonly_user():
         import secrets
         password = os.environ.get("AI_DB_PASSWORD", "") or secrets.token_urlsafe(16)
         try:
-            await conn.execute_query(f"CREATE USER erp_ai_readonly WITH PASSWORD '{password}'")
+            # 使用 $$ 美元引用避免密码中特殊字符导致的 SQL 注入
+            safe_password = password.replace("$", "\\$")
+            await conn.execute_query(f"CREATE USER erp_ai_readonly WITH PASSWORD $${safe_password}$$")
             await conn.execute_query("GRANT CONNECT ON DATABASE erp TO erp_ai_readonly")
             await conn.execute_query("GRANT USAGE ON SCHEMA public TO erp_ai_readonly")
             await conn.execute_query("GRANT SELECT ON ALL TABLES IN SCHEMA public TO erp_ai_readonly")
@@ -2276,7 +2291,7 @@ git commit -m "feat(ai): 语义视图 DDL + AI 只读用户迁移"
 
 **Files:**
 - Modify: `backend/main.py`
-- Modify: `backend/docker-compose.yml`
+- Modify: `docker-compose.yml`（项目根目录）
 - Modify: `backend/app/services/logistics_service.py`
 
 - [ ] **Step 1: Update main.py — register AI routes + lifespan**
@@ -2313,7 +2328,7 @@ app.include_router(ai_chat.router)
 app.include_router(api_keys.router)
 ```
 
-- [ ] **Step 2: Update docker-compose.yml**
+- [ ] **Step 2: Update docker-compose.yml（项目根目录）**
 
 在 erp 服务的 environment 部分添加：
 
@@ -2364,7 +2379,7 @@ async def _get_kd100_config() -> tuple[str, str]:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add backend/main.py backend/docker-compose.yml backend/app/services/logistics_service.py
+git add backend/main.py docker-compose.yml backend/app/services/logistics_service.py
 git commit -m "feat(ai): main.py 集成 + Docker 环境变量 + KD100 配置迁移"
 ```
 
@@ -2465,7 +2480,7 @@ Create `frontend/src/components/business/settings/ApiKeysPanel.vue`:
         <!-- KD100 -->
         <div class="border-t pt-4 space-y-3">
           <h4 class="text-sm font-medium text-secondary">快递100</h4>
-          <div class="grid md:grid-cols-3 gap-3">
+          <div class="grid md:grid-cols-2 gap-3">
             <div>
               <label class="text-xs text-muted mb-1 block" for="kd-key">Key</label>
               <input id="kd-key" v-model="keys['api.kd100.key']" type="password" class="input text-sm" />
@@ -2473,10 +2488,6 @@ Create `frontend/src/components/business/settings/ApiKeysPanel.vue`:
             <div>
               <label class="text-xs text-muted mb-1 block" for="kd-customer">Customer</label>
               <input id="kd-customer" v-model="keys['api.kd100.customer']" class="input text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-muted mb-1 block" for="kd-secret">Secret</label>
-              <input id="kd-secret" v-model="keys['api.kd100.secret']" type="password" class="input text-sm" />
             </div>
           </div>
         </div>
@@ -2586,7 +2597,8 @@ Create `frontend/src/components/business/settings/ApiKeysPanel.vue`:
       <div v-if="sections.presets" class="mt-4">
         <div class="space-y-2">
           <div v-for="(item, idx) in (aiConfig['ai.preset_queries'] || [])" :key="idx" class="flex gap-2 items-start">
-            <input v-model="item.display" class="input text-sm w-48" placeholder="显示文字" />
+            <input v-model="item.display" class="input text-sm w-40" placeholder="显示文字" />
+            <input :value="(item.keywords || []).join(', ')" @change="item.keywords = $event.target.value.split(',').map(s => s.trim()).filter(Boolean)" class="input text-sm w-40" placeholder="关键词（逗号分隔）" />
             <input v-model="item.sql" class="input text-sm flex-1 font-mono" placeholder="预置 SQL" />
             <button class="btn btn-danger btn-sm" @click="removeItem('ai.preset_queries', idx)">
               <Trash2 :size="14" />
@@ -2722,10 +2734,11 @@ git commit -m "feat(ai): API 密钥 + AI 配置管理面板"
 import ApiKeysPanel from '../components/business/settings/ApiKeysPanel.vue'
 ```
 
-2. 在 tab 导航区域（现有 `<span>` 标签后）添加新 tab：
+2. 将现有的 `<span @click>` 标签**全部改为 `<button>`**（修复 CLAUDE.md 反模式），并在末尾添加新 AI tab：
 ```html
-<button v-if="authStore.user?.role === 'admin'" @click="settingsTab = 'ai'" :class="['tab', settingsTab === 'ai' ? 'active' : '']">AI 助手配置</button>
+<button v-if="hasPermission('admin')" @click="settingsTab = 'ai'" :class="['tab', settingsTab === 'ai' ? 'active' : '']">AI 助手配置</button>
 ```
+注意使用 `hasPermission('admin')` 而非 `authStore.user?.role`（与现有模式一致）。
 
 3. 在 `<Transition>` 的内容区域添加新面板：
 ```html
@@ -2977,12 +2990,18 @@ const formatCell = (val) => {
 const renderMarkdown = (text) => {
   if (!text) return ''
   // 轻量 Markdown：加粗、列表、换行（防 XSS）
-  return text
+  let html = text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
     .replace(/\n/g, '<br>')
+  // 处理列表项：连续的 "- xxx<br>" 行合并为 <ul>
+  html = html.replace(/(?:^|<br>)((?:- .+?(?:<br>|$))+)/g, (_, block) => {
+    const items = block.replace(/<br>$/g, '').split('<br>').map(
+      line => '<li>' + line.replace(/^- /, '') + '</li>'
+    ).join('')
+    return '<ul>' + items + '</ul>'
+  })
+  return html
 }
 
 const copyTable = () => {
@@ -3115,7 +3134,7 @@ Create `frontend/src/components/business/AiChatbot.vue`:
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { Sparkles, X, RotateCcw, Send } from 'lucide-vue-next'
 import AiMessage from './AiMessage.vue'
 import { aiChat, aiExport, aiFeedback, getAiStatus, getAiConfig } from '../../api/ai'
@@ -3131,7 +3150,15 @@ const messages = ref([])
 const presetQueries = ref([])
 const messagesRef = ref(null)
 const inputRef = ref(null)
-const isMobile = computed(() => window.innerWidth < 768)
+// 使用 matchMedia 实现真正的响应式
+const isMobile = ref(false)
+const mql = window.matchMedia('(max-width: 767px)')
+const updateMobile = (e) => { isMobile.value = e.matches }
+onMounted(() => {
+  isMobile.value = mql.matches
+  mql.addEventListener('change', updateMobile)
+})
+onUnmounted(() => mql.removeEventListener('change', updateMobile))
 
 const checkStatus = async () => {
   try {
@@ -3374,10 +3401,11 @@ onMounted(checkStatus)
 import AiChatbot from './components/business/AiChatbot.vue'
 ```
 
-2. 在模板的 `</div>` 闭合标签（app-layout 的末尾）之前添加：
+2. 在 `app-layout` div 内部的末尾（`<BottomNav>` 之后、`</div>` 之前）添加：
 ```html
-<AiChatbot v-if="ready" />
+<AiChatbot />
 ```
+注意：`app-layout` 已被 `v-if="authStore.user"` 保护，所以 chatbot 只在登录后渲染，无需额外 `v-if`。
 
 - [ ] **Step 3: Build 验证**
 
