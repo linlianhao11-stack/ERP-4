@@ -28,6 +28,11 @@ _config_cache: dict | None = None
 _config_cache_time: float = 0
 CONFIG_CACHE_TTL = 300  # 5 分钟
 
+# 查询结果缓存 — 相同问题短时间内不重复调用 API
+_query_cache: dict[str, tuple[float, dict]] = {}
+QUERY_CACHE_TTL = 300  # 5 分钟
+QUERY_CACHE_MAX = 50   # 最多缓存 50 条
+
 
 async def get_ai_pool(dsn: str) -> asyncpg.Pool:
     """获取或创建 AI 专用连接池"""
@@ -136,11 +141,42 @@ async def process_chat(
 
     返回 ChatResponse 格式的 dict。
     """
+    import time as _time
+
+    # 查询缓存：相同问题 5 分钟内直接返回
+    cache_key = message.strip().lower()
+    now = _time.time()
+    cached = _query_cache.get(cache_key)
+    if cached:
+        cached_time, cached_result = cached
+        if now - cached_time < QUERY_CACHE_TTL:
+            logger.info(f"命中查询缓存: {message[:30]}")
+            # 返回缓存副本（使用新 message_id）
+            result = {**cached_result, "message_id": str(uuid.uuid4())}
+            return result
+        else:
+            del _query_cache[cache_key]
+
     message_id = str(uuid.uuid4())
 
     # 并发限制：防止同时过多 AI 请求耗尽 API 配额
     async with _ai_semaphore:
-        return await _process_chat_inner(message, history, user_id, db_dsn, message_id)
+        result = await _process_chat_inner(message, history, user_id, db_dsn, message_id)
+
+    # 缓存成功的查询结果
+    if result.get("type") in ("answer", "clarification"):
+        # 淘汰过期缓存
+        if len(_query_cache) >= QUERY_CACHE_MAX:
+            expired = [k for k, (t, _) in _query_cache.items() if now - t >= QUERY_CACHE_TTL]
+            for k in expired:
+                del _query_cache[k]
+            # 还是满了就清掉最旧的
+            if len(_query_cache) >= QUERY_CACHE_MAX:
+                oldest_key = min(_query_cache, key=lambda k: _query_cache[k][0])
+                del _query_cache[oldest_key]
+        _query_cache[cache_key] = (now, result)
+
+    return result
 
 
 async def _process_chat_inner(
