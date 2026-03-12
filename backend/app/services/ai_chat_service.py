@@ -317,10 +317,22 @@ async def _execute_and_analyze(
     for r in rows:
         row_data.append([_serialize_value(r[c]) for c in columns])
 
-    # 限制传给分析模型的数据量（最多 100 行）
-    analysis_rows = row_data[:100]
+    # 小数据集（≤10 行）：本地生成摘要，跳过分析 API 调用（省 15-20s）
+    if len(rows) <= 10:
+        analysis_text = _build_local_summary(columns, row_data, message)
+        logger.info(f"本地摘要（{len(rows)} 行），跳过分析 API，总耗时: {_time.monotonic() - _t0:.1f}s")
+        return {
+            "type": "answer",
+            "message_id": message_id,
+            "analysis": analysis_text,
+            "table_data": {"columns": columns, "rows": row_data},
+            "chart_config": None,
+            "sql": sql,
+            "row_count": len(rows),
+        }
 
-    # 调用分析模型
+    # 大数据集：调用分析模型（限制 max_tokens 加速）
+    analysis_rows = row_data[:100]
     analysis_prompt = build_analysis_prompt(config.get("ai.prompt.analysis"))
     data_summary = f"用户问题: {message}\n\nSQL: {sql}\n\n查询结果 ({len(rows)} 行):\n列: {columns}\n数据（前 {len(analysis_rows)} 行）:\n"
     for row in analysis_rows[:20]:  # prompt 中只放 20 行
@@ -336,6 +348,7 @@ async def _execute_and_analyze(
         base_url=config.get("base_url", DEFAULT_BASE_URL),
         model=config.get("model_analysis", DEFAULT_MODEL_ANALYSIS),
         temperature=0.7,
+        max_tokens=1024,
     )
     _t3 = _time.monotonic()
     logger.info(f"数据分析耗时: {_t3 - _t2:.1f}s, 总耗时: {_t3 - _t0:.1f}s")
@@ -355,6 +368,33 @@ async def _execute_and_analyze(
         "sql": sql,
         "row_count": len(rows),
     }
+
+
+def _build_local_summary(columns: list[str], row_data: list[list], question: str) -> str:
+    """为小数据集生成本地摘要，避免调用分析 API"""
+    n = len(row_data)
+
+    # 识别金额列并汇总
+    amount_keywords = {"amount", "total_amount", "profit", "total_profit", "cost", "total_cost",
+                       "stock_value", "unreceived_amount", "unpaid_amount", "received_amount", "paid_amount"}
+    summaries = []
+    col_lower = [c.lower() for c in columns]
+    for i, col in enumerate(columns):
+        if col.lower() in amount_keywords:
+            vals = [r[i] for r in row_data if isinstance(r[i], (int, float))]
+            if vals:
+                total = sum(vals)
+                label = col.replace("_", " ").replace("total ", "")
+                if total >= 10000:
+                    summaries.append(f"**{label}** 合计 {total / 10000:.2f} 万")
+                else:
+                    summaries.append(f"**{label}** 合计 {total:,.2f}")
+
+    parts = [f"查询到 **{n}** 条记录。"]
+    if summaries:
+        parts.append("、".join(summaries) + "。")
+    parts.append("详细数据见下方表格。")
+    return "".join(parts)
 
 
 def _serialize_value(val) -> str | int | float | None:
