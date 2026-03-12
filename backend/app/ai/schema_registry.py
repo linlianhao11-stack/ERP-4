@@ -122,6 +122,62 @@ VIEW_SCHEMAS = {
     },
 }
 
+# 基础参考表 schema — 用于查询仓库/客户/供应商/产品等基础信息
+REFERENCE_TABLE_SCHEMAS = {
+    "warehouses": {
+        "description": "仓库列表",
+        "columns": [
+            ("id", "INT", "仓库ID"),
+            ("name", "VARCHAR", "仓库名称"),
+            ("is_default", "BOOL", "是否默认仓库"),
+            ("is_virtual", "BOOL", "是否虚拟仓库（虚拟仓库不算实际仓库）"),
+            ("is_active", "BOOL", "是否启用"),
+        ],
+    },
+    "products": {
+        "description": "产品目录",
+        "columns": [
+            ("id", "INT", "产品ID"),
+            ("sku", "VARCHAR", "产品SKU"),
+            ("name", "VARCHAR", "产品名称"),
+            ("brand", "VARCHAR", "品牌"),
+            ("category", "VARCHAR", "分类"),
+            ("retail_price", "DECIMAL", "零售价"),
+            ("cost_price", "DECIMAL", "成本价"),
+            ("unit", "VARCHAR", "单位"),
+            ("is_active", "BOOL", "是否启用"),
+        ],
+    },
+    "customers": {
+        "description": "客户列表",
+        "columns": [
+            ("id", "INT", "客户ID"),
+            ("name", "VARCHAR", "客户名称"),
+            ("contact", "VARCHAR", "联系人"),
+            ("phone", "VARCHAR", "电话"),
+            ("is_active", "BOOL", "是否启用"),
+        ],
+    },
+    "suppliers": {
+        "description": "供应商列表",
+        "columns": [
+            ("id", "INT", "供应商ID"),
+            ("name", "VARCHAR", "供应商名称"),
+            ("contact", "VARCHAR", "联系人"),
+            ("phone", "VARCHAR", "电话"),
+            ("is_active", "BOOL", "是否启用"),
+        ],
+    },
+    "account_sets": {
+        "description": "账套列表",
+        "columns": [
+            ("id", "INT", "账套ID"),
+            ("name", "VARCHAR", "账套名称"),
+            ("is_active", "BOOL", "是否启用"),
+        ],
+    },
+}
+
 _cached_schema: str | None = None
 
 
@@ -130,6 +186,12 @@ def get_view_schema_text() -> str:
     lines = ["## 数据视图（优先使用这些视图查询）\n"]
     for view_name, info in VIEW_SCHEMAS.items():
         lines.append(f"### {view_name} — {info['description']}")
+        for col_name, col_type, comment in info["columns"]:
+            lines.append(f"  - {col_name} ({col_type}): {comment}")
+        lines.append("")
+    lines.append("## 基础参考表（查询仓库/产品/客户/供应商等基础信息）\n")
+    for table_name, info in REFERENCE_TABLE_SCHEMAS.items():
+        lines.append(f"### {table_name} — {info['description']}")
         for col_name, col_type, comment in info["columns"]:
             lines.append(f"  - {col_name} ({col_type}): {comment}")
         lines.append("")

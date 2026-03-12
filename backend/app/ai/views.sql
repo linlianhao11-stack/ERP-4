@@ -163,7 +163,7 @@ FROM payable_bills pb
 LEFT JOIN suppliers sup ON sup.id = pb.supplier_id
 LEFT JOIN account_sets ast ON ast.id = pb.account_set_id;
 
--- 授权只读用户
+-- 授权只读用户 — 语义视图
 GRANT SELECT ON vw_sales_detail TO erp_ai_readonly;
 GRANT SELECT ON vw_sales_summary TO erp_ai_readonly;
 GRANT SELECT ON vw_purchase_detail TO erp_ai_readonly;
@@ -171,3 +171,10 @@ GRANT SELECT ON vw_inventory_status TO erp_ai_readonly;
 GRANT SELECT ON vw_inventory_turnover TO erp_ai_readonly;
 GRANT SELECT ON vw_receivables TO erp_ai_readonly;
 GRANT SELECT ON vw_payables TO erp_ai_readonly;
+
+-- 授权只读用户 — 基础参考表
+GRANT SELECT ON warehouses TO erp_ai_readonly;
+GRANT SELECT ON products TO erp_ai_readonly;
+GRANT SELECT ON customers TO erp_ai_readonly;
+GRANT SELECT ON suppliers TO erp_ai_readonly;
+GRANT SELECT ON account_sets TO erp_ai_readonly;
