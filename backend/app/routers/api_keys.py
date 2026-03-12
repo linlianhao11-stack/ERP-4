@@ -6,6 +6,10 @@ from app.auth.dependencies import require_permission
 from app.models import User, SystemSetting
 from app.ai.encryption import encrypt_value, decrypt_value, mask_key
 from app.ai.deepseek_client import test_connection
+from app.ai.business_dict import DEFAULT_BUSINESS_DICT
+from app.ai.few_shots import DEFAULT_FEW_SHOTS
+from app.ai.preset_queries import DEFAULT_PRESET_QUERIES
+from app.ai.prompt_builder import DEFAULT_SQL_SYSTEM_PROMPT, DEFAULT_ANALYSIS_SYSTEM_PROMPT
 from app.services.ai_chat_service import invalidate_config_cache
 from app.logger import get_logger
 
@@ -93,9 +97,18 @@ async def test_deepseek_connection(user: User = Depends(require_permission("admi
 
 # ===== AI 配置管理 =====
 
+_CONFIG_DEFAULTS = {
+    "ai.prompt.system": DEFAULT_SQL_SYSTEM_PROMPT,
+    "ai.prompt.analysis": DEFAULT_ANALYSIS_SYSTEM_PROMPT,
+    "ai.business_dict": DEFAULT_BUSINESS_DICT,
+    "ai.few_shots": DEFAULT_FEW_SHOTS,
+    "ai.preset_queries": DEFAULT_PRESET_QUERIES,
+}
+
+
 @router.get("/ai-config")
 async def get_ai_config(user: User = Depends(require_permission("admin"))):
-    """获取 AI 配置（提示词、词典、示例、快捷问题）"""
+    """获取 AI 配置（提示词、词典、示例、快捷问题）— 数据库无值时返回代码默认值"""
     result = {}
     for key in ["ai.prompt.system", "ai.prompt.analysis", "ai.business_dict", "ai.few_shots", "ai.preset_queries"]:
         setting = await SystemSetting.filter(key=key).first()
@@ -104,11 +117,11 @@ async def get_ai_config(user: User = Depends(require_permission("admin"))):
                 try:
                     result[key] = json.loads(setting.value)
                 except json.JSONDecodeError:
-                    result[key] = None
+                    result[key] = _CONFIG_DEFAULTS.get(key)
             else:
                 result[key] = setting.value
         else:
-            result[key] = None
+            result[key] = _CONFIG_DEFAULTS.get(key)
     return result
 
 

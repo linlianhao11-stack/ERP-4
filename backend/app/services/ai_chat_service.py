@@ -14,6 +14,8 @@ from app.ai.deepseek_client import (
     call_deepseek, DEFAULT_BASE_URL, DEFAULT_MODEL_SQL, DEFAULT_MODEL_ANALYSIS,
 )
 from app.ai.preset_queries import DEFAULT_PRESET_QUERIES
+from app.ai.business_dict import DEFAULT_BUSINESS_DICT
+from app.ai.few_shots import DEFAULT_FEW_SHOTS
 
 logger = get_logger("ai.chat_service")
 
@@ -83,16 +85,22 @@ async def _get_config() -> dict:
     config["model_sql"] = settings_map.get("ai.deepseek.model_sql") or DEFAULT_MODEL_SQL
     config["model_analysis"] = settings_map.get("ai.deepseek.model_analysis") or DEFAULT_MODEL_ANALYSIS
 
-    # JSON 配置
-    for json_key in ["ai.business_dict", "ai.few_shots", "ai.preset_queries"]:
+    # JSON 配置 — 数据库无值时使用代码默认值
+    _json_defaults = {
+        "ai.business_dict": DEFAULT_BUSINESS_DICT,
+        "ai.few_shots": DEFAULT_FEW_SHOTS,
+        "ai.preset_queries": DEFAULT_PRESET_QUERIES,
+    }
+    for json_key in _json_defaults:
         raw = settings_map.get(json_key)
         if raw:
             try:
-                config[json_key] = json.loads(raw)
+                parsed = json.loads(raw)
+                config[json_key] = parsed if parsed else _json_defaults[json_key]
             except json.JSONDecodeError:
-                config[json_key] = None
+                config[json_key] = _json_defaults[json_key]
         else:
-            config[json_key] = None
+            config[json_key] = _json_defaults[json_key]
 
     # 自定义提示词
     for prompt_key in ["ai.prompt.system", "ai.prompt.analysis"]:
