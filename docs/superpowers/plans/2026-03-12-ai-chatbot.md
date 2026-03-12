@@ -2096,7 +2096,7 @@ JOIN products p ON p.id = oi.product_id
 LEFT JOIN customers c ON c.id = o.customer_id
 LEFT JOIN salespersons s ON s.id = o.salesperson_id
 LEFT JOIN account_sets ast ON ast.id = o.account_set_id
-WHERE o.status != 'cancelled'
+WHERE o.shipping_status != 'cancelled'
   AND o.order_type != 'return';
 
 -- 2. 销售按月汇总
@@ -2119,7 +2119,7 @@ SELECT
 FROM orders o
 JOIN order_items oi ON oi.order_id = o.id
 LEFT JOIN account_sets ast ON ast.id = o.account_set_id
-WHERE o.status != 'cancelled'
+WHERE o.shipping_status != 'cancelled'
   AND o.order_type != 'return'
 GROUP BY TO_CHAR(o.created_at, 'YYYY-MM'), ast.name;
 
@@ -2184,7 +2184,7 @@ LEFT JOIN (
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     WHERE o.created_at >= CURRENT_DATE - INTERVAL '30 days'
-      AND o.status != 'cancelled' AND o.order_type != 'return'
+      AND o.shipping_status != 'cancelled' AND o.order_type != 'return'
     GROUP BY oi.product_id
 ) sold_30 ON sold_30.product_id = p.id
 LEFT JOIN (
@@ -2192,7 +2192,7 @@ LEFT JOIN (
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
     WHERE o.created_at >= CURRENT_DATE - INTERVAL '90 days'
-      AND o.status != 'cancelled' AND o.order_type != 'return'
+      AND o.shipping_status != 'cancelled' AND o.order_type != 'return'
     GROUP BY oi.product_id
 ) sold_90 ON sold_90.product_id = p.id
 GROUP BY p.id, p.sku, p.name, p.brand, sold_30.qty, sold_90.qty;
