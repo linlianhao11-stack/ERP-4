@@ -175,7 +175,14 @@ backend/app/
 
 配置读取带 **5 分钟内存缓存**，变更后自动刷新，无需重启服务。
 
-环境变量只需一个：`API_KEYS_ENCRYPTION_SECRET`（AES 加密密钥）。在 `docker-compose.yml` 中使用 `${API_KEYS_ENCRYPTION_SECRET:?请设置 API 密钥加密密钥}` 语法，未设置时容器拒绝启动。
+新增环境变量：
+
+| 变量名 | 用途 | 必需 |
+|--------|------|------|
+| `API_KEYS_ENCRYPTION_SECRET` | AES 加密 API Key | 是，未设置容器拒绝启动 |
+| `AI_DB_PASSWORD` | AI 只读数据库用户密码 | 否，未设置时自动生成并记录到日志 |
+
+在 `docker-compose.yml` 中使用 `${API_KEYS_ENCRYPTION_SECRET:?请设置 API 密钥加密密钥}` 语法。
 
 ### 5.2.1 KD100 配置迁移
 
@@ -377,7 +384,7 @@ ALTER USER erp_ai_readonly CONNECTION LIMIT 5;
 }
 ```
 
-响应（错误）：
+响应（错误，无 `message_id`）：
 ```json
 {
   "type": "error",
