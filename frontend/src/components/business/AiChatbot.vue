@@ -115,6 +115,23 @@ const buildHistory = () => {
     }))
 }
 
+// 非数据问题本地快速回复，避免调用慢速 R1 模型
+const LOCAL_REPLIES = [
+  { patterns: ['你是谁', '你是什么', '介绍一下你', '你叫什么'], reply: '我是 AI 数据助手，专门帮你查询和分析业务数据（销售、采购、库存、应收应付等）。试试问我"本月销售概况"或"哪些产品快缺货了"吧！' },
+  { patterns: ['你好', '嗨', 'hi', 'hello', '在吗'], reply: '你好！我是 AI 数据助手。你可以问我业务数据相关的问题，比如销售、采购、库存、应收应付等。' },
+  { patterns: ['谢谢', '感谢', 'thanks'], reply: '不客气！有其他数据需要查询随时问我。' },
+  { patterns: ['能做什么', '怎么用', '有什么功能', '帮助'], reply: '我可以帮你查询和分析：\n- **销售数据**：销售额、毛利、客户分析、产品排名\n- **采购数据**：采购金额、供应商分析\n- **库存数据**：库存状态、缺货预警、周转率\n- **应收应付**：欠款汇总、账龄分析\n\n直接用自然语言提问即可，比如"本月毛利多少"、"哪些客户欠款最多"。' },
+  { patterns: ['聊天', '闲聊', '除了工作', '别的事', '聊点别的', '讲个笑话', '天气', '今天心情'], reply: '不好意思，我是专门的业务数据助手，只能帮你查询和分析 ERP 系统中的数据哦。试试问我一些业务问题吧，比如"本月毛利多少"、"哪些客户欠款最多"。' },
+]
+
+const tryLocalReply = (msg) => {
+  const lower = msg.toLowerCase()
+  for (const item of LOCAL_REPLIES) {
+    if (item.patterns.some(p => lower.includes(p))) return item.reply
+  }
+  return null
+}
+
 const sendMessage = async (text) => {
   if (!text || !text.trim() || loading.value) return
   const msg = text.trim()
@@ -122,8 +139,17 @@ const sendMessage = async (text) => {
   autoResize()
 
   messages.value.push({ role: 'user', content: msg })
-  const aiMsg = { role: 'assistant', loading: true }
-  messages.value.push(aiMsg)
+
+  // 非数据问题本地秒回
+  const localReply = tryLocalReply(msg)
+  if (localReply) {
+    messages.value.push({ role: 'assistant', type: 'clarification', message: localReply, options: [] })
+    scrollToBottom()
+    return
+  }
+
+  messages.value.push({ role: 'assistant', loading: true })
+  const aiMsgIndex = messages.value.length - 1
   scrollToBottom()
 
   loading.value = true
@@ -132,13 +158,15 @@ const sendMessage = async (text) => {
       message: msg,
       history: buildHistory().slice(0, -2), // 排除当前这轮
     })
-    Object.assign(aiMsg, data, { loading: false, role: 'assistant', _question: msg })
+    messages.value[aiMsgIndex] = { ...data, loading: false, role: 'assistant', _question: msg }
   } catch (e) {
-    Object.assign(aiMsg, {
+    const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
+    messages.value[aiMsgIndex] = {
       loading: false,
+      role: 'assistant',
       type: 'error',
-      message: e.response?.data?.message || '请求失败，请检查网络连接',
-    })
+      message: isTimeout ? 'AI 思考超时了，请简化问题后重试' : (e.response?.data?.message || '请求失败，请检查网络连接'),
+    }
   } finally {
     loading.value = false
     scrollToBottom()

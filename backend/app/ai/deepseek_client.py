@@ -99,17 +99,32 @@ async def call_deepseek(
 async def test_connection(api_key: str, base_url: str = DEFAULT_BASE_URL) -> tuple[bool, str]:
     """测试 DeepSeek 连接。返回 (success, message)"""
     try:
-        result = await call_deepseek(
-            messages=[{"role": "user", "content": "回复 ok"}],
-            api_key=api_key,
-            base_url=base_url,
-            model=DEFAULT_MODEL_ANALYSIS,
-            temperature=0.0,
-            max_tokens=10,
-        )
-        if result is not None:
+        client = _get_client()
+        url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": DEFAULT_MODEL_ANALYSIS,
+            "messages": [{"role": "user", "content": "回复 ok"}],
+            "temperature": 0.0,
+            "max_tokens": 10,
+        }
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code == 200:
             return True, "连接成功"
-        return False, "API 返回异常"
+        elif resp.status_code == 401:
+            return False, "API Key 无效或已过期"
+        elif resp.status_code == 402:
+            return False, "API 账户余额不足"
+        elif resp.status_code == 429:
+            return False, "请求过于频繁，请稍后再试"
+        else:
+            body = resp.text[:200]
+            return False, f"API 返回 {resp.status_code}: {body}"
+    except httpx.TimeoutException:
+        return False, "连接超时，请检查 Base URL 是否正确"
     except Exception as e:
         return False, f"连接失败: {type(e).__name__}"
 

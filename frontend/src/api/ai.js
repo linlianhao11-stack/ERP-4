@@ -1,7 +1,7 @@
 import api from './index'
 
 // AI 聊天
-export const aiChat = (data) => api.post('/ai/chat', data, { timeout: 90000 })
+export const aiChat = (data) => api.post('/ai/chat', data, { timeout: 180000 })
 
 // AI 状态检查
 export const getAiStatus = () => api.get('/ai/status')

@@ -159,7 +159,6 @@ async def _process_chat_inner(
         # 1. 意图预分类 — 命中预置模板则校验后执行
         preset = classify_intent(message, config.get("ai.preset_queries"))
         if preset and preset.get("sql"):
-            from app.ai.sql_validator import validate_sql
             ok, _, reason = validate_sql(preset["sql"])
             if not ok:
                 logger.warning(f"预设 SQL 校验失败: {reason} — {preset['sql'][:100]}")
@@ -213,7 +212,7 @@ async def _process_chat_inner(
             }
 
         if resp_type != "sql" or not r1_result.get("sql"):
-            return {"type": "error", "message": "AI 无法理解这个查询，请换个说法试试"}
+            return {"type": "clarification", "message_id": message_id, "message": "我是业务数据查询助手，只能帮你查询 ERP 系统中的销售、采购、库存、应收应付等数据。请试试问我具体的业务问题吧！", "options": ["本月销售概况", "库存状态", "应收账款汇总"]}
 
         sql = r1_result["sql"]
 
