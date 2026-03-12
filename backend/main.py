@@ -28,6 +28,7 @@ from app.routers import (
     sales_delivery, purchase_receipt, invoices,
     period_end, financial_reports,
     purchase_returns,
+    ai_chat, api_keys,
 )
 
 
@@ -44,6 +45,14 @@ async def lifespan(app: FastAPI):
     try:
         await backup_task
     except asyncio.CancelledError:
+        pass
+    # 关闭 AI 资源
+    try:
+        from app.services.ai_chat_service import close_ai_pool
+        from app.ai.deepseek_client import close_client
+        await close_ai_pool()
+        await close_client()
+    except Exception:
         pass
     await close_db()
 
@@ -135,6 +144,8 @@ app.include_router(invoices.router)
 app.include_router(period_end.router)
 app.include_router(financial_reports.router)
 app.include_router(purchase_returns.router)
+app.include_router(ai_chat.router)
+app.include_router(api_keys.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")

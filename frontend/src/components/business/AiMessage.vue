@@ -1,0 +1,177 @@
+<template>
+  <div class="ai-msg" :class="msg.role">
+    <!-- 用户消息 -->
+    <div v-if="msg.role === 'user'" class="ai-msg-user">
+      {{ msg.content }}
+    </div>
+
+    <!-- AI 消息 -->
+    <div v-else class="ai-msg-ai">
+      <!-- 加载中 -->
+      <div v-if="msg.loading" class="flex items-center gap-2 text-muted text-sm">
+        <div class="ai-typing">
+          <span /><span /><span />
+        </div>
+        思考中...
+      </div>
+
+      <!-- 澄清 -->
+      <template v-else-if="msg.type === 'clarification'">
+        <p class="text-sm mb-2">{{ msg.message }}</p>
+        <div class="flex flex-wrap gap-2">
+          <button v-for="opt in (msg.options || [])" :key="opt" class="btn btn-secondary btn-sm text-xs" @click="$emit('select-option', opt)">
+            {{ opt }}
+          </button>
+        </div>
+      </template>
+
+      <!-- 错误 -->
+      <template v-else-if="msg.type === 'error'">
+        <p class="text-sm text-error">{{ msg.message }}</p>
+      </template>
+
+      <!-- 正常回答 -->
+      <template v-else-if="msg.type === 'answer'">
+        <!-- 文字分析 -->
+        <div v-if="msg.analysis" class="ai-analysis text-sm" v-html="renderMarkdown(msg.analysis)" />
+
+        <!-- 数据表格 -->
+        <div v-if="msg.table_data" class="mt-3 border rounded-lg overflow-hidden">
+          <div class="overflow-x-auto max-h-[300px]">
+            <table class="w-full text-sm">
+              <thead class="bg-elevated sticky top-0">
+                <tr>
+                  <th v-for="col in msg.table_data.columns" :key="col" class="px-3 py-2 text-left text-xs font-medium text-muted whitespace-nowrap">
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in msg.table_data.rows" :key="ri" class="border-t">
+                  <td v-for="(cell, ci) in row" :key="ci" class="px-3 py-1.5 whitespace-nowrap" :class="isNumber(cell) ? 'tabular-nums font-mono text-right' : ''">
+                    {{ formatCell(cell) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-3 py-1.5 text-xs text-muted border-t bg-elevated">
+            共 {{ msg.row_count }} 行
+          </div>
+        </div>
+
+        <!-- 图表 -->
+        <AiChartRenderer v-if="msg.chart_config" :config="msg.chart_config" class="mt-3" />
+
+        <!-- SQL 折叠 -->
+        <details v-if="msg.sql" class="mt-3">
+          <summary class="text-xs text-muted cursor-pointer">查看 SQL</summary>
+          <pre class="mt-1 p-2 bg-elevated rounded text-xs font-mono overflow-x-auto">{{ msg.sql }}</pre>
+        </details>
+
+        <!-- 操作栏 -->
+        <div class="flex items-center gap-3 mt-3 pt-2 border-t">
+          <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="copyTable" title="复制表格">
+            <Copy :size="14" />
+          </button>
+          <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="$emit('export', msg)" title="导出 Excel">
+            <Download :size="14" />
+          </button>
+          <div class="flex-1" />
+          <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'positive' ? 'bg-success-subtle text-success-emphasis' : 'text-muted hover:text-success'" @click="$emit('feedback', msg, 'positive')">
+            <ThumbsUp :size="14" />
+          </button>
+          <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'negative' ? 'bg-error-subtle text-error-emphasis' : 'text-muted hover:text-error'" @click="$emit('feedback', msg, 'negative')">
+            <ThumbsDown :size="14" />
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { Copy, Download, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import AiChartRenderer from './AiChartRenderer.vue'
+import { useAppStore } from '../../stores/app'
+
+const appStore = useAppStore()
+
+const props = defineProps({
+  msg: { type: Object, required: true },
+})
+
+defineEmits(['select-option', 'export', 'feedback'])
+
+const isNumber = (val) => typeof val === 'number'
+
+const formatCell = (val) => {
+  if (val === null || val === undefined) return '-'
+  if (typeof val === 'number') {
+    return Number.isInteger(val) ? val.toLocaleString() : val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+  return String(val)
+}
+
+const renderMarkdown = (text) => {
+  if (!text) return ''
+  // 轻量 Markdown：加粗、列表、换行（防 XSS）
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+  // 处理列表项：连续的 "- xxx<br>" 行合并为 <ul>
+  html = html.replace(/(?:^|<br>)((?:- .+?(?:<br>|$))+)/g, (_, block) => {
+    const items = block.replace(/<br>$/g, '').split('<br>').map(
+      line => '<li>' + line.replace(/^- /, '') + '</li>'
+    ).join('')
+    return '<ul>' + items + '</ul>'
+  })
+  return html
+}
+
+const copyTable = async () => {
+  if (!props.msg.table_data) return
+  const { columns, rows } = props.msg.table_data
+  const tsv = [columns.join('\t'), ...rows.map(r => r.map(c => c ?? '').join('\t'))].join('\n')
+  try {
+    await navigator.clipboard.writeText(tsv)
+    appStore.showToast('已复制到剪贴板')
+  } catch {
+    appStore.showToast('复制失败', 'error')
+  }
+}
+</script>
+
+<style scoped>
+.ai-msg-user {
+  background: var(--primary-muted);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 12px 12px 4px 12px;
+  max-width: 85%;
+  margin-left: auto;
+  font-size: 14px;
+}
+.ai-msg-ai {
+  background: var(--elevated);
+  padding: 10px 14px;
+  border-radius: 4px 12px 12px 12px;
+  max-width: 95%;
+  font-size: 14px;
+}
+.ai-typing span {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typing 1.2s infinite;
+  margin-right: 3px;
+}
+.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+</style>
