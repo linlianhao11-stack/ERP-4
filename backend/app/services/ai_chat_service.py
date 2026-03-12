@@ -13,6 +13,7 @@ from app.ai.prompt_builder import build_sql_prompt, build_analysis_prompt
 from app.ai.deepseek_client import (
     call_deepseek, DEFAULT_BASE_URL, DEFAULT_MODEL_SQL, DEFAULT_MODEL_ANALYSIS,
 )
+from app.ai.preset_queries import DEFAULT_PRESET_QUERIES
 
 logger = get_logger("ai.chat_service")
 
@@ -124,10 +125,10 @@ async def get_preset_queries() -> list[dict]:
     """获取预设快捷问题列表（仅 display 字段，不暴露 sql/keywords）"""
     try:
         config = await _get_config()
-        raw = config.get("ai.preset_queries") or []
+        raw = config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES
         return [{"display": q["display"]} for q in raw if q.get("display")]
     except Exception:
-        return []
+        return [{"display": q["display"]} for q in DEFAULT_PRESET_QUERIES if q.get("display")]
 
 
 async def process_chat(
@@ -196,7 +197,7 @@ async def _process_chat_inner(
             return {"type": "error", "message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key"}
 
         # 1. 意图预分类 — 命中预置模板则校验后执行
-        preset = classify_intent(message, config.get("ai.preset_queries"))
+        preset = classify_intent(message, config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES)
         if preset and preset.get("sql"):
             ok, _, reason = validate_sql(preset["sql"])
             if not ok:
