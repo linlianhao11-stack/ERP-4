@@ -1,0 +1,152 @@
+"""AI 聊天路由 — 聊天 / 导出 / 反馈 / 状态"""
+from __future__ import annotations
+import io
+import json
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from app.auth.dependencies import get_current_user
+from app.models import User, SystemSetting
+from app.schemas.ai import ChatRequest, FeedbackRequest, ExportRequest
+from app.services.ai_chat_service import process_chat, check_ai_available, get_preset_queries
+from app.ai.rate_limiter import user_limiter, global_limiter
+from app.config import DATABASE_URL, AI_DB_PASSWORD
+from app.logger import get_logger
+
+logger = get_logger("ai.chat")
+router = APIRouter(prefix="/api/ai", tags=["AI助手"])
+
+
+def _build_ai_dsn() -> str:
+    """构建 AI 只读用户的数据库连接字符串"""
+    # 从主 DSN 解析 host/port/dbname
+    # DATABASE_URL 格式: postgres://user:pass@host:port/dbname
+    import re
+    from urllib.parse import quote_plus
+    match = re.match(r'postgres(?:ql)?://[^@]+@([^/]+)/([\w-]+)', DATABASE_URL)
+    if not match:
+        raise RuntimeError("无法解析 DATABASE_URL")
+    host_port = match.group(1)
+    dbname = match.group(2)
+    if not AI_DB_PASSWORD:
+        raise RuntimeError("AI_DB_PASSWORD 环境变量未设置，无法连接 AI 只读数据库")
+    return f"postgresql://erp_ai_readonly:{quote_plus(AI_DB_PASSWORD)}@{host_port}/{dbname}"
+
+
+@router.get("/status")
+async def ai_status(user: User = Depends(get_current_user)):
+    """检查 AI 助手可用性（含预设快捷问题，所有登录用户可访问）"""
+    available, reason = await check_ai_available()
+    preset = await get_preset_queries() if available else []
+    return {"available": available, "reason": reason, "preset_queries": preset}
+
+
+@router.post("/chat")
+async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
+    """AI 聊天接口"""
+    # 输入验证
+    if len(body.history) > 20:
+        body.history = body.history[-20:]
+    for h in body.history:
+        if len(h.get("content", "")) > 5000:
+            h["content"] = h["content"][:5000]
+
+    # 限流检查（spec 要求返回 HTTP 429）
+    user_key = f"user:{user.id}"
+    if not user_limiter.allow(user_key):
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    if not global_limiter.allow("global"):
+        raise HTTPException(status_code=429, detail="系统繁忙，请稍后再试")
+
+    # 清洗输入
+    clean_msg = body.message.strip()
+    # 移除控制字符（保留换行）
+    clean_msg = "".join(c for c in clean_msg if c == "\n" or (ord(c) >= 32))
+
+    if not clean_msg:
+        return {"type": "error", "message": "请输入查询内容"}
+
+    dsn = _build_ai_dsn()
+    result = await process_chat(
+        message=clean_msg,
+        history=body.history,
+        user_id=user.id,
+        db_dsn=dsn,
+    )
+
+    logger.info(
+        f"AI 查询: user={user.username}, question={clean_msg[:50]}, "
+        f"type={result.get('type')}, rows={result.get('row_count', 0)}"
+    )
+    return result
+
+
+@router.post("/chat/export")
+async def ai_export(body: ExportRequest, user: User = Depends(get_current_user)):
+    """导出查询结果为 Excel"""
+    import openpyxl
+
+    table_data = body.table_data
+    if not table_data or "columns" not in table_data or "rows" not in table_data:
+        raise HTTPException(status_code=400, detail="无效的表格数据")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = body.title[:31]  # Excel sheet 名最多 31 字符
+
+    # 写表头
+    for col, name in enumerate(table_data["columns"], 1):
+        ws.cell(row=1, column=col, value=name)
+
+    # 写数据行
+    for row_idx, row in enumerate(table_data["rows"], 2):
+        for col_idx, val in enumerate(row, 1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+
+    # 输出为字节流
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f"{body.title}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/chat/feedback")
+async def ai_feedback(body: FeedbackRequest, user: User = Depends(get_current_user)):
+    """接收用户反馈"""
+    logger.info(
+        f"AI 反馈: user={user.username}, message_id={body.message_id}, "
+        f"feedback={body.feedback}, reason={body.negative_reason}"
+    )
+
+    # 正面反馈 + 保存为示例
+    if body.feedback == "positive" and body.save_as_example and body.original_question and body.sql:
+        try:
+            setting = await SystemSetting.filter(key="ai.few_shots").first()
+            shots = []
+            if setting and setting.value:
+                shots = json.loads(setting.value)
+
+            new_shot = {
+                "question": body.original_question,
+                "sql": body.sql,
+                "source": "feedback",
+            }
+            shots.append(new_shot)
+
+            store_value = json.dumps(shots, ensure_ascii=False)
+            if setting:
+                setting.value = store_value
+                await setting.save()
+            else:
+                await SystemSetting.create(key="ai.few_shots", value=store_value)
+
+            logger.info(f"新增 few-shot 示例: {body.original_question[:50]}")
+        except Exception as e:
+            logger.error(f"保存 few-shot 失败: {e}")
+
+    return {"ok": True}
