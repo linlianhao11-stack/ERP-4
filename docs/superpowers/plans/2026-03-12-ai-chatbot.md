@@ -1471,6 +1471,16 @@ async def check_ai_available() -> tuple[bool, str | None]:
     return True, None
 
 
+async def get_preset_queries() -> list[dict]:
+    """获取预设快捷问题列表（仅 display 字段，不暴露 sql/keywords）"""
+    try:
+        config = await _get_config()
+        raw = config.get("ai.preset_queries") or []
+        return [{"display": q["display"]} for q in raw if q.get("display")]
+    except Exception:
+        return []
+
+
 async def process_chat(
     message: str,
     history: list[dict],
@@ -1889,9 +1899,8 @@ from fastapi.responses import StreamingResponse
 from app.auth.dependencies import get_current_user
 from app.models import User, SystemSetting
 from app.schemas.ai import ChatRequest, FeedbackRequest, ExportRequest
-from app.services.ai_chat_service import process_chat, check_ai_available
+from app.services.ai_chat_service import process_chat, check_ai_available, get_preset_queries
 from app.ai.rate_limiter import user_limiter, global_limiter
-from app.ai.few_shots import DEFAULT_FEW_SHOTS
 from app.config import DATABASE_URL, AI_DB_PASSWORD
 from app.logger import get_logger
 
@@ -1904,30 +1913,23 @@ def _build_ai_dsn() -> str:
     # 从主 DSN 解析 host/port/dbname
     # DATABASE_URL 格式: postgres://user:pass@host:port/dbname
     import re
-    match = re.match(r'postgres(?:ql)?://[^@]+@([^/]+)/(\w+)', DATABASE_URL)
+    from urllib.parse import quote_plus
+    match = re.match(r'postgres(?:ql)?://[^@]+@([^/]+)/([\w-]+)', DATABASE_URL)
     if not match:
         raise RuntimeError("无法解析 DATABASE_URL")
     host_port = match.group(1)
     dbname = match.group(2)
     if not AI_DB_PASSWORD:
         raise RuntimeError("AI_DB_PASSWORD 环境变量未设置，无法连接 AI 只读数据库")
-    return f"postgresql://erp_ai_readonly:{AI_DB_PASSWORD}@{host_port}/{dbname}"
+    return f"postgresql://erp_ai_readonly:{quote_plus(AI_DB_PASSWORD)}@{host_port}/{dbname}"
 
 
 @router.get("/status")
 async def ai_status(user: User = Depends(get_current_user)):
     """检查 AI 助手可用性（含预设快捷问题，所有登录用户可访问）"""
     available, reason = await check_ai_available()
-    preset_queries = []
-    if available:
-        try:
-            config = await _get_config()
-            # 只返回 display 字段，不暴露 sql/keywords
-            raw = config.get("ai.preset_queries") or []
-            preset_queries = [{"display": q["display"]} for q in raw if q.get("display")]
-        except Exception:
-            pass
-    return {"available": available, "reason": reason, "preset_queries": preset_queries}
+    preset = await get_preset_queries() if available else []
+    return {"available": available, "reason": reason, "preset_queries": preset}
 
 
 @router.post("/chat")
@@ -2275,7 +2277,7 @@ async def migrate_ai_readonly_user():
             await conn.execute_query("ALTER USER erp_ai_readonly SET work_mem = '16MB'")
             await conn.execute_query("ALTER USER erp_ai_readonly SET temp_file_limit = '100MB'")
             await conn.execute_query("ALTER USER erp_ai_readonly CONNECTION LIMIT 5")
-            logger.info(f"AI 只读用户 erp_ai_readonly 已创建（密码: {password[:4]}...）")
+            logger.info(f"AI 只读用户 erp_ai_readonly 已创建（密码: {AI_DB_PASSWORD[:4]}...）")
         except Exception as e:
             logger.warning(f"创建 AI 只读用户失败（可能权限不足）: {e}")
 
@@ -2286,14 +2288,20 @@ async def migrate_ai_readonly_user():
         if os.path.exists(views_path):
             with open(views_path, "r", encoding="utf-8") as f:
                 views_sql = f.read()
-            # 逐条执行（按分号分割，跳过注释）
+            # 逐条执行（按分号分割，跳过纯注释段落）
             for stmt in views_sql.split(";"):
                 stmt = stmt.strip()
-                if stmt and not stmt.startswith("--"):
-                    try:
-                        await conn.execute_query(stmt)
-                    except Exception as ve:
-                        logger.warning(f"视图语句执行失败: {ve}")
+                if not stmt:
+                    continue
+                # 跳过只有注释的段落
+                non_comment_lines = [l for l in stmt.split("\n")
+                                     if l.strip() and not l.strip().startswith("--")]
+                if not non_comment_lines:
+                    continue
+                try:
+                    await conn.execute_query(stmt)
+                except Exception as ve:
+                    logger.warning(f"视图语句执行失败: {ve}")
             logger.info("AI 语义视图已创建/更新")
     except Exception as e:
         logger.warning(f"语义视图创建失败: {e}")

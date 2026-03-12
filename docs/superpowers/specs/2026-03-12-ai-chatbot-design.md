@@ -179,7 +179,7 @@ backend/app/
 | 变量名 | 用途 | 必需 |
 |--------|------|------|
 | `API_KEYS_ENCRYPTION_SECRET` | AES 加密 API Key | 是，未设置容器拒绝启动 |
-| `AI_DB_PASSWORD` | AI 只读数据库用户密码 | 否，未设置时自动生成并记录到日志 |
+| `AI_DB_PASSWORD` | AI 只读数据库用户密码 | 是，未设置时 AI 功能不可用 |
 
 在 `docker-compose.yml` 中使用 `${API_KEYS_ENCRYPTION_SECRET:?请设置 API 密钥加密密钥}` 语法。
 
@@ -271,7 +271,7 @@ ALTER USER erp_ai_readonly CONNECTION LIMIT 5;
 1. 检查 `erp_ai_readonly` 用户是否存在（`SELECT 1 FROM pg_roles WHERE rolname = 'erp_ai_readonly'`）
 2. 不存在则创建用户、授权、设资源限制
 3. 创建/更新语义视图（执行 `backend/app/ai/views.sql`）
-4. 密码从 `AI_DB_PASSWORD` 环境变量读取，默认随机生成并记录到日志
+4. 密码从 `AI_DB_PASSWORD` 环境变量读取，未设置时跳过创建（AI 功能不可用）
 
 ---
 
@@ -448,11 +448,11 @@ history 最多保留最近 10 轮对话。
 
 ### 7.5 AI 配置管理
 
-**GET /api/ai/config**（仅 admin 角色）
+**GET /api/api-keys/ai-config**（仅 admin 角色）
 
 响应：提示词、业务词典、示例库、快捷问题。
 
-**PUT /api/ai/config**（仅 admin 角色）
+**PUT /api/api-keys/ai-config**（仅 admin 角色）
 
 请求：`{ "prompt_system": "...", "business_dict": [...], ... }`
 
