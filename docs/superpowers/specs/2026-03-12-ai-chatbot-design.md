@@ -166,7 +166,6 @@ backend/app/
 | `ai.deepseek.model_analysis` | 分析模型 | 否 |
 | `api.kd100.key` | 快递 100 Key | AES 加密 |
 | `api.kd100.customer` | 快递 100 Customer | 否 |
-| `api.kd100.secret` | 快递 100 Secret | AES 加密 |
 | `ai.prompt.system` | SQL 生成系统提示词 | 否 |
 | `ai.prompt.analysis` | 数据分析提示词 | 否 |
 | `ai.business_dict` | 业务词典 JSON | 否 |
