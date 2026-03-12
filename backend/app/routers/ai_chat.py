@@ -44,8 +44,8 @@ async def ai_status(user: User = Depends(get_current_user)):
 async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
     """AI 聊天接口"""
     # 输入验证
-    if len(body.history) > 20:
-        body.history = body.history[-20:]
+    if len(body.history) > 50:
+        body.history = body.history[-50:]
     for h in body.history:
         if len(h.get("content", "")) > 5000:
             h["content"] = h["content"][:5000]

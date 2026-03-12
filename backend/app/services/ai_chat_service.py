@@ -232,8 +232,8 @@ async def _process_chat_inner(
 
         # 4. 调用 DeepSeek 生成 SQL
         messages = [{"role": "system", "content": system_prompt}]
-        # 添加历史对话（最多 10 轮）
-        for h in history[-20:]:
+        # 添加历史对话
+        for h in history[-50:]:
             messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
 

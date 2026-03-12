@@ -105,13 +105,25 @@ const checkStatus = async () => {
   }
 }
 
+const buildAssistantContext = (m) => {
+  const parts = []
+  if (m.analysis) parts.push(m.analysis)
+  if (m.sql) parts.push(`[SQL: ${m.sql}]`)
+  if (m.table_data?.columns && m.table_data?.rows?.length) {
+    const cols = m.table_data.columns.join(', ')
+    const preview = m.table_data.rows.slice(0, 5).map(r => r.join(' | ')).join('\n')
+    parts.push(`[数据 (${m.table_data.rows.length}行): ${cols}\n${preview}]`)
+  }
+  return parts.join('\n') || m.message || ''
+}
+
 const buildHistory = () => {
   return messages.value
-    .filter(m => !m.loading && (m.role === 'user' || m.type === 'answer'))
-    .slice(-20)
+    .filter(m => !m.loading && (m.role === 'user' || m.type === 'answer' || m.type === 'clarification'))
+    .slice(-50)
     .map(m => ({
       role: m.role,
-      content: m.role === 'user' ? m.content : (m.analysis || m.message || ''),
+      content: m.role === 'user' ? m.content : buildAssistantContext(m),
     }))
 }
 
@@ -295,6 +307,7 @@ onMounted(checkStatus)
 .ai-messages {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px;
   display: flex;
   flex-direction: column;
