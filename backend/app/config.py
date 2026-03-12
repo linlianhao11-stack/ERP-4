@@ -79,3 +79,6 @@ KD100_STATE_MAP = {
 # 登录限制
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 300
+
+# AI 数据库只读用户密码
+AI_DB_PASSWORD = os.environ.get("AI_DB_PASSWORD", "")
