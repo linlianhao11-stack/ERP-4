@@ -96,7 +96,7 @@ FROM warehouse_stocks ws
 JOIN products p ON p.id = ws.product_id
 JOIN warehouses w ON w.id = ws.warehouse_id
 LEFT JOIN locations loc ON loc.id = ws.location_id
-WHERE ws.quantity > 0
+WHERE ws.quantity >= 0
   AND w.is_virtual = false;
 
 -- 5. 库存周转分析

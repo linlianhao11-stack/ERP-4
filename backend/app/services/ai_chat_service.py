@@ -341,7 +341,7 @@ async def _execute_and_analyze(
         return {
             "type": "answer",
             "message_id": message_id,
-            "analysis": "查询没有返回数据。可能是条件范围内没有匹配的记录。",
+            "analysis": "没查到符合条件的数据，可能这个时间段或范围内确实没有相关记录。",
             "table_data": None,
             "chart_config": None,
             "sql": sql,
@@ -407,30 +407,50 @@ async def _execute_and_analyze(
     }
 
 
+_COL_LABEL_MAP = {
+    "amount": "金额", "total_amount": "总金额", "销售额": "销售额",
+    "profit": "毛利", "total_profit": "总毛利", "毛利": "毛利",
+    "cost": "成本", "total_cost": "总成本", "成本": "成本",
+    "stock_value": "库存金额", "库存金额": "库存金额",
+    "unreceived_amount": "未收金额", "未收": "未收",
+    "unpaid_amount": "未付金额", "未付总额": "未付总额",
+    "received_amount": "已收金额", "已收": "已收",
+    "paid_amount": "已付金额",
+    "profit_rate": "毛利率", "毛利率": "毛利率",
+    "quantity": "数量", "数量": "数量",
+    "order_count": "订单数", "订单数": "订单数",
+    "bill_count": "笔数", "笔数": "笔数",
+    "采购金额": "采购金额", "应收总额": "应收总额", "欠款总额": "欠款总额",
+}
+
+_AMOUNT_COLS = {
+    "amount", "total_amount", "profit", "total_profit", "cost", "total_cost",
+    "stock_value", "unreceived_amount", "unpaid_amount", "received_amount", "paid_amount",
+    "销售额", "毛利", "成本", "库存金额", "未收", "已收", "未付总额", "欠款总额",
+    "采购金额", "应收总额", "总金额", "总毛利", "总成本",
+}
+
+
 def _build_local_summary(columns: list[str], row_data: list[list], question: str) -> str:
     """为小数据集生成本地摘要，避免调用分析 API"""
     n = len(row_data)
 
-    # 识别金额列并汇总
-    amount_keywords = {"amount", "total_amount", "profit", "total_profit", "cost", "total_cost",
-                       "stock_value", "unreceived_amount", "unpaid_amount", "received_amount", "paid_amount"}
     summaries = []
-    col_lower = [c.lower() for c in columns]
     for i, col in enumerate(columns):
-        if col.lower() in amount_keywords:
+        if col.lower() in _AMOUNT_COLS or col in _AMOUNT_COLS:
             vals = [r[i] for r in row_data if isinstance(r[i], (int, float))]
             if vals:
                 total = sum(vals)
-                label = col.replace("_", " ").replace("total ", "")
+                label = _COL_LABEL_MAP.get(col.lower(), _COL_LABEL_MAP.get(col, col))
                 if total >= 10000:
                     summaries.append(f"**{label}** 合计 {total / 10000:.2f} 万")
                 else:
                     summaries.append(f"**{label}** 合计 {total:,.2f}")
 
-    parts = [f"查询到 **{n}** 条记录。"]
+    parts = [f"查到 **{n}** 条数据"]
     if summaries:
-        parts.append("、".join(summaries) + "。")
-    parts.append("详细数据见下方表格。")
+        parts.append("，" + "、".join(summaries))
+    parts.append("，详细看下面表格。")
     return "".join(parts)
 
 
