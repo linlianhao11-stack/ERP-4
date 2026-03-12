@@ -18,7 +18,8 @@ def _get_client() -> httpx.AsyncClient:
     """获取或创建 httpx 客户端（懒初始化）"""
     global _client
     if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+        # deepseek-chat 通常 3-10s 响应，30s 超时足够
+        _client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0))
     return _client
 
 

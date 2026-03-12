@@ -151,6 +151,9 @@ async def _process_chat_inner(
     message_id: str,
 ) -> dict:
     try:
+        import time as _time
+        _t0 = _time.monotonic()
+
         config = await _get_config()
         api_key = config.get("api_key")
         if not api_key:
@@ -182,13 +185,14 @@ async def _process_chat_inner(
             custom_shots=config.get("ai.few_shots"),
         )
 
-        # 4. 调用 R1 生成 SQL
+        # 4. 调用 DeepSeek 生成 SQL
         messages = [{"role": "system", "content": system_prompt}]
         # 添加历史对话（最多 10 轮）
         for h in history[-20:]:
             messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
 
+        _t1 = _time.monotonic()
         r1_result = await call_deepseek(
             messages=messages,
             api_key=api_key,
@@ -197,10 +201,13 @@ async def _process_chat_inner(
             temperature=0.0,
         )
 
+        _t2 = _time.monotonic()
+        logger.info(f"SQL 生成耗时: {_t2 - _t1:.1f}s, 模型: {config.get('model_sql', DEFAULT_MODEL_SQL)}")
+
         if r1_result is None:
             return {"type": "error", "message": "AI 服务暂时不可用，请稍后再试"}
 
-        # 5. 处理 R1 响应
+        # 5. 处理响应
         resp_type = r1_result.get("type", "")
 
         if resp_type == "clarification":
@@ -280,12 +287,18 @@ async def _execute_and_analyze(
     message_id: str,
 ) -> dict:
     """执行 SQL 并调用 V3 分析"""
+    import time as _time
+    _t0 = _time.monotonic()
+
     pool = await get_ai_pool(db_dsn)
 
     async with pool.acquire() as conn:
         # READ ONLY 事务
         async with conn.transaction(readonly=True):
             rows = await conn.fetch(sql)
+
+    _t1 = _time.monotonic()
+    logger.info(f"SQL 执行耗时: {_t1 - _t0:.2f}s, 行数: {len(rows)}")
 
     if not rows:
         return {
@@ -304,15 +317,16 @@ async def _execute_and_analyze(
     for r in rows:
         row_data.append([_serialize_value(r[c]) for c in columns])
 
-    # 限制传给 V3 的数据量（最多 100 行）
+    # 限制传给分析模型的数据量（最多 100 行）
     analysis_rows = row_data[:100]
 
-    # 调用 V3 分析
+    # 调用分析模型
     analysis_prompt = build_analysis_prompt(config.get("ai.prompt.analysis"))
     data_summary = f"用户问题: {message}\n\nSQL: {sql}\n\n查询结果 ({len(rows)} 行):\n列: {columns}\n数据（前 {len(analysis_rows)} 行）:\n"
     for row in analysis_rows[:20]:  # prompt 中只放 20 行
         data_summary += str(row) + "\n"
 
+    _t2 = _time.monotonic()
     v3_result = await call_deepseek(
         messages=[
             {"role": "system", "content": analysis_prompt},
@@ -323,6 +337,8 @@ async def _execute_and_analyze(
         model=config.get("model_analysis", DEFAULT_MODEL_ANALYSIS),
         temperature=0.7,
     )
+    _t3 = _time.monotonic()
+    logger.info(f"数据分析耗时: {_t3 - _t2:.1f}s, 总耗时: {_t3 - _t0:.1f}s")
 
     analysis_text = "查询完成。"
     chart_config = None
