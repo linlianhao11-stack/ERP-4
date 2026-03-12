@@ -35,6 +35,8 @@ services:
       DATABASE_URL: postgres://erp:${POSTGRES_PASSWORD:-erp123456}@db:5432/erp
       SECRET_KEY: ${SECRET_KEY:?请在 .env 文件中设置 SECRET_KEY}
       TZ: Asia/Shanghai
+      API_KEYS_ENCRYPTION_SECRET: ${API_KEYS_ENCRYPTION_SECRET:?请在 .env 文件中设置 API_KEYS_ENCRYPTION_SECRET}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-}
     volumes:
       - ./backups:/app/backups
       - ./uploads:/app/uploads
