@@ -39,6 +39,9 @@
           </div>
         </div>
       </Transition>
+
+      <!-- AI 数据助手浮窗 -->
+      <AiChatbot />
     </div>
 
     <router-view v-else />
@@ -87,6 +90,7 @@ import { menuItems, iconMap } from './utils/constants'
 import Sidebar from './components/layout/Sidebar.vue'
 import BottomNav from './components/layout/BottomNav.vue'
 import { AlertTriangle } from 'lucide-vue-next'
+import AiChatbot from './components/business/AiChatbot.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
