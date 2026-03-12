@@ -32,6 +32,7 @@ CONFIG_CACHE_TTL = 300  # 5 分钟
 async def get_ai_pool(dsn: str) -> asyncpg.Pool:
     """获取或创建 AI 专用连接池"""
     global _ai_pool, _pool_dsn
+    # asyncpg.Pool 无公共 is_closed 属性，_closed 是唯一可检查方式
     if _ai_pool is not None and not _ai_pool._closed and _pool_dsn == dsn:
         return _ai_pool
     if _ai_pool is not None and not _ai_pool._closed:
@@ -155,9 +156,14 @@ async def _process_chat_inner(
         if not api_key:
             return {"type": "error", "message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key"}
 
-        # 1. 意图预分类 — 命中预置模板则直接执行
+        # 1. 意图预分类 — 命中预置模板则校验后执行
         preset = classify_intent(message, config.get("ai.preset_queries"))
         if preset and preset.get("sql"):
+            from app.ai.sql_validator import validate_sql
+            ok, _, reason = validate_sql(preset["sql"])
+            if not ok:
+                logger.warning(f"预设 SQL 校验失败: {reason} — {preset['sql'][:100]}")
+                return {"type": "error", "message": f"预设查询模板异常，请联系管理员检查: {reason}"}
             return await _execute_and_analyze(
                 sql=preset["sql"],
                 message=message,

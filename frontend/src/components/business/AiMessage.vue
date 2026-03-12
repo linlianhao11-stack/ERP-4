@@ -117,7 +117,7 @@ const renderMarkdown = (text) => {
   if (!text) return ''
   // 轻量 Markdown：加粗、列表、换行（防 XSS）
   let html = text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>')
   // 处理列表项：连续的 "- xxx<br>" 行合并为 <ul>

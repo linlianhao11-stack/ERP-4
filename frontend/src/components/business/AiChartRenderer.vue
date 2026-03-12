@@ -19,10 +19,10 @@ let chartInstance = null
 const getThemeColors = () => {
   const style = getComputedStyle(document.documentElement)
   return {
-    text: style.getPropertyValue('--text').trim() || '#0a0a0a',
-    textMuted: style.getPropertyValue('--text-muted').trim() || '#555',
-    border: style.getPropertyValue('--border').trim() || '#e5e5e5',
-    primary: style.getPropertyValue('--primary').trim() || '#3b82f6',
+    text: style.getPropertyValue('--text').trim() || 'oklch(0.13 0 0)',
+    textMuted: style.getPropertyValue('--text-muted').trim() || 'oklch(0.45 0 0)',
+    border: style.getPropertyValue('--border').trim() || 'oklch(0.87 0 0)',
+    primary: style.getPropertyValue('--primary').trim() || 'oklch(0.55 0.20 250)',
   }
 }
 

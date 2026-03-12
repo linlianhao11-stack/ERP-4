@@ -108,10 +108,12 @@ async def ai_export(body: ExportRequest, user: User = Depends(get_current_user))
     buffer.seek(0)
 
     filename = f"{body.title}.xlsx"
+    from urllib.parse import quote
+    encoded_name = quote(filename)
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f"attachment; filename=\"export.xlsx\"; filename*=UTF-8''{encoded_name}"},
     )
 
 
@@ -137,6 +139,15 @@ async def ai_feedback(body: FeedbackRequest, user: User = Depends(get_current_us
                 "source": "feedback",
             }
             shots.append(new_shot)
+
+            # 限制 feedback 来源的示例不超过 50 条，超限移除最早的
+            MAX_FEEDBACK_SHOTS = 50
+            feedback_count = sum(1 for s in shots if s.get("source") == "feedback")
+            if feedback_count > MAX_FEEDBACK_SHOTS:
+                for idx, s in enumerate(shots):
+                    if s.get("source") == "feedback":
+                        shots.pop(idx)
+                        break
 
             store_value = json.dumps(shots, ensure_ascii=False)
             if setting:

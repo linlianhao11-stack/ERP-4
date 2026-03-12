@@ -1,7 +1,7 @@
 """内存滑动窗口限流器 — 单容器部署，无需 Redis"""
 from __future__ import annotations
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 
 
 class RateLimiter:
@@ -10,7 +10,7 @@ class RateLimiter:
     def __init__(self, max_requests: int, window_seconds: float):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
         self._last_cleanup = time.monotonic()
 
     def allow(self, key: str) -> bool:
@@ -21,11 +21,11 @@ class RateLimiter:
         if now - self._last_cleanup > 60:
             self._cleanup(now)
 
-        # 移除窗口外的旧记录
+        # 移除窗口外的旧记录（deque.popleft 为 O(1)）
         timestamps = self._requests[key]
         cutoff = now - self.window_seconds
         while timestamps and timestamps[0] < cutoff:
-            timestamps.pop(0)
+            timestamps.popleft()
 
         if len(timestamps) >= self.max_requests:
             return False

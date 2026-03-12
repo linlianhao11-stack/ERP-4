@@ -818,7 +818,10 @@ async def migrate_ai_readonly_user():
             # 使用单引号 + 转义防止密码中的特殊字符
             safe_password = AI_DB_PASSWORD.replace("'", "''")
             await conn.execute_query(f"CREATE USER erp_ai_readonly WITH PASSWORD '{safe_password}'")
-            await conn.execute_query("GRANT CONNECT ON DATABASE erp TO erp_ai_readonly")
+            # 动态获取当前数据库名
+            db_name_rows = await conn.execute_query_dict("SELECT current_database() AS db")
+            db_name = db_name_rows[0]["db"] if db_name_rows else "erp"
+            await conn.execute_query(f"GRANT CONNECT ON DATABASE {db_name} TO erp_ai_readonly")
             await conn.execute_query("GRANT USAGE ON SCHEMA public TO erp_ai_readonly")
             await conn.execute_query("GRANT SELECT ON ALL TABLES IN SCHEMA public TO erp_ai_readonly")
             await conn.execute_query("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO erp_ai_readonly")

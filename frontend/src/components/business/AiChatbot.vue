@@ -52,6 +52,7 @@
           v-model="input"
           class="ai-input"
           placeholder="输入你的问题..."
+          aria-label="输入你的问题"
           rows="1"
           @keydown.enter.exact.prevent="sendMessage(input)"
           @input="autoResize"
@@ -234,7 +235,7 @@ onMounted(checkStatus)
   display: flex;
   flex-direction: column;
   z-index: 1001;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 .ai-window-mobile {

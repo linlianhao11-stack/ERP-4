@@ -79,12 +79,17 @@ def build_sql_prompt(
         account_instruction = "系统当前未配置账套，忽略账套相关逻辑。"
 
     template = custom_system_prompt or DEFAULT_SQL_SYSTEM_PROMPT
-    return template.format(
+    fmt_kwargs = dict(
         account_set_instruction=account_instruction,
         schema=get_view_schema_text(),
         business_dict=format_business_dict(custom_dict),
         few_shots=format_few_shots(custom_shots),
     )
+    try:
+        return template.format(**fmt_kwargs)
+    except (KeyError, ValueError, IndexError):
+        # 自定义模板格式有误（缺少占位符或含未转义的花括号），回退默认模板
+        return DEFAULT_SQL_SYSTEM_PROMPT.format(**fmt_kwargs)
 
 
 def build_analysis_prompt(
