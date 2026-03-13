@@ -46,11 +46,15 @@ data: {"message": "错误描述", "retryable": true}
 - `POST /api/ai/chat` 返回 `StreamingResponse`（`text/event-stream`）
 - `process_chat` 改为 `async generator`，在每个关键节点 yield 进度事件
 - 保留原有限流、输入清洗逻辑不变
+- **缓存命中**时仍需以 SSE 格式返回：直接 yield `event: done` 事件（跳过 progress 阶段）
+- **断连检测**：async generator 内用 `try/finally` 包裹，捕获 `asyncio.CancelledError`，确保断连时释放 `_ai_semaphore` 和数据库连接
 
 **前端改动**:
 - 用 `fetch` + `ReadableStream` 接收 SSE（不用 EventSource，因为需要 POST + headers）
 - 消息气泡内显示当前阶段文字 + 线性进度指示器（4 段高亮），替换三圆点动画
 - 预设查询和本地回复仍走原有同步路径
+- **AbortController**：每次发送新请求前 abort 上一个未完成的请求；组件 unmount 时 abort；聊天窗口关闭时 abort
+- **重叠请求处理**：同一时间只允许一个 SSE 请求，新请求会取消前一个
 
 ### 2. 重试按钮 + 错误优化
 
@@ -84,7 +88,7 @@ data: {"message": "错误描述", "retryable": true}
 - 新开标签页 / 重新登录 / 关闭浏览器 → 自动重置
 
 **实现要点**:
-- `watch(messages, saveToStorage, { deep: true })` 自动同步
+- 使用 debounce 后的手动 `saveToStorage()` 在关键变更点调用（消息新增、反馈变更），避免 `watch deep: true` 导致的高频序列化
 - `onMounted` 时从 storage 恢复
 - 单条消息序列化最大 2KB，总体最大 100KB
 
@@ -149,9 +153,9 @@ data: {"message": "错误描述", "retryable": true}
 ```
 
 **匹配算法改进**:
-1. 用户输入先做同义词展开（所有同义词替换为标准词）
-2. 匹配逻辑从 `all(kw in msg)` 改为关键词命中率 >= 80%
-3. 多个模板同时命中时，取命中率最高的
+1. 同义词展开方向：扫描用户输入，将输入中出现的同义词替换为对应的标准词（展开发生在用户消息上，不改变模板关键词）
+2. 匹配逻辑从 `all(kw in msg)` 改为：关键词数 >= 2 时命中率 >= 80%；关键词数 = 1 时仍要求精确匹配
+3. 多个模板同时命中时，取命中率最高的；命中率相同取关键词更多的（更具体的模板优先）
 
 **配置**: 同义词表存入 `SystemSetting` key `ai.synonyms`，管理面板可编辑。
 
@@ -177,6 +181,8 @@ data: {"message": "错误描述", "retryable": true}
   2. **本地小数据集回退**: 预设关联映射（如查了销售 → 推荐"毛利分析"、"客户排名"）
 - 用户点击建议按钮 → 等同于发送该文字
 - `ChatResponse` 新增 `suggestions: list[str] | None` 字段
+- V3 返回中 `suggestions` 缺失时回退为 `None`（向后兼容）
+- 本地摘要路径（`_build_local_summary`）使用硬编码关联映射表生成建议
 
 **关联映射表**（用于本地摘要时）:
 ```json
@@ -230,6 +236,7 @@ data: {"message": "错误描述", "retryable": true}
 **方案**:
 - 操作栏加"收藏"按钮（Star 图标），点击将 `{question, timestamp}` 存入 localStorage
 - key: `ai_favorites_{userId}`，最多 20 条
+- **去重**: 收藏相同 question 时更新 timestamp 而非创建重复项
 - 聊天窗口欢迎页改为两区:
   - 上半区: **我的收藏**（用户收藏的查询）
   - 下半区: **常用查询**（系统预设模板）
@@ -252,7 +259,7 @@ data: {"message": "错误描述", "retryable": true}
 **CSV 生成**（前端纯本地）:
 ```javascript
 const bom = '\uFEFF'
-const csv = bom + [columns.join(','), ...rows.map(r => r.map(c => `"${c ?? ''}"`).join(','))].join('\n')
+const csv = bom + [columns.join(','), ...rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))].join('\n')
 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 ```
 
@@ -282,13 +289,16 @@ const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
 1. **Prompt 层**: `schema_registry.py` 新增 `get_view_schema_text(allowed_views)` 参数，根据用户 AI 子权限动态裁剪注入 prompt 的 schema。无权限的视图不出现在 prompt 中，LLM 无法生成相关 SQL。
 
-2. **SQL 验证层**: `sql_validator.py` 的 `validate_sql` 新增 `allowed_tables` 参数。AST 遍历时提取所有表引用，不在白名单内 → 拒绝执行，返回"你没有查询该模块数据的权限"。
+2. **SQL 验证层**: `sql_validator.py` 的 `validate_sql` 新增 `allowed_tables` 参数。AST 遍历时提取 LLM 生成 SQL 中直接引用的表名（视图作为不透明单元，不检查视图底层表），不在白名单内 → 拒绝执行，返回"你没有查询该模块数据的权限"。
 
-3. **预设问题过滤**: 后端 `get_preset_queries` 接收用户权限，过滤掉无权限模块的预设问题。
+3. **预设问题过滤**: 每条预设问题新增 `permission` 字段（如 `"permission": "ai_sales"`），`get_preset_queries` 接收用户权限列表，过滤掉无权限模块的预设问题。
+
+4. **权限检查时机**: `require_permission("ai_chat")` 作为 FastAPI 依赖项在请求级别检查（HTTP 403），子权限（`ai_sales` 等）在 SSE generator 内部检查并通过 SSE error 事件返回友好提示。
 
 **视图-权限映射表**（后端常量）:
 ```python
 AI_VIEW_PERMISSIONS = {
+    # 业务视图 — 按模块隔离
     "vw_sales_detail": "ai_sales",
     "vw_sales_summary": "ai_sales",
     "vw_purchase_detail": "ai_purchase",
@@ -298,13 +308,19 @@ AI_VIEW_PERMISSIONS = {
     "vw_payables": "ai_finance",
     "vw_accounting_ledger": "ai_accounting",
     "vw_accounting_voucher_summary": "ai_accounting",
-    "customers": "ai_customer",
-    "products": "ai_stock",
-    "suppliers": "ai_purchase",
-    "warehouses": "ai_stock",
-    "account_sets": "ai_chat",  # 主开关即可访问
+    # 基础参考表 — 主开关即可访问（非敏感数据）
+    "customers": "ai_chat",
+    "products": "ai_chat",
+    "suppliers": "ai_chat",
+    "warehouses": "ai_chat",
+    "account_sets": "ai_chat",
 }
 ```
+
+**部署迁移策略**:
+- admin 用户自动拥有所有权限（`has_permission` 逻辑已覆盖），无需额外处理
+- 部署时自动为所有**现有活跃非 admin 用户**追加 `ai_chat` + 全部 AI 子权限，保持功能不中断
+- 迁移脚本在后端启动时检查（一次性），已有 AI 权限的用户跳过
 
 **新建会计语义视图**:
 
@@ -344,6 +360,12 @@ AI_VIEW_PERMISSIONS = {
   - **导入 JSON** 按钮: 文件选择器 → 读取 → 校验格式 → 替换当前配置
 - 提示词编辑区加行号显示（CSS counter 实现，不引入重型编辑器）
 - 同义词表编辑界面: 类似业务词典，左侧标准词 + 右侧同义词（逗号分隔输入）
+- **导入校验规则**:
+  - 业务词典: 每项必须有 `term` (string) + `meaning` (string)
+  - 示例问答: 每项必须有 `question` (string) + `sql` (string)，且 `sql` 通过 `validate_sql()` 校验
+  - 快捷问题: 每项必须有 `display` (string) + `keywords` (string[]) + `sql` (string)，且 `sql` 通过 `validate_sql()` 校验
+  - 同义词表: key 为标准词 (string)，value 为同义词数组 (string[])
+  - 校验失败时提示具体哪一行有问题，不导入
 
 ---
 
@@ -403,6 +425,23 @@ AI_VIEW_PERMISSIONS = {
 | `frontend/src/api/ai.js` | SSE fetch 改造 + CSV 导出 |
 | `frontend/src/utils/constants.js` | AI 权限组 |
 | `frontend/src/components/business/settings/ApiKeysPanel.vue` | 导入导出 + 同义词编辑 + 行号 |
+
+---
+
+## 实施顺序
+
+按依赖关系和风险排序的建议实施顺序:
+
+| 批次 | 项目 | 理由 |
+|------|------|------|
+| **1 — 独立快赢** | #5 缓存 key 修复, #6 Markdown 渲染 | 无依赖，低风险，立即生效 |
+| **2 — SSE 基础** | #1 流式响应 | 后续 #2 #3 依赖 SSE 消息格式 |
+| **3 — SSE 配套** | #2 重试 + 错误, #3 对话持久化 | 依赖 SSE 格式定义 |
+| **4 — 独立 UI** | #4 窗口尺寸, #11 收藏查询, #12 导出增强 | 互相独立，纯前端 |
+| **5 — 智能增强** | #7 意图分类, #8 反馈增强 | #7 被 #13 权限和 #14 配置依赖 |
+| **6 — 权限体系** | #13 权限控制 | 需要 #7 同义词表完成（共享配置面板） |
+| **7 — 分析增强** | #9 查询建议, #10 图表增强 | 依赖 SSE 完成，增强分析输出 |
+| **8 — 配置收尾** | #14 配置面板增强 | 需要 #7 同义词表完成 |
 
 ---
 
