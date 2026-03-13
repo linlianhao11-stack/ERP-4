@@ -1,5 +1,6 @@
 """AI 聊天路由 — 聊天 / 导出 / 反馈 / 状态"""
 from __future__ import annotations
+import asyncio
 import io
 import json
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,7 +43,7 @@ async def ai_status(user: User = Depends(get_current_user)):
 
 @router.post("/chat")
 async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
-    """AI 聊天接口"""
+    """AI 聊天接口 — SSE 流式响应"""
     # 输入验证
     if len(body.history) > 50:
         body.history = body.history[-50:]
@@ -50,7 +51,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
         if len(h.get("content", "")) > 5000:
             h["content"] = h["content"][:5000]
 
-    # 限流检查（spec 要求返回 HTTP 429）
+    # 限流检查
     user_key = f"user:{user.id}"
     if not user_limiter.allow(user_key):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
@@ -59,25 +60,33 @@ async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
 
     # 清洗输入
     clean_msg = body.message.strip()
-    # 移除控制字符（保留换行）
     clean_msg = "".join(c for c in clean_msg if c == "\n" or (ord(c) >= 32))
-
     if not clean_msg:
-        return {"type": "error", "message": "请输入查询内容"}
+        raise HTTPException(status_code=400, detail="请输入查询内容")
 
     dsn = _build_ai_dsn()
-    result = await process_chat(
-        message=clean_msg,
-        history=body.history,
-        user_id=user.id,
-        db_dsn=dsn,
-    )
 
-    logger.info(
-        f"AI 查询: user={user.username}, question={clean_msg[:50]}, "
-        f"type={result.get('type')}, rows={result.get('row_count', 0)}"
+    async def event_stream():
+        try:
+            async for event in process_chat(
+                message=clean_msg,
+                history=body.history,
+                user_id=user.id,
+                db_dsn=dsn,
+            ):
+                evt_type = event.get("event", "progress")
+                evt_data = json.dumps(event.get("data", {}), ensure_ascii=False)
+                yield f"event: {evt_type}\ndata: {evt_data}\n\n"
+        except asyncio.CancelledError:
+            pass
+
+        logger.info(f"AI 查询: user={user.username}, question={clean_msg[:50]}")
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-    return result
 
 
 @router.post("/chat/export")
