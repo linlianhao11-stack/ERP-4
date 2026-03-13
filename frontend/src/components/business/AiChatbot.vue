@@ -6,7 +6,7 @@
 
   <!-- 聊天窗口 -->
   <Transition name="slide-up">
-    <div v-if="open" class="ai-window" :class="{ 'ai-window-mobile': isMobile }">
+    <div v-if="open" class="ai-window" :class="{ 'ai-window-mobile': isMobile, 'ai-window-expanded': expanded && !isMobile }">
       <!-- 标题栏 -->
       <div class="ai-header">
         <div class="flex items-center gap-2">
@@ -14,6 +14,9 @@
           <span class="font-semibold text-sm">AI 数据助手</span>
         </div>
         <div class="flex items-center gap-1">
+          <button class="ai-header-btn" @click="toggleExpand" :title="expanded ? '缩小' : '展开'" v-if="!isMobile">
+            <component :is="expanded ? Minimize2 : Maximize2" :size="14" />
+          </button>
           <button class="ai-header-btn" @click="handleClear" title="清空对话">
             <RotateCcw :size="14" />
           </button>
@@ -68,14 +71,14 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { Sparkles, X, RotateCcw, Send } from 'lucide-vue-next'
+import { Sparkles, X, RotateCcw, Send, Maximize2, Minimize2 } from 'lucide-vue-next'
 import AiMessage from './AiMessage.vue'
 import { aiExport, aiFeedback, getAiStatus } from '../../api/ai'
 import { useAppStore } from '../../stores/app'
 import { useAiChat } from '../../composables/useAiChat'
 
 const appStore = useAppStore()
-const { messages, loading, sendMessage, retryMessage, clearChat } = useAiChat()
+const { messages, loading, sendMessage, retryMessage, clearChat, restoreFromStorage, clearStorage, saveToStorage } = useAiChat()
 
 const open = ref(false)
 const available = ref(false)
@@ -91,6 +94,13 @@ onMounted(() => {
   mql.addEventListener('change', updateMobile)
 })
 onUnmounted(() => mql.removeEventListener('change', updateMobile))
+
+// 窗口尺寸切换
+const expanded = ref(localStorage.getItem('ai_window_expanded') === 'true')
+const toggleExpand = () => {
+  expanded.value = !expanded.value
+  localStorage.setItem('ai_window_expanded', String(expanded.value))
+}
 
 // 自动滚动到底部
 const scrollToBottom = () => {
@@ -115,6 +125,7 @@ const handleSend = async (text) => {
 
 const handleClear = () => {
   clearChat()
+  clearStorage()
 }
 
 const checkStatus = async () => {
@@ -123,6 +134,7 @@ const checkStatus = async () => {
     available.value = data.available
     if (data.available) {
       presetQueries.value = data.preset_queries || []
+      restoreFromStorage(appStore.user?.id)
     }
   } catch {
     available.value = false
@@ -156,6 +168,7 @@ const handleFeedback = async (msg, type) => {
       sql: msg.sql,
     })
   } catch { /* silent */ }
+  saveToStorage()
 }
 
 const autoResize = () => {
@@ -205,6 +218,11 @@ onMounted(checkStatus)
   z-index: 1001;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  transition: width 0.3s ease, height 0.3s ease;
+}
+.ai-window-expanded {
+  width: 680px;
+  height: 720px;
 }
 .ai-window-mobile {
   position: fixed;

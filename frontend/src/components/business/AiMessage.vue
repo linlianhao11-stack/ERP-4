@@ -33,8 +33,13 @@
         <!-- 文字分析 -->
         <div v-if="msg.analysis" class="ai-analysis text-sm" v-html="renderMarkdown(msg.analysis)" />
 
+        <!-- 数据已过期 -->
+        <div v-if="msg._expired && (msg._hasTableData || msg._hasChartConfig)" class="mt-3 p-3 bg-elevated rounded-lg text-center">
+          <p class="text-xs text-muted mb-2">数据已过期</p>
+          <button class="btn btn-secondary btn-sm text-xs" @click="$emit('select-option', msg._question)">重新查询</button>
+        </div>
         <!-- 数据表格 -->
-        <div v-if="msg.table_data" class="mt-3 border rounded-lg overflow-hidden">
+        <div v-else-if="msg.table_data" class="mt-3 border rounded-lg overflow-hidden">
           <div class="overflow-x-auto max-h-[300px]">
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">

@@ -48,6 +48,57 @@ export function useAiChat() {
       }))
   }
 
+  // sessionStorage 持久化
+  const STORAGE_KEY_PREFIX = 'ai_chat_messages_'
+  let currentUserId = null
+
+  // 防抖保存
+  let saveTimer = null
+  const saveToStorage = () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      if (!currentUserId) return
+      const key = `${STORAGE_KEY_PREFIX}${currentUserId}`
+      // 序列化时剥离 table_data 和 chart_config
+      const stripped = messages.value.map(m => {
+        if (m.role === 'user') return m
+        const { table_data, chart_config, ...rest } = m
+        return {
+          ...rest,
+          _hasTableData: !!table_data,
+          _hasChartConfig: !!chart_config,
+        }
+      })
+      const json = JSON.stringify(stripped)
+      if (json.length <= 102400) { // 100KB 限制
+        sessionStorage.setItem(key, json)
+      }
+    }, 500)
+  }
+
+  const restoreFromStorage = (userId) => {
+    currentUserId = userId
+    const key = `${STORAGE_KEY_PREFIX}${userId}`
+    const raw = sessionStorage.getItem(key)
+    if (raw) {
+      try {
+        const restored = JSON.parse(raw)
+        messages.value = restored.map(m => {
+          if (m._hasTableData || m._hasChartConfig) {
+            return { ...m, _expired: true }
+          }
+          return m
+        })
+      } catch { /* 忽略损坏数据 */ }
+    }
+  }
+
+  const clearStorage = () => {
+    if (currentUserId) {
+      sessionStorage.removeItem(`${STORAGE_KEY_PREFIX}${currentUserId}`)
+    }
+  }
+
   const sendMessage = async (text) => {
     if (!text || !text.trim() || loading.value) return
     const msg = text.trim()
@@ -58,6 +109,7 @@ export function useAiChat() {
     const localReply = tryLocalReply(msg)
     if (localReply) {
       messages.value.push({ role: 'assistant', type: 'clarification', message: localReply, options: [] })
+      saveToStorage()
       return
     }
 
@@ -150,6 +202,7 @@ export function useAiChat() {
     } finally {
       loading.value = false
       abortController = null
+      saveToStorage()
     }
   }
 
@@ -167,6 +220,7 @@ export function useAiChat() {
   const clearChat = () => {
     messages.value = []
     if (abortController) abortController.abort()
+    saveToStorage()
   }
 
   onUnmounted(() => {
@@ -175,5 +229,6 @@ export function useAiChat() {
 
   return {
     messages, loading, sendMessage, retryMessage, clearChat, buildHistory,
+    restoreFromStorage, clearStorage, saveToStorage,
   }
 }
