@@ -163,6 +163,52 @@ FROM payable_bills pb
 LEFT JOIN suppliers sup ON sup.id = pb.supplier_id
 LEFT JOIN account_sets ast ON ast.id = pb.account_set_id;
 
+-- ============================================================
+-- 8. 科目明细账（仅已过账凭证）
+-- ============================================================
+CREATE OR REPLACE VIEW vw_accounting_ledger AS
+SELECT
+    coa.code       AS account_code,
+    coa.name       AS account_name,
+    coa.category   AS category,
+    coa.direction  AS direction,
+    v.period_name  AS period_name,
+    v.voucher_no   AS voucher_no,
+    v.voucher_date AS voucher_date,
+    v.voucher_type AS voucher_type,
+    ve.summary     AS summary,
+    ve.debit_amount  AS debit_amount,
+    ve.credit_amount AS credit_amount,
+    c.name         AS aux_customer_name,
+    s.name         AS aux_supplier_name,
+    acts.name      AS account_set_name
+FROM voucher_entries ve
+JOIN vouchers v          ON v.id = ve.voucher_id
+JOIN chart_of_accounts coa ON coa.id = ve.account_id
+LEFT JOIN customers c    ON c.id = ve.aux_customer_id
+LEFT JOIN suppliers s    ON s.id = ve.aux_supplier_id
+JOIN account_sets acts   ON acts.id = v.account_set_id
+WHERE v.status = 'posted';
+
+-- ============================================================
+-- 9. 凭证汇总（按期间、类型统计）
+-- ============================================================
+CREATE OR REPLACE VIEW vw_accounting_voucher_summary AS
+SELECT
+    acts.name        AS account_set_name,
+    v.period_name    AS period_name,
+    v.voucher_type   AS voucher_type,
+    COUNT(*)         AS total_count,
+    SUM(v.total_debit)  AS total_debit,
+    SUM(v.total_credit) AS total_credit,
+    COUNT(*) FILTER (WHERE v.status = 'draft')    AS draft_count,
+    COUNT(*) FILTER (WHERE v.status = 'pending')  AS pending_count,
+    COUNT(*) FILTER (WHERE v.status = 'approved') AS approved_count,
+    COUNT(*) FILTER (WHERE v.status = 'posted')   AS posted_count
+FROM vouchers v
+JOIN account_sets acts ON acts.id = v.account_set_id
+GROUP BY acts.name, v.period_name, v.voucher_type;
+
 -- 授权只读用户 — 语义视图
 GRANT SELECT ON vw_sales_detail TO erp_ai_readonly;
 GRANT SELECT ON vw_sales_summary TO erp_ai_readonly;
@@ -171,6 +217,8 @@ GRANT SELECT ON vw_inventory_status TO erp_ai_readonly;
 GRANT SELECT ON vw_inventory_turnover TO erp_ai_readonly;
 GRANT SELECT ON vw_receivables TO erp_ai_readonly;
 GRANT SELECT ON vw_payables TO erp_ai_readonly;
+GRANT SELECT ON vw_accounting_ledger TO erp_ai_readonly;
+GRANT SELECT ON vw_accounting_voucher_summary TO erp_ai_readonly;
 
 -- 授权只读用户 — 基础参考表
 GRANT SELECT ON warehouses TO erp_ai_readonly;
