@@ -21,6 +21,25 @@ from app.ai.schema_registry import get_full_schema_text
 
 logger = get_logger("ai.chat_service")
 
+# 本地查询建议映射 — 小数据集回退用，按视图匹配
+LOCAL_SUGGESTIONS = {
+    "vw_sales": ["毛利分析", "客户销售排名", "产品销售排名"],
+    "vw_purchase": ["供应商采购排名", "采购成本趋势"],
+    "vw_inventory": ["缺货预警", "库存周转率"],
+    "vw_receivable": ["客户欠款排名", "应收账龄分析"],
+    "vw_payable": ["供应商应付汇总", "应付账龄分析"],
+}
+
+
+def _get_local_suggestions(sql: str) -> list[str]:
+    """根据 SQL 内容匹配本地查询建议"""
+    sql_lower = sql.lower()
+    for prefix, suggestions in LOCAL_SUGGESTIONS.items():
+        if prefix in sql_lower:
+            return suggestions[:3]
+    return []
+
+
 # AI 专用连接池（与 Tortoise ORM 完全分离）
 _ai_pool: asyncpg.Pool | None = None
 _pool_dsn: str | None = None
@@ -390,6 +409,7 @@ async def _execute_and_analyze(
             "chart_config": None,
             "sql": sql,
             "row_count": len(rows),
+            "suggestions": _get_local_suggestions(sql),
         }
 
     # 大数据集：调用分析模型（限制 max_tokens 加速）
@@ -416,9 +436,11 @@ async def _execute_and_analyze(
 
     analysis_text = "查询完成。"
     chart_config = None
+    suggestions = None
     if v3_result:
         analysis_text = v3_result.get("analysis", analysis_text)
         chart_config = v3_result.get("chart_config")
+        suggestions = v3_result.get("suggestions")
 
     return {
         "type": "answer",
@@ -428,6 +450,7 @@ async def _execute_and_analyze(
         "chart_config": chart_config,
         "sql": sql,
         "row_count": len(rows),
+        "suggestions": suggestions,
     }
 
 

@@ -108,6 +108,13 @@
             </div>
           </div>
         </div>
+
+        <!-- 相关问题建议 -->
+        <div v-if="msg.suggestions?.length" class="flex flex-wrap gap-1.5 mt-2">
+          <button v-for="s in msg.suggestions" :key="s" class="text-xs px-2 py-1 rounded-full border text-muted hover:text-primary hover:border-primary transition-colors" @click="$emit('select-option', s)">
+            {{ s }}
+          </button>
+        </div>
       </template>
     </div>
   </div>
