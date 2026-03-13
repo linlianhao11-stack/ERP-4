@@ -397,7 +397,7 @@ async def _execute_and_analyze(
         return {
             "type": "answer",
             "message_id": message_id,
-            "analysis": "没查到符合条件的数据，可能这个时间段或范围内确实没有相关记录。",
+            "analysis": _build_empty_message(message),
             "table_data": None,
             "chart_config": None,
             "sql": sql,
@@ -492,9 +492,10 @@ _AMOUNT_COLS = {
 
 
 def _build_local_summary(columns: list[str], row_data: list[list], question: str) -> str:
-    """为小数据集生成本地摘要，避免调用分析 API"""
+    """为小数据集生成自然语言摘要，避免调用分析 API"""
     n = len(row_data)
 
+    # 提取金额类汇总
     summaries = []
     for i, col in enumerate(columns):
         if col.lower() in _AMOUNT_COLS or col in _AMOUNT_COLS:
@@ -503,15 +504,72 @@ def _build_local_summary(columns: list[str], row_data: list[list], question: str
                 total = sum(vals)
                 label = _COL_LABEL_MAP.get(col.lower(), _COL_LABEL_MAP.get(col, col))
                 if total >= 10000:
-                    summaries.append(f"**{label}** 合计 {total / 10000:.2f} 万")
+                    summaries.append(f"**{label}** {total / 10000:.2f} 万")
                 else:
-                    summaries.append(f"**{label}** 合计 {total:,.2f}")
+                    summaries.append(f"**{label}** {total:,.2f}")
 
-    parts = [f"查到 **{n}** 条数据"]
-    if summaries:
-        parts.append("，" + "、".join(summaries))
-    parts.append("，详细看下面表格。")
-    return "".join(parts)
+    # 根据数据量用不同的口吻
+    if n == 1:
+        # 就一条，说得简洁
+        if summaries:
+            return f"就找到 **1** 条记录，{summaries[0]}。"
+        # 尝试用第一行首列的值给出更有信息量的回复
+        first_val = row_data[0][0] if row_data[0] else None
+        if first_val is not None:
+            return f"找到 **1** 条记录：**{first_val}**。"
+        return "就查到 **1** 条记录，看看下面的详情。"
+    elif n <= 5:
+        if summaries:
+            return f"一共 **{n}** 条，{_join_cn(summaries)}。"
+        return f"查到 **{n}** 条记录，具体看下面。"
+    else:
+        if summaries:
+            return f"共 **{n}** 条记录，{_join_cn(summaries)}，详情如下。"
+        return f"查到 **{n}** 条记录，详情如下。"
+
+
+def _join_cn(items: list[str]) -> str:
+    """中文顿号连接，最后两项用'、'"""
+    if len(items) == 1:
+        return items[0]
+    return "、".join(items)
+
+
+# 空结果关键词映射
+_TIME_KEYWORDS = [
+    ("今天", "今天"), ("昨天", "昨天"), ("这周", "这周"), ("本周", "本周"),
+    ("上周", "上周"), ("这个月", "这个月"), ("本月", "本月"), ("上个月", "上个月"),
+    ("今年", "今年"), ("本年", "本年"),
+]
+_BIZ_KEYWORDS = [
+    ("交易", "交易"), ("订单", "订单"), ("销售", "销售"), ("采购", "采购"),
+    ("库存", "库存"), ("应收", "应收"), ("应付", "应付"), ("欠款", "欠款"),
+    ("客户", "客户"), ("供应商", "供应商"), ("产品", "产品"),
+]
+
+
+def _build_empty_message(question: str) -> str:
+    """根据用户问题生成有上下文的空结果回复"""
+    time_part = ""
+    for kw, label in _TIME_KEYWORDS:
+        if kw in question:
+            time_part = label
+            break
+
+    biz_part = ""
+    for kw, label in _BIZ_KEYWORDS:
+        if kw in question:
+            biz_part = label
+            break
+
+    if time_part and biz_part:
+        return f"{time_part}暂时没有查到相关的{biz_part}记录，可以换个时间范围试试。"
+    elif time_part:
+        return f"{time_part}没有查到相关数据，可能确实还没有记录。"
+    elif biz_part:
+        return f"没有查到符合条件的{biz_part}数据，可以换个条件试试看。"
+    else:
+        return "暂时没有查到相关数据，可以换个说法或者调整一下查询条件试试。"
 
 
 def _serialize_value(val) -> str | int | float | None:
