@@ -144,16 +144,12 @@ async def process_chat(
     history: list[dict],
     user_id: int,
     db_dsn: str,
-) -> dict:
-    """
-    处理用户聊天消息。
-
-    返回 ChatResponse 格式的 dict。
-    """
+):
+    """处理用户聊天消息，yield SSE 事件 dict"""
     import time as _time
-
-    # 查询缓存：相同问题 5 分钟内直接返回（含 user_id + 日期，避免跨用户/跨天串漏）
     from datetime import date
+
+    # 查询缓存
     cache_key = f"{user_id}:{date.today().isoformat()}:{message.strip().lower()}"
     now = _time.time()
     cached = _query_cache.get(cache_key)
@@ -161,32 +157,32 @@ async def process_chat(
         cached_time, cached_result = cached
         if now - cached_time < QUERY_CACHE_TTL:
             logger.info(f"命中查询缓存: {message[:30]}")
-            # 返回缓存副本（使用新 message_id）
-            result = {**cached_result, "message_id": str(uuid.uuid4())}
-            return result
+            yield {"event": "done", "data": {**cached_result, "message_id": str(uuid.uuid4())}}
+            return
         else:
             del _query_cache[cache_key]
 
     message_id = str(uuid.uuid4())
 
-    # 并发限制：防止同时过多 AI 请求耗尽 API 配额
     async with _ai_semaphore:
-        result = await _process_chat_inner(message, history, user_id, db_dsn, message_id)
-
-    # 缓存成功的查询结果
-    if result.get("type") in ("answer", "clarification"):
-        # 淘汰过期缓存
-        if len(_query_cache) >= QUERY_CACHE_MAX:
-            expired = [k for k, (t, _) in _query_cache.items() if now - t >= QUERY_CACHE_TTL]
-            for k in expired:
-                del _query_cache[k]
-            # 还是满了就清掉最旧的
-            if len(_query_cache) >= QUERY_CACHE_MAX:
-                oldest_key = min(_query_cache, key=lambda k: _query_cache[k][0])
-                del _query_cache[oldest_key]
-        _query_cache[cache_key] = (now, result)
-
-    return result
+        try:
+            async for event in _process_chat_inner(message, history, user_id, db_dsn, message_id):
+                yield event
+                # 缓存最终结果
+                if event.get("event") == "done":
+                    result = event["data"]
+                    if result.get("type") in ("answer", "clarification"):
+                        if len(_query_cache) >= QUERY_CACHE_MAX:
+                            expired = [k for k, (t, _) in _query_cache.items() if now - t >= QUERY_CACHE_TTL]
+                            for k in expired:
+                                del _query_cache[k]
+                            if len(_query_cache) >= QUERY_CACHE_MAX:
+                                oldest_key = min(_query_cache, key=lambda k: _query_cache[k][0])
+                                del _query_cache[oldest_key]
+                        _query_cache[cache_key] = (now, result)
+        except asyncio.CancelledError:
+            logger.info(f"客户端断开连接，取消查询: {message[:30]}")
+            return
 
 
 async def _process_chat_inner(
@@ -195,35 +191,35 @@ async def _process_chat_inner(
     user_id: int,
     db_dsn: str,
     message_id: str,
-) -> dict:
+):
     try:
         import time as _time
         _t0 = _time.monotonic()
 
+        yield {"event": "progress", "data": {"stage": "thinking", "message": "正在理解问题..."}}
+
         config = await _get_config()
         api_key = config.get("api_key")
         if not api_key:
-            return {"type": "error", "message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key"}
+            yield {"event": "error", "data": {"message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key", "retryable": False, "error_type": "config"}}
+            return
 
-        # 1. 意图预分类 — 命中预置模板则校验后执行
+        # 意图预分类
         preset = classify_intent(message, config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES)
         if preset and preset.get("sql"):
             ok, _, reason = validate_sql(preset["sql"])
             if not ok:
-                logger.warning(f"预设 SQL 校验失败: {reason} — {preset['sql'][:100]}")
-                return {"type": "error", "message": f"预设查询模板异常，请联系管理员检查: {reason}"}
-            return await _execute_and_analyze(
-                sql=preset["sql"],
-                message=message,
-                config=config,
-                db_dsn=db_dsn,
-                message_id=message_id,
-            )
+                yield {"event": "error", "data": {"message": f"预设查询模板异常: {reason}", "retryable": False, "error_type": "config"}}
+                return
+            yield {"event": "progress", "data": {"stage": "executing", "message": "正在查询数据库..."}}
+            result = await _execute_and_analyze(sql=preset["sql"], message=message, config=config, db_dsn=db_dsn, message_id=message_id)
+            yield {"event": "done", "data": result}
+            return
 
-        # 2. 获取账套列表
+        # 获取账套列表
         account_sets = await AccountSet.filter(is_active=True).values("id", "name")
 
-        # 3. 组装 system prompt
+        # 组装 system prompt
         system_prompt = build_sql_prompt(
             account_sets=list(account_sets),
             custom_system_prompt=config.get("ai.prompt.system"),
@@ -231,12 +227,13 @@ async def _process_chat_inner(
             custom_shots=config.get("ai.few_shots"),
         )
 
-        # 4. 调用 DeepSeek 生成 SQL
+        # 调用 DeepSeek 生成 SQL
         messages = [{"role": "system", "content": system_prompt}]
-        # 添加历史对话
         for h in history[-50:]:
             messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
+
+        yield {"event": "progress", "data": {"stage": "generating", "message": "正在生成查询..."}}
 
         _t1 = _time.monotonic()
         r1_result = await call_deepseek(
@@ -246,37 +243,36 @@ async def _process_chat_inner(
             model=config.get("model_sql", DEFAULT_MODEL_SQL),
             temperature=0.0,
         )
-
         _t2 = _time.monotonic()
-        logger.info(f"SQL 生成耗时: {_t2 - _t1:.1f}s, 模型: {config.get('model_sql', DEFAULT_MODEL_SQL)}")
+        logger.info(f"SQL 生成耗时: {_t2 - _t1:.1f}s")
 
         if r1_result is None:
-            return {"type": "error", "message": "AI 服务暂时不可用，请稍后再试"}
+            yield {"event": "error", "data": {"message": "AI 服务暂时不可用，请稍后再试", "retryable": True, "error_type": "api"}}
+            return
 
-        # 5. 处理响应
         resp_type = r1_result.get("type", "")
 
         if resp_type == "clarification":
-            return {
+            yield {"event": "done", "data": {
                 "type": "clarification",
                 "message_id": message_id,
                 "message": r1_result.get("message", "请补充更多信息"),
                 "options": r1_result.get("options", []),
-            }
+            }}
+            return
 
         if resp_type != "sql" or not r1_result.get("sql"):
-            return {"type": "clarification", "message_id": message_id, "message": "我是业务数据查询助手，只能帮你查询 ERP 系统中的销售、采购、库存、应收应付等数据。请试试问我具体的业务问题吧！", "options": ["本月销售概况", "库存状态", "应收账款汇总"]}
+            yield {"event": "done", "data": {"type": "clarification", "message_id": message_id, "message": "我是业务数据查询助手，只能帮你查询 ERP 系统中的销售、采购、库存、应收应付等数据。请试试问我具体的业务问题吧！", "options": ["本月销售概况", "库存状态", "应收账款汇总"]}}
+            return
 
         sql = r1_result["sql"]
 
-        # 6. 自动纠错循环（最多 2 次重试）
+        # 自动纠错循环
         for attempt in range(3):
-            # AST 安全校验
             is_safe, sanitized_sql, reason = validate_sql(sql)
             if not is_safe:
                 logger.warning(f"SQL 校验失败: {reason}，SQL: {sql[:200]}")
                 if attempt < 2:
-                    # 反馈给 R1 重新生成
                     messages.append({"role": "assistant", "content": json.dumps(r1_result, ensure_ascii=False)})
                     messages.append({"role": "user", "content": f"你生成的 SQL 不安全被拒绝了，原因: {reason}。请重新生成一个合法的 SELECT 查询。"})
                     r1_result = await call_deepseek(
@@ -289,10 +285,11 @@ async def _process_chat_inner(
                     if r1_result and r1_result.get("sql"):
                         sql = r1_result["sql"]
                         continue
-                return {"type": "error", "message": "查询无法执行，请换个说法试试"}
+                yield {"event": "error", "data": {"message": "查询无法执行，请换个说法试试", "retryable": True, "error_type": "validation"}}
+                return
 
-            # 执行 SQL
             try:
+                yield {"event": "progress", "data": {"stage": "executing", "message": "正在查询数据库..."}}
                 result = await _execute_and_analyze(
                     sql=sanitized_sql,
                     message=message,
@@ -300,7 +297,8 @@ async def _process_chat_inner(
                     db_dsn=db_dsn,
                     message_id=message_id,
                 )
-                return result
+                yield {"event": "done", "data": result}
+                return
             except Exception as exec_err:
                 err_msg = str(exec_err)[:200]
                 logger.warning(f"SQL 执行失败（第{attempt+1}次）: {err_msg}")
@@ -318,11 +316,11 @@ async def _process_chat_inner(
                         sql = r1_result["sql"]
                         continue
 
-        return {"type": "error", "message": "查询执行失败，请换个说法试试"}
+        yield {"event": "error", "data": {"message": "查询执行失败，请换个说法试试", "retryable": True, "error_type": "execution"}}
 
     except Exception as e:
         logger.error(f"AI 聊天处理异常: {type(e).__name__}: {e}")
-        return {"type": "error", "message": "AI 服务出现异常，请稍后再试"}
+        yield {"event": "error", "data": {"message": "AI 服务出现异常，请稍后再试", "retryable": True, "error_type": "server"}}
 
 
 async def _execute_and_analyze(
