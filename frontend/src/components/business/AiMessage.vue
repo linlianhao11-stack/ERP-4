@@ -8,12 +8,7 @@
     <!-- AI 消息 -->
     <div v-else class="ai-msg-ai">
       <!-- 加载中 -->
-      <div v-if="msg.loading" class="flex items-center gap-2 text-muted text-sm">
-        <div class="ai-typing">
-          <span /><span /><span />
-        </div>
-        思考中...
-      </div>
+      <AiProgressIndicator v-if="msg.loading" :stage="msg.stage" :stage-message="msg.stageMessage" />
 
       <!-- 澄清 -->
       <template v-else-if="msg.type === 'clarification'">
@@ -28,6 +23,9 @@
       <!-- 错误 -->
       <template v-else-if="msg.type === 'error'">
         <p class="text-sm text-error">{{ msg.message }}</p>
+        <button v-if="msg._retryable" class="btn btn-secondary btn-sm text-xs mt-2" @click="$emit('retry', msg)">
+          <RotateCcw :size="12" class="mr-1" /> 重试
+        </button>
       </template>
 
       <!-- 正常回答 -->
@@ -91,8 +89,9 @@
 </template>
 
 <script setup>
-import { Copy, Download, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { Copy, Download, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-vue-next'
 import AiChartRenderer from './AiChartRenderer.vue'
+import AiProgressIndicator from './AiProgressIndicator.vue'
 import { useAppStore } from '../../stores/app'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -105,7 +104,7 @@ const props = defineProps({
   msg: { type: Object, required: true },
 })
 
-defineEmits(['select-option', 'export', 'feedback'])
+defineEmits(['select-option', 'export', 'feedback', 'retry'])
 
 const isNumber = (val) => typeof val === 'number'
 
@@ -155,20 +154,7 @@ const copyTable = async () => {
   max-width: 95%;
   font-size: 14px;
 }
-.ai-typing span {
-  display: inline-block;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  animation: typing 1.2s infinite;
-  margin-right: 3px;
-}
-.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
-.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes typing {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
+
 .ai-analysis :deep(p) { margin-bottom: 0.5em; }
 .ai-analysis :deep(ul), .ai-analysis :deep(ol) { padding-left: 1.2em; margin: 0.5em 0; }
 .ai-analysis :deep(li) { margin-bottom: 0.25em; }
