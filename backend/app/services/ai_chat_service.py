@@ -16,6 +16,8 @@ from app.ai.deepseek_client import (
 from app.ai.preset_queries import DEFAULT_PRESET_QUERIES
 from app.ai.business_dict import DEFAULT_BUSINESS_DICT
 from app.ai.few_shots import DEFAULT_FEW_SHOTS
+from app.ai.view_permissions import get_allowed_views
+from app.ai.schema_registry import get_full_schema_text
 
 logger = get_logger("ai.chat_service")
 
@@ -129,12 +131,20 @@ async def check_ai_available() -> tuple[bool, str | None]:
     return True, None
 
 
-async def get_preset_queries() -> list[dict]:
-    """获取预设快捷问题列表（仅 display 字段，不暴露 sql/keywords）"""
+async def get_preset_queries(user_permissions: list[str] | None = None) -> list[dict]:
+    """获取预设快捷问题列表（仅 display 字段，不暴露 sql/keywords），按权限过滤"""
     try:
         config = await _get_config()
         raw = config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES
-        return [{"display": q["display"]} for q in raw if q.get("display")]
+        result = []
+        for q in raw:
+            if not q.get("display"):
+                continue
+            perm = q.get("permission")
+            if perm and user_permissions is not None and perm not in user_permissions:
+                continue
+            result.append({"display": q["display"]})
+        return result
     except Exception:
         return [{"display": q["display"]} for q in DEFAULT_PRESET_QUERIES if q.get("display")]
 
@@ -144,6 +154,7 @@ async def process_chat(
     history: list[dict],
     user_id: int,
     db_dsn: str,
+    user_permissions: list[str] | None = None,
 ):
     """处理用户聊天消息，yield SSE 事件 dict"""
     import time as _time
@@ -166,7 +177,7 @@ async def process_chat(
 
     async with _ai_semaphore:
         try:
-            async for event in _process_chat_inner(message, history, user_id, db_dsn, message_id):
+            async for event in _process_chat_inner(message, history, user_id, db_dsn, message_id, user_permissions=user_permissions):
                 yield event
                 # 缓存最终结果
                 if event.get("event") == "done":
@@ -191,6 +202,7 @@ async def _process_chat_inner(
     user_id: int,
     db_dsn: str,
     message_id: str,
+    user_permissions: list[str] | None = None,
 ):
     try:
         import time as _time
@@ -204,10 +216,13 @@ async def _process_chat_inner(
             yield {"event": "error", "data": {"message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key", "retryable": False, "error_type": "config"}}
             return
 
+        # 计算用户允许访问的视图/表
+        allowed = get_allowed_views(user_permissions or []) if user_permissions else None
+
         # 意图预分类
         preset = classify_intent(message, config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES)
         if preset and preset.get("sql"):
-            ok, _, reason = validate_sql(preset["sql"])
+            ok, _, reason = validate_sql(preset["sql"], allowed_tables=allowed)
             if not ok:
                 yield {"event": "error", "data": {"message": f"预设查询模板异常: {reason}", "retryable": False, "error_type": "config"}}
                 return
@@ -219,12 +234,14 @@ async def _process_chat_inner(
         # 获取账套列表
         account_sets = await AccountSet.filter(is_active=True).values("id", "name")
 
-        # 组装 system prompt
+        # 组装 system prompt（按权限过滤 schema）
+        schema_text = get_full_schema_text(allowed_views=allowed)
         system_prompt = build_sql_prompt(
             account_sets=list(account_sets),
             custom_system_prompt=config.get("ai.prompt.system"),
             custom_dict=config.get("ai.business_dict"),
             custom_shots=config.get("ai.few_shots"),
+            schema_text=schema_text,
         )
 
         # 调用 DeepSeek 生成 SQL
@@ -269,7 +286,7 @@ async def _process_chat_inner(
 
         # 自动纠错循环
         for attempt in range(3):
-            is_safe, sanitized_sql, reason = validate_sql(sql)
+            is_safe, sanitized_sql, reason = validate_sql(sql, allowed_tables=allowed)
             if not is_safe:
                 logger.warning(f"SQL 校验失败: {reason}，SQL: {sql[:200]}")
                 if attempt < 2:

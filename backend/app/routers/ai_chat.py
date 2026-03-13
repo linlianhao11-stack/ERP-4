@@ -5,7 +5,7 @@ import io
 import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, SystemSetting
 from app.schemas.ai import ChatRequest, FeedbackRequest, ExportRequest
 from app.services.ai_chat_service import process_chat, check_ai_available, get_preset_queries
@@ -37,12 +37,15 @@ def _build_ai_dsn() -> str:
 async def ai_status(user: User = Depends(get_current_user)):
     """检查 AI 助手可用性（含预设快捷问题，所有登录用户可访问）"""
     available, reason = await check_ai_available()
-    preset = await get_preset_queries() if available else []
+    if available and not user.has_permission("ai_chat"):
+        available = False
+        reason = "你没有 AI 助手使用权限"
+    preset = await get_preset_queries(user_permissions=user.permissions or []) if available else []
     return {"available": available, "reason": reason, "preset_queries": preset}
 
 
 @router.post("/chat")
-async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
+async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai_chat"))):
     """AI 聊天接口 — SSE 流式响应"""
     # 输入验证
     if len(body.history) > 50:
@@ -73,6 +76,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(get_current_user)):
                 history=body.history,
                 user_id=user.id,
                 db_dsn=dsn,
+                user_permissions=user.permissions or [],
             ):
                 evt_type = event.get("event", "progress")
                 evt_data = json.dumps(event.get("data", {}), ensure_ascii=False)

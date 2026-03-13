@@ -32,11 +32,32 @@ from app.routers import (
 )
 
 
+async def _migrate_ai_permissions():
+    """一次性：为所有活跃非 admin 用户追加 AI 权限"""
+    from app.models import User
+    from app.ai.view_permissions import AI_PERMISSION_KEYS
+    from app.logger import get_logger
+    logger = get_logger("migration")
+
+    users = await User.filter(is_active=True).exclude(role="admin").all()
+    migrated = 0
+    for user in users:
+        perms = user.permissions or []
+        if "ai_chat" not in perms:
+            perms.extend(AI_PERMISSION_KEYS)
+            user.permissions = list(set(perms))
+            await user.save()
+            migrated += 1
+    if migrated:
+        logger.info(f"AI 权限迁移完成，已为 {migrated} 个用户添加 AI 权限")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动
     await init_db()
     await run_migrations()
+    await _migrate_ai_permissions()
     # 启动自动备份任务
     backup_task = asyncio.create_task(auto_backup_loop())
     yield

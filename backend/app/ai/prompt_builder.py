@@ -84,6 +84,7 @@ def build_sql_prompt(
     custom_system_prompt: str | None = None,
     custom_dict: list | None = None,
     custom_shots: list | None = None,
+    schema_text: str | None = None,
 ) -> str:
     """组装 SQL 生成的 system prompt"""
     # 账套指令
@@ -103,7 +104,7 @@ def build_sql_prompt(
     template = custom_system_prompt or DEFAULT_SQL_SYSTEM_PROMPT
     fmt_kwargs = dict(
         account_set_instruction=account_instruction,
-        schema=get_view_schema_text(),
+        schema=schema_text if schema_text is not None else get_view_schema_text(),
         business_dict=format_business_dict(custom_dict),
         few_shots=format_few_shots(custom_shots),
     )

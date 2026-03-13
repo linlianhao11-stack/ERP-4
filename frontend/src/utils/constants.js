@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, Package, ShoppingBag,
-  ArrowLeftRight, Truck, Wallet, Users, Settings, BookOpen
+  ArrowLeftRight, Truck, Wallet, Users, Settings, BookOpen, Sparkles
 } from 'lucide-vue-next'
 
 export const iconMap = {
@@ -13,6 +13,7 @@ export const iconMap = {
   finance: Wallet,
   customers: Users,
   accounting: BookOpen,
+  sparkles: Sparkles,
   settings: Settings
 }
 
@@ -100,6 +101,14 @@ export const permissionGroups = [
     { key: 'accounting_ap_confirm', name: '应付确认' },
   ]},
   { label: '客户管理', icon: 'customers', main: 'customer', children: [] },
+  { label: 'AI 助手', icon: 'sparkles', main: 'ai_chat', children: [
+    { key: 'ai_sales', name: '销售数据' },
+    { key: 'ai_purchase', name: '采购数据' },
+    { key: 'ai_stock', name: '库存数据' },
+    { key: 'ai_customer', name: '客户数据' },
+    { key: 'ai_finance', name: '财务数据' },
+    { key: 'ai_accounting', name: '会计数据' },
+  ]},
   { label: '系统设置', icon: 'settings', main: 'settings', children: [
     { key: 'logs', name: '操作日志' },
   ]},
