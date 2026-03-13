@@ -28,16 +28,14 @@
 
       <!-- 消息区域 -->
       <div ref="messagesRef" class="ai-messages">
-        <!-- 欢迎语 -->
-        <div v-if="messages.length === 0" class="text-center py-8 text-muted">
-          <Sparkles :size="32" class="mx-auto mb-3 opacity-30" />
-          <p class="text-sm mb-4">你好！我是 AI 数据助手，可以帮你查询和分析业务数据。</p>
-          <div v-if="presetQueries.length" class="flex flex-wrap gap-2 justify-center">
-            <button v-for="pq in presetQueries" :key="pq.display" class="btn btn-secondary btn-sm text-xs" @click="handleSend(pq.display)">
-              {{ pq.display }}
-            </button>
-          </div>
-        </div>
+        <!-- 欢迎页（含收藏和预设查询） -->
+        <AiWelcome
+          v-if="messages.length === 0"
+          :favorites="favorites"
+          :preset-queries="presetQueries"
+          @send="handleSend"
+          @remove-favorite="handleRemoveFavorite"
+        />
 
         <AiMessage
           v-for="(msg, i) in messages" :key="i"
@@ -46,6 +44,7 @@
           @export="handleExport"
           @feedback="handleFeedback"
           @retry="retryMessage"
+          @favorite="handleFavorite"
         />
       </div>
 
@@ -73,9 +72,11 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Sparkles, X, RotateCcw, Send, Maximize2, Minimize2 } from 'lucide-vue-next'
 import AiMessage from './AiMessage.vue'
+import AiWelcome from './AiWelcome.vue'
 import { aiExport, aiFeedback, getAiStatus } from '../../api/ai'
 import { useAppStore } from '../../stores/app'
 import { useAiChat } from '../../composables/useAiChat'
+import { useAiFavorites } from '../../composables/useAiFavorites'
 
 const appStore = useAppStore()
 const { messages, loading, sendMessage, retryMessage, clearChat, restoreFromStorage, clearStorage, saveToStorage } = useAiChat()
@@ -84,6 +85,8 @@ const open = ref(false)
 const available = ref(false)
 const input = ref('')
 const presetQueries = ref([])
+const favorites = ref([])
+let favFns = null
 const messagesRef = ref(null)
 const inputRef = ref(null)
 const isMobile = ref(false)
@@ -135,6 +138,12 @@ const checkStatus = async () => {
     if (data.available) {
       presetQueries.value = data.preset_queries || []
       restoreFromStorage(appStore.user?.id)
+      // 初始化收藏功能
+      const userId = appStore.user?.id
+      if (userId) {
+        favFns = useAiFavorites(userId)
+        favorites.value = [...favFns.favorites.value]
+      }
     }
   } catch {
     available.value = false
@@ -169,6 +178,20 @@ const handleFeedback = async (msg, type) => {
     })
   } catch { /* silent */ }
   saveToStorage()
+}
+
+const handleFavorite = (msg) => {
+  if (!favFns || !msg._question) return
+  if (favFns.isFavorited(msg._question)) return
+  favFns.addFavorite(msg._question)
+  msg._favorited = true
+  favorites.value = [...favFns.favorites.value]
+}
+
+const handleRemoveFavorite = (index) => {
+  if (!favFns) return
+  favFns.removeFavorite(index)
+  favorites.value = [...favFns.favorites.value]
 }
 
 const autoResize = () => {

@@ -77,8 +77,17 @@
           <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="copyTable" title="复制表格">
             <Copy :size="14" />
           </button>
-          <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="$emit('export', msg)" title="导出 Excel">
-            <Download :size="14" />
+          <div class="relative" v-if="msg.table_data">
+            <button class="text-xs text-muted hover:text-primary" @click="showExportMenu = !showExportMenu" title="导出">
+              <Download :size="14" />
+            </button>
+            <div v-if="showExportMenu" class="absolute bottom-full left-0 mb-1 bg-surface border rounded-lg shadow-lg py-1 z-10 whitespace-nowrap">
+              <button class="block w-full text-left px-3 py-1.5 text-xs hover:bg-elevated" @click="$emit('export', msg); showExportMenu = false">导出 Excel</button>
+              <button class="block w-full text-left px-3 py-1.5 text-xs hover:bg-elevated" @click="exportCsv(); showExportMenu = false">导出 CSV</button>
+            </div>
+          </div>
+          <button class="text-xs text-muted hover:text-warning" @click="$emit('favorite', msg)" :title="msg._favorited ? '已收藏' : '收藏查询'">
+            <Star :size="14" :fill="msg._favorited ? 'currentColor' : 'none'" :class="msg._favorited ? 'text-warning' : ''" />
           </button>
           <div class="flex-1" />
           <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'positive' ? 'bg-success-subtle text-success-emphasis' : 'text-muted hover:text-success'" @click="$emit('feedback', msg, 'positive')">
@@ -94,7 +103,8 @@
 </template>
 
 <script setup>
-import { Copy, Download, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { Copy, Download, ThumbsUp, ThumbsDown, RotateCcw, Star } from 'lucide-vue-next'
 import AiChartRenderer from './AiChartRenderer.vue'
 import AiProgressIndicator from './AiProgressIndicator.vue'
 import { useAppStore } from '../../stores/app'
@@ -109,7 +119,7 @@ const props = defineProps({
   msg: { type: Object, required: true },
 })
 
-defineEmits(['select-option', 'export', 'feedback', 'retry'])
+defineEmits(['select-option', 'export', 'feedback', 'retry', 'favorite'])
 
 const isNumber = (val) => typeof val === 'number'
 
@@ -127,6 +137,25 @@ const renderMarkdown = (text) => {
     ALLOWED_TAGS: ['strong', 'em', 'ul', 'ol', 'li', 'br', 'p', 'h3', 'h4', 'code', 'pre'],
     ALLOWED_ATTR: ['class'],
   })
+}
+
+const showExportMenu = ref(false)
+
+const exportCsv = () => {
+  if (!props.msg.table_data) return
+  const { columns, rows } = props.msg.table_data
+  const bom = '\uFEFF'
+  const csv = bom + [
+    columns.join(','),
+    ...rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'AI查询结果.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 const copyTable = async () => {
