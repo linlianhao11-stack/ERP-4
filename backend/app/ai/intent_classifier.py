@@ -1,32 +1,59 @@
-"""意图预分类器 — 高频查询直接匹配预置 SQL 模板"""
+"""意图预分类器 — 同义词展开 + 模糊匹配"""
 from __future__ import annotations
 from app.logger import get_logger
+from app.ai.synonym_map import DEFAULT_SYNONYMS
 
 logger = get_logger("ai.intent")
+
+
+def _expand_synonyms(text: str, synonyms: dict[str, list[str]] | None = None) -> str:
+    """将用户输入中的同义词替换为标准词"""
+    syn = synonyms or DEFAULT_SYNONYMS
+    result = text.lower()
+    for standard, alts in syn.items():
+        for alt in alts:
+            if alt in result:
+                result = result.replace(alt, standard)
+    return result
 
 
 def classify_intent(
     message: str,
     preset_queries: list[dict] | None = None,
+    synonyms: dict[str, list[str]] | None = None,
 ) -> dict | None:
-    """
-    尝试匹配预置查询模板。
-
-    preset_queries 格式: [{"display": "...", "keywords": ["..."], "sql": "..."}]
-    返回匹配的模板 dict 或 None（未命中走 NL2SQL）。
-    """
     if not preset_queries or not message:
         return None
 
-    msg_lower = message.lower().strip()
+    expanded = _expand_synonyms(message, synonyms)
+
+    best_match = None
+    best_rate = 0.0
+    best_kw_count = 0
 
     for preset in preset_queries:
         keywords = preset.get("keywords", [])
         if not keywords:
             continue
-        # 所有关键词都出现在消息中才算命中
-        if all(kw.lower() in msg_lower for kw in keywords):
-            logger.info(f"命中预置模板: {preset.get('display', '')}")
-            return preset
 
-    return None
+        hits = sum(1 for kw in keywords if kw.lower() in expanded)
+        rate = hits / len(keywords)
+
+        # 单关键词精确匹配，多关键词 >= 80%
+        if len(keywords) == 1:
+            if rate < 1.0:
+                continue
+        else:
+            if rate < 0.8:
+                continue
+
+        # 取命中率最高、关键词更多的
+        if rate > best_rate or (rate == best_rate and len(keywords) > best_kw_count):
+            best_match = preset
+            best_rate = rate
+            best_kw_count = len(keywords)
+
+    if best_match:
+        logger.info(f"命中预置模板: {best_match.get('display', '')} (命中率: {best_rate:.0%})")
+
+    return best_match
