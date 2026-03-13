@@ -120,6 +120,40 @@ VIEW_SCHEMAS = {
             ("account_set_name", "VARCHAR", "账套名称"),
         ],
     },
+    "vw_accounting_ledger": {
+        "description": "科目明细账（仅已过账凭证）",
+        "columns": [
+            ("account_code", "VARCHAR", "科目代码"),
+            ("account_name", "VARCHAR", "科目名称"),
+            ("category", "VARCHAR", "科目类别"),
+            ("direction", "VARCHAR", "余额方向: debit/credit"),
+            ("period_name", "VARCHAR", "会计期间"),
+            ("voucher_no", "VARCHAR", "凭证号"),
+            ("voucher_date", "DATE", "凭证日期"),
+            ("voucher_type", "VARCHAR", "凭证类型"),
+            ("summary", "VARCHAR", "摘要"),
+            ("debit_amount", "DECIMAL", "借方金额"),
+            ("credit_amount", "DECIMAL", "贷方金额"),
+            ("aux_customer_name", "VARCHAR", "辅助核算-客户"),
+            ("aux_supplier_name", "VARCHAR", "辅助核算-供应商"),
+            ("account_set_name", "VARCHAR", "账套名称"),
+        ],
+    },
+    "vw_accounting_voucher_summary": {
+        "description": "凭证汇总（按期间、类型统计）",
+        "columns": [
+            ("account_set_name", "VARCHAR", "账套名称"),
+            ("period_name", "VARCHAR", "会计期间"),
+            ("voucher_type", "VARCHAR", "凭证类型"),
+            ("total_count", "INT", "凭证总数"),
+            ("total_debit", "DECIMAL", "借方合计"),
+            ("total_credit", "DECIMAL", "贷方合计"),
+            ("draft_count", "INT", "草稿数"),
+            ("pending_count", "INT", "待审数"),
+            ("approved_count", "INT", "已审数"),
+            ("posted_count", "INT", "已过账数"),
+        ],
+    },
 }
 
 # 基础参考表 schema — 用于查询仓库/客户/供应商/产品等基础信息
@@ -181,16 +215,20 @@ REFERENCE_TABLE_SCHEMAS = {
 _cached_schema: str | None = None
 
 
-def get_view_schema_text() -> str:
-    """生成视图 schema 文本（供 system prompt 使用）"""
+def get_view_schema_text(allowed_views: set[str] | None = None) -> str:
+    """生成视图 schema 文本（供 system prompt 使用），支持按权限过滤"""
     lines = ["## 数据视图（优先使用这些视图查询）\n"]
     for view_name, info in VIEW_SCHEMAS.items():
+        if allowed_views is not None and view_name not in allowed_views:
+            continue
         lines.append(f"### {view_name} — {info['description']}")
         for col_name, col_type, comment in info["columns"]:
             lines.append(f"  - {col_name} ({col_type}): {comment}")
         lines.append("")
     lines.append("## 基础参考表（查询仓库/产品/客户/供应商等基础信息）\n")
     for table_name, info in REFERENCE_TABLE_SCHEMAS.items():
+        if allowed_views is not None and table_name not in allowed_views:
+            continue
         lines.append(f"### {table_name} — {info['description']}")
         for col_name, col_type, comment in info["columns"]:
             lines.append(f"  - {col_name} ({col_type}): {comment}")
@@ -228,14 +266,14 @@ async def get_table_schema_text() -> str:
     return _cached_schema
 
 
-def get_full_schema_text() -> str:
+def get_full_schema_text(allowed_views: set[str] | None = None) -> str:
     """返回 AI 可用的 schema 文本。
 
     当前仅包含语义视图 — 原始表 schema 不暴露给 AI，
     因为视图已涵盖所有业务查询需求，且避免泄露敏感表结构。
     如需支持更复杂查询，可在此合并 get_table_schema_text()。
     """
-    return get_view_schema_text()
+    return get_view_schema_text(allowed_views=allowed_views)
 
 
 def invalidate_cache() -> None:

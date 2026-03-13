@@ -21,13 +21,14 @@ BLOCKED_KEYWORDS = frozenset({"grant", "revoke", "copy", "execute", "call"})
 MAX_LIMIT = 1000
 
 
-def validate_sql(sql: str) -> tuple[bool, str, str]:
+def validate_sql(sql: str, allowed_tables: set[str] | None = None) -> tuple[bool, str, str]:
     """
     校验 SQL 安全性。
 
     返回 (is_safe, sanitized_sql, rejection_reason)
     - is_safe=True 时 sanitized_sql 是处理后可执行的 SQL
     - is_safe=False 时 rejection_reason 说明拒绝原因
+    - allowed_tables: 白名单，若提供则只允许访问这些表/视图
     """
     if not sql or not sql.strip():
         return False, "", "空 SQL"
@@ -81,6 +82,12 @@ def validate_sql(sql: str) -> tuple[bool, str, str]:
             table_name = (node.name or "").lower()
             if table_name in BLOCKED_TABLES:
                 return False, "", f"禁止访问敏感表: {table_name}"
+
+        # 白名单检查
+        if isinstance(node, exp.Table) and allowed_tables is not None:
+            table_name = (node.name or "").lower()
+            if table_name and table_name not in allowed_tables:
+                return False, "", f"你没有查询 {table_name} 数据的权限"
 
     # LIMIT 处理（只对 SELECT 追加，Union 根节点不直接加 LIMIT）
     sanitized = _enforce_limit(statement)
