@@ -35,7 +35,11 @@ export function useAiChat() {
       const preview = m.table_data.rows.slice(0, 5).map(r => r.join(' | ')).join('\n')
       parts.push(`[数据 (${m.table_data.rows.length}行): ${cols}\n${preview}]`)
     }
-    return parts.join('\n') || m.message || ''
+    // clarification 或 text 回复的内容
+    if (m.message) parts.push(m.message)
+    // 过期消息（sessionStorage 恢复后 table_data 丢失）也保留已有上下文
+    if (m._expired && m._hasTableData) parts.push('[之前有表格数据，已过期]')
+    return parts.join('\n') || ''
   }
 
   const buildHistory = () => {
@@ -123,7 +127,7 @@ export function useAiChat() {
     abortController = new AbortController()
 
     try {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('erp_token')
       const history = buildHistory().slice(0, -2)
 
       const response = await fetch(`${API_BASE}/api/ai/chat`, {
@@ -135,6 +139,24 @@ export function useAiChat() {
         body: JSON.stringify({ message: msg, history }),
         signal: abortController.signal,
       })
+
+      if (response.status === 401) {
+        messages.value[aiMsgIndex] = {
+          loading: false, role: 'assistant', type: 'error',
+          message: '登录已过期，请刷新页面重新登录',
+          _retryable: false, _originalQuestion: msg, _errorType: 'auth',
+        }
+        return
+      }
+
+      if (response.status === 403) {
+        messages.value[aiMsgIndex] = {
+          loading: false, role: 'assistant', type: 'error',
+          message: '你没有使用 AI 助手的权限，请联系管理员开通',
+          _retryable: false, _originalQuestion: msg, _errorType: 'forbidden',
+        }
+        return
+      }
 
       if (response.status === 429) {
         messages.value[aiMsgIndex] = {

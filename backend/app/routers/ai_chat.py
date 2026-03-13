@@ -40,7 +40,8 @@ async def ai_status(user: User = Depends(get_current_user)):
     if available and not user.has_permission("ai_chat"):
         available = False
         reason = "你没有 AI 助手使用权限"
-    preset = await get_preset_queries(user_permissions=user.permissions or []) if available else []
+    perms = None if user.role == "admin" else (user.permissions or [])
+    preset = await get_preset_queries(user_permissions=perms) if available else []
     return {"available": available, "reason": reason, "preset_queries": preset}
 
 
@@ -76,7 +77,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai
                 history=body.history,
                 user_id=user.id,
                 db_dsn=dsn,
-                user_permissions=user.permissions or [],
+                user_permissions=None if user.role == "admin" else (user.permissions or []),
             ):
                 evt_type = event.get("event", "progress")
                 evt_data = json.dumps(event.get("data", {}), ensure_ascii=False)
@@ -94,7 +95,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai
 
 
 @router.post("/chat/export")
-async def ai_export(body: ExportRequest, user: User = Depends(get_current_user)):
+async def ai_export(body: ExportRequest, user: User = Depends(require_permission("ai_chat"))):
     """导出查询结果为 Excel"""
     import openpyxl
 
@@ -131,7 +132,7 @@ async def ai_export(body: ExportRequest, user: User = Depends(get_current_user))
 
 
 @router.post("/chat/feedback")
-async def ai_feedback(body: FeedbackRequest, user: User = Depends(get_current_user)):
+async def ai_feedback(body: FeedbackRequest, user: User = Depends(require_permission("ai_chat"))):
     """接收用户反馈"""
     logger.info(
         f"AI 反馈: user={user.username}, message_id={body.message_id}, "

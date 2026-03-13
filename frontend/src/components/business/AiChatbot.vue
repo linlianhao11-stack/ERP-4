@@ -38,7 +38,7 @@
         />
 
         <AiMessage
-          v-for="(msg, i) in messages" :key="i"
+          v-for="(msg, i) in messages" :key="msg.message_id || i"
           :msg="msg"
           @select-option="handleSend"
           @export="handleExport"

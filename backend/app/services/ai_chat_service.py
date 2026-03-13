@@ -235,15 +235,20 @@ async def _process_chat_inner(
             yield {"event": "error", "data": {"message": "AI 助手未配置，请联系管理员设置 DeepSeek API Key", "retryable": False, "error_type": "config"}}
             return
 
-        # 计算用户允许访问的视图/表
-        allowed = get_allowed_views(user_permissions or []) if user_permissions else None
+        # 计算用户允许访问的视图/表（None=admin 不限制）
+        allowed = get_allowed_views(user_permissions) if user_permissions is not None else None
 
-        # 意图预分类
-        preset = classify_intent(message, config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES)
+        # 意图预分类（按权限过滤预设）
+        all_presets = config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES
+        if user_permissions is not None:
+            filtered_presets = [p for p in all_presets if p.get("permission", "ai_chat") in user_permissions]
+        else:
+            filtered_presets = all_presets
+        preset = classify_intent(message, filtered_presets)
         if preset and preset.get("sql"):
             ok, _, reason = validate_sql(preset["sql"], allowed_tables=allowed)
             if not ok:
-                yield {"event": "error", "data": {"message": f"预设查询模板异常: {reason}", "retryable": False, "error_type": "config"}}
+                yield {"event": "error", "data": {"message": f"你没有查询该数据的权限", "retryable": False, "error_type": "forbidden"}}
                 return
             yield {"event": "progress", "data": {"stage": "executing", "message": "正在查询数据库..."}}
             result = await _execute_and_analyze(sql=preset["sql"], message=message, config=config, db_dsn=db_dsn, message_id=message_id)
@@ -294,6 +299,14 @@ async def _process_chat_inner(
                 "message_id": message_id,
                 "message": r1_result.get("message", "请补充更多信息"),
                 "options": r1_result.get("options", []),
+            }}
+            return
+
+        if resp_type == "text":
+            yield {"event": "done", "data": {
+                "type": "answer",
+                "message_id": message_id,
+                "analysis": r1_result.get("message", ""),
             }}
             return
 

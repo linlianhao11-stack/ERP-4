@@ -33,11 +33,16 @@ from app.routers import (
 
 
 async def _migrate_ai_permissions():
-    """一次性：为所有活跃非 admin 用户追加 AI 权限"""
-    from app.models import User
+    """一次性：为所有活跃非 admin 用户追加 AI 权限（仅首次运行）"""
+    from app.models import User, SystemSetting
     from app.ai.view_permissions import AI_PERMISSION_KEYS
     from app.logger import get_logger
     logger = get_logger("migration")
+
+    # 检查是否已执行过迁移
+    flag = await SystemSetting.filter(key="ai.permissions_migrated").first()
+    if flag:
+        return
 
     users = await User.filter(is_active=True).exclude(role="admin").all()
     migrated = 0
@@ -50,6 +55,9 @@ async def _migrate_ai_permissions():
             migrated += 1
     if migrated:
         logger.info(f"AI 权限迁移完成，已为 {migrated} 个用户添加 AI 权限")
+
+    # 标记已迁移（get_or_create 防止多 worker 竞争）
+    await SystemSetting.get_or_create(key="ai.permissions_migrated", defaults={"value": "1"})
 
 
 @asynccontextmanager
