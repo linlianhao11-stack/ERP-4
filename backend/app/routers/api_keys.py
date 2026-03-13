@@ -10,6 +10,7 @@ from app.ai.business_dict import DEFAULT_BUSINESS_DICT
 from app.ai.few_shots import DEFAULT_FEW_SHOTS
 from app.ai.preset_queries import DEFAULT_PRESET_QUERIES
 from app.ai.prompt_builder import DEFAULT_SQL_SYSTEM_PROMPT, DEFAULT_ANALYSIS_SYSTEM_PROMPT
+from app.ai.synonym_map import DEFAULT_SYNONYMS
 from app.services.ai_chat_service import invalidate_config_cache
 from app.logger import get_logger
 
@@ -103,6 +104,7 @@ _CONFIG_DEFAULTS = {
     "ai.business_dict": DEFAULT_BUSINESS_DICT,
     "ai.few_shots": DEFAULT_FEW_SHOTS,
     "ai.preset_queries": DEFAULT_PRESET_QUERIES,
+    "ai.synonyms": DEFAULT_SYNONYMS,
 }
 
 
@@ -110,10 +112,10 @@ _CONFIG_DEFAULTS = {
 async def get_ai_config(user: User = Depends(require_permission("admin"))):
     """获取 AI 配置（提示词、词典、示例、快捷问题）— 数据库无值时返回代码默认值"""
     result = {}
-    for key in ["ai.prompt.system", "ai.prompt.analysis", "ai.business_dict", "ai.few_shots", "ai.preset_queries"]:
+    for key in ["ai.prompt.system", "ai.prompt.analysis", "ai.business_dict", "ai.few_shots", "ai.preset_queries", "ai.synonyms"]:
         setting = await SystemSetting.filter(key=key).first()
         if setting and setting.value:
-            if key in ("ai.business_dict", "ai.few_shots", "ai.preset_queries"):
+            if key in ("ai.business_dict", "ai.few_shots", "ai.preset_queries", "ai.synonyms"):
                 try:
                     result[key] = json.loads(setting.value)
                 except json.JSONDecodeError:
@@ -128,13 +130,13 @@ async def get_ai_config(user: User = Depends(require_permission("admin"))):
 @router.put("/ai-config")
 async def update_ai_config(body: dict, user: User = Depends(require_permission("admin"))):
     """更新 AI 配置"""
-    allowed_keys = {"ai.prompt.system", "ai.prompt.analysis", "ai.business_dict", "ai.few_shots", "ai.preset_queries"}
+    allowed_keys = {"ai.prompt.system", "ai.prompt.analysis", "ai.business_dict", "ai.few_shots", "ai.preset_queries", "ai.synonyms"}
     updated = []
     for key, value in body.items():
         if key not in allowed_keys:
             continue
         # JSON 类型的配置序列化存储
-        if key in ("ai.business_dict", "ai.few_shots", "ai.preset_queries"):
+        if key in ("ai.business_dict", "ai.few_shots", "ai.preset_queries", "ai.synonyms"):
             store_value = json.dumps(value, ensure_ascii=False) if value else None
         else:
             store_value = value

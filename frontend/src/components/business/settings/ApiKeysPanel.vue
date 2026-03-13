@@ -106,7 +106,16 @@
           </div>
         </div>
         <div class="flex justify-between mt-3">
-          <button class="btn btn-secondary btn-sm" @click="addDictItem">添加术语</button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="addDictItem">添加术语</button>
+            <button class="btn btn-secondary btn-sm" @click="exportJson('ai.business_dict', '业务词典')">
+              <Download :size="14" class="mr-1" />导出
+            </button>
+            <label class="btn btn-secondary btn-sm cursor-pointer">
+              <Upload :size="14" class="mr-1" />导入
+              <input type="file" accept=".json" class="hidden" @change="e => importJson(e, 'ai.business_dict', '业务词典', validateDictImport)" />
+            </label>
+          </div>
           <button class="btn btn-primary btn-sm" @click="handleSaveConfig" :disabled="saving">保存词典</button>
         </div>
       </div>
@@ -136,7 +145,16 @@
           </div>
         </div>
         <div class="flex justify-between mt-3">
-          <button class="btn btn-secondary btn-sm" @click="addShotItem">添加示例</button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="addShotItem">添加示例</button>
+            <button class="btn btn-secondary btn-sm" @click="exportJson('ai.few_shots', '示例问答库')">
+              <Download :size="14" class="mr-1" />导出
+            </button>
+            <label class="btn btn-secondary btn-sm cursor-pointer">
+              <Upload :size="14" class="mr-1" />导入
+              <input type="file" accept=".json" class="hidden" @change="e => importJson(e, 'ai.few_shots', '示例问答库', validateShotsImport)" />
+            </label>
+          </div>
           <button class="btn btn-primary btn-sm" @click="handleSaveConfig" :disabled="saving">保存示例</button>
         </div>
       </div>
@@ -164,8 +182,64 @@
           </div>
         </div>
         <div class="flex justify-between mt-3">
-          <button class="btn btn-secondary btn-sm" @click="addPresetItem">添加问题</button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="addPresetItem">添加问题</button>
+            <button class="btn btn-secondary btn-sm" @click="exportJson('ai.preset_queries', '快捷问题')">
+              <Download :size="14" class="mr-1" />导出
+            </button>
+            <label class="btn btn-secondary btn-sm cursor-pointer">
+              <Upload :size="14" class="mr-1" />导入
+              <input type="file" accept=".json" class="hidden" @change="e => importJson(e, 'ai.preset_queries', '快捷问题', validatePresetsImport)" />
+            </label>
+          </div>
           <button class="btn btn-primary btn-sm" @click="handleSaveConfig" :disabled="saving">保存问题</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. 同义词映射 -->
+    <div class="card p-4">
+      <button class="flex items-center justify-between w-full text-left" @click="sections.synonyms = !sections.synonyms">
+        <h3 class="font-semibold flex items-center gap-2">
+          <ArrowLeftRight :size="16" />
+          同义词映射
+          <span class="text-xs text-muted">({{ synonymRows.length }})</span>
+        </h3>
+        <ChevronDown :size="16" :class="{ 'rotate-180': sections.synonyms }" class="transition-transform" />
+      </button>
+      <div v-if="sections.synonyms" class="mt-4">
+        <p class="text-xs text-muted mb-3">将用户口语化表达映射到标准业务术语，提升 AI 理解准确度</p>
+        <div class="space-y-2">
+          <div v-for="(row, idx) in synonymRows" :key="idx" class="flex gap-2 items-start">
+            <input
+              :value="row.term"
+              @change="renameSynonymKey(idx, $event.target.value)"
+              class="input text-sm w-32"
+              placeholder="标准词"
+            />
+            <input
+              :value="row.alts"
+              @change="updateSynonymAlts(idx, $event.target.value)"
+              class="input text-sm flex-1"
+              placeholder="同义词（逗号分隔）"
+            />
+            <button class="btn btn-danger btn-sm" @click="deleteSynonym(idx)">
+              <Trash2 :size="14" />
+            </button>
+          </div>
+        </div>
+        <div class="flex justify-between mt-3">
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="addSynonym">添加映射</button>
+            <button class="btn btn-secondary btn-sm" @click="exportJson('ai.synonyms', '同义词映射')">
+              <Download :size="14" class="mr-1" />导出
+            </button>
+            <label class="btn btn-secondary btn-sm cursor-pointer">
+              <Upload :size="14" class="mr-1" />导入
+              <input type="file" accept=".json" class="hidden" @change="e => importJson(e, 'ai.synonyms', '同义词映射', validateSynonymsImport)" />
+            </label>
+          </div>
+          <button class="btn btn-primary btn-sm" @click="handleSaveConfig" :disabled="saving">保存映射</button>
         </div>
       </div>
     </div>
@@ -173,18 +247,82 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Key, ChevronDown, FileText, BookOpen, MessageSquare, Zap, Trash2 } from 'lucide-vue-next'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Key, ChevronDown, FileText, BookOpen, MessageSquare, Zap, Trash2, ArrowLeftRight, Download, Upload } from 'lucide-vue-next'
 import { getApiKeys, updateApiKeys, testDeepseek, getAiConfig, updateAiConfig } from '../../../api/ai'
 import { useAppStore } from '../../../stores/app'
 
 const appStore = useAppStore()
 
-const sections = reactive({ keys: true, prompts: false, dict: false, shots: false, presets: false })
+const sections = reactive({ keys: true, prompts: false, dict: false, shots: false, presets: false, synonyms: false })
 const keys = reactive({})
 const aiConfig = reactive({})
 const saving = ref(false)
 const testing = ref(false)
+
+// ===== 同义词：对象 <-> 行列表转换 =====
+
+const synonymRows = computed(() => {
+  const obj = aiConfig['ai.synonyms'] || {}
+  return Object.entries(obj).map(([term, alts]) => ({
+    term,
+    alts: alts.join(', ')
+  }))
+})
+
+const addSynonym = () => {
+  if (!aiConfig['ai.synonyms']) aiConfig['ai.synonyms'] = {}
+  // 生成一个不重复的临时 key
+  let key = ''
+  let i = 1
+  do { key = `新术语${i++}` } while (aiConfig['ai.synonyms'][key] !== undefined)
+  aiConfig['ai.synonyms'][key] = []
+}
+
+const renameSynonymKey = (idx, newKey) => {
+  const trimmed = newKey.trim()
+  if (!trimmed) return
+  const obj = aiConfig['ai.synonyms'] || {}
+  const entries = Object.entries(obj)
+  if (idx < 0 || idx >= entries.length) return
+  const [oldKey, alts] = entries[idx]
+  if (oldKey === trimmed) return
+  // 如果新 key 已存在且不是自身，阻止
+  if (obj[trimmed] !== undefined) {
+    appStore.showToast(`标准词 "${trimmed}" 已存在`, 'error')
+    return
+  }
+  // 构建新对象以保持顺序
+  const newObj = {}
+  for (const [k, v] of entries) {
+    if (k === oldKey) {
+      newObj[trimmed] = alts
+    } else {
+      newObj[k] = v
+    }
+  }
+  aiConfig['ai.synonyms'] = newObj
+}
+
+const updateSynonymAlts = (idx, value) => {
+  const obj = aiConfig['ai.synonyms'] || {}
+  const entries = Object.entries(obj)
+  if (idx < 0 || idx >= entries.length) return
+  const [key] = entries[idx]
+  obj[key] = value.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+const deleteSynonym = (idx) => {
+  const obj = aiConfig['ai.synonyms'] || {}
+  const entries = Object.entries(obj)
+  if (idx < 0 || idx >= entries.length) return
+  const [key] = entries[idx]
+  delete obj[key]
+  // 触发响应式更新
+  aiConfig['ai.synonyms'] = { ...obj }
+}
+
+// ===== 数据加载 =====
 
 const loadKeys = async () => {
   try {
@@ -203,6 +341,8 @@ const loadConfig = async () => {
     appStore.showToast('加载 AI 配置失败', 'error')
   }
 }
+
+// ===== 保存/测试 =====
 
 const handleSaveKeys = async () => {
   if (saving.value) return
@@ -243,6 +383,8 @@ const handleSaveConfig = async () => {
   }
 }
 
+// ===== 列表项增删 =====
+
 const addDictItem = () => {
   if (!aiConfig['ai.business_dict']) aiConfig['ai.business_dict'] = []
   aiConfig['ai.business_dict'].push({ term: '', meaning: '' })
@@ -260,6 +402,93 @@ const addPresetItem = () => {
 
 const removeItem = (key, idx) => {
   if (aiConfig[key]) aiConfig[key].splice(idx, 1)
+}
+
+// ===== JSON 导入/导出 =====
+
+const exportJson = (configKey, label) => {
+  const data = aiConfig[configKey]
+  if (!data) {
+    appStore.showToast(`${label}为空，无内容可导出`, 'error')
+    return
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${configKey.replace(/\./g, '_')}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  appStore.showToast(`${label}已导出`)
+}
+
+const importJson = (event, configKey, label, validator) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result)
+      const error = validator(parsed)
+      if (error) {
+        appStore.showToast(`${label}导入失败: ${error}`, 'error')
+        return
+      }
+      aiConfig[configKey] = parsed
+      appStore.showToast(`${label}已导入，请点击保存以生效`)
+    } catch {
+      appStore.showToast(`${label}导入失败: JSON 格式无效`, 'error')
+    }
+  }
+  reader.readAsText(file)
+  // 重置 file input 以允许重复导入同一文件
+  event.target.value = ''
+}
+
+// ===== 格式校验 =====
+
+const validateDictImport = (data) => {
+  if (!Array.isArray(data)) return '数据必须是数组格式'
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i]
+    if (typeof item !== 'object' || item === null) return `第 ${i + 1} 项不是对象`
+    if (typeof item.term !== 'string') return `第 ${i + 1} 项缺少 term 字段`
+    if (typeof item.meaning !== 'string') return `第 ${i + 1} 项缺少 meaning 字段`
+  }
+  return null
+}
+
+const validateShotsImport = (data) => {
+  if (!Array.isArray(data)) return '数据必须是数组格式'
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i]
+    if (typeof item !== 'object' || item === null) return `第 ${i + 1} 项不是对象`
+    if (typeof item.question !== 'string') return `第 ${i + 1} 项缺少 question 字段`
+    if (typeof item.sql !== 'string') return `第 ${i + 1} 项缺少 sql 字段`
+  }
+  return null
+}
+
+const validatePresetsImport = (data) => {
+  if (!Array.isArray(data)) return '数据必须是数组格式'
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i]
+    if (typeof item !== 'object' || item === null) return `第 ${i + 1} 项不是对象`
+    if (typeof item.display !== 'string') return `第 ${i + 1} 项缺少 display 字段`
+    if (typeof item.sql !== 'string') return `第 ${i + 1} 项缺少 sql 字段`
+  }
+  return null
+}
+
+const validateSynonymsImport = (data) => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return '数据必须是对象格式 { "标准词": ["同义词1", ...] }'
+  for (const [key, val] of Object.entries(data)) {
+    if (!Array.isArray(val)) return `"${key}" 的值必须是数组`
+    for (let i = 0; i < val.length; i++) {
+      if (typeof val[i] !== 'string') return `"${key}" 的第 ${i + 1} 个同义词必须是字符串`
+    }
+  }
+  return null
 }
 
 onMounted(() => {
