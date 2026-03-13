@@ -152,8 +152,9 @@ async def process_chat(
     """
     import time as _time
 
-    # 查询缓存：相同问题 5 分钟内直接返回
-    cache_key = message.strip().lower()
+    # 查询缓存：相同问题 5 分钟内直接返回（含 user_id + 日期，避免跨用户/跨天串漏）
+    from datetime import date
+    cache_key = f"{user_id}:{date.today().isoformat()}:{message.strip().lower()}"
     now = _time.time()
     cached = _query_cache.get(cache_key)
     if cached:
