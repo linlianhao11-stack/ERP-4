@@ -936,7 +936,8 @@ const handleCancelOrder = async (orderId) => {
     cancelPreviewData.value = data
     const hasPaid = data.paid_amount > 0 || data.rebate_used > 0
 
-    if (data.order_type === 'CONSIGN_OUT' || (!data.is_partial && !hasPaid)) {
+    // 寄售调拨 / 未发货未收款 / 未发货且收款未确认 → 直接简单确认
+    if (data.order_type === 'CONSIGN_OUT' || (!data.is_partial && (!hasPaid || !data.has_confirmed_payment))) {
       const confirmed = await appStore.customConfirm('确认取消', `确认取消订单 ${data.order_no}？`)
       if (!confirmed) return
       cancelForm.refund_amount = 0

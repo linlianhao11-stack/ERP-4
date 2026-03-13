@@ -1,11 +1,12 @@
 import io
+import re
 from typing import Optional
 from decimal import Decimal
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from tortoise import transactions
+from tortoise import transactions, connections
 from tortoise.expressions import Q
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import (
@@ -16,6 +17,17 @@ from app.utils.time import now, to_naive, days_between
 from app.services.operation_log_service import log_operation
 
 router = APIRouter(prefix="/api/products", tags=["商品管理"])
+
+
+async def _generate_next_sku() -> str:
+    """生成下一个 SKU 编号，格式: SKU00001"""
+    conn = connections.get("default")
+    rows = await conn.execute_query_dict(
+        "SELECT MAX(CAST(SUBSTRING(sku FROM 4) AS INTEGER)) AS max_num "
+        "FROM products WHERE sku ~ '^SKU\\d+$'"
+    )
+    max_num = rows[0]["max_num"] if rows and rows[0]["max_num"] else 0
+    return f"SKU{max_num + 1:05d}"
 
 
 @router.get("")
@@ -469,6 +481,13 @@ async def import_products(file: UploadFile = File(...), user: User = Depends(req
     return result
 
 
+@router.get("/next-sku")
+async def get_next_sku(user: User = Depends(require_permission("stock_edit"))):
+    """预览下一个自动生成的 SKU 编号"""
+    sku = await _generate_next_sku()
+    return {"sku": sku}
+
+
 @router.get("/{product_id}")
 async def get_product(product_id: int, user: User = Depends(get_current_user)):
     p = await Product.filter(id=product_id).first()
@@ -488,10 +507,9 @@ async def get_product(product_id: int, user: User = Depends(get_current_user)):
 
 @router.post("")
 async def create_product(data: ProductCreate, user: User = Depends(require_permission("stock_edit"))):
-    if await Product.filter(sku=data.sku).exists():
-        raise HTTPException(status_code=400, detail="SKU已存在")
-    p = await Product.create(**data.model_dump())
-    return {"id": p.id, "message": "创建成功"}
+    sku = await _generate_next_sku()
+    p = await Product.create(sku=sku, **data.model_dump())
+    return {"id": p.id, "sku": sku, "message": "创建成功"}
 
 
 @router.put("/{product_id}")

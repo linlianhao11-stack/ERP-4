@@ -486,6 +486,12 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
     default_refund = paid - default_new_paid
     default_refund_rebate = rebate - default_new_rebate
 
+    # 检查是否有已确认的收款记录
+    confirmed_payments = await Payment.filter(
+        order_id=order.id, is_confirmed=True
+    ).exclude(source="REFUND").count()
+    has_confirmed_payment = confirmed_payments > 0
+
     return {
         "order_id": order.id,
         "order_no": order.order_no,
@@ -502,7 +508,8 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
         "default_refund": float(default_refund),
         "default_refund_rebate": float(default_refund_rebate),
         "is_partial": is_partial,
-        "has_payment": float(paid) > 0 or float(rebate) > 0
+        "has_payment": float(paid) > 0 or float(rebate) > 0,
+        "has_confirmed_payment": has_confirmed_payment,
     }
 
 
@@ -510,7 +517,9 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
 async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(require_permission("sales"))):
     """取消订单，支持完整财务闭环和部分发货拆单"""
     async with transactions.in_transaction():
-        order = await Order.filter(id=order_id).select_for_update().select_related("customer", "warehouse").first()
+        order = await Order.filter(id=order_id).select_for_update().first()
+        if order:
+            await order.fetch_related("customer", "warehouse")
         if not order:
             raise HTTPException(status_code=404, detail="订单不存在")
         if order.shipping_status not in ("pending", "partial"):
@@ -603,6 +612,68 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                 f"取消拆分生成订单 {new_order_no}（原订单 {order.order_no}）")
 
         # 3. 财务回退
+        # 未发货且所有收款未确认时，直接删除未确认收款记录，无需退款
+        if not has_shipped and customer and order.order_type in ("CASH", "CREDIT"):
+            confirmed_count = await Payment.filter(
+                order_id=order.id, is_confirmed=True
+            ).exclude(source="REFUND").count()
+            unconfirmed_count = await Payment.filter(
+                order_id=order.id, is_confirmed=False
+            ).exclude(source="REFUND").count()
+            if confirmed_count == 0 and unconfirmed_count > 0:
+                await Payment.filter(
+                    order_id=order.id, is_confirmed=False
+                ).exclude(source="REFUND").delete()
+                order.paid_amount = Decimal("0")
+
+                # 退回返利
+                if order.rebate_used and order.rebate_used > 0:
+                    account_set_id = order.account_set_id
+                    if account_set_id:
+                        bal = await CustomerAccountBalance.filter(
+                            customer_id=customer.id, account_set_id=account_set_id
+                        ).first()
+                        if not bal:
+                            bal = await CustomerAccountBalance.create(
+                                customer_id=customer.id, account_set_id=account_set_id,
+                                rebate_balance=0
+                            )
+                        await CustomerAccountBalance.filter(id=bal.id).update(
+                            rebate_balance=F('rebate_balance') + order.rebate_used
+                        )
+                        await bal.refresh_from_db()
+                        balance_after = bal.rebate_balance
+                    else:
+                        await Customer.filter(id=customer.id).update(
+                            rebate_balance=F('rebate_balance') + order.rebate_used
+                        )
+                        await customer.refresh_from_db()
+                        balance_after = customer.rebate_balance
+                    await RebateLog.create(
+                        target_type="customer", target_id=customer.id,
+                        type="refund", amount=order.rebate_used,
+                        balance_after=balance_after,
+                        account_set_id=account_set_id,
+                        reference_type="ORDER", reference_id=order.id,
+                        remark=f"取消订单 {order.order_no} 退回返利",
+                        creator=user
+                    )
+
+                # 账期订单退回挂账
+                if order.order_type == "CREDIT":
+                    cancel_balance_amount = abs(order.total_amount)
+                    if cancel_balance_amount > 0:
+                        await Customer.filter(id=customer.id).update(
+                            balance=F('balance') - cancel_balance_amount
+                        )
+
+                # 跳过后续退款逻辑，直接到标记取消
+                order.shipping_status = "cancelled"
+                await order.save()
+                await log_operation(user, "ORDER_CANCEL", "ORDER", order.id,
+                    f"取消订单 {order.order_no}（未发货、收款未确认，直接取消）")
+                return {"message": "订单已取消", "shipping_status": "cancelled"}
+
         if customer and order.order_type in ("CASH", "CREDIT"):
             refund_amount = Decimal(str(data.refund_amount or 0))
             refund_rebate = Decimal(str(data.refund_rebate or 0))
