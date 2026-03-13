@@ -175,6 +175,7 @@ const handleFeedback = async (msg, type) => {
       save_as_example: type === 'positive',
       original_question: msg._question,
       sql: msg.sql,
+      negative_reason: msg.negative_reason || null,
     })
   } catch { /* silent */ }
   saveToStorage()

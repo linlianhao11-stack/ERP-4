@@ -90,12 +90,23 @@
             <Star :size="14" :fill="msg._favorited ? 'currentColor' : 'none'" :class="msg._favorited ? 'text-warning' : ''" />
           </button>
           <div class="flex-1" />
-          <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'positive' ? 'bg-success-subtle text-success-emphasis' : 'text-muted hover:text-success'" @click="$emit('feedback', msg, 'positive')">
-            <ThumbsUp :size="14" />
-          </button>
-          <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'negative' ? 'bg-error-subtle text-error-emphasis' : 'text-muted hover:text-error'" @click="$emit('feedback', msg, 'negative')">
-            <ThumbsDown :size="14" />
-          </button>
+          <!-- 反馈区域 -->
+          <div class="relative flex items-center gap-1">
+            <Transition name="fade"><span v-if="feedbackToast" class="absolute -top-6 left-0 text-xs text-success whitespace-nowrap">感谢反馈</span></Transition>
+            <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'positive' ? 'bg-success-subtle text-success-emphasis' : 'text-muted hover:text-success'" @click="handlePositiveFeedback">
+              <ThumbsUp :size="14" />
+            </button>
+            <div class="relative">
+              <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'negative' ? 'bg-error-subtle text-error-emphasis' : 'text-muted hover:text-error'" @click="showNegativeMenu = !showNegativeMenu">
+                <ThumbsDown :size="14" />
+              </button>
+              <div v-if="showNegativeMenu && !msg.feedback" class="absolute bottom-full right-0 mb-1 bg-surface border rounded-lg shadow-lg py-1 z-10 whitespace-nowrap">
+                <button v-for="reason in NEGATIVE_REASONS" :key="reason" class="block w-full text-left px-3 py-1.5 text-xs hover:bg-elevated" @click="handleNegativeReason(reason)">
+                  {{ reason }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </template>
     </div>
@@ -119,7 +130,24 @@ const props = defineProps({
   msg: { type: Object, required: true },
 })
 
-defineEmits(['select-option', 'export', 'feedback', 'retry', 'favorite'])
+const emit = defineEmits(['select-option', 'export', 'feedback', 'retry', 'favorite'])
+
+const showNegativeMenu = ref(false)
+const feedbackToast = ref(false)
+
+const NEGATIVE_REASONS = ['数据不准确', '答非所问', '回复太慢', '其他']
+
+const handlePositiveFeedback = () => {
+  emit('feedback', props.msg, 'positive')
+  feedbackToast.value = true
+  setTimeout(() => { feedbackToast.value = false }, 1500)
+}
+
+const handleNegativeReason = (reason) => {
+  props.msg.negative_reason = reason
+  emit('feedback', props.msg, 'negative')
+  showNegativeMenu.value = false
+}
 
 const isNumber = (val) => typeof val === 'number'
 
@@ -196,4 +224,8 @@ const copyTable = async () => {
 .ai-analysis :deep(pre) { background: var(--elevated); padding: 8px 12px; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
 .ai-analysis :deep(pre code) { background: none; padding: 0; }
 .ai-analysis :deep(h3), .ai-analysis :deep(h4) { font-weight: 600; margin: 0.75em 0 0.25em; }
+
+.fade-enter-active { transition: opacity 0.3s; }
+.fade-leave-active { transition: opacity 0.5s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
