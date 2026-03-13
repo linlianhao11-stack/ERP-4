@@ -94,6 +94,10 @@
 import { Copy, Download, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
 import AiChartRenderer from './AiChartRenderer.vue'
 import { useAppStore } from '../../stores/app'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 const appStore = useAppStore()
 
@@ -115,19 +119,10 @@ const formatCell = (val) => {
 
 const renderMarkdown = (text) => {
   if (!text) return ''
-  // 轻量 Markdown：加粗、列表、换行（防 XSS）
-  let html = text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>')
-  // 处理列表项：连续的 "- xxx<br>" 行合并为 <ul>
-  html = html.replace(/(?:^|<br>)((?:- .+?(?:<br>|$))+)/g, (_, block) => {
-    const items = block.replace(/<br>$/g, '').split('<br>').map(
-      line => '<li>' + line.replace(/^- /, '') + '</li>'
-    ).join('')
-    return '<ul>' + items + '</ul>'
+  return DOMPurify.sanitize(marked.parse(text), {
+    ALLOWED_TAGS: ['strong', 'em', 'ul', 'ol', 'li', 'br', 'p', 'h3', 'h4', 'code', 'pre'],
+    ALLOWED_ATTR: ['class'],
   })
-  return html
 }
 
 const copyTable = async () => {
@@ -174,4 +169,11 @@ const copyTable = async () => {
   0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
   40% { opacity: 1; transform: scale(1); }
 }
+.ai-analysis :deep(p) { margin-bottom: 0.5em; }
+.ai-analysis :deep(ul), .ai-analysis :deep(ol) { padding-left: 1.2em; margin: 0.5em 0; }
+.ai-analysis :deep(li) { margin-bottom: 0.25em; }
+.ai-analysis :deep(code) { background: var(--elevated); padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
+.ai-analysis :deep(pre) { background: var(--elevated); padding: 8px 12px; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
+.ai-analysis :deep(pre code) { background: none; padding: 0; }
+.ai-analysis :deep(h3), .ai-analysis :deep(h4) { font-weight: 600; margin: 0.75em 0 0.25em; }
 </style>
