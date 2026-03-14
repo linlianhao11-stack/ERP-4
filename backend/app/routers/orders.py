@@ -9,10 +9,11 @@ from tortoise.expressions import F
 
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import (
-    User, Product, Warehouse, Location, Customer, Salesperson,
+    User, Product, Warehouse, Location, Customer,
     Order, OrderItem, WarehouseStock, StockLog, Payment, PaymentOrder,
     Shipment, ShipmentItem, RebateLog
 )
+from app.models.department import Employee
 from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.order import OrderCreate, CancelRequest
 from app.services.order_service import (
@@ -39,12 +40,29 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             total_profit = Decimal("0")
 
             # 1. 校验关联实体
-            customer, warehouse, salesperson, consignment_wh = await validate_order_entities(data)
+            customer, warehouse, employee, consignment_wh = await validate_order_entities(data)
 
-            # 2. resolve account_set: 优先用 data.account_set_id，其次 warehouse.account_set_id
-            account_set_id = data.account_set_id
-            if not account_set_id and warehouse:
-                account_set_id = warehouse.account_set_id
+            # 2. 从订单行仓库自动推断账套
+            # 批量预加载仓库（后续创建订单行时复用）
+            _warehouse_ids = list(set(
+                i.warehouse_id for i in data.items if i.warehouse_id
+            ))
+            if data.warehouse_id and data.warehouse_id not in _warehouse_ids:
+                _warehouse_ids.append(data.warehouse_id)
+            _warehouses_map = {w.id: w for w in await Warehouse.filter(id__in=_warehouse_ids, is_active=True)} if _warehouse_ids else {}
+
+            account_set_ids = set()
+            for item in data.items:
+                wh = _warehouses_map.get(item.warehouse_id) if item.warehouse_id else warehouse
+                if wh and wh.account_set_id:
+                    account_set_ids.add(wh.account_set_id)
+
+            if len(account_set_ids) == 1:
+                account_set_id = account_set_ids.pop()
+            elif len(account_set_ids) > 1:
+                account_set_id = None  # 多账套订单
+            else:
+                account_set_id = data.account_set_id  # 回退到手动指定
 
             # 3. 创建订单主记录
             is_cleared = data.order_type == "CASH" or (data.order_type == "RETURN" and data.refunded)
@@ -54,20 +72,15 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 customer=customer, warehouse=warehouse,
                 related_order_id=data.related_order_id if data.order_type == "RETURN" else None,
                 refunded=data.refunded if data.order_type == "RETURN" else False,
-                remark=data.remark, salesperson=salesperson,
+                remark=data.remark, employee=employee,
                 creator=user, is_cleared=is_cleared,
                 shipping_status=shipping_status,
                 account_set_id=account_set_id
             )
 
             # 4. 创建订单行 + 库存处理
-            # 批量预加载实体，避免 N+1 查询
+            # 批量预加载实体，避免 N+1 查询（_warehouses_map 已在步骤2中预加载）
             _product_ids = list(set(i.product_id for i in data.items))
-            _warehouse_ids = list(set(
-                i.warehouse_id for i in data.items if i.warehouse_id
-            ))
-            if data.warehouse_id and data.warehouse_id not in _warehouse_ids:
-                _warehouse_ids.append(data.warehouse_id)
             _location_ids = list(set(
                 i.location_id for i in data.items if i.location_id
             ))
@@ -75,7 +88,6 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 _location_ids.append(data.location_id)
 
             _products_map = {p.id: p for p in await Product.filter(id__in=_product_ids, is_active=True)} if _product_ids else {}
-            _warehouses_map = {w.id: w for w in await Warehouse.filter(id__in=_warehouse_ids, is_active=True)} if _warehouse_ids else {}
             _locations_map = {l.id: l for l in await Location.filter(id__in=_location_ids, is_active=True)} if _location_ids else {}
             _entities_cache = {'products': _products_map, 'warehouses': _warehouses_map, 'locations': _locations_map}
 
@@ -238,7 +250,7 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
         query = query.filter(account_set_id=account_set_id)
 
     total = await query.count()
-    orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse", "creator", "related_order", "salesperson")
+    orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse", "creator", "related_order", "employee")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
 
     result = []
@@ -251,7 +263,7 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
             "total_amount": float(o.total_amount),
             "paid_amount": float(o.paid_amount),
             "is_cleared": o.is_cleared, "remark": o.remark,
-            "salesperson_name": o.salesperson.name if o.salesperson else None,
+            "employee_name": o.employee.name if o.employee else None,
             "creator_name": o.creator.display_name if o.creator else None,
             "created_at": o.created_at.isoformat(),
             "related_order_no": o.related_order.order_no if o.related_order else None,
@@ -268,7 +280,7 @@ async def list_orders(order_type: Optional[str] = None, customer_id: Optional[in
 
 @router.get("/{order_id}")
 async def get_order(order_id: int, user: User = Depends(require_permission("sales", "finance", "logistics"))):
-    order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "related_order", "salesperson").first()
+    order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "related_order", "employee").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
@@ -377,7 +389,7 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
         "is_cleared": order.is_cleared,
         "shipping_status": order.shipping_status,
         "refunded": order.refunded, "remark": order.remark,
-        "salesperson_name": order.salesperson.name if order.salesperson else None,
+        "employee_name": order.employee.name if order.employee else None,
         "creator_name": order.creator.display_name if order.creator else None,
         "created_at": order.created_at.isoformat(),
         "related_order": {"id": order.related_order.id, "order_no": order.related_order.order_no} if order.related_order else None,
@@ -558,7 +570,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                 related_order=order,
                 shipping_status="completed",
                 remark=f"由取消订单 {order.order_no} 拆分生成（已发货部分）",
-                salesperson_id=order.salesperson_id,
+                employee_id=order.employee_id,
                 account_set_id=order.account_set_id,
                 creator=user
             )
