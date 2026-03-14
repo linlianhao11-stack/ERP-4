@@ -29,6 +29,7 @@ from app.routers import (
     period_end, financial_reports,
     purchase_returns,
     ai_chat, api_keys,
+    departments, employees,
 )
 
 
@@ -175,6 +176,8 @@ app.include_router(financial_reports.router)
 app.include_router(purchase_returns.router)
 app.include_router(ai_chat.router)
 app.include_router(api_keys.router)
+app.include_router(departments.router)
+app.include_router(employees.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
