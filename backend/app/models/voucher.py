@@ -40,6 +40,8 @@ class VoucherEntry(models.Model):
     credit_amount = fields.DecimalField(max_digits=18, decimal_places=2, default=0)
     aux_customer = fields.ForeignKeyField("models.Customer", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
     aux_supplier = fields.ForeignKeyField("models.Supplier", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
+    aux_employee = fields.ForeignKeyField("models.Employee", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
+    aux_department = fields.ForeignKeyField("models.Department", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
 
     class Meta:
         table = "voucher_entries"
