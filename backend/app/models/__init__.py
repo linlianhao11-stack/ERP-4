@@ -25,6 +25,7 @@ from app.models.delivery import (
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.supplier_balance import SupplierAccountBalance
 from app.models.customer_balance import CustomerAccountBalance
+from app.models.department import Department, Employee
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
@@ -40,4 +41,5 @@ __all__ = [
     "Invoice", "InvoiceItem",
     "SupplierAccountBalance",
     "CustomerAccountBalance",
+    "Department", "Employee",
 ]
