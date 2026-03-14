@@ -81,13 +81,16 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                         )
 
             # 3. 创建订单主记录
-            is_cleared = data.order_type == "CASH" or (data.order_type == "RETURN" and data.refunded)
+            # 退货订单不再自动 is_cleared，等待财务确认退款后才结清
+            is_cleared = data.order_type == "CASH"
             shipping_status = "pending" if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT"] else "completed"
             order = await Order.create(
                 order_no=order_no, order_type=data.order_type,
                 customer=customer, warehouse=warehouse,
                 related_order_id=data.related_order_id if data.order_type == "RETURN" else None,
                 refunded=data.refunded if data.order_type == "RETURN" else False,
+                refund_method=data.refund_method if data.order_type == "RETURN" else None,
+                refund_amount=data.refund_amount if data.order_type == "RETURN" else None,
                 remark=data.remark, employee=employee,
                 creator=user, is_cleared=is_cleared,
                 shipping_status=shipping_status,
@@ -165,7 +168,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             order.total_cost = total_cost
             order.total_profit = total_profit
             if data.order_type == "RETURN" and data.refunded:
-                order.is_cleared = True
+                # 不再自动 is_cleared，等待财务确认退款
                 order.paid_amount = abs(total_amount)
             elif is_cleared:
                 order.paid_amount = abs(total_amount)
@@ -213,31 +216,35 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     logger.error(f"退货自动生成红字应收单失败: {e}")
                     raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
 
-            # 6.6 钩子：销售退货 + 已退款 → 自动生成收款退款单（按账套拆分）
+            # 6.6 钩子：销售退货 + 已退款 → 自动生成退款收款单（按账套拆分，draft 状态）
             if data.order_type == "RETURN" and data.refunded and amount_by_account_set:
                 try:
-                    from app.models.ar_ap import ReceiptBill, ReceiptRefundBill
+                    from app.models.ar_ap import ReceivableBill, ReceiptBill
                     for as_id, group_amount in amount_by_account_set.items():
-                        original_receipt = await ReceiptBill.filter(
+                        # 查找对应的红字应收单（上面 6.5b 已创建）
+                        ar_bill = await ReceivableBill.filter(
                             account_set_id=as_id,
                             customer_id=order.customer_id,
-                            status="confirmed",
+                            order_id=order.id,
                         ).order_by("-id").first()
-                        if original_receipt:
-                            refund_no = generate_order_no("SKTK")
-                            await ReceiptRefundBill.create(
-                                bill_no=refund_no,
-                                account_set_id=as_id,
-                                customer_id=order.customer_id,
-                                original_receipt=original_receipt,
-                                refund_date=datetime.now().date(),
-                                amount=abs(group_amount),
-                                reason=f"销售退货 {order.order_no}",
-                                status="draft",
-                                creator=user,
-                            )
+                        related_order = await order.related_order if order.related_order_id else None
+                        original_order_no = related_order.order_no if related_order else ""
+                        await ReceiptBill.create(
+                            bill_no=generate_order_no("SK"),
+                            account_set_id=as_id,
+                            customer_id=order.customer_id,
+                            receivable_bill=ar_bill,
+                            receipt_date=datetime.now().date(),
+                            amount=-abs(group_amount),
+                            payment_method=data.refund_method or "",
+                            bill_type="return_refund",
+                            return_order=order,
+                            status="draft",
+                            remark=f"销售退货退款 | 退货单：{order.order_no} | 原订单：{original_order_no}",
+                            creator=user,
+                        )
                 except Exception as e:
-                    logger.error(f"销售退货自动生成收款退款单失败: {e}")
+                    logger.error(f"销售退货自动生成退款收款单失败: {e}")
 
             # 7. 操作日志
             order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
@@ -803,29 +810,38 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         creator=user,
                         account_set_id=order.account_set_id
                     )
-                    # 推送会计模块：创建收款退款单
+                    # 推送会计模块：创建退款收款单（红字应收 + 退款收款）
                     if order.account_set_id:
                         try:
-                            from app.models.ar_ap import ReceiptBill, ReceiptRefundBill
-                            original_receipt = await ReceiptBill.filter(
+                            from app.models.ar_ap import ReceivableBill, ReceiptBill
+                            ar_bill = await ReceivableBill.create(
+                                bill_no=generate_order_no("YS"),
                                 account_set_id=order.account_set_id,
                                 customer_id=customer.id,
-                                status="confirmed",
-                            ).order_by("-id").first()
-                            if original_receipt:
-                                await ReceiptRefundBill.create(
-                                    bill_no=generate_order_no("SKTK"),
-                                    account_set_id=order.account_set_id,
-                                    customer_id=customer.id,
-                                    original_receipt=original_receipt,
-                                    refund_date=date.today(),
-                                    amount=refund_amount,
-                                    reason=f"取消订单 {order.order_no} 退款",
-                                    status="draft",
-                                    creator=user,
-                                )
+                                order=order,
+                                bill_date=date.today(),
+                                total_amount=-abs(refund_amount),
+                                received_amount=Decimal("0"),
+                                unreceived_amount=-abs(refund_amount),
+                                status="pending",
+                                creator=user,
+                            )
+                            await ReceiptBill.create(
+                                bill_no=generate_order_no("SK"),
+                                account_set_id=order.account_set_id,
+                                customer_id=customer.id,
+                                receivable_bill=ar_bill,
+                                receipt_date=date.today(),
+                                amount=-abs(refund_amount),
+                                payment_method=data.refund_payment_method or "",
+                                bill_type="return_refund",
+                                return_order=order,
+                                status="draft",
+                                remark=f"取消订单退款 | 订单：{order.order_no}",
+                                creator=user,
+                            )
                         except Exception as e:
-                            logger.error(f"取消订单自动生成收款退款单失败: {e}")
+                            logger.error(f"取消订单自动生成退款收款单失败: {e}")
 
             if order.order_type == "CREDIT":
                 cancel_balance_amount = abs(order.total_amount) - (abs(new_order.total_amount) if new_order else Decimal("0"))

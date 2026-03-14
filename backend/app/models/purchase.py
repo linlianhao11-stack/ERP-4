@@ -63,6 +63,8 @@ class PurchaseReturn(models.Model):
     total_amount = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_refunded = fields.BooleanField(default=False)
     refund_status = fields.CharField(max_length=20, default="pending")
+    refund_method = fields.CharField(max_length=50, null=True)
+    refund_amount = fields.DecimalField(max_digits=18, decimal_places=2, null=True)
     tracking_no = fields.CharField(max_length=100, null=True)
     reason = fields.TextField(null=True)
     created_by = fields.ForeignKeyField("models.User", related_name="created_purchase_returns", null=True, on_delete=fields.SET_NULL)

@@ -38,6 +38,8 @@ class ReceiptBill(models.Model):
     amount = fields.DecimalField(max_digits=18, decimal_places=2)
     payment_method = fields.CharField(max_length=50)
     is_advance = fields.BooleanField(default=False)
+    bill_type = fields.CharField(max_length=20, default="normal")  # normal / return_refund
+    return_order = fields.ForeignKeyField("models.Order", null=True, on_delete=fields.SET_NULL, related_name="refund_receipt_bills")
     status = fields.CharField(max_length=20, default="draft")  # draft/confirmed
     confirmed_by = fields.ForeignKeyField("models.User", null=True, on_delete=fields.SET_NULL, related_name="confirmed_receipts")
     confirmed_at = fields.DatetimeField(null=True)
@@ -131,6 +133,8 @@ class DisbursementBill(models.Model):
     disbursement_date = fields.DateField()
     amount = fields.DecimalField(max_digits=18, decimal_places=2)
     disbursement_method = fields.CharField(max_length=50)
+    bill_type = fields.CharField(max_length=20, default="normal")  # normal / return_refund
+    purchase_return = fields.ForeignKeyField("models.PurchaseReturn", null=True, on_delete=fields.SET_NULL, related_name="refund_disbursement_bills")
     status = fields.CharField(max_length=20, default="draft")
     confirmed_by = fields.ForeignKeyField("models.User", null=True, on_delete=fields.SET_NULL, related_name="confirmed_disbursements")
     confirmed_at = fields.DatetimeField(null=True)

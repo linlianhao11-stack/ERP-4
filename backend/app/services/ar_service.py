@@ -96,6 +96,17 @@ async def confirm_receipt_bill(receipt_id: int, user) -> ReceiptBill:
                     rb.status = "partial"
                 await rb.save()
 
+        # 退款收款单确认后，更新退货订单状态
+        if receipt.bill_type == "return_refund" and receipt.return_order_id:
+            try:
+                return_order = await Order.filter(id=receipt.return_order_id).select_for_update().first()
+                if return_order:
+                    return_order.is_cleared = True
+                    await return_order.save()
+                    logger.info(f"退款确认，订单 {return_order.order_no} 已结清")
+            except Exception as e:
+                logger.error(f"退款确认更新订单状态失败: {e}")
+
     logger.info(f"确认收款单: {receipt.bill_no}")
     return receipt
 
