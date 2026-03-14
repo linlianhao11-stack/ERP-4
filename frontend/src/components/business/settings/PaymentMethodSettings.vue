@@ -1,10 +1,24 @@
 <!--
   收款方式与付款方式管理组件
-  功能：收款方式（PaymentMethod）的增删改、付款方式（DisbursementMethod）的增删改
+  功能：按账套 Tab 切换，收款方式（PaymentMethod）的增删改、付款方式（DisbursementMethod）的增删改
   从 SettingsView.vue 财务设置标签页提取
 -->
 <template>
   <div>
+    <!-- 账套 Tab 切换 -->
+    <div v-if="accountSets.length > 1" class="flex gap-2 mb-4 border-b border-border pb-2">
+      <button
+        v-for="as in accountSets" :key="as.id"
+        @click="switchAccountSet(as.id)"
+        :class="['text-sm px-3 py-1.5 rounded-t transition-colors',
+          currentAccountSetId === as.id
+            ? 'bg-primary text-white font-medium'
+            : 'text-secondary hover:text-foreground hover:bg-elevated']"
+      >
+        {{ as.name }}
+      </button>
+    </div>
+
     <!-- 收款方式管理 -->
     <div class="grid md:grid-cols-2 gap-5">
       <div class="card p-4">
@@ -82,11 +96,12 @@
 <script setup>
 /**
  * 收款方式与付款方式管理
- * 包含：收款方式CRUD、付款方式(付供应商)CRUD
+ * 包含：账套 Tab 切换、收款方式CRUD、付款方式(付供应商)CRUD
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { useSettingsStore } from '../../../stores/settings'
+import { useAccountingStore } from '../../../stores/accounting'
 import {
   createPaymentMethod, updatePaymentMethod, deletePaymentMethod as deletePaymentMethodApi,
   createDisbursementMethod, updateDisbursementMethod, deleteDisbursementMethod as deleteDisbursementMethodApi
@@ -96,6 +111,12 @@ const emit = defineEmits(['data-changed'])
 
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
+const accountingStore = useAccountingStore()
+
+// 账套相关
+const accountSets = computed(() => accountingStore.accountSets)
+const currentAccountSetId = ref(null)
+
 const paymentMethods = computed(() => settingsStore.paymentMethods)
 const disbursementMethods = computed(() => settingsStore.disbursementMethods)
 
@@ -110,6 +131,25 @@ const newDisbMethodCode = ref('')
 const newDisbMethodName = ref('')
 const editingDisbMethodId = ref(null)
 const editingDisbMethodName = ref('')
+
+/** 切换账套 */
+function switchAccountSet(id) {
+  currentAccountSetId.value = id
+}
+
+/** 按当前账套重新加载收付款方式 */
+function reloadMethods() {
+  settingsStore.loadPaymentMethods(currentAccountSetId.value)
+  settingsStore.loadDisbursementMethods(currentAccountSetId.value)
+}
+
+// 监听账套切换
+watch(currentAccountSetId, () => {
+  // 切换时清除编辑状态
+  cancelEditPaymentMethod()
+  cancelEditDisbursementMethod()
+  reloadMethods()
+})
 
 // === 收款方式操作 ===
 const editPaymentMethod = (m) => {
@@ -127,7 +167,7 @@ const saveEditPaymentMethod = async () => {
     appStore.showToast('修改成功')
     editingPayMethodId.value = null
     editingPayMethodName.value = ''
-    settingsStore.loadPaymentMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '修改失败', 'error')
@@ -145,11 +185,15 @@ const handleCreatePaymentMethod = async () => {
     return
   }
   try {
-    await createPaymentMethod({ code: newPayMethodCode.value.trim(), name: newPayMethodName.value.trim() })
+    await createPaymentMethod({
+      code: newPayMethodCode.value.trim(),
+      name: newPayMethodName.value.trim(),
+      account_set_id: currentAccountSetId.value
+    })
     appStore.showToast('创建成功')
     newPayMethodCode.value = ''
     newPayMethodName.value = ''
-    settingsStore.loadPaymentMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '创建失败', 'error')
@@ -161,7 +205,7 @@ const handleDeletePaymentMethod = async (id) => {
   try {
     await deletePaymentMethodApi(id)
     appStore.showToast('已删除')
-    settingsStore.loadPaymentMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
@@ -184,7 +228,7 @@ const saveEditDisbursementMethod = async () => {
     appStore.showToast('修改成功')
     editingDisbMethodId.value = null
     editingDisbMethodName.value = ''
-    settingsStore.loadDisbursementMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '修改失败', 'error')
@@ -202,11 +246,15 @@ const handleCreateDisbursementMethod = async () => {
     return
   }
   try {
-    await createDisbursementMethod({ code: newDisbMethodCode.value.trim(), name: newDisbMethodName.value.trim() })
+    await createDisbursementMethod({
+      code: newDisbMethodCode.value.trim(),
+      name: newDisbMethodName.value.trim(),
+      account_set_id: currentAccountSetId.value
+    })
     appStore.showToast('添加成功')
     newDisbMethodCode.value = ''
     newDisbMethodName.value = ''
-    settingsStore.loadDisbursementMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '添加失败', 'error')
@@ -218,7 +266,7 @@ const handleDeleteDisbursementMethod = async (id) => {
   try {
     await deleteDisbursementMethodApi(id)
     appStore.showToast('已删除')
-    settingsStore.loadDisbursementMethods()
+    reloadMethods()
     emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '删除失败', 'error')
@@ -226,8 +274,19 @@ const handleDeleteDisbursementMethod = async (id) => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
-  settingsStore.loadPaymentMethods()
-  settingsStore.loadDisbursementMethods()
+onMounted(async () => {
+  // 加载账套列表
+  if (!accountSets.value.length) {
+    await accountingStore.loadAccountSets()
+  }
+  // 默认选中第一个账套
+  if (accountSets.value.length && !currentAccountSetId.value) {
+    currentAccountSetId.value = accountSets.value[0].id
+  }
+  // 如果没有账套，直接加载全部收付款方式
+  if (!currentAccountSetId.value) {
+    settingsStore.loadPaymentMethods()
+    settingsStore.loadDisbursementMethods()
+  }
 })
 </script>
