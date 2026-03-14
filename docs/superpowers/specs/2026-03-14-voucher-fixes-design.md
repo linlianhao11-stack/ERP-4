@@ -1,7 +1,7 @@
 # 凭证系统三项修复 — 设计规格
 
 **日期**：2026-03-14
-**状态**：待审阅
+**状态**：审阅修订后
 
 ---
 
@@ -41,7 +41,7 @@ cost_price = poi.amount / poi.quantity if poi.quantity > 0 else poi.tax_inclusiv
 cost_price = poi.tax_exclusive_price
 ```
 
-同时检查 `purchase_orders.py:786`（采购退货取值），如有相同问题一并修复。
+注意：`purchase_orders.py:786` 的 `unit_amount = poi.amount / poi.quantity` 用于计算退货退款金额（含税），语义与 L640 不同，**不应修改**。退给供应商的是含税货款，而入库成本是不含税价。
 
 ### 历史数据
 
@@ -61,16 +61,19 @@ cost_price = poi.tax_exclusive_price
 
 **触发时机**：AR 批量生成凭证时（`ar_service.py:generate_ar_vouchers`）
 
-**查询条件**：`Order` where `order_type="RETURN"`, `voucher_id=None`，且订单创建日期在选中期间内
+**查询条件**：`Order` where `order_type="RETURN"`, `voucher_id=None`, `account_set_id=account_set_id`，且订单创建日期在选中期间内
 
-**凭证结构**：
+**分录方式**：采用红字冲销法 —— 与原出库凭证科目位置一致，金额取负数。与现有 `create_rebate_payment_voucher` 中使用负数分录的模式统一。
 
-| 行 | 科目 | 方向 | 金额 | 辅助核算 |
-|----|------|------|------|----------|
-| 1 | 1405 库存商品 | 借（红字） | 退货成本（不含税） | — |
-| 2 | 1407 发出商品 | 贷（红字） | 退货成本（不含税） | — |
+**凭证结构**（红字冲销原出库凭证"借1407/贷1405"）：
+
+| 行 | 科目 | 借方金额 | 贷方金额 | 辅助核算 |
+|----|------|----------|----------|----------|
+| 1 | 1407 发出商品 | -cost（负数） | 0 | — |
+| 2 | 1405 库存商品 | 0 | -cost（负数） | — |
 
 - 凭证类型：记
+- `total_debit` / `total_credit`：均为 `-cost`（负数）
 - 摘要：`销售退货冲回 {order_no}`
 - `source_type`：`sales_return`
 - `source_bill_id`：退货订单 ID
@@ -78,25 +81,35 @@ cost_price = poi.tax_exclusive_price
 
 **凭证关联**：生成后回写 `Order.voucher_id` 和 `Order.voucher_no`。
 
+**注意**：`Order.voucher_id` / `voucher_no` 仅用于 `order_type="RETURN"` 的订单，其他类型订单该字段永远为 null。
+
 ### 2.3 采购退货 → 红字入库凭证
 
 **触发时机**：AP 批量生成凭证时（`ap_service.py:generate_ap_vouchers`）
 
-**查询条件**：`PurchaseReturn` where `voucher_id=None`，且退货创建日期在选中期间内
+**查询条件**：`PurchaseReturn` where `voucher_id=None`, `account_set_id=account_set_id`，且退货创建日期在选中期间内
 
-**凭证结构**：
+**分录方式**：红字冲销法，与原入库凭证科目位置一致，金额取负数。
 
-| 行 | 科目 | 方向 | 金额 | 辅助核算 |
-|----|------|------|------|----------|
-| 1 | 2202 应付账款 | 借（红字） | 退货含税金额 | 供应商 |
-| 2 | 1405 库存商品 | 贷（红字） | 退货不含税金额 | — |
-| 3 | 222101 进项税额 | 贷（红字） | 退货税额 | — |
+**凭证结构**（红字冲销原入库凭证"借1405+借222101/贷2202"）：
+
+| 行 | 科目 | 借方金额 | 贷方金额 | 辅助核算 |
+|----|------|----------|----------|----------|
+| 1 | 1405 库存商品 | -excl_tax（负数） | 0 | — |
+| 2 | 222101 进项税额 | -tax（负数） | 0 | — |
+| 3 | 2202 应付账款 | 0 | -total（负数） | 供应商 |
 
 - 凭证类型：记
+- `total_debit` / `total_credit`：均为 `-total`（负数）
 - 摘要：`采购退货冲回 {return_no}`
 - `source_type`：`purchase_return`
 - `source_bill_id`：PurchaseReturn ID
-- 税额换算：`total_amount` 为含税总额，按关联 `PurchaseOrderItem` 的 `tax_rate` 拆分不含税金额和税额
+
+**税额拆分**：一次退货可能包含多个不同税率的商品，需要逐行计算：
+1. 遍历 `PurchaseReturnItem`，通过 `purchase_item_id` 关联到 `PurchaseOrderItem` 获取 `tax_rate`
+2. 每行：`excl_tax = item.amount / (1 + tax_rate)`，`tax = item.amount - excl_tax`
+3. 汇总所有行的 `excl_tax` 和 `tax` 作为凭证金额
+4. 参考 `delivery_service.py:create_purchase_receipt` 的逐行计算模式
 
 **凭证关联**：生成后回写 `PurchaseReturn.voucher_id` 和 `PurchaseReturn.voucher_no`。
 
@@ -177,7 +190,7 @@ POST /payables/generate-ap-vouchers
 ### 后端
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
-| `backend/app/routers/purchase_orders.py` | 修改 | 修复 L640/L786 cost_price 取值 |
+| `backend/app/routers/purchase_orders.py` | 修改 | 修复 L640 cost_price 取值（L786 不动） |
 | `backend/app/services/ar_service.py` | 修改 | 增加销售退货凭证生成；`period_name` → `period_names` |
 | `backend/app/services/ap_service.py` | 修改 | 增加采购退货凭证生成；`period_name` → `period_names` |
 | `backend/app/routers/receivables.py` | 修改 | 新增销售退货列表 API；批量接口改多月 |
@@ -191,4 +204,8 @@ POST /payables/generate-ap-vouchers
 |------|---------|------|
 | `frontend/src/components/business/ReceivablePanel.vue` | 修改 | 增加销售退货 tab；月份多选 |
 | `frontend/src/components/business/PayablePanel.vue` | 修改 | 增加采购退货 tab；月份多选 |
-| `frontend/src/api/accounting.js` | 修改 | API 参数调整 |
+| `frontend/src/api/accounting.js` | 修改 | API 参数调整（`period_name` → `period_names`） |
+
+### 实施顺序
+
+修复 1 → 修复 2 → 修复 3（修复 2 的退货成本依赖修复 1 的不含税成本；修复 3 的多月逻辑需覆盖修复 2 新增的退货单据类型）
