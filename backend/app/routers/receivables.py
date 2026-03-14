@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import require_permission
 from app.models import User, Customer
@@ -432,14 +433,18 @@ async def list_sales_returns(
 
 # ── 期末凭证生成 ──
 
+class GenerateVouchersRequest(BaseModel):
+    period_names: list[str]
+
 @router.post("/generate-ar-vouchers")
 async def generate_ar_vouchers_endpoint(
     account_set_id: int = Query(...),
-    period_name: str = Query(...),
+    data: GenerateVouchersRequest = ...,
     user: User = Depends(require_permission("accounting_ar_confirm")),
 ):
     try:
-        vouchers = await generate_ar_vouchers(account_set_id, period_name, user)
+        result = await generate_ar_vouchers(account_set_id, data.period_names, user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"message": f"生成 {len(vouchers)} 张凭证", "vouchers": vouchers}
+    total_count = len(result["vouchers"])
+    return {"message": f"生成 {total_count} 张凭证", "vouchers": result["vouchers"], "summary": result["summary"]}
