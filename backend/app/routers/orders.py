@@ -314,8 +314,18 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
-    items = await OrderItem.filter(order_id=order_id).select_related("product")
+    items = await OrderItem.filter(order_id=order_id).select_related("product", "warehouse")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
+
+    # 批量加载订单行仓库的账套名称
+    _item_as_ids = list(set(
+        i.warehouse.account_set_id for i in items
+        if i.warehouse and i.warehouse.account_set_id
+    ))
+    _as_name_map = {}
+    if _item_as_ids:
+        for _as in await AccountSet.filter(id__in=_item_as_ids):
+            _as_name_map[_as.id] = _as.name
 
     returned_quantities = {}
     if order.order_type in ["CASH", "CREDIT"]:
@@ -405,10 +415,30 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
             } for si in si_list]
         })
 
+    # 加载关联的应收单
+    receivable_bills = []
+    if has_finance:
+        try:
+            from app.models.ar_ap import ReceivableBill
+            _ar_bills = await ReceivableBill.filter(order_id=order.id).select_related("account_set").all()
+            for rb in _ar_bills:
+                receivable_bills.append({
+                    "id": rb.id,
+                    "bill_no": rb.bill_no,
+                    "account_set_id": rb.account_set_id,
+                    "account_set_name": rb.account_set.name if rb.account_set else None,
+                    "total_amount": float(rb.total_amount),
+                    "received_amount": float(rb.received_amount),
+                    "status": rb.status,
+                })
+        except Exception:
+            pass
+
     return {
         "id": order.id, "order_no": order.order_no, "order_type": order.order_type,
         "customer": {"id": order.customer.id, "name": order.customer.name} if order.customer else None,
         "warehouse": {"id": order.warehouse.id, "name": order.warehouse.name} if order.warehouse else None,
+        "account_set_id": order.account_set_id,
         "total_amount": float(order.total_amount),
         "total_cost": float(order.total_cost) if has_finance else None,
         "total_profit": float(order.total_profit) if has_finance else None,
@@ -425,6 +455,7 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
         "related_order": {"id": order.related_order.id, "order_no": order.related_order.order_no} if order.related_order else None,
         "related_children": related_children,
         "rebate_refund_records": rebate_refund_records,
+        "receivable_bills": receivable_bills,
         "shipments": shipments_info,
         "items": [{
             "product_id": i.product_id, "product_sku": i.product.sku,
@@ -437,7 +468,11 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
             "cost_price": float(i.cost_price) if has_finance else None,
             "amount": float(i.amount),
             "profit": float(i.profit) if has_finance else None,
-            "rebate_amount": float(i.rebate_amount) if i.rebate_amount else 0
+            "rebate_amount": float(i.rebate_amount) if i.rebate_amount else 0,
+            "warehouse_id": i.warehouse_id,
+            "warehouse_name": i.warehouse.name if i.warehouse else None,
+            "account_set_id": i.warehouse.account_set_id if i.warehouse else None,
+            "account_set_name": _as_name_map.get(i.warehouse.account_set_id) if (i.warehouse and i.warehouse.account_set_id) else None,
         } for i in items]
     }
 

@@ -69,7 +69,7 @@
               <th v-if="financeIsColumnVisible('item_count')" class="px-2 py-2 text-center">品项数</th>
               <th v-if="financeIsColumnVisible('remark')" class="px-2 py-2 text-left">备注</th>
               <th v-if="financeIsColumnVisible('warehouse')" class="px-2 py-2 text-left">仓库</th>
-              <th v-if="financeIsColumnVisible('salesperson')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleOrderSort('salesperson')">业务员 <span v-if="orderSort.key === 'salesperson'" class="text-primary">{{ orderSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="financeIsColumnVisible('employee')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleOrderSort('employee')">业务员 <span v-if="orderSort.key === 'employee'" class="text-primary">{{ orderSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="financeIsColumnVisible('creator')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleOrderSort('creator')">创建人 <span v-if="orderSort.key === 'creator'" class="text-primary">{{ orderSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="financeIsColumnVisible('created_at')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleOrderSort('time')">创建时间 <span v-if="orderSort.key === 'time'" class="text-primary">{{ orderSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="financeIsColumnVisible('refunded')" class="px-2 py-2 text-center">退款状态</th>
@@ -104,7 +104,7 @@
                 <td v-if="financeIsColumnVisible('item_count')" class="px-2 py-2 text-center">{{ o.item_count ?? '-' }}</td>
                 <td v-if="financeIsColumnVisible('remark')" class="px-2 py-2 text-muted text-xs max-w-[150px] truncate">{{ o.remark || '-' }}</td>
                 <td v-if="financeIsColumnVisible('warehouse')" class="px-2 py-2">{{ o.warehouse_name || '-' }}</td>
-                <td v-if="financeIsColumnVisible('salesperson')" class="px-2 py-2 text-muted">{{ o.salesperson_name || '-' }}</td>
+                <td v-if="financeIsColumnVisible('employee')" class="px-2 py-2 text-muted">{{ o.employee_name || '-' }}</td>
                 <td v-if="financeIsColumnVisible('creator')" class="px-2 py-2 text-muted">{{ o.creator_name }}</td>
                 <td v-if="financeIsColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
                 <td v-if="financeIsColumnVisible('refunded')" class="px-2 py-2 text-center"><span v-if="o.refunded" class="badge badge-warning text-xs">已退款</span><span v-else class="text-xs text-muted">-</span></td>
@@ -194,7 +194,7 @@
             <div>
               <div class="text-[15px] font-bold font-mono">{{ orderDetail.order_no }}</div>
               <div class="text-xs text-muted mt-0.5">
-                <span v-if="orderDetail.salesperson_name">销售员: {{ orderDetail.salesperson_name }} · </span>
+                <span v-if="orderDetail.employee_name">销售员: {{ orderDetail.employee_name }} · </span>
                 {{ orderDetail.creator_name }} · {{ fmtDate(orderDetail.created_at) }}
               </div>
             </div>
@@ -246,38 +246,68 @@
           </div>
         </div>
 
-        <!-- 商品明细（优先展示） -->
+        <!-- 商品明细（按账套分组） -->
         <div class="mb-5">
           <div class="flex items-center gap-2 mb-2.5">
             <span class="text-[13px] font-semibold text-secondary">商品明细</span>
             <span v-if="orderDetail.items?.length" class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.items.length }} 件商品</span>
+            <span v-if="detailItemsByAccountSet.length > 1" class="text-[11px] text-warning bg-warning-subtle px-2 py-0.5 rounded-full">{{ detailItemsByAccountSet.length }} 个账套</span>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-[13px]">
-              <thead class="bg-elevated">
-                <tr>
-                  <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">数量</th>
-                  <th v-if="orderDetail.rebate_used > 0" class="px-3 py-2 text-right text-xs font-semibold text-secondary">返利</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">金额</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary" v-if="hasPermission('finance')">毛利</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-line">
-                <tr v-for="item in orderDetail.items" :key="item.product_id">
-                  <td class="px-3 py-2.5">
-                    <div class="font-medium">{{ item.product_name }}</div>
-                    <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
-                  </td>
-                  <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
-                  <td class="px-3 py-2.5 text-right">{{ item.quantity }}</td>
-                  <td v-if="orderDetail.rebate_used > 0" class="px-3 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
-                  <td class="px-3 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
-                  <td class="px-3 py-2.5 text-right" v-if="hasPermission('finance')" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <template v-for="(group, gIdx) in detailItemsByAccountSet" :key="group.key">
+              <!-- 分组标题（仅多账套时显示） -->
+              <div v-if="detailItemsByAccountSet.length > 1" class="flex justify-between items-center px-3 py-1.5 bg-elevated border-b text-xs" :class="gIdx > 0 ? 'mt-3' : ''">
+                <span class="font-semibold text-secondary">{{ group.name }}</span>
+                <span class="text-primary font-mono font-semibold">&yen;{{ fmt(group.subtotal) }}</span>
+              </div>
+              <table class="w-full text-[13px]">
+                <thead class="bg-elevated" v-if="gIdx === 0 || detailItemsByAccountSet.length > 1">
+                  <tr>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">数量</th>
+                    <th v-if="orderDetail.rebate_used > 0" class="px-3 py-2 text-right text-xs font-semibold text-secondary">返利</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">金额</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary" v-if="hasPermission('finance')">毛利</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                  <tr v-for="item in group.items" :key="item.id || item.product_id">
+                    <td class="px-3 py-2.5">
+                      <div class="font-medium">{{ item.product_name }}</div>
+                      <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
+                    </td>
+                    <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                    <td class="px-3 py-2.5 text-right">{{ item.quantity }}</td>
+                    <td v-if="orderDetail.rebate_used > 0" class="px-3 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
+                    <td class="px-3 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
+                    <td class="px-3 py-2.5 text-right" v-if="hasPermission('finance')" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+          </div>
+        </div>
+
+        <!-- 关联应收单（按账套分组） -->
+        <div v-if="orderDetail.receivable_bills?.length" class="mb-5">
+          <div class="flex items-center gap-2 mb-2.5">
+            <span class="text-[13px] font-semibold text-secondary">关联应收单</span>
+            <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.receivable_bills.length }} 笔</span>
+          </div>
+          <div class="space-y-2">
+            <div v-for="rb in orderDetail.receivable_bills" :key="rb.id" class="flex items-center justify-between px-3 py-2 bg-elevated rounded-lg border text-[13px]">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs text-primary">{{ rb.bill_no }}</span>
+                <span v-if="rb.account_set_name" class="text-[11px] text-muted bg-surface px-1.5 py-0.5 rounded">{{ rb.account_set_name }}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="font-semibold">&yen;{{ fmt(rb.total_amount) }}</span>
+                <span :class="rb.status === 'completed' ? 'badge badge-green' : rb.status === 'partial' ? 'badge badge-orange' : 'badge badge-gray'" class="text-[11px]">
+                  {{ rb.status === 'completed' ? '已收' : rb.status === 'partial' ? '部分收' : rb.status === 'cancelled' ? '已取消' : '待收' }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -598,7 +628,7 @@ const financeColumnDefs = {
   item_count: { label: '品项数', defaultVisible: true, align: 'center' },
   remark: { label: '备注', defaultVisible: true },
   warehouse: { label: '仓库', defaultVisible: true },
-  salesperson: { label: '业务员', defaultVisible: true },
+  employee: { label: '业务员', defaultVisible: true },
   created_at: { label: '创建时间', defaultVisible: true },
   related_order: { label: '关联订单', defaultVisible: false },
   refunded: { label: '退款状态', defaultVisible: false, align: 'center' },
@@ -713,10 +743,28 @@ const sortedOrders = computed(() => {
     amount: o => Number(o.total_amount) || 0,
     profit: o => Number(o.total_profit) || 0,
     status: o => o.is_cleared ? 1 : 0,
-    salesperson: o => (o.salesperson_name || '').toLowerCase(),
+    employee: o => (o.employee_name || '').toLowerCase(),
     creator: o => (o.creator_name || '').toLowerCase(),
     time: o => o.created_at || ''
   })
+})
+
+/** 订单详情商品按账套分组 */
+const detailItemsByAccountSet = computed(() => {
+  const items = orderDetail.items || []
+  if (!items.length) return []
+  const groups = new Map()
+  for (const item of items) {
+    const asId = item.account_set_id || 0
+    const asName = item.account_set_name || '未关联账套'
+    if (!groups.has(asId)) {
+      groups.set(asId, { key: asId, name: asName, items: [], subtotal: 0 })
+    }
+    const group = groups.get(asId)
+    group.items.push(item)
+    group.subtotal += Number(item.amount) || 0
+  }
+  return [...groups.values()]
 })
 
 /** 取消向导总步数 */
