@@ -29,9 +29,9 @@
       :cart="cart"
       :order-type="saleForm.order_type"
       :customer-id="saleForm.customer_id"
-      :salesperson-id="saleForm.salesperson_id"
+      :employee-id="saleForm.employee_id"
       :customers="customers"
-      :salespersons="salespersons"
+      :employees="salespersonEmployees"
       :warehouses="warehouses"
       :cart-total="cartTotal"
       :need-customer="needCustomer"
@@ -48,7 +48,7 @@
       @update-warehouse="(idx, wid) => updateCartWarehouse(idx)"
       @update-location="(idx, lid) => updateCartLocation(idx, lid)"
       @update:customer-id="saleForm.customer_id = $event"
-      @update:salesperson-id="saleForm.salesperson_id = $event"
+      @update:employee-id="saleForm.employee_id = $event"
       @update:order-type="saleForm.order_type = $event"
       @update:return-order-search="returnOrderSearch = $event"
       @update:return-order-dropdown="returnOrderDropdown = $event"
@@ -61,7 +61,7 @@
   <OrderConfirmModal
     :visible="appStore.modal.show && appStore.modal.type === 'order_confirm'"
     :order-confirm="orderConfirm"
-    :salespersons="salespersons"
+    :employees="salespersonEmployees"
     :payment-methods="paymentMethods"
     :account-sets="accountSets"
     :submitting="appStore.submitting"
@@ -86,6 +86,7 @@ import { useSalesCart } from '../composables/useSalesCart'
 import { getOrders, getOrder, createOrder } from '../api/orders'
 import { getWarehouses } from '../api/warehouses'
 import { getAccountSets } from '../api/accounting'
+import { getPaymentMethods as getPaymentMethodsApi } from '../api/settings'
 import { fuzzyMatchAny } from '../utils/helpers'
 import ProductSelector from '../components/business/sales/ProductSelector.vue'
 import ShoppingCart from '../components/business/sales/ShoppingCart.vue'
@@ -105,8 +106,26 @@ const products = computed(() => productsStore.products)
 const warehouses = computed(() => warehousesStore.warehouses)
 const locations = computed(() => warehousesStore.locations)
 const customers = computed(() => customersStore.customers)
-const salespersons = computed(() => settingsStore.salespersons)
-const paymentMethods = computed(() => settingsStore.paymentMethods)
+const salespersonEmployees = computed(() => settingsStore.employees.filter(e => e.is_salesperson))
+const allPaymentMethods = computed(() => settingsStore.paymentMethods)
+
+// 按账套过滤的收款方式（用于订单确认弹窗）
+const filteredPaymentMethodsList = ref([])
+async function loadFilteredPaymentMethods(accountSetId) {
+  if (!accountSetId) {
+    filteredPaymentMethodsList.value = []
+    return
+  }
+  try {
+    const { data } = await getPaymentMethodsApi({ account_set_id: accountSetId })
+    filteredPaymentMethodsList.value = data
+  } catch {
+    filteredPaymentMethodsList.value = []
+  }
+}
+const paymentMethods = computed(() =>
+  filteredPaymentMethodsList.value.length ? filteredPaymentMethodsList.value : allPaymentMethods.value
+)
 
 // ---------- 购物车 composable ----------
 const {
@@ -126,7 +145,7 @@ const saleForm = reactive({
   warehouse_id: '',
   location_id: '',
   customer_id: '',
-  salesperson_id: '',
+  employee_id: '',
   related_order_id: '',
   remark: ''
 })
@@ -141,7 +160,7 @@ const selectedReturnOrder = ref(null)
 const orderConfirm = ref({
   items: [], customer: null, total: 0, order_type: '',
   refunded: false, use_credit: false, available_credit: 0,
-  use_rebate: false, rebate_balance: 0, salesperson_id: '',
+  use_rebate: false, rebate_balance: 0, employee_id: '',
   remark: '', payment_method: 'cash', account_set_id: null
 })
 
@@ -274,10 +293,14 @@ const submitOrder = () => {
     total, refunded: false,
     use_credit: false, available_credit: availableCredit,
     use_rebate: false, rebate_balance: rebateBalance,
-    salesperson_id: saleForm.salesperson_id || '',
-    salesperson_name: salespersons.value.find(s => s.id === parseInt(saleForm.salesperson_id))?.name || '',
+    employee_id: saleForm.employee_id || '',
+    employee_name: salespersonEmployees.value.find(s => s.id === parseInt(saleForm.employee_id))?.name || '',
     remark: '', payment_method: 'cash',
     account_set_id: autoAccountSetId
+  }
+  // 按账套加载收款方式
+  if (orderConfirm.value.account_set_id) {
+    loadFilteredPaymentMethods(orderConfirm.value.account_set_id)
   }
   appStore.openModal('order_confirm', '确认提交订单')
 }
@@ -306,7 +329,7 @@ const confirmSubmitOrder = async () => {
     const result = await createOrder({
       order_type: saleForm.order_type,
       customer_id: saleForm.customer_id || null,
-      salesperson_id: orderConfirm.value.salesperson_id ? parseInt(orderConfirm.value.salesperson_id) : null,
+      employee_id: orderConfirm.value.employee_id ? parseInt(orderConfirm.value.employee_id) : null,
       warehouse_id: null, location_id: null,
       related_order_id: saleForm.related_order_id || null,
       refunded: orderConfirm.value.refunded || false,
@@ -333,7 +356,7 @@ const confirmSubmitOrder = async () => {
     // 重置状态
     clearCart()
     Object.assign(saleForm, {
-      warehouse_id: '', location_id: '', salesperson_id: '',
+      warehouse_id: '', location_id: '', employee_id: '',
       related_order_id: '', customer_id: '', order_type: 'CASH'
     })
     returnOrderSearch.value = ''
@@ -351,6 +374,10 @@ const confirmSubmitOrder = async () => {
 }
 
 // ---------- Watchers ----------
+watch(() => orderConfirm.value.account_set_id, (newId) => {
+  loadFilteredPaymentMethods(newId)
+})
+
 watch(() => saleForm.warehouse_id, () => { saleForm.location_id = '' })
 
 watch(() => saleForm.order_type, (newType, oldType) => {
@@ -372,7 +399,7 @@ onMounted(async () => {
   if (!warehouses.value.length) warehousesStore.loadWarehouses()
   if (!locations.value.length) warehousesStore.loadLocations()
   if (!customers.value.length) customersStore.loadCustomers()
-  if (!salespersons.value.length) settingsStore.loadSalespersons()
+  if (!salespersonEmployees.value.length) settingsStore.loadEmployees()
   if (!paymentMethods.value.length) settingsStore.loadPaymentMethods()
   try {
     const { data } = await getAccountSets()

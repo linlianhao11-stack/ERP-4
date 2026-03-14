@@ -87,7 +87,10 @@
               </div>
               <div>
                 <label class="label" for="ap-disb-method">付款方式</label>
-                <input id="ap-disb-method" v-model="form.disbursement_method" class="input text-sm" placeholder="如：银行转账" />
+                <select id="ap-disb-method" v-model="form.disbursement_method" class="input text-sm">
+                  <option value="">请选择</option>
+                  <option v-for="m in filteredDisbursementMethods" :key="m.id" :value="m.name">{{ m.name }}</option>
+                </select>
               </div>
               <div>
                 <label class="label" for="ap-disb-payable-id">关联应付单ID</label>
@@ -110,19 +113,40 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getDisbursementBills, createDisbursementBill, confirmDisbursementBill } from '../../api/accounting'
+import { getDisbursementMethods as getDisbursementMethodsApi } from '../../api/settings'
 import { useAccountingStore } from '../../stores/accounting'
+import { useSettingsStore } from '../../stores/settings'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
+const settingsStore = useSettingsStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
 const { fmtMoney } = useFormat()
+
+// 按当前账套过滤的付款方式
+const accountSetDisbursementMethods = ref([])
+async function loadAccountSetDisbursementMethods() {
+  if (!accountingStore.currentAccountSetId) {
+    accountSetDisbursementMethods.value = settingsStore.disbursementMethods
+    return
+  }
+  try {
+    const { data } = await getDisbursementMethodsApi({ account_set_id: accountingStore.currentAccountSetId })
+    accountSetDisbursementMethods.value = data
+  } catch {
+    accountSetDisbursementMethods.value = settingsStore.disbursementMethods
+  }
+}
+const filteredDisbursementMethods = computed(() =>
+  accountSetDisbursementMethods.value.length ? accountSetDisbursementMethods.value : settingsStore.disbursementMethods
+)
 
 const items = ref([])
 const total = ref(0)
@@ -150,6 +174,7 @@ async function loadSuppliers() {
 
 function openCreate() {
   form.value = { supplier_id: '', disbursement_date: new Date().toISOString().slice(0, 10), amount: '', disbursement_method: '', payable_bill_id: null, remark: '' }
+  loadAccountSetDisbursementMethods()
   showCreate.value = true
 }
 
@@ -184,6 +209,14 @@ async function confirmBill(b) {
   }
 }
 
-watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
-onMounted(() => { loadList(); loadSuppliers() })
+watch(() => accountingStore.currentAccountSetId, () => {
+  page.value = 1
+  loadList()
+  loadAccountSetDisbursementMethods()
+})
+onMounted(() => {
+  loadList()
+  loadSuppliers()
+  loadAccountSetDisbursementMethods()
+})
 </script>

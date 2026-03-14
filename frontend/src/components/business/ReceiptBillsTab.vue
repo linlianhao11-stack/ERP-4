@@ -96,7 +96,7 @@
                 <label class="label" for="ar-rcpt-payment-method">收款方式</label>
                 <select id="ar-rcpt-payment-method" v-model="form.payment_method" class="input text-sm">
                   <option value="">请选择</option>
-                  <option v-for="m in settingsStore.paymentMethods" :key="m.id" :value="m.name">{{ m.name }}</option>
+                  <option v-for="m in filteredPaymentMethods" :key="m.id" :value="m.name">{{ m.name }}</option>
                 </select>
               </div>
               <div>
@@ -134,6 +134,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getReceiptBills, createReceiptBill, confirmReceiptBill, getReceivableBills } from '../../api/accounting'
+import { getPaymentMethods } from '../../api/settings'
 import { useAccountingStore } from '../../stores/accounting'
 import { useSettingsStore } from '../../stores/settings'
 import { useAppStore } from '../../stores/app'
@@ -147,6 +148,24 @@ const settingsStore = useSettingsStore()
 const appStore = useAppStore()
 const { hasPermission } = usePermission()
 const { fmtMoney } = useFormat()
+
+// 按当前账套过滤的收款方式
+const accountSetPaymentMethods = ref([])
+async function loadAccountSetPaymentMethods() {
+  if (!accountingStore.currentAccountSetId) {
+    accountSetPaymentMethods.value = settingsStore.paymentMethods
+    return
+  }
+  try {
+    const { data } = await getPaymentMethods({ account_set_id: accountingStore.currentAccountSetId })
+    accountSetPaymentMethods.value = data
+  } catch {
+    accountSetPaymentMethods.value = settingsStore.paymentMethods
+  }
+}
+const filteredPaymentMethods = computed(() =>
+  accountSetPaymentMethods.value.length ? accountSetPaymentMethods.value : settingsStore.paymentMethods
+)
 
 // 该客户的待收/部分收款应收单
 const receivableBillsList = ref([])
@@ -213,6 +232,7 @@ async function loadReceivables() {
 function openCreate() {
   form.value = { customer_id: '', receipt_date: new Date().toISOString().slice(0, 10), amount: '', payment_method: '', receivable_bill_id: null, is_advance: false, remark: '' }
   loadReceivables()
+  loadAccountSetPaymentMethods()
   showCreate.value = true
 }
 
@@ -255,6 +275,14 @@ async function confirmBill(b) {
   }
 }
 
-watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
-onMounted(() => { loadList(); loadCustomers() })
+watch(() => accountingStore.currentAccountSetId, () => {
+  page.value = 1
+  loadList()
+  loadAccountSetPaymentMethods()
+})
+onMounted(() => {
+  loadList()
+  loadCustomers()
+  loadAccountSetPaymentMethods()
+})
 </script>
