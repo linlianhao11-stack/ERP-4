@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from tortoise import transactions
 from app.auth.dependencies import require_permission
 from app.models import User, Customer
+from app.models.order import Order
 from app.models.accounting import AccountSet
 from app.models.ar_ap import ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff
 from app.schemas.ar_ap import (
@@ -394,6 +395,39 @@ async def confirm_write_off_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"message": "确认成功", "bill_no": wo.bill_no}
+
+
+# ── 销售退货单（凭证视角） ──
+
+@router.get("/sales-returns")
+async def list_sales_returns(
+    account_set_id: int = Query(...),
+    customer_id: int = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    user: User = Depends(require_permission("accounting_ar_view")),
+):
+    query = Order.filter(account_set_id=account_set_id, order_type="RETURN")
+    if customer_id:
+        query = query.filter(customer_id=customer_id)
+
+    total = await query.count()
+    orders = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
+
+    items = []
+    for o in orders:
+        items.append({
+            "id": o.id,
+            "order_no": o.order_no,
+            "customer_id": o.customer_id,
+            "customer_name": o.customer.name if o.customer else None,
+            "total_amount": str(abs(o.total_amount)),
+            "total_cost": str(abs(o.total_cost)),
+            "return_date": o.created_at.strftime("%Y-%m-%d") if o.created_at else None,
+            "voucher_no": o.voucher_no,
+            "has_voucher": o.voucher_id is not None,
+        })
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 # ── 期末凭证生成 ──
