@@ -228,6 +228,13 @@
           <div v-if="!returnForm.is_refunded" class="text-xs text-primary bg-info-subtle rounded p-2">
             未退款的金额将转为供应商"在账资金"，可在后续采购单中抵扣
           </div>
+          <div v-if="returnForm.is_refunded">
+            <label class="label text-xs" for="purchase-return-refund-method">退款方式</label>
+            <select id="purchase-return-refund-method" v-model="returnForm.refund_method" class="input text-sm">
+              <option value="">请选择</option>
+              <option v-for="m in disbursementMethods" :key="m.code" :value="m.name">{{ m.name }}</option>
+            </select>
+          </div>
           <div>
             <label class="label text-xs">退货物流单号（选填）</label>
             <input v-model="returnForm.tracking_no" class="input text-sm" placeholder="退货物流单号">
@@ -256,6 +263,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { useProductsStore } from '../../../stores/products'
 import { useWarehousesStore } from '../../../stores/warehouses'
+import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import {
@@ -278,9 +286,11 @@ const emit = defineEmits(['update:visible', 'data-changed'])
 const appStore = useAppStore()
 const productsStore = useProductsStore()
 const warehousesStore = useWarehousesStore()
+const settingsStore = useSettingsStore()
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
 const warehouses = computed(() => warehousesStore.warehouses)
+const disbursementMethods = computed(() => settingsStore.disbursementMethods)
 
 // ---- 详情状态 ----
 const purchaseOrderDetail = ref(null)
@@ -293,7 +303,7 @@ const receivablePOs = ref([])
 
 // ---- 退货状态 ----
 const showReturnModal = ref(false)
-const returnForm = reactive({ po_id: null, po_no: '', items: [], is_refunded: false, tracking_no: '' })
+const returnForm = reactive({ po_id: null, po_no: '', items: [], is_refunded: false, tracking_no: '', refund_method: '' })
 
 /** 退货总金额 */
 const returnTotalAmount = computed(() => {
@@ -557,6 +567,9 @@ const openReturnModal = (po) => {
   returnForm.po_no = po.po_no
   returnForm.is_refunded = false
   returnForm.tracking_no = ''
+  returnForm.refund_method = ''
+  // 确保付款方式已加载
+  if (!settingsStore.disbursementMethods.length) settingsStore.loadDisbursementMethods()
   returnForm.items = po.items
     .filter(it => it.returnable_quantity > 0)
     .map(it => ({
@@ -590,7 +603,8 @@ const confirmReturn = async () => {
     await returnPurchaseOrder(returnForm.po_id, {
       items: checkedItems.map(i => ({ item_id: i.item_id, return_quantity: i.return_quantity })),
       is_refunded: returnForm.is_refunded,
-      tracking_no: returnForm.tracking_no || null
+      tracking_no: returnForm.tracking_no || null,
+      refund_method: returnForm.is_refunded ? (returnForm.refund_method || null) : null
     })
     appStore.showToast('退货成功')
     showReturnModal.value = false

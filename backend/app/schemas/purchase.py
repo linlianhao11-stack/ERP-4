@@ -29,6 +29,7 @@ class PurchaseReturnRequest(BaseModel):
     items: List[PurchaseReturnItemRequest]
     is_refunded: bool = False
     tracking_no: Optional[str] = None
+    refund_method: Optional[str] = None
 
 
 class ReceiveItemRequest(BaseModel):

@@ -79,6 +79,20 @@
               <div class="mb-1"><b>已勾选</b>：货款已经退还给客户，不产生在账资金</div>
               <div><b>未勾选</b>：货款未退还，将形成客户的在账资金（预付款），下次购货时可以抵扣</div>
             </div>
+            <!-- 退款方式和金额（勾选已退款时显示） -->
+            <div v-if="orderConfirm.refunded" class="mt-3 space-y-2 border-t border-warning/30 pt-3">
+              <div>
+                <label class="text-xs text-secondary" for="refund-method">退款方式</label>
+                <select id="refund-method" v-model="orderConfirm.refund_method" class="input text-sm mt-0.5">
+                  <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-secondary" for="refund-amount">退款金额</label>
+                <input id="refund-amount" v-model.number="orderConfirm.refund_amount" type="number" step="0.01" min="0" class="input text-sm mt-0.5" />
+                <div class="text-xs text-muted mt-0.5">默认为订单总金额，可调整实际退款金额</div>
+              </div>
+            </div>
           </div>
 
           <!-- 在账资金勾选 -->

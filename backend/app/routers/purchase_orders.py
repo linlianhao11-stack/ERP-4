@@ -878,6 +878,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
             is_refunded=data.is_refunded,
             refund_status="pending" if data.is_refunded else "n/a",
             refund_amount=total_return_amount if data.is_refunded else None,
+            refund_method=data.refund_method if data.is_refunded else None,
             tracking_no=data.tracking_no or None,
             created_by=user,
         )
@@ -921,7 +922,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
                         payable_bill=ap_bill,
                         disbursement_date=date.today(),
                         amount=-abs(total_return_amount),
-                        disbursement_method="",
+                        disbursement_method=data.refund_method or "",
                         bill_type="return_refund",
                         purchase_return=pr,
                         status="draft",
