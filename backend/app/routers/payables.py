@@ -7,6 +7,7 @@ from app.auth.dependencies import require_permission
 from app.models import User, Supplier
 from app.models.accounting import AccountSet
 from app.models.ar_ap import PayableBill, DisbursementBill, DisbursementRefundBill
+from app.models.purchase import PurchaseReturn
 from app.schemas.ar_ap import (
     PayableBillCreate, DisbursementBillCreate, DisbursementRefundBillCreate,
 )
@@ -304,6 +305,40 @@ async def confirm_disbursement_refund_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"message": "确认成功", "bill_no": refund.bill_no}
+
+
+# ── 采购退货单（凭证视角） ──
+
+@router.get("/purchase-returns")
+async def list_purchase_returns_for_ap(
+    account_set_id: int = Query(...),
+    supplier_id: int = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    user: User = Depends(require_permission("accounting_ap_view")),
+):
+    query = PurchaseReturn.filter(account_set_id=account_set_id)
+    if supplier_id:
+        query = query.filter(supplier_id=supplier_id)
+
+    total = await query.count()
+    returns = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier", "purchase_order")
+
+    items = []
+    for pr in returns:
+        items.append({
+            "id": pr.id,
+            "return_no": pr.return_no,
+            "supplier_id": pr.supplier_id,
+            "supplier_name": pr.supplier.name if pr.supplier else None,
+            "purchase_order_no": pr.purchase_order.po_no if pr.purchase_order else None,
+            "total_amount": str(pr.total_amount),
+            "return_date": pr.created_at.strftime("%Y-%m-%d") if pr.created_at else None,
+            "refund_status": pr.refund_status,
+            "voucher_no": getattr(pr, 'voucher_no', None),
+            "has_voucher": getattr(pr, 'voucher_id', None) is not None,
+        })
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 # ── 期末凭证生成 ──
