@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from tortoise import transactions
 from app.models.ar_ap import PayableBill, DisbursementBill, DisbursementRefundBill
+from app.models.purchase import PurchaseReturn, PurchaseReturnItem, PurchaseOrderItem
 from app.models.accounting import AccountSet, ChartOfAccount, AccountingPeriod
 from app.models.voucher import Voucher, VoucherEntry
 from app.utils.generators import generate_order_no
@@ -257,6 +258,81 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
             rf.voucher_no = vno
             await rf.save()
             vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款退款 {rf.bill_no}"})
+
+    # 采购退货单 → 红字冲销入库凭证：借 库存1405（负）+借 进项税222101（负）/ 贷 应付2202（负）
+    inventory_acct = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="1405", is_active=True
+    ).first()
+    input_tax_acct = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="222101", is_active=True
+    ).first()
+
+    if inventory_acct and input_tax_acct and ap_account:
+        purchase_returns = await PurchaseReturn.filter(
+            account_set_id=account_set_id,
+            voucher_id=None,
+            created_at__gte=datetime(period_start.year, period_start.month, period_start.day, 0, 0, 0, tzinfo=timezone.utc),
+            created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
+        ).all()
+        for pr in purchase_returns:
+            if pr.total_amount <= 0:
+                continue
+            # 逐行计算不含税金额和税额
+            pr_items = await PurchaseReturnItem.filter(purchase_return_id=pr.id).all()
+            total_excl_tax = Decimal("0")
+            total_tax = Decimal("0")
+            for pri in pr_items:
+                poi = await PurchaseOrderItem.filter(id=pri.purchase_item_id).first() if pri.purchase_item_id else None
+                tax_rate = poi.tax_rate if poi else Decimal("0.13")
+                item_excl = (pri.amount / (1 + tax_rate)).quantize(Decimal("0.01"))
+                item_tax = pri.amount - item_excl
+                total_excl_tax += item_excl
+                total_tax += item_tax
+            total_amount = total_excl_tax + total_tax
+
+            async with transactions.in_transaction():
+                p_name = f"{pr.created_at.year}-{pr.created_at.month:02d}"
+                vno = await _next_voucher_no(account_set_id, "记", p_name)
+                v = await Voucher.create(
+                    account_set_id=account_set_id,
+                    voucher_type="记",
+                    voucher_no=vno,
+                    period_name=p_name,
+                    voucher_date=pr.created_at.date() if hasattr(pr.created_at, 'date') else pr.created_at,
+                    summary=f"采购退货冲回 {pr.return_no}",
+                    total_debit=-total_amount,
+                    total_credit=-total_amount,
+                    status="draft",
+                    creator=user,
+                    source_type="purchase_return",
+                    source_bill_id=pr.id,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=1,
+                    account_id=inventory_acct.id,
+                    summary=f"采购退货冲回 {pr.return_no}",
+                    debit_amount=-total_excl_tax,
+                    credit_amount=Decimal("0"),
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=2,
+                    account_id=input_tax_acct.id,
+                    summary=f"采购退货冲回 {pr.return_no} 进项税",
+                    debit_amount=-total_tax,
+                    credit_amount=Decimal("0"),
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=3,
+                    account_id=ap_account.id,
+                    summary=f"采购退货冲回 {pr.return_no}",
+                    debit_amount=Decimal("0"),
+                    credit_amount=-total_amount,
+                    aux_supplier_id=pr.supplier_id,
+                )
+                pr.voucher = v
+                pr.voucher_no = vno
+                await pr.save()
+                vouchers.append({"id": v.id, "voucher_no": vno, "source": f"采购退货 {pr.return_no}"})
 
     logger.info(f"AP凭证生成完成: {len(vouchers)} 张")
     return vouchers
