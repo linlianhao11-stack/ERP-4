@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from tortoise.expressions import Q
 from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import require_permission
@@ -33,6 +34,7 @@ async def list_payable_bills(
     status: str = Query(None),
     start_date: str = Query(None),
     end_date: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ap_view")),
@@ -46,6 +48,10 @@ async def list_payable_bills(
         query = query.filter(bill_date__gte=start_date)
     if end_date:
         query = query.filter(bill_date__lte=end_date)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(supplier__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier", "purchase_order")
@@ -149,6 +155,7 @@ async def list_disbursement_bills(
     account_set_id: int = Query(...),
     supplier_id: int = Query(None),
     status: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ap_view")),
@@ -158,6 +165,10 @@ async def list_disbursement_bills(
         query = query.filter(supplier_id=supplier_id)
     if status:
         query = query.filter(status=status)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(supplier__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier")
@@ -233,6 +244,7 @@ async def list_disbursement_refund_bills(
     account_set_id: int = Query(...),
     supplier_id: int = Query(None),
     status: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ap_view")),
@@ -242,6 +254,10 @@ async def list_disbursement_refund_bills(
         query = query.filter(supplier_id=supplier_id)
     if status:
         query = query.filter(status=status)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(supplier__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier")
@@ -314,6 +330,7 @@ async def confirm_disbursement_refund_endpoint(
 async def list_purchase_returns_for_ap(
     account_set_id: int = Query(...),
     supplier_id: int = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ap_view")),
@@ -321,6 +338,10 @@ async def list_purchase_returns_for_ap(
     query = PurchaseReturn.filter(account_set_id=account_set_id)
     if supplier_id:
         query = query.filter(supplier_id=supplier_id)
+    if search:
+        query = query.filter(
+            Q(return_no__icontains=search) | Q(supplier__name__icontains=search)
+        )
 
     total = await query.count()
     returns = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier", "purchase_order")
