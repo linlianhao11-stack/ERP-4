@@ -636,8 +636,8 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             if location.warehouse_id != wh_id:
                 raise HTTPException(status_code=400, detail=f"{poi.product.name} 的仓位不属于所选仓库")
 
-            # 成本价 = 实际付款金额(已扣返利) / 数量，反映真实资金成本
-            cost_price = poi.amount / poi.quantity if poi.quantity > 0 else poi.tax_inclusive_price
+            # 成本价 = 不含税单价，反映真实资金成本
+            cost_price = poi.tax_exclusive_price
 
             # SN 检查：用预加载的 sn_config_set 替代逐条查询
             product_brand = poi.product.brand if poi.product else None
