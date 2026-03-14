@@ -36,23 +36,27 @@ class PaymentOrder(models.Model):
 
 class PaymentMethod(models.Model):
     id = fields.IntField(pk=True)
-    code = fields.CharField(max_length=50, unique=True)
+    code = fields.CharField(max_length=50)
     name = fields.CharField(max_length=100)
     sort_order = fields.IntField(default=0)
     is_active = fields.BooleanField(default=True)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="payment_methods", null=True, on_delete=fields.RESTRICT)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
         table = "payment_methods"
+        unique_together = (("account_set", "code"),)
 
 
 class DisbursementMethod(models.Model):
     id = fields.IntField(pk=True)
-    code = fields.CharField(max_length=50, unique=True)
+    code = fields.CharField(max_length=50)
     name = fields.CharField(max_length=100)
     sort_order = fields.IntField(default=0)
     is_active = fields.BooleanField(default=True)
+    account_set = fields.ForeignKeyField("models.AccountSet", related_name="disbursement_methods", null=True, on_delete=fields.RESTRICT)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
         table = "disbursement_methods"
+        unique_together = (("account_set", "code"),)
