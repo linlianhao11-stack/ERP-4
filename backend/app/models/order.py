@@ -22,6 +22,8 @@ class Order(models.Model):
     creator = fields.ForeignKeyField("models.User", related_name="orders", null=True, on_delete=fields.SET_NULL)
     shipping_status = fields.CharField(max_length=20, default="pending")
     account_set = fields.ForeignKeyField("models.AccountSet", related_name="orders", null=True, on_delete=fields.SET_NULL)
+    voucher = fields.ForeignKeyField("models.Voucher", null=True, on_delete=fields.SET_NULL, related_name="return_order_vouchers")
+    voucher_no = fields.CharField(max_length=30, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
