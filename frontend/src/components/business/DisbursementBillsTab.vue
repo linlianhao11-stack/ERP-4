@@ -119,6 +119,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+
+const emit = defineEmits(['data-changed'])
 import PageToolbar from '../common/PageToolbar.vue'
 import { getDisbursementBills, createDisbursementBill, confirmDisbursementBill } from '../../api/accounting'
 import { getDisbursementMethods as getDisbursementMethodsApi } from '../../api/settings'
@@ -209,6 +211,7 @@ async function confirmBill(b) {
     await confirmDisbursementBill(b.id)
     appStore.showToast('确认成功', 'success')
     loadList()
+    emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '确认失败', 'error')
   }
