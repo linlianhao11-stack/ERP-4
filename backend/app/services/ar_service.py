@@ -183,18 +183,8 @@ async def _get_employee_department_from_receivable(receivable_bill_id: int | Non
     return employee, department
 
 
-async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> list:
-    period = await AccountingPeriod.filter(
-        account_set_id=account_set_id, period_name=period_name
-    ).first()
-    if not period:
-        raise ValueError(f"会计期间 {period_name} 不存在")
-
-    # 根据年月计算期间起止日期
-    period_start = date(period.year, period.month, 1)
-    _, last_day = calendar.monthrange(period.year, period.month)
-    period_end = date(period.year, period.month, last_day)
-
+async def generate_ar_vouchers(account_set_id: int, period_names: list[str], user) -> dict:
+    # 科目查询只执行一次，放在循环外
     bank_account = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1002", is_active=True
     ).first()
@@ -207,155 +197,6 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
     if not bank_account or not ar_account:
         raise ValueError("缺少必要科目：银行存款(1002)或应收账款(1122)")
 
-    vouchers = []
-
-    # 收款单 → 借 银行存款1002，贷 应收账款1122（仅处理当前期间）
-    receipts = await ReceiptBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None,
-        receipt_date__gte=period_start, receipt_date__lte=period_end,
-    ).all()
-    for r in receipts:
-        employee, department = await _get_employee_department_from_receivable(r.receivable_bill_id)
-        async with transactions.in_transaction():
-            vno = await _next_voucher_no(account_set_id, "收", period_name)
-            v = await Voucher.create(
-                account_set_id=account_set_id,
-                voucher_type="收",
-                voucher_no=vno,
-                period_name=period_name,
-                voucher_date=r.receipt_date,
-                summary=f"收款单 {r.bill_no}",
-                total_debit=r.amount,
-                total_credit=r.amount,
-                status="draft",
-                creator=user,
-                source_type="receipt_bill",
-                source_bill_id=r.id,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=1,
-                account_id=bank_account.id,
-                summary=f"收款 {r.bill_no}",
-                debit_amount=r.amount,
-                credit_amount=Decimal("0"),
-                aux_employee=employee if bank_account.aux_employee else None,
-                aux_department=department if bank_account.aux_department else None,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=2,
-                account_id=ar_account.id,
-                summary=f"收款 {r.bill_no}",
-                debit_amount=Decimal("0"),
-                credit_amount=r.amount,
-                aux_customer_id=r.customer_id,
-                aux_employee=employee if ar_account.aux_employee else None,
-                aux_department=department if ar_account.aux_department else None,
-            )
-            r.voucher = v
-            r.voucher_no = vno
-            await r.save()
-            vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款单 {r.bill_no}"})
-
-    # 收款退款单 → 借 应收账款1122，贷 银行存款1002（仅处理当前期间）
-    refunds = await ReceiptRefundBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None,
-        refund_date__gte=period_start, refund_date__lte=period_end,
-    ).all()
-    for rf in refunds:
-        # 通过原始收款单的应收单获取员工/部门
-        original_receipt = await ReceiptBill.filter(id=rf.original_receipt_id).first()
-        receivable_id = original_receipt.receivable_bill_id if original_receipt else None
-        employee, department = await _get_employee_department_from_receivable(receivable_id)
-        async with transactions.in_transaction():
-            vno = await _next_voucher_no(account_set_id, "收", period_name)
-            v = await Voucher.create(
-                account_set_id=account_set_id,
-                voucher_type="收",
-                voucher_no=vno,
-                period_name=period_name,
-                voucher_date=rf.refund_date,
-                summary=f"收款退款 {rf.bill_no}",
-                total_debit=rf.amount,
-                total_credit=rf.amount,
-                status="draft",
-                creator=user,
-                source_type="receipt_refund_bill",
-                source_bill_id=rf.id,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=1,
-                account_id=ar_account.id,
-                summary=f"收款退款 {rf.bill_no}",
-                debit_amount=rf.amount,
-                credit_amount=Decimal("0"),
-                aux_customer_id=rf.customer_id,
-                aux_employee=employee if ar_account.aux_employee else None,
-                aux_department=department if ar_account.aux_department else None,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=2,
-                account_id=bank_account.id,
-                summary=f"收款退款 {rf.bill_no}",
-                debit_amount=Decimal("0"),
-                credit_amount=rf.amount,
-                aux_employee=employee if bank_account.aux_employee else None,
-                aux_department=department if bank_account.aux_department else None,
-            )
-            rf.voucher = v
-            rf.voucher_no = vno
-            await rf.save()
-            vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款退款 {rf.bill_no}"})
-
-    # 核销单 → 借 预收账款2203，贷 应收账款1122（仅处理当前期间）
-    if advance_account:
-        write_offs = await ReceivableWriteOff.filter(
-            account_set_id=account_set_id, status="confirmed", voucher_id=None,
-            write_off_date__gte=period_start, write_off_date__lte=period_end,
-        ).all()
-        for wo in write_offs:
-            employee, department = await _get_employee_department_from_receivable(wo.receivable_bill_id)
-            async with transactions.in_transaction():
-                vno = await _next_voucher_no(account_set_id, "记", period_name)
-                v = await Voucher.create(
-                    account_set_id=account_set_id,
-                    voucher_type="记",
-                    voucher_no=vno,
-                    period_name=period_name,
-                    voucher_date=wo.write_off_date,
-                    summary=f"核销 {wo.bill_no}",
-                    total_debit=wo.amount,
-                    total_credit=wo.amount,
-                    status="draft",
-                    creator=user,
-                    source_type="receivable_write_off",
-                    source_bill_id=wo.id,
-                )
-                await VoucherEntry.create(
-                    voucher=v, line_no=1,
-                    account_id=advance_account.id,
-                    summary=f"核销 {wo.bill_no}",
-                    debit_amount=wo.amount,
-                    credit_amount=Decimal("0"),
-                    aux_customer_id=wo.customer_id,
-                    aux_employee=employee if advance_account.aux_employee else None,
-                    aux_department=department if advance_account.aux_department else None,
-                )
-                await VoucherEntry.create(
-                    voucher=v, line_no=2,
-                    account_id=ar_account.id,
-                    summary=f"核销 {wo.bill_no}",
-                    debit_amount=Decimal("0"),
-                    credit_amount=wo.amount,
-                    aux_customer_id=wo.customer_id,
-                    aux_employee=employee if ar_account.aux_employee else None,
-                    aux_department=department if ar_account.aux_department else None,
-                )
-                wo.voucher = v
-                wo.voucher_no = vno
-                await wo.save()
-                vouchers.append({"id": v.id, "voucher_no": vno, "source": f"核销 {wo.bill_no}"})
-
-    # 销售退货单 → 红字冲销出库凭证：借 发出商品1407（负数），贷 库存商品1405（负数）
     shipped_acct = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1407", is_active=True
     ).first()
@@ -363,53 +204,221 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
         account_set_id=account_set_id, code="1405", is_active=True
     ).first()
 
-    if shipped_acct and inventory_acct:
-        return_orders = await Order.filter(
-            account_set_id=account_set_id,
-            order_type="RETURN",
-            voucher_id=None,
-            created_at__gte=period_start,
-            created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
+    vouchers = []
+    summary = {}
+
+    for period_name in period_names:
+        period = await AccountingPeriod.filter(
+            account_set_id=account_set_id, period_name=period_name
+        ).first()
+        if not period:
+            summary[period_name] = {"count": 0, "skipped": True, "reason": "期间不存在"}
+            continue
+        if period.is_closed:
+            summary[period_name] = {"count": 0, "skipped": True, "reason": "期间已结账"}
+            continue
+
+        period_start = date(period.year, period.month, 1)
+        _, last_day = calendar.monthrange(period.year, period.month)
+        period_end = date(period.year, period.month, last_day)
+        month_vouchers = []
+
+        # 收款单 → 借 银行存款1002，贷 应收账款1122
+        receipts = await ReceiptBill.filter(
+            account_set_id=account_set_id, status="confirmed", voucher_id=None,
+            receipt_date__gte=period_start, receipt_date__lte=period_end,
         ).all()
-        for ro in return_orders:
-            cost = abs(ro.total_cost)
-            if cost <= 0:
-                continue
+        for r in receipts:
+            employee, department = await _get_employee_department_from_receivable(r.receivable_bill_id)
             async with transactions.in_transaction():
-                p_name = f"{ro.created_at.year}-{ro.created_at.month:02d}"
-                vno = await _next_voucher_no(account_set_id, "记", p_name)
+                vno = await _next_voucher_no(account_set_id, "收", period_name)
                 v = await Voucher.create(
                     account_set_id=account_set_id,
-                    voucher_type="记",
+                    voucher_type="收",
                     voucher_no=vno,
-                    period_name=p_name,
-                    voucher_date=ro.created_at.date() if hasattr(ro.created_at, 'date') else ro.created_at,
-                    summary=f"销售退货冲回 {ro.order_no}",
-                    total_debit=-cost,
-                    total_credit=-cost,
+                    period_name=period_name,
+                    voucher_date=r.receipt_date,
+                    summary=f"收款单 {r.bill_no}",
+                    total_debit=r.amount,
+                    total_credit=r.amount,
                     status="draft",
                     creator=user,
-                    source_type="sales_return",
-                    source_bill_id=ro.id,
+                    source_type="receipt_bill",
+                    source_bill_id=r.id,
                 )
                 await VoucherEntry.create(
                     voucher=v, line_no=1,
-                    account_id=shipped_acct.id,
-                    summary=f"销售退货冲回 {ro.order_no}",
-                    debit_amount=-cost,
+                    account_id=bank_account.id,
+                    summary=f"收款 {r.bill_no}",
+                    debit_amount=r.amount,
                     credit_amount=Decimal("0"),
+                    aux_employee=employee if bank_account.aux_employee else None,
+                    aux_department=department if bank_account.aux_department else None,
                 )
                 await VoucherEntry.create(
                     voucher=v, line_no=2,
-                    account_id=inventory_acct.id,
-                    summary=f"销售退货冲回 {ro.order_no}",
+                    account_id=ar_account.id,
+                    summary=f"收款 {r.bill_no}",
                     debit_amount=Decimal("0"),
-                    credit_amount=-cost,
+                    credit_amount=r.amount,
+                    aux_customer_id=r.customer_id,
+                    aux_employee=employee if ar_account.aux_employee else None,
+                    aux_department=department if ar_account.aux_department else None,
                 )
-                ro.voucher = v
-                ro.voucher_no = vno
-                await ro.save()
-                vouchers.append({"id": v.id, "voucher_no": vno, "source": f"销售退货 {ro.order_no}"})
+                r.voucher = v
+                r.voucher_no = vno
+                await r.save()
+                month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款单 {r.bill_no}"})
+
+        # 收款退款单 → 借 应收账款1122，贷 银行存款1002
+        refunds = await ReceiptRefundBill.filter(
+            account_set_id=account_set_id, status="confirmed", voucher_id=None,
+            refund_date__gte=period_start, refund_date__lte=period_end,
+        ).all()
+        for rf in refunds:
+            # 通过原始收款单的应收单获取员工/部门
+            original_receipt = await ReceiptBill.filter(id=rf.original_receipt_id).first()
+            receivable_id = original_receipt.receivable_bill_id if original_receipt else None
+            employee, department = await _get_employee_department_from_receivable(receivable_id)
+            async with transactions.in_transaction():
+                vno = await _next_voucher_no(account_set_id, "收", period_name)
+                v = await Voucher.create(
+                    account_set_id=account_set_id,
+                    voucher_type="收",
+                    voucher_no=vno,
+                    period_name=period_name,
+                    voucher_date=rf.refund_date,
+                    summary=f"收款退款 {rf.bill_no}",
+                    total_debit=rf.amount,
+                    total_credit=rf.amount,
+                    status="draft",
+                    creator=user,
+                    source_type="receipt_refund_bill",
+                    source_bill_id=rf.id,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=1,
+                    account_id=ar_account.id,
+                    summary=f"收款退款 {rf.bill_no}",
+                    debit_amount=rf.amount,
+                    credit_amount=Decimal("0"),
+                    aux_customer_id=rf.customer_id,
+                    aux_employee=employee if ar_account.aux_employee else None,
+                    aux_department=department if ar_account.aux_department else None,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=2,
+                    account_id=bank_account.id,
+                    summary=f"收款退款 {rf.bill_no}",
+                    debit_amount=Decimal("0"),
+                    credit_amount=rf.amount,
+                    aux_employee=employee if bank_account.aux_employee else None,
+                    aux_department=department if bank_account.aux_department else None,
+                )
+                rf.voucher = v
+                rf.voucher_no = vno
+                await rf.save()
+                month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款退款 {rf.bill_no}"})
+
+        # 核销单 → 借 预收账款2203，贷 应收账款1122
+        if advance_account:
+            write_offs = await ReceivableWriteOff.filter(
+                account_set_id=account_set_id, status="confirmed", voucher_id=None,
+                write_off_date__gte=period_start, write_off_date__lte=period_end,
+            ).all()
+            for wo in write_offs:
+                employee, department = await _get_employee_department_from_receivable(wo.receivable_bill_id)
+                async with transactions.in_transaction():
+                    vno = await _next_voucher_no(account_set_id, "记", period_name)
+                    v = await Voucher.create(
+                        account_set_id=account_set_id,
+                        voucher_type="记",
+                        voucher_no=vno,
+                        period_name=period_name,
+                        voucher_date=wo.write_off_date,
+                        summary=f"核销 {wo.bill_no}",
+                        total_debit=wo.amount,
+                        total_credit=wo.amount,
+                        status="draft",
+                        creator=user,
+                        source_type="receivable_write_off",
+                        source_bill_id=wo.id,
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=1,
+                        account_id=advance_account.id,
+                        summary=f"核销 {wo.bill_no}",
+                        debit_amount=wo.amount,
+                        credit_amount=Decimal("0"),
+                        aux_customer_id=wo.customer_id,
+                        aux_employee=employee if advance_account.aux_employee else None,
+                        aux_department=department if advance_account.aux_department else None,
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=2,
+                        account_id=ar_account.id,
+                        summary=f"核销 {wo.bill_no}",
+                        debit_amount=Decimal("0"),
+                        credit_amount=wo.amount,
+                        aux_customer_id=wo.customer_id,
+                        aux_employee=employee if ar_account.aux_employee else None,
+                        aux_department=department if ar_account.aux_department else None,
+                    )
+                    wo.voucher = v
+                    wo.voucher_no = vno
+                    await wo.save()
+                    month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"核销 {wo.bill_no}"})
+
+        # 销售退货单 → 红字冲销出库凭证：借 发出商品1407（负数），贷 库存商品1405（负数）
+        if shipped_acct and inventory_acct:
+            return_orders = await Order.filter(
+                account_set_id=account_set_id,
+                order_type="RETURN",
+                voucher_id=None,
+                created_at__gte=period_start,
+                created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
+            ).all()
+            for ro in return_orders:
+                cost = abs(ro.total_cost)
+                if cost <= 0:
+                    continue
+                async with transactions.in_transaction():
+                    vno = await _next_voucher_no(account_set_id, "记", period_name)
+                    v = await Voucher.create(
+                        account_set_id=account_set_id,
+                        voucher_type="记",
+                        voucher_no=vno,
+                        period_name=period_name,
+                        voucher_date=ro.created_at.date() if hasattr(ro.created_at, 'date') else ro.created_at,
+                        summary=f"销售退货冲回 {ro.order_no}",
+                        total_debit=-cost,
+                        total_credit=-cost,
+                        status="draft",
+                        creator=user,
+                        source_type="sales_return",
+                        source_bill_id=ro.id,
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=1,
+                        account_id=shipped_acct.id,
+                        summary=f"销售退货冲回 {ro.order_no}",
+                        debit_amount=-cost,
+                        credit_amount=Decimal("0"),
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=2,
+                        account_id=inventory_acct.id,
+                        summary=f"销售退货冲回 {ro.order_no}",
+                        debit_amount=Decimal("0"),
+                        credit_amount=-cost,
+                    )
+                    ro.voucher = v
+                    ro.voucher_no = vno
+                    await ro.save()
+                    month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"销售退货 {ro.order_no}"})
+
+        summary[period_name] = {"count": len(month_vouchers), "skipped": False}
+        vouchers.extend(month_vouchers)
 
     logger.info(f"AR凭证生成完成: {len(vouchers)} 张")
-    return vouchers
+    return {"vouchers": vouchers, "summary": summary}

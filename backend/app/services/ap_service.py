@@ -152,18 +152,8 @@ async def confirm_disbursement_refund(refund_id: int, user) -> DisbursementRefun
 from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
-async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> list:
-    period = await AccountingPeriod.filter(
-        account_set_id=account_set_id, period_name=period_name
-    ).first()
-    if not period:
-        raise ValueError(f"会计期间 {period_name} 不存在")
-
-    # 根据年月计算期间起止日期
-    period_start = date(period.year, period.month, 1)
-    _, last_day = calendar.monthrange(period.year, period.month)
-    period_end = date(period.year, period.month, last_day)
-
+async def generate_ap_vouchers(account_set_id: int, period_names: list[str], user) -> dict:
+    # 科目查询只执行一次，放在循环外
     bank_account = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1002", is_active=True
     ).first()
@@ -173,93 +163,6 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
     if not bank_account or not ap_account:
         raise ValueError("缺少必要科目：银行存款(1002)或应付账款(2202)")
 
-    vouchers = []
-
-    # 付款单 → 借 应付账款2202，贷 银行存款1002（仅处理当前期间）
-    disbursements = await DisbursementBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None,
-        disbursement_date__gte=period_start, disbursement_date__lte=period_end,
-    ).all()
-    for d in disbursements:
-        async with transactions.in_transaction():
-            vno = await _next_voucher_no(account_set_id, "付", period_name)
-            v = await Voucher.create(
-                account_set_id=account_set_id,
-                voucher_type="付",
-                voucher_no=vno,
-                period_name=period_name,
-                voucher_date=d.disbursement_date,
-                summary=f"付款单 {d.bill_no}",
-                total_debit=d.amount,
-                total_credit=d.amount,
-                status="draft",
-                creator=user,
-                source_type="disbursement_bill",
-                source_bill_id=d.id,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=1,
-                account_id=ap_account.id,
-                summary=f"付款 {d.bill_no}",
-                debit_amount=d.amount,
-                credit_amount=Decimal("0"),
-                aux_supplier_id=d.supplier_id,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=2,
-                account_id=bank_account.id,
-                summary=f"付款 {d.bill_no}",
-                debit_amount=Decimal("0"),
-                credit_amount=d.amount,
-            )
-            d.voucher = v
-            d.voucher_no = vno
-            await d.save()
-            vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款单 {d.bill_no}"})
-
-    # 付款退款单 → 借 银行存款1002，贷 应付账款2202（仅处理当前期间）
-    refunds = await DisbursementRefundBill.filter(
-        account_set_id=account_set_id, status="confirmed", voucher_id=None,
-        refund_date__gte=period_start, refund_date__lte=period_end,
-    ).all()
-    for rf in refunds:
-        async with transactions.in_transaction():
-            vno = await _next_voucher_no(account_set_id, "付", period_name)
-            v = await Voucher.create(
-                account_set_id=account_set_id,
-                voucher_type="付",
-                voucher_no=vno,
-                period_name=period_name,
-                voucher_date=rf.refund_date,
-                summary=f"付款退款 {rf.bill_no}",
-                total_debit=rf.amount,
-                total_credit=rf.amount,
-                status="draft",
-                creator=user,
-                source_type="disbursement_refund_bill",
-                source_bill_id=rf.id,
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=1,
-                account_id=bank_account.id,
-                summary=f"付款退款 {rf.bill_no}",
-                debit_amount=rf.amount,
-                credit_amount=Decimal("0"),
-            )
-            await VoucherEntry.create(
-                voucher=v, line_no=2,
-                account_id=ap_account.id,
-                summary=f"付款退款 {rf.bill_no}",
-                debit_amount=Decimal("0"),
-                credit_amount=rf.amount,
-                aux_supplier_id=rf.supplier_id,
-            )
-            rf.voucher = v
-            rf.voucher_no = vno
-            await rf.save()
-            vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款退款 {rf.bill_no}"})
-
-    # 采购退货单 → 红字冲销入库凭证：借 库存1405（负）+借 进项税222101（负）/ 贷 应付2202（负）
     inventory_acct = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1405", is_active=True
     ).first()
@@ -267,75 +170,181 @@ async def generate_ap_vouchers(account_set_id: int, period_name: str, user) -> l
         account_set_id=account_set_id, code="222101", is_active=True
     ).first()
 
-    if inventory_acct and input_tax_acct and ap_account:
-        purchase_returns = await PurchaseReturn.filter(
-            account_set_id=account_set_id,
-            voucher_id=None,
-            created_at__gte=datetime(period_start.year, period_start.month, period_start.day, 0, 0, 0, tzinfo=timezone.utc),
-            created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
-        ).all()
-        for pr in purchase_returns:
-            if pr.total_amount <= 0:
-                continue
-            # 逐行计算不含税金额和税额
-            pr_items = await PurchaseReturnItem.filter(purchase_return_id=pr.id).all()
-            total_excl_tax = Decimal("0")
-            total_tax = Decimal("0")
-            for pri in pr_items:
-                poi = await PurchaseOrderItem.filter(id=pri.purchase_item_id).first() if pri.purchase_item_id else None
-                tax_rate = poi.tax_rate if poi else Decimal("0.13")
-                item_excl = (pri.amount / (1 + tax_rate)).quantize(Decimal("0.01"))
-                item_tax = pri.amount - item_excl
-                total_excl_tax += item_excl
-                total_tax += item_tax
-            total_amount = total_excl_tax + total_tax
+    vouchers = []
+    summary = {}
 
+    for period_name in period_names:
+        period = await AccountingPeriod.filter(
+            account_set_id=account_set_id, period_name=period_name
+        ).first()
+        if not period:
+            summary[period_name] = {"count": 0, "skipped": True, "reason": "期间不存在"}
+            continue
+        if period.is_closed:
+            summary[period_name] = {"count": 0, "skipped": True, "reason": "期间已结账"}
+            continue
+
+        period_start = date(period.year, period.month, 1)
+        _, last_day = calendar.monthrange(period.year, period.month)
+        period_end = date(period.year, period.month, last_day)
+        month_vouchers = []
+
+        # 付款单 → 借 应付账款2202，贷 银行存款1002
+        disbursements = await DisbursementBill.filter(
+            account_set_id=account_set_id, status="confirmed", voucher_id=None,
+            disbursement_date__gte=period_start, disbursement_date__lte=period_end,
+        ).all()
+        for d in disbursements:
             async with transactions.in_transaction():
-                p_name = f"{pr.created_at.year}-{pr.created_at.month:02d}"
-                vno = await _next_voucher_no(account_set_id, "记", p_name)
+                vno = await _next_voucher_no(account_set_id, "付", period_name)
                 v = await Voucher.create(
                     account_set_id=account_set_id,
-                    voucher_type="记",
+                    voucher_type="付",
                     voucher_no=vno,
-                    period_name=p_name,
-                    voucher_date=pr.created_at.date() if hasattr(pr.created_at, 'date') else pr.created_at,
-                    summary=f"采购退货冲回 {pr.return_no}",
-                    total_debit=-total_amount,
-                    total_credit=-total_amount,
+                    period_name=period_name,
+                    voucher_date=d.disbursement_date,
+                    summary=f"付款单 {d.bill_no}",
+                    total_debit=d.amount,
+                    total_credit=d.amount,
                     status="draft",
                     creator=user,
-                    source_type="purchase_return",
-                    source_bill_id=pr.id,
+                    source_type="disbursement_bill",
+                    source_bill_id=d.id,
                 )
                 await VoucherEntry.create(
                     voucher=v, line_no=1,
-                    account_id=inventory_acct.id,
-                    summary=f"采购退货冲回 {pr.return_no}",
-                    debit_amount=-total_excl_tax,
+                    account_id=ap_account.id,
+                    summary=f"付款 {d.bill_no}",
+                    debit_amount=d.amount,
+                    credit_amount=Decimal("0"),
+                    aux_supplier_id=d.supplier_id,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=2,
+                    account_id=bank_account.id,
+                    summary=f"付款 {d.bill_no}",
+                    debit_amount=Decimal("0"),
+                    credit_amount=d.amount,
+                )
+                d.voucher = v
+                d.voucher_no = vno
+                await d.save()
+                month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款单 {d.bill_no}"})
+
+        # 付款退款单 → 借 银行存款1002，贷 应付账款2202
+        refunds = await DisbursementRefundBill.filter(
+            account_set_id=account_set_id, status="confirmed", voucher_id=None,
+            refund_date__gte=period_start, refund_date__lte=period_end,
+        ).all()
+        for rf in refunds:
+            async with transactions.in_transaction():
+                vno = await _next_voucher_no(account_set_id, "付", period_name)
+                v = await Voucher.create(
+                    account_set_id=account_set_id,
+                    voucher_type="付",
+                    voucher_no=vno,
+                    period_name=period_name,
+                    voucher_date=rf.refund_date,
+                    summary=f"付款退款 {rf.bill_no}",
+                    total_debit=rf.amount,
+                    total_credit=rf.amount,
+                    status="draft",
+                    creator=user,
+                    source_type="disbursement_refund_bill",
+                    source_bill_id=rf.id,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=1,
+                    account_id=bank_account.id,
+                    summary=f"付款退款 {rf.bill_no}",
+                    debit_amount=rf.amount,
                     credit_amount=Decimal("0"),
                 )
                 await VoucherEntry.create(
                     voucher=v, line_no=2,
-                    account_id=input_tax_acct.id,
-                    summary=f"采购退货冲回 {pr.return_no} 进项税",
-                    debit_amount=-total_tax,
-                    credit_amount=Decimal("0"),
-                )
-                await VoucherEntry.create(
-                    voucher=v, line_no=3,
                     account_id=ap_account.id,
-                    summary=f"采购退货冲回 {pr.return_no}",
+                    summary=f"付款退款 {rf.bill_no}",
                     debit_amount=Decimal("0"),
-                    credit_amount=-total_amount,
-                    aux_supplier_id=pr.supplier_id,
+                    credit_amount=rf.amount,
+                    aux_supplier_id=rf.supplier_id,
                 )
-                pr.voucher = v
-                pr.voucher_no = vno
-                await pr.save()
-                vouchers.append({"id": v.id, "voucher_no": vno, "source": f"采购退货 {pr.return_no}"})
+                rf.voucher = v
+                rf.voucher_no = vno
+                await rf.save()
+                month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"付款退款 {rf.bill_no}"})
+
+        # 采购退货单 → 红字冲销入库凭证：借 库存1405（负）+借 进项税222101（负）/ 贷 应付2202（负）
+        if inventory_acct and input_tax_acct and ap_account:
+            purchase_returns = await PurchaseReturn.filter(
+                account_set_id=account_set_id,
+                voucher_id=None,
+                created_at__gte=datetime(period_start.year, period_start.month, period_start.day, 0, 0, 0, tzinfo=timezone.utc),
+                created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
+            ).all()
+            for pr in purchase_returns:
+                if pr.total_amount <= 0:
+                    continue
+                # 逐行计算不含税金额和税额
+                pr_items = await PurchaseReturnItem.filter(purchase_return_id=pr.id).all()
+                total_excl_tax = Decimal("0")
+                total_tax = Decimal("0")
+                for pri in pr_items:
+                    poi = await PurchaseOrderItem.filter(id=pri.purchase_item_id).first() if pri.purchase_item_id else None
+                    tax_rate = poi.tax_rate if poi else Decimal("0.13")
+                    item_excl = (pri.amount / (1 + tax_rate)).quantize(Decimal("0.01"))
+                    item_tax = pri.amount - item_excl
+                    total_excl_tax += item_excl
+                    total_tax += item_tax
+                total_amount = total_excl_tax + total_tax
+
+                async with transactions.in_transaction():
+                    vno = await _next_voucher_no(account_set_id, "记", period_name)
+                    v = await Voucher.create(
+                        account_set_id=account_set_id,
+                        voucher_type="记",
+                        voucher_no=vno,
+                        period_name=period_name,
+                        voucher_date=pr.created_at.date() if hasattr(pr.created_at, 'date') else pr.created_at,
+                        summary=f"采购退货冲回 {pr.return_no}",
+                        total_debit=-total_amount,
+                        total_credit=-total_amount,
+                        status="draft",
+                        creator=user,
+                        source_type="purchase_return",
+                        source_bill_id=pr.id,
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=1,
+                        account_id=inventory_acct.id,
+                        summary=f"采购退货冲回 {pr.return_no}",
+                        debit_amount=-total_excl_tax,
+                        credit_amount=Decimal("0"),
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=2,
+                        account_id=input_tax_acct.id,
+                        summary=f"采购退货冲回 {pr.return_no} 进项税",
+                        debit_amount=-total_tax,
+                        credit_amount=Decimal("0"),
+                    )
+                    await VoucherEntry.create(
+                        voucher=v, line_no=3,
+                        account_id=ap_account.id,
+                        summary=f"采购退货冲回 {pr.return_no}",
+                        debit_amount=Decimal("0"),
+                        credit_amount=-total_amount,
+                        aux_supplier_id=pr.supplier_id,
+                    )
+                    pr.voucher = v
+                    pr.voucher_no = vno
+                    await pr.save()
+                    month_vouchers.append({"id": v.id, "voucher_no": vno, "source": f"采购退货 {pr.return_no}"})
+
+        summary[period_name] = {"count": len(month_vouchers), "skipped": False}
+        vouchers.extend(month_vouchers)
 
     logger.info(f"AP凭证生成完成: {len(vouchers)} 张")
-    return vouchers
+    return {"vouchers": vouchers, "summary": summary}
 
 
 async def create_rebate_payment_voucher(
