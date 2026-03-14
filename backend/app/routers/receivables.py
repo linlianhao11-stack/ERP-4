@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from tortoise.expressions import Q
 from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import require_permission
@@ -33,6 +34,7 @@ async def list_receivable_bills(
     status: str = Query(None),
     start_date: str = Query(None),
     end_date: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ar_view")),
@@ -46,6 +48,10 @@ async def list_receivable_bills(
         query = query.filter(bill_date__gte=start_date)
     if end_date:
         query = query.filter(bill_date__lte=end_date)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(customer__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer", "order")
@@ -149,6 +155,7 @@ async def list_receipt_bills(
     account_set_id: int = Query(...),
     customer_id: int = Query(None),
     status: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ar_view")),
@@ -158,6 +165,10 @@ async def list_receipt_bills(
         query = query.filter(customer_id=customer_id)
     if status:
         query = query.filter(status=status)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(customer__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
@@ -235,6 +246,7 @@ async def list_receipt_refund_bills(
     account_set_id: int = Query(...),
     customer_id: int = Query(None),
     status: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ar_view")),
@@ -244,6 +256,10 @@ async def list_receipt_refund_bills(
         query = query.filter(customer_id=customer_id)
     if status:
         query = query.filter(status=status)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(customer__name__icontains=search)
+        )
 
     total = await query.count()
     bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
@@ -315,6 +331,7 @@ async def list_write_offs(
     account_set_id: int = Query(...),
     customer_id: int = Query(None),
     status: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ar_view")),
@@ -324,6 +341,10 @@ async def list_write_offs(
         query = query.filter(customer_id=customer_id)
     if status:
         query = query.filter(status=status)
+    if search:
+        query = query.filter(
+            Q(bill_no__icontains=search) | Q(customer__name__icontains=search)
+        )
 
     total = await query.count()
     items_raw = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
@@ -404,6 +425,7 @@ async def confirm_write_off_endpoint(
 async def list_sales_returns(
     account_set_id: int = Query(...),
     customer_id: int = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_ar_view")),
@@ -411,6 +433,10 @@ async def list_sales_returns(
     query = Order.filter(account_set_id=account_set_id, order_type="RETURN")
     if customer_id:
         query = query.filter(customer_id=customer_id)
+    if search:
+        query = query.filter(
+            Q(order_no__icontains=search) | Q(customer__name__icontains=search)
+        )
 
     total = await query.count()
     orders = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
