@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from urllib.parse import quote
 from tortoise import transactions
+from tortoise.expressions import Q
 from app.auth.dependencies import require_permission
 from app.models import User
 from app.models.invoice import Invoice, InvoiceItem
@@ -42,6 +43,7 @@ async def list_invoices(
     supplier_id: int = Query(None),
     start_date: str = Query(None),
     end_date: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_view")),
@@ -59,6 +61,15 @@ async def list_invoices(
         query = query.filter(invoice_date__gte=start_date)
     if end_date:
         query = query.filter(invoice_date__lte=end_date)
+    if search:
+        q_filter = Q(invoice_no__icontains=search)
+        if direction == 'output':
+            q_filter = q_filter | Q(customer__name__icontains=search)
+        elif direction == 'input':
+            q_filter = q_filter | Q(supplier__name__icontains=search)
+        else:
+            q_filter = q_filter | Q(customer__name__icontains=search) | Q(supplier__name__icontains=search)
+        query = query.filter(q_filter)
 
     total = await query.count()
     invoices = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer", "supplier")
