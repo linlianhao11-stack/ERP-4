@@ -355,5 +355,61 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                 await wo.save()
                 vouchers.append({"id": v.id, "voucher_no": vno, "source": f"核销 {wo.bill_no}"})
 
+    # 销售退货单 → 红字冲销出库凭证：借 发出商品1407（负数），贷 库存商品1405（负数）
+    shipped_acct = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="1407", is_active=True
+    ).first()
+    inventory_acct = await ChartOfAccount.filter(
+        account_set_id=account_set_id, code="1405", is_active=True
+    ).first()
+
+    if shipped_acct and inventory_acct:
+        return_orders = await Order.filter(
+            account_set_id=account_set_id,
+            order_type="RETURN",
+            voucher_id=None,
+            created_at__gte=period_start,
+            created_at__lte=datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc),
+        ).all()
+        for ro in return_orders:
+            cost = abs(ro.total_cost)
+            if cost <= 0:
+                continue
+            async with transactions.in_transaction():
+                p_name = f"{ro.created_at.year}-{ro.created_at.month:02d}"
+                vno = await _next_voucher_no(account_set_id, "记", p_name)
+                v = await Voucher.create(
+                    account_set_id=account_set_id,
+                    voucher_type="记",
+                    voucher_no=vno,
+                    period_name=p_name,
+                    voucher_date=ro.created_at.date() if hasattr(ro.created_at, 'date') else ro.created_at,
+                    summary=f"销售退货冲回 {ro.order_no}",
+                    total_debit=-cost,
+                    total_credit=-cost,
+                    status="draft",
+                    creator=user,
+                    source_type="sales_return",
+                    source_bill_id=ro.id,
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=1,
+                    account_id=shipped_acct.id,
+                    summary=f"销售退货冲回 {ro.order_no}",
+                    debit_amount=-cost,
+                    credit_amount=Decimal("0"),
+                )
+                await VoucherEntry.create(
+                    voucher=v, line_no=2,
+                    account_id=inventory_acct.id,
+                    summary=f"销售退货冲回 {ro.order_no}",
+                    debit_amount=Decimal("0"),
+                    credit_amount=-cost,
+                )
+                ro.voucher = v
+                ro.voucher_no = vno
+                await ro.save()
+                vouchers.append({"id": v.id, "voucher_no": vno, "source": f"销售退货 {ro.order_no}"})
+
     logger.info(f"AR凭证生成完成: {len(vouchers)} 张")
     return vouchers
