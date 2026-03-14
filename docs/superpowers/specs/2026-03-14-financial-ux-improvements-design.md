@@ -87,13 +87,13 @@
 
 ### A1: 凭证号分开显示 (#13)
 
-**改动范围**：纯前端。
-
-**设计**：在凭证列表和详情页将合在一起的凭证号拆分为两个独立字段：
+**设计**：在凭证列表和详情页将凭证号拆分为两个独立显示字段：
 - 凭证字列：显示 `记` / `收` / `付` / `转`
-- 凭证号列：显示纯数字 `1`、`2`、`3`...
+- 凭证号列：显示纯序号数字 `1`、`2`、`3`...
 
-**数据结构**：后端已有独立的 `voucher_type`（记/收/付/转）和 `voucher_no`（整数）字段，无需后端改动。
+**数据结构说明**：后端 `voucher_no` 是 `CharField(max_length=30)`，存储格式为复合字符串（如 `A01-记-202603-007`），包含账套编码、凭证类型、期间和序号。`voucher_type` 是独立的凭证字字段。
+
+**后端改动**：API 响应中新增 `sequence_no` 字段（从 `voucher_no` 中提取序号部分），供前端直接使用。前端显示"凭证字"取 `voucher_type`，"凭证号"取 `sequence_no`。
 
 ### A2: 凭证列表页双视图 + 搜索筛选 + 导出 (#15)
 
@@ -137,13 +137,15 @@
 **后端**：
 - 新增 `GET /api/vouchers/next-number`
 - 参数：`account_set_id`、`period`（YYYY-MM）、`voucher_type`（记/收/付/转）
-- 返回：`{ "next_number": 8 }`
-- 逻辑：查询该期间该类型的最大凭证号 + 1
+- 返回：`{ "sequence_no": 8, "voucher_no": "A01-记-202601-008" }`
+- 逻辑：调用现有 `next_voucher_no()` 工具函数（`backend/app/utils/voucher_no.py`）获取完整凭证号，同时提取序号部分返回
 
 **前端**：
 - 凭证录入/编辑界面，日期或凭证类型变更时自动调用此 API
-- 更新凭证号字段（用户仍可手动修改）
-- 保存时后端校验凭证号在该期间内的唯一性
+- 显示 `sequence_no` 给用户（用户仍可手动修改序号部分）
+- 保存时后端校验 `voucher_no` 全局唯一性（`voucher_no` 字段有 `unique=True` 约束）
+
+**并发安全**：`next-number` 仅用于前端预览，实际凭证号分配在保存时由后端在事务中完成（使用 `select_for_update` 锁定），避免并发冲突。如果预览号与实际分配号不同，后端返回最终分配的凭证号供前端更新。
 
 ### A4: 批量提交、审核、过账 (#17)
 
@@ -166,12 +168,16 @@
   - body: `{ "voucher_ids": [1, 2, 3] }`
   - 校验：每张凭证状态必须是 `approved`，期间未关闭
 - 返回格式：`{ "success": [1, 2], "failed": [{ "id": 3, "reason": "期间已关闭" }] }`
+- **事务策略**：采用 best-effort（部分成功）模式，逐条处理，成功的立即生效，失败的跳过并记录原因。不使用全局事务（避免一条失败导致全部回滚）。
+- **安全校验**：所有传入的 `voucher_ids` 必须属于同一个 `account_set_id`，后端需验证。
 
 ### A5: 制单人 = 审核人 = 过账人 (#19)
 
-**改动**：检查后端 `approve_voucher` 和 `post_voucher` 中是否有 `creator != current_user` 的校验逻辑（maker-checker rule），如有则移除。
+**现状**：后端 `approve_voucher` 已通过 `SystemSetting(key="voucher_maker_checker")` 控制是否强制制单人与审核人不同。当设置值为 `"false"` 时不做校验。
 
-**影响**：允许同一用户创建凭证后自行审核和过账，简化小型企业的操作流程。
+**改动**：将 `voucher_maker_checker` 的默认值改为 `"false"`（允许同一人），并在前端设置页面增加此开关供管理员配置。如果当前系统没有在设置页面暴露此选项，需要补上。
+
+**影响**：默认允许同一用户创建凭证后自行审核和过账，简化小型企业的操作流程。企业可在设置中重新开启 maker-checker 规则。
 
 ### A6: 录入时显示凭证号 + 科目搜索 (#23)
 
@@ -247,11 +253,26 @@ class BankAccount(models.Model):
 - 银行存款(1002)：`aux_bank=True`
 - 在途物资(1407)：`aux_product=True`
 
+#### ReceiptBill / DisbursementBill 模型变更
+
+为支持银行维度自动填充，收付款单需记录使用的银行账户：
+- `ReceiptBill` 新增：`bank_account: ForeignKeyField("models.BankAccount", null=True, on_delete=SET_NULL)` — 收款使用的银行账户
+- `DisbursementBill` 新增：`bank_account: ForeignKeyField("models.BankAccount", null=True, on_delete=SET_NULL)` — 付款使用的银行账户
+
+前端收款/付款确认时，如果选择的收付款方式对应银行转账，需同时选择银行账户。
+
 #### 凭证生成逻辑更新
 
 AR/AP service 的批量凭证生成中：
-- 银行存款分录自动填充 `aux_bank`（需要在收款单/付款单中记录使用的银行账户）
-- 库存/成本分录自动填充 `aux_product`（从关联订单行项提取）
+- 银行存款分录：从 `ReceiptBill.bank_account` / `DisbursementBill.bank_account` 获取银行维度填入 `VoucherEntry.aux_bank`
+- 库存/成本分录：从关联订单行项的 `Product` 填入 `VoucherEntry.aux_product`
+
+**所有创建 VoucherEntry 的代码位置**（均需更新以支持新字段）：
+1. `backend/app/routers/vouchers.py` — 手动录入凭证
+2. `backend/app/services/ar_service.py` — AR 凭证生成
+3. `backend/app/services/ap_service.py` — AP 凭证生成
+4. `backend/app/services/invoice_service.py` — 发票确认凭证
+5. `backend/app/services/period_end_service.py` — 期末结转凭证（无需商品/银行维度，传 None 即可）
 
 #### 前端改动
 
@@ -276,29 +297,57 @@ AR/AP service 的批量凭证生成中：
 **新增查询 API**：
 - `GET /api/receivables/pending-voucher-bills`
   - 参数：`account_set_id`、`period`（YYYY-MM）
-  - 返回：该月所有 `status=confirmed` 且 `voucher_id=None` 的收款单、退款单、核销单列表
-  - 每条记录包含：id、单据号、类型、客户名称、金额、日期
+  - 返回四类单据（与现有 `generate_ar_vouchers` 处理范围一致）：
+    1. 收款单（ReceiptBill, `status=confirmed`, `voucher_id=None`）
+    2. 收款退款单（ReceiptRefundBill, `status=confirmed`, `voucher_id=None`）
+    3. 核销单（ReceivableWriteOff, `status=confirmed`, `voucher_id=None`）
+    4. 销售退货单（Order, `order_type=RETURN`, 该期间内, 未生成凭证）
+  - 每条记录包含：id、单据号、类型标签、客户名称、金额、日期
 
 - `GET /api/payables/pending-voucher-bills`
-  - 同上，返回付款单、退款单列表
+  - 返回三类单据：
+    1. 付款单（DisbursementBill, `status=confirmed`, `voucher_id=None`）
+    2. 付款退款单（DisbursementRefundBill, `status=confirmed`, `voucher_id=None`）
+    3. 采购退货单（PurchaseReturn, 该期间内, 未生成凭证）
+  - 每条记录包含：id、单据号、类型标签、供应商名称、金额、日期
 
 **修改生成 API**：
 - `POST /api/receivables/generate-ar-vouchers`
   ```json
   {
     "account_set_id": 1,
-    "bill_ids": [1, 2, 3],
-    "bill_type": "receipt",
+    "bills": [
+      { "id": 1, "type": "receipt" },
+      { "id": 2, "type": "receipt" },
+      { "id": 3, "type": "refund" },
+      { "id": 4, "type": "write_off" },
+      { "id": 5, "type": "sales_return" }
+    ],
     "merge_by_partner": true
   }
   ```
-- `POST /api/payables/generate-ap-vouchers` 同上
+  - `type` 区分单据类型，支持混合选择不同类型的单据
+  - 保留向后兼容：如果传入 `period_names` 而不是 `bills`，则走旧的全量处理逻辑
+
+- `POST /api/payables/generate-ap-vouchers`
+  ```json
+  {
+    "account_set_id": 1,
+    "bills": [
+      { "id": 1, "type": "disbursement" },
+      { "id": 2, "type": "refund" },
+      { "id": 3, "type": "purchase_return" }
+    ],
+    "merge_by_partner": true
+  }
+  ```
 
 **合并逻辑**：
 - `merge_by_partner=true` 时，按 `customer_id` / `supplier_id` 分组
-- 同组多张单据合并到一张凭证的多条分录中
+- 同组同类型的多张单据合并到一张凭证的多条分录中
 - 凭证摘要汇总：如"收货款-客户A（SK-001, SK-002, SK-003）"
 - 借贷方分别合计
+- **合并凭证日期**：使用该组中最晚的单据日期作为凭证日期
 
 #### 前端改动
 
@@ -378,11 +427,19 @@ AR/AP service 的批量凭证生成中：
 **修改 `push_invoice_from_receivable`**：
 - 接受 `receivable_bill_ids: list[int]`（替代单个 id）
 - 校验所有应收单属于同一客户
+- **防重复校验**：检查每张应收单是否已有关联发票，已有则排除并提示
 - 从关联订单的 OrderItem 提取货物明细生成 InvoiceItem
 - 汇总金额、税额
 
+**Invoice 模型多源关联**：
+- 当前 Invoice 模型的 `receivable_bill` / `payable_bill` 是单个 FK，不支持多单合并
+- 新增 `InvoiceSourceBill` 关联表（或 `source_bill_ids: JSONField`）记录发票关联的所有源单据
+- 推荐方案：使用 JSONField 存储 `source_receivable_bill_ids: list[int]`（简单，无需新表）
+- 保留原有的 `receivable_bill` FK 指向第一张应收单（兼容现有逻辑）
+
 **Customer 模型检查**：
-- 如缺少开票信息字段，新增：`tax_id`（税号）、`invoice_address`（开票地址）、`invoice_phone`（开票电话）、`bank_name`（开户行）、`bank_account`（银行账号）
+- Customer 已有字段：`tax_id`、`bank_name`、`bank_account`
+- 仅需新增：`invoice_address`（开票地址）、`invoice_phone`（开票电话）
 
 #### 前端改动
 
@@ -399,15 +456,18 @@ AR/AP service 的批量凭证生成中：
 **新增 service 方法**：
 - `push_invoice_from_payable(payable_bill_ids: list[int])`
 - 校验所有应付单属于同一供应商
+- **防重复校验**：检查每张应付单是否已有关联发票
 - 从关联采购订单提取商品明细
 - 生成进项发票（`direction=input`）
+- 使用 JSONField `source_payable_bill_ids` 记录所有源应付单（与 D1 对称）
 
 **新增 API**：
 - `POST /api/invoices/from-payable`
 - body: `{ "payable_bill_ids": [1, 2, 3] }`
 
 **Supplier 模型检查**：
-- 如缺少开票信息字段，新增：`tax_id`、`invoice_address`、`invoice_phone`、`bank_name`、`bank_account`
+- Supplier 已有字段：`tax_id`、`bank_name`、`bank_account`、`address`、`phone`
+- 已有的 `address` 和 `phone` 可直接用作开票信息，无需新增字段
 
 #### 前端改动
 
@@ -450,7 +510,7 @@ D (发票下推流程)             ← 相对独立，放最后
 | `backend/app/services/ap_service.py` | B | 勾单合并生成逻辑 |
 | `backend/app/services/invoice_service.py` | D | 多单合并推送、进项下推 |
 | `backend/app/services/accounting_init.py` | B | 初始化商品/银行维度标记 |
-| `backend/app/services/voucher_pdf.py` | C | 重写标准记账凭证 PDF 模板 |
+| `backend/app/utils/pdf_print.py` | C | 重写标准记账凭证 PDF 模板（现有 PDF 生成工具） |
 
 ### 前端
 
@@ -470,3 +530,29 @@ D (发票下推流程)             ← 相对独立，放最后
 |------|------|------|
 | `backend/app/models/bank_account.py` | B | BankAccount 模型 |
 | `backend/app/routers/bank_accounts.py` | B | 银行账户 CRUD API |
+
+---
+
+## 计划内部依赖与并行说明
+
+### 计划 A 内部
+
+```
+A1 (凭证号分开显示) ← 独立
+A3 (next-number API) ← 独立
+A6 (预填凭证号 + 科目搜索) ← 依赖 A3
+A5 (maker-checker 设置) ← 独立
+A4 (批量操作) ← 需要先确认 A5（批量审核会触发 maker-checker 检查）
+A7 (分录列顺序) ← 独立
+A2 (双视图 + 搜索 + 导出) ← 独立，但工作量最大，建议最后做
+```
+
+可并行：A1 + A3 + A5 + A7 → 然后 A6 + A4 → 最后 A2
+
+### 计划 B 内部
+
+B1（辅助核算）必须先于 B2（凭证生成流程），因为 B2 的凭证生成需要填充新的辅助核算维度。
+
+### 计划 D 与计划 B 的隐性耦合
+
+D1/D2 中发票确认后如果会生成凭证，该凭证需要填充 B1 新增的 `aux_product` 维度。因此 D 放在 B 之后是正确的。
