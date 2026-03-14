@@ -7,8 +7,9 @@
         { value: 'refunds', label: '收款退款' },
         { value: 'writeoffs', label: '应收核销' },
         { value: 'delivery', label: '出库单' },
+        { value: 'returns', label: '销售退货' },
       ]" container-class="" />
-      <button @click="handleGenerateVouchers" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors shrink-0">
+      <button @click="showPeriodPicker = true" :disabled="generating" class="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-lg bg-purple-subtle text-purple-emphasis hover:bg-purple-subtle transition-colors shrink-0">
         {{ generating ? '生成中...' : '批量生成凭证' }}
       </button>
     </div>
@@ -18,42 +19,96 @@
       <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" />
       <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" />
       <SalesDeliveryTab v-else-if="sub === 'delivery'" key="delivery" />
+      <SalesReturnTab v-else-if="sub === 'returns'" key="returns" />
+    </Transition>
+
+    <!-- 月份多选弹窗 -->
+    <Transition name="fade">
+      <div v-if="showPeriodPicker" class="modal-backdrop" @click.self="showPeriodPicker = false">
+        <div class="modal max-w-sm">
+          <div class="modal-header">
+            <h3>选择生成凭证的月份</h3>
+            <button @click="showPeriodPicker = false" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="space-y-1.5 max-h-64 overflow-y-auto">
+              <label v-for="p in availablePeriods" :key="p.period_name"
+                class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-elevated cursor-pointer text-sm"
+                :class="{ 'opacity-50': p.is_closed }"
+                :for="'ar-period-' + p.period_name">
+                <input :id="'ar-period-' + p.period_name" type="checkbox" v-model="selectedPeriods" :value="p.period_name" :disabled="p.is_closed" class="rounded" />
+                <span>{{ p.period_name }}</span>
+                <span v-if="p.is_closed" class="text-xs text-muted ml-auto">已结账</span>
+              </label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="showPeriodPicker = false" class="btn btn-secondary btn-sm">取消</button>
+            <button @click="handleGenerateVouchers" :disabled="!selectedPeriods.length || generating" class="btn btn-primary btn-sm">
+              生成（{{ selectedPeriods.length }} 个月）
+            </button>
+          </div>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import AppTabs from '../common/AppTabs.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
-import { generateArVouchers } from '../../api/accounting'
+import { generateArVouchers, getAccountingPeriods } from '../../api/accounting'
 import ReceivableBillsTab from './ReceivableBillsTab.vue'
 import ReceiptBillsTab from './ReceiptBillsTab.vue'
 import ReceiptRefundBillsTab from './ReceiptRefundBillsTab.vue'
 import WriteOffBillsTab from './WriteOffBillsTab.vue'
 import SalesDeliveryTab from './SalesDeliveryTab.vue'
+import SalesReturnTab from './SalesReturnTab.vue'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const sub = ref('bills')
 const generating = ref(false)
+const showPeriodPicker = ref(false)
+const availablePeriods = ref([])
+const selectedPeriods = ref([])
+
+const loadPeriods = async () => {
+  const setId = accountingStore.currentAccountSetId
+  if (!setId) return
+  const year = new Date().getFullYear()
+  try {
+    const [res1, res2] = await Promise.all([
+      getAccountingPeriods(setId, year),
+      getAccountingPeriods(setId, year - 1),
+    ])
+    availablePeriods.value = [...(res2.data || []), ...(res1.data || [])]
+    const current = accountingStore.currentAccountSet?.current_period
+    if (current && !selectedPeriods.value.length) {
+      selectedPeriods.value = [current]
+    }
+  } catch { /* ignore */ }
+}
 
 const handleGenerateVouchers = async () => {
   const setId = accountingStore.currentAccountSetId
-  const period = accountingStore.currentAccountSet?.current_period
-  if (!setId || !period) {
-    appStore.showToast('请先选择账套和期间', 'error')
-    return
-  }
-  if (!await appStore.customConfirm('确认操作', `确认为当前期间 ${period} 批量生成应收凭证？`)) return
+  if (!setId || !selectedPeriods.value.length) return
+  const label = selectedPeriods.value.join(', ')
+  if (!await appStore.customConfirm('确认操作', `确认为 ${label} 批量生成应收凭证？`)) return
+  showPeriodPicker.value = false
   generating.value = true
   try {
-    const { data } = await generateArVouchers(setId, period)
-    if (data.length === 0) {
+    const { data } = await generateArVouchers(setId, selectedPeriods.value)
+    const total = data.vouchers?.length || 0
+    if (total === 0) {
       appStore.showToast('无需生成凭证（已确认单据均已生成凭证）', 'info')
     } else {
-      appStore.showToast(`成功生成 ${data.length} 张应收凭证`, 'success')
+      const parts = Object.entries(data.summary || {})
+        .filter(([, v]) => v.count > 0)
+        .map(([k, v]) => `${k}: ${v.count} 张`)
+      appStore.showToast(`成功生成 ${total} 张凭证（${parts.join('，')}）`, 'success')
     }
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '生成凭证失败', 'error')
@@ -61,4 +116,7 @@ const handleGenerateVouchers = async () => {
     generating.value = false
   }
 }
+
+watch(() => accountingStore.currentAccountSetId, () => loadPeriods())
+watch(showPeriodPicker, (v) => { if (v) loadPeriods() })
 </script>
