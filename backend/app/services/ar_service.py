@@ -8,6 +8,7 @@ from tortoise import transactions
 from app.models.ar_ap import ReceivableBill, ReceiptBill, ReceiptRefundBill, ReceivableWriteOff
 from app.models.accounting import AccountSet, ChartOfAccount, AccountingPeriod
 from app.models.voucher import Voucher, VoucherEntry
+from app.models.order import Order
 from app.utils.generators import generate_order_no
 from app.logger import get_logger
 
@@ -156,6 +157,21 @@ async def confirm_write_off(write_off_id: int, user) -> ReceivableWriteOff:
 from app.utils.voucher_no import next_voucher_no as _next_voucher_no
 
 
+async def _get_employee_department_from_receivable(receivable_bill_id: int | None):
+    """从应收单关联的订单中获取员工和部门"""
+    if not receivable_bill_id:
+        return None, None
+    rb = await ReceivableBill.filter(id=receivable_bill_id).first()
+    if not rb or not rb.order_id:
+        return None, None
+    order = await Order.filter(id=rb.order_id).prefetch_related("employee__department").first()
+    if not order or not order.employee:
+        return None, None
+    employee = order.employee
+    department = employee.department if hasattr(employee, "department") else None
+    return employee, department
+
+
 async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> list:
     period = await AccountingPeriod.filter(
         account_set_id=account_set_id, period_name=period_name
@@ -188,6 +204,7 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
         receipt_date__gte=period_start, receipt_date__lte=period_end,
     ).all()
     for r in receipts:
+        employee, department = await _get_employee_department_from_receivable(r.receivable_bill_id)
         async with transactions.in_transaction():
             vno = await _next_voucher_no(account_set_id, "收", period_name)
             v = await Voucher.create(
@@ -210,6 +227,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                 summary=f"收款 {r.bill_no}",
                 debit_amount=r.amount,
                 credit_amount=Decimal("0"),
+                aux_employee=employee if bank_account.aux_employee else None,
+                aux_department=department if bank_account.aux_department else None,
             )
             await VoucherEntry.create(
                 voucher=v, line_no=2,
@@ -218,6 +237,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                 debit_amount=Decimal("0"),
                 credit_amount=r.amount,
                 aux_customer_id=r.customer_id,
+                aux_employee=employee if ar_account.aux_employee else None,
+                aux_department=department if ar_account.aux_department else None,
             )
             r.voucher = v
             r.voucher_no = vno
@@ -230,6 +251,10 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
         refund_date__gte=period_start, refund_date__lte=period_end,
     ).all()
     for rf in refunds:
+        # 通过原始收款单的应收单获取员工/部门
+        original_receipt = await ReceiptBill.filter(id=rf.original_receipt_id).first()
+        receivable_id = original_receipt.receivable_bill_id if original_receipt else None
+        employee, department = await _get_employee_department_from_receivable(receivable_id)
         async with transactions.in_transaction():
             vno = await _next_voucher_no(account_set_id, "收", period_name)
             v = await Voucher.create(
@@ -253,6 +278,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                 debit_amount=rf.amount,
                 credit_amount=Decimal("0"),
                 aux_customer_id=rf.customer_id,
+                aux_employee=employee if ar_account.aux_employee else None,
+                aux_department=department if ar_account.aux_department else None,
             )
             await VoucherEntry.create(
                 voucher=v, line_no=2,
@@ -260,6 +287,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                 summary=f"收款退款 {rf.bill_no}",
                 debit_amount=Decimal("0"),
                 credit_amount=rf.amount,
+                aux_employee=employee if bank_account.aux_employee else None,
+                aux_department=department if bank_account.aux_department else None,
             )
             rf.voucher = v
             rf.voucher_no = vno
@@ -273,6 +302,7 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
             write_off_date__gte=period_start, write_off_date__lte=period_end,
         ).all()
         for wo in write_offs:
+            employee, department = await _get_employee_department_from_receivable(wo.receivable_bill_id)
             async with transactions.in_transaction():
                 vno = await _next_voucher_no(account_set_id, "记", period_name)
                 v = await Voucher.create(
@@ -296,6 +326,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                     debit_amount=wo.amount,
                     credit_amount=Decimal("0"),
                     aux_customer_id=wo.customer_id,
+                    aux_employee=employee if advance_account.aux_employee else None,
+                    aux_department=department if advance_account.aux_department else None,
                 )
                 await VoucherEntry.create(
                     voucher=v, line_no=2,
@@ -304,6 +336,8 @@ async def generate_ar_vouchers(account_set_id: int, period_name: str, user) -> l
                     debit_amount=Decimal("0"),
                     credit_amount=wo.amount,
                     aux_customer_id=wo.customer_id,
+                    aux_employee=employee if ar_account.aux_employee else None,
+                    aux_department=department if ar_account.aux_department else None,
                 )
                 wo.voucher = v
                 wo.voucher_no = vno
