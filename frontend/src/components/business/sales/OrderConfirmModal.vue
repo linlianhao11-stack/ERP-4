@@ -1,6 +1,7 @@
 <!--
   订单确认弹窗
-  展示订单摘要，支持修改销售员、返利、收款方式、账套、备注
+  展示订单摘要，支持修改业务员、返利、收款方式、备注
+  账套从商品所在仓库自动推断，只读展示（支持多账套提示）
   使用 teleport 渲染到 body，通过 appStore.modal 控制显示
 -->
 <template>
@@ -32,12 +33,12 @@
             </div>
           </div>
 
-          <!-- 销售员选择 -->
+          <!-- 业务员选择 -->
           <div class="mb-4">
-            <label class="label">销售员（可选）</label>
-            <select v-model="orderConfirm.salesperson_id" class="input text-sm">
-              <option value="">不指定销售员</option>
-              <option v-for="s in salespersons" :key="s.id" :value="s.id">{{ s.name }}</option>
+            <label class="label" for="order-confirm-employee">业务员（可选）</label>
+            <select id="order-confirm-employee" v-model="orderConfirm.employee_id" class="input text-sm">
+              <option value="">不指定业务员</option>
+              <option v-for="s in employees" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
 
@@ -158,15 +159,22 @@
             </select>
           </div>
 
-          <!-- 财务账套选择 -->
-          <div v-if="accountSets.length" class="mb-4">
-            <label class="label">财务账套（可选）</label>
-            <select v-model="orderConfirm.account_set_id" class="input text-sm">
-              <option :value="null">不指定</option>
-              <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <div v-if="orderConfirm.account_set_id" class="text-xs text-muted mt-1">选择仓库后将自动带入关联账套，也可手动修改</div>
-            <div v-else class="text-xs text-warning mt-1">未选择财务账套，发货后将不会自动生成财务单据（应收单/出库单/发票）</div>
+          <!-- 财务账套（自动推断，只读展示） -->
+          <div v-if="accountSetInfo.count > 0" class="mb-4">
+            <label class="label">财务账套</label>
+            <!-- 单账套：显示名称 -->
+            <div v-if="accountSetInfo.count === 1" class="text-sm font-medium px-3 py-2 bg-elevated rounded-lg border">
+              {{ accountSetInfo.name }}
+            </div>
+            <!-- 多账套：警告横幅 -->
+            <div v-else class="p-3 bg-warning-subtle border border-warning rounded-lg">
+              <div class="text-sm font-semibold text-warning mb-1">本单包含多个账套的商品</div>
+              <div class="text-xs text-secondary">财务将按账套分别生成应收单，共涉及 {{ accountSetInfo.count }} 个账套：{{ accountSetInfo.names.join('、') }}</div>
+            </div>
+          </div>
+          <div v-else-if="orderConfirm.items?.length" class="mb-4">
+            <label class="label">财务账套</label>
+            <div class="text-xs text-warning">商品所在仓库未关联账套，发货后将不会自动生成财务单据</div>
           </div>
 
           <!-- 订单备注 -->
@@ -203,12 +211,10 @@ const props = defineProps({
   visible: Boolean,
   /** 订单确认数据（reactive 对象，可直接修改） */
   orderConfirm: Object,
-  /** 销售员列表 */
-  salespersons: Array,
+  /** 业务员列表 */
+  employees: Array,
   /** 收款方式列表 */
   paymentMethods: Array,
-  /** 财务账套列表 */
-  accountSets: Array,
   /** 是否正在提交 */
   submitting: Boolean
 })
@@ -221,4 +227,22 @@ const { fmt } = useFormat()
 const rebateTotal = computed(() =>
   props.orderConfirm.items.reduce((s, i) => s + (i.rebate_amount || 0), 0)
 )
+
+/** 账套信息（从订单行的仓库数据推断） */
+const accountSetInfo = computed(() => {
+  const items = props.orderConfirm.items || []
+  const setMap = new Map()
+  for (const item of items) {
+    if (item.account_set_id) {
+      setMap.set(item.account_set_id, item.account_set_name || `账套${item.account_set_id}`)
+    }
+  }
+  const names = [...setMap.values()]
+  return {
+    count: setMap.size,
+    name: names[0] || '',
+    names,
+    ids: [...setMap.keys()]
+  }
+})
 </script>

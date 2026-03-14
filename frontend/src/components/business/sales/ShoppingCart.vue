@@ -1,6 +1,7 @@
 <!--
   购物车 - 销售页面右栏
   显示已选商品，支持数量调整、仓库仓位选择、订单提交
+  多账套时自动分组展示，含警告横幅和分组小计
   所有状态通过 props 传入，修改通过 emit 回传
 -->
 <template>
@@ -11,94 +12,60 @@
       <button @click="$emit('clear')" class="text-error text-xs" v-show="cart.length">清空</button>
     </div>
 
+    <!-- 多账套警告横幅 -->
+    <div v-if="isMultiAccountSet" class="px-2 pt-2">
+      <div class="p-2 bg-warning-subtle border border-warning rounded-lg text-xs">
+        <div class="font-semibold text-warning">本单包含多个账套的商品</div>
+        <div class="text-secondary mt-0.5">财务将按账套分别生成应收单</div>
+      </div>
+    </div>
+
     <!-- 购物车商品列表 -->
     <div class="flex-1 overflow-y-auto cart-items">
-      <div v-for="(item, idx) in cart" :key="item._id" class="p-2 border-b">
-        <!-- 商品名称和操作按钮 -->
-        <div class="flex justify-between items-center mb-1">
-          <div class="font-medium truncate text-sm flex-1">{{ item.name }}</div>
-          <div class="flex gap-1 ml-2">
-            <!-- 复制行按钮（非退货/寄售结算模式） -->
-            <button
-              v-if="orderType !== 'RETURN' && orderType !== 'CONSIGN_SETTLE'"
-              @click="$emit('duplicate-line', idx)"
-              class="w-5 h-5 rounded-full bg-info-subtle text-primary text-xs font-bold flex items-center justify-center hover:bg-info-subtle"
-              title="从其他仓库再出一行"
-            >+</button>
-            <!-- 删除按钮 -->
-            <button
-              @click="$emit('remove-item', idx)"
-              class="w-5 h-5 rounded-full bg-error-subtle text-error text-xs font-bold flex items-center justify-center hover:bg-error-subtle"
-              title="删除"
-            >-</button>
+      <!-- 多账套分组展示 -->
+      <template v-if="isMultiAccountSet">
+        <template v-for="group in itemsByAccountSet" :key="group.key">
+          <!-- 分组标题 -->
+          <div class="px-2 py-1.5 bg-elevated text-xs font-semibold text-secondary border-b flex justify-between items-center">
+            <span>{{ group.name }}</span>
+            <span class="text-primary font-mono">&yen;{{ fmt(group.subtotal) }}</span>
           </div>
-        </div>
-
-        <!-- 价格和数量调整 -->
-        <div class="flex items-center gap-2 text-sm">
-          <span class="text-muted">&yen;</span>
-          <input v-model.number="item.unit_price" type="number" step="0.01" class="input input-sm w-16 text-right">
-          <span class="text-muted">&times;</span>
-          <button @click="item.quantity = Math.max(1, item.quantity - 1)" class="w-6 h-6 rounded border text-xs">-</button>
-          <input
-            v-model.number="item.quantity"
-            type="number"
-            min="1"
-            class="input input-sm w-14 text-center"
-            @blur="item.quantity = Math.max(1, Math.floor(item.quantity) || 1)"
-          >
-          <button
-            @click="$emit('increment-quantity', item)"
-            class="w-6 h-6 rounded border text-xs"
-          >+</button>
-        </div>
-
-        <!-- 仓库/仓位选择（非寄售结算模式） -->
-        <div v-if="orderType !== 'CONSIGN_SETTLE'" class="mt-2 space-y-1">
-          <select
-            v-model="item.warehouse_id"
-            @change="$emit('update-warehouse', idx, item.warehouse_id)"
-            class="input input-sm text-xs w-full"
-          >
-            <option value="">选择仓库 *</option>
-            <option
-              v-for="w in warehouses.filter(x => !x.is_virtual)"
-              :key="w.id"
-              :value="w.id"
-            >{{ w.name }} (可用: {{ item.stocks?.filter(s => s.warehouse_id === w.id).reduce((sum, s) => sum + (s.available_qty ?? s.quantity), 0) || 0 }})</option>
-          </select>
-          <select
-            v-model="item.location_id"
-            @change="$emit('update-location', idx, item.location_id)"
-            class="input input-sm text-xs w-full"
-            :disabled="!item.warehouse_id"
-          >
-            <option value="">{{ item.warehouse_id ? '选择仓位 *' : '请先选择仓库' }}</option>
-            <option
-              v-for="loc in getCartItemLocations(item)"
-              :key="loc.id"
-              :value="loc.id"
-            >{{ loc.code }} (可用: {{ (s => s ? (s.available_qty ?? s.quantity) : 0)(item.stocks?.find(s => s.warehouse_id === parseInt(item.warehouse_id) && s.location_id === loc.id)) }})</option>
-          </select>
-          <!-- 库存提示 -->
-          <div v-if="item.warehouse_id && item.location_id" class="text-xs text-secondary">
-            可用库存:
-            <span :class="getCartStock(item) >= item.quantity ? 'text-success font-semibold' : 'text-error font-semibold'">
-              {{ getCartStock(item) }}
-            </span> 件
+          <!-- 分组内商品 -->
+          <div v-for="({ item, idx }) in group.items" :key="item._id" class="p-2 border-b">
+            <CartItem
+              :item="item"
+              :idx="idx"
+              :order-type="orderType"
+              :warehouses="warehouses"
+              :get-cart-stock="getCartStock"
+              :get-cart-item-locations="getCartItemLocations"
+              @duplicate-line="$emit('duplicate-line', $event)"
+              @remove-item="$emit('remove-item', $event)"
+              @increment-quantity="$emit('increment-quantity', $event)"
+              @update-warehouse="(i, wid) => $emit('update-warehouse', i, wid)"
+              @update-location="(i, lid) => $emit('update-location', i, lid)"
+            />
           </div>
+        </template>
+      </template>
+      <!-- 单账套（或无账套）：常规列表 -->
+      <template v-else>
+        <div v-for="(item, idx) in cart" :key="item._id" class="p-2 border-b">
+          <CartItem
+            :item="item"
+            :idx="idx"
+            :order-type="orderType"
+            :warehouses="warehouses"
+            :get-cart-stock="getCartStock"
+            :get-cart-item-locations="getCartItemLocations"
+            @duplicate-line="$emit('duplicate-line', $event)"
+            @remove-item="$emit('remove-item', $event)"
+            @increment-quantity="$emit('increment-quantity', $event)"
+            @update-warehouse="(i, wid) => $emit('update-warehouse', i, wid)"
+            @update-location="(i, lid) => $emit('update-location', i, lid)"
+          />
         </div>
-
-        <!-- 退货数量上限提示 -->
-        <div v-if="orderType === 'RETURN' && item.max_return_qty" class="text-xs text-warning mt-1">
-          最多可退: {{ item.max_return_qty }} 件
-        </div>
-
-        <!-- 行小计 -->
-        <div class="text-right text-primary font-semibold text-sm mt-1">
-          &yen;{{ (Math.round(item.unit_price * item.quantity * 100) / 100).toFixed(2) }}
-        </div>
-      </div>
+      </template>
       <div v-if="!cart.length" class="text-muted text-center py-6 text-sm">空</div>
     </div>
 
@@ -114,15 +81,15 @@
           searchPlaceholder="搜索客户名/电话"
         />
       </div>
-      <!-- 销售员选择 -->
+      <!-- 业务员选择 -->
       <div class="mb-2">
         <select
-          :value="salespersonId"
-          @change="$emit('update:salespersonId', $event.target.value)"
+          :value="employeeId"
+          @change="$emit('update:employeeId', $event.target.value)"
           class="input text-sm"
         >
-          <option value="">选销售员(可选)</option>
-          <option v-for="s in salespersons" :key="s.id" :value="s.id">{{ s.name }}</option>
+          <option value="">选业务员(可选)</option>
+          <option v-for="s in employees" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
       </div>
       <!-- 订单类型选择 -->
@@ -172,8 +139,19 @@
         </div>
       </div>
 
-      <!-- 合计金额 -->
-      <div class="flex justify-between mb-2">
+      <!-- 多账套分组小计 -->
+      <div v-if="isMultiAccountSet" class="mb-2 space-y-1">
+        <div v-for="group in itemsByAccountSet" :key="'t-' + group.key" class="flex justify-between text-xs text-secondary">
+          <span>{{ group.name }}</span>
+          <span class="font-mono">&yen;{{ fmt(group.subtotal) }}</span>
+        </div>
+        <div class="border-t pt-1 flex justify-between">
+          <span class="text-sm">合计</span>
+          <span class="text-lg font-bold text-primary">&yen;{{ fmt(cartTotal) }}</span>
+        </div>
+      </div>
+      <!-- 单账套合计 -->
+      <div v-else class="flex justify-between mb-2">
         <span class="text-sm">合计</span>
         <span class="text-lg font-bold text-primary">&yen;{{ fmt(cartTotal) }}</span>
       </div>
@@ -187,11 +165,13 @@
 /**
  * 购物车组件
  * 通过 props 接收数据，emit 事件回传操作
+ * 支持多账套分组展示
  */
 import { computed } from 'vue'
 import { useFormat } from '../../../composables/useFormat'
 import { useWarehousesStore } from '../../../stores/warehouses'
 import SearchableSelect from '../../common/SearchableSelect.vue'
+import CartItem from './CartItem.vue'
 
 const props = defineProps({
   /** 购物车数据 */
@@ -200,12 +180,12 @@ const props = defineProps({
   orderType: String,
   /** 客户 ID */
   customerId: [String, Number],
-  /** 销售员 ID */
-  salespersonId: [String, Number],
+  /** 业务员 ID */
+  employeeId: [String, Number],
   /** 客户列表 */
   customers: Array,
-  /** 销售员列表 */
-  salespersons: Array,
+  /** 业务员列表 */
+  employees: Array,
   /** 仓库列表 */
   warehouses: Array,
   /** 购物车合计金额 */
@@ -228,7 +208,7 @@ const emit = defineEmits([
   'clear', 'submit', 'remove-item',
   'duplicate-line', 'increment-quantity',
   'update-warehouse', 'update-location',
-  'update:customerId', 'update:salespersonId', 'update:orderType',
+  'update:customerId', 'update:employeeId', 'update:orderType',
   'update:returnOrderSearch', 'update:returnOrderDropdown',
   'search-return-orders', 'select-return-order'
 ])
@@ -252,4 +232,41 @@ const getCartItemLocations = (item) => {
   if (!item.warehouse_id) return []
   return warehousesStore.getLocationsByWarehouse(item.warehouse_id)
 }
+
+/**
+ * 获取行对应的仓库对象
+ */
+const getItemWarehouse = (item) => {
+  if (!item.warehouse_id) return null
+  return (props.warehouses || []).find(w => w.id === parseInt(item.warehouse_id))
+}
+
+/**
+ * 按账套分组的购物车商品
+ * 每个分组包含 key、name、items（带原始索引）、subtotal
+ */
+const itemsByAccountSet = computed(() => {
+  const groups = new Map()
+  const cart = props.cart || []
+  for (let idx = 0; idx < cart.length; idx++) {
+    const item = cart[idx]
+    const wh = getItemWarehouse(item)
+    const asId = wh?.account_set_id || 0
+    const asName = wh?.account_set_name || '未关联账套'
+    if (!groups.has(asId)) {
+      groups.set(asId, { key: asId, name: asName, items: [], subtotal: 0 })
+    }
+    const group = groups.get(asId)
+    group.items.push({ item, idx })
+    group.subtotal += Math.round(item.unit_price * item.quantity * 100) / 100
+  }
+  return [...groups.values()]
+})
+
+/**
+ * 是否为多账套购物车
+ */
+const isMultiAccountSet = computed(() => {
+  return itemsByAccountSet.value.length > 1
+})
 </script>

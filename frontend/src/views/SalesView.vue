@@ -63,7 +63,6 @@
     :order-confirm="orderConfirm"
     :employees="salespersonEmployees"
     :payment-methods="paymentMethods"
-    :account-sets="accountSets"
     :submitting="appStore.submitting"
     @update:visible="!$event && appStore.closeModal()"
     @confirm="confirmSubmitOrder"
@@ -286,7 +285,14 @@ const submitOrder = () => {
     items: cart.value.map(i => {
       const warehouse = warehouses.value.find(w => w.id === parseInt(i.warehouse_id))
       const location = locations.value.find(l => l.id === parseInt(i.location_id))
-      return { ...i, warehouse_name: warehouse?.name || '-', location_code: location?.code || '-', rebate_amount: 0 }
+      return {
+        ...i,
+        warehouse_name: warehouse?.name || '-',
+        location_code: location?.code || '-',
+        account_set_id: warehouse?.account_set_id || null,
+        account_set_name: warehouse?.account_set_name || null,
+        rebate_amount: 0
+      }
     }),
     customer, order_type: saleForm.order_type,
     related_order_id: saleForm.related_order_id,
