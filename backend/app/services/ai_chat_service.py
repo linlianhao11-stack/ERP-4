@@ -296,6 +296,7 @@ async def _process_chat_inner(
             return
 
         resp_type = r1_result.get("type", "")
+        logger.info(f"DeepSeek 返回类型: {resp_type}, 问题: {message[:50]}")
 
         if resp_type == "clarification":
             yield {"event": "done", "data": {
@@ -305,6 +306,28 @@ async def _process_chat_inner(
                 "options": r1_result.get("options", []),
             }}
             return
+
+        # 复合问题回退：模型返回 text 但问题明显涉及业务数据时，重试要求生成 SQL
+        _BIZ_DATA_KEYWORDS = ["销售", "采购", "库存", "订单", "应收", "应付", "欠款", "客户", "供应商", "产品", "利润", "毛利", "退货", "缺货", "收入", "支出", "账款"]
+        if resp_type == "text":
+            has_biz_keyword = any(kw in message for kw in _BIZ_DATA_KEYWORDS)
+            if has_biz_keyword:
+                logger.info(f"text 回退重试: 问题含业务关键词，追加指令要求生成 SQL")
+                messages.append({"role": "assistant", "content": json.dumps(r1_result, ensure_ascii=False)})
+                messages.append({"role": "user", "content": "这个问题需要从数据库查数据来回答。请生成 SQL 查询相关的业务数据，用 type=sql 格式返回。你的分析和建议可以之后再补充。"})
+                retry_result = await call_deepseek(
+                    messages=messages,
+                    api_key=api_key,
+                    base_url=config.get("base_url", DEFAULT_BASE_URL),
+                    model=config.get("model_sql", DEFAULT_MODEL_SQL),
+                    temperature=0.0,
+                )
+                if retry_result and retry_result.get("type") == "sql" and retry_result.get("sql"):
+                    logger.info(f"text 回退成功，获得 SQL")
+                    r1_result = retry_result
+                    resp_type = "sql"
+                else:
+                    logger.info(f"text 回退未获得 SQL，使用原始 text 回复")
 
         if resp_type == "text":
             yield {"event": "done", "data": {
