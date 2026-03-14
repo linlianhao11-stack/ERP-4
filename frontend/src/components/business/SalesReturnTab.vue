@@ -4,6 +4,10 @@
       <PageToolbar>
         <template #filters>
           <span class="text-xs text-muted">销售退货单（用于冲抵出库凭证）</span>
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="searchQuery" @input="debouncedSearch" class="toolbar-search" placeholder="搜索单号/客户...">
+          </div>
         </template>
       </PageToolbar>
       <div class="table-container">
@@ -51,6 +55,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { Search } from 'lucide-vue-next'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getSalesReturns } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
@@ -63,14 +68,26 @@ const items = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 50
+const searchQuery = ref('')
+
+let _searchTimer
+function debouncedSearch() {
+  clearTimeout(_searchTimer)
+  _searchTimer = setTimeout(() => {
+    page.value = 1
+    loadList()
+  }, 300)
+}
 
 async function loadList() {
   if (!accountingStore.currentAccountSetId) return
-  const res = await getSalesReturns({
+  const params = {
     account_set_id: accountingStore.currentAccountSetId,
     page: page.value,
     page_size: pageSize,
-  })
+  }
+  if (searchQuery.value) params.search = searchQuery.value
+  const res = await getSalesReturns(params)
   items.value = res.data.items
   total.value = res.data.total
 }

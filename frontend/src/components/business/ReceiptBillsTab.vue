@@ -8,6 +8,10 @@
             <option value="draft">草稿</option>
             <option value="confirmed">已确认</option>
           </select>
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="searchQuery" @input="debouncedSearch" class="toolbar-search" placeholder="搜索单号/客户...">
+          </div>
         </template>
         <template #actions>
           <button v-if="hasPermission('accounting_ar_edit')" @click="openCreate" class="btn btn-primary btn-sm">新增收款单</button>
@@ -136,6 +140,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { Search } from 'lucide-vue-next'
 
 const emit = defineEmits(['data-changed'])
 import ColumnMenu from '../common/ColumnMenu.vue'
@@ -190,6 +195,16 @@ const showCreate = ref(false)
 const submitting = ref(false)
 const customers = ref([])
 const form = ref({ customer_id: '', receipt_date: new Date().toISOString().slice(0, 10), amount: '', payment_method: '', receivable_bill_id: null, is_advance: false, remark: '' })
+const searchQuery = ref('')
+
+let _searchTimer
+function debouncedSearch() {
+  clearTimeout(_searchTimer)
+  _searchTimer = setTimeout(() => {
+    page.value = 1
+    loadList()
+  }, 300)
+}
 
 const receiptColumnDefs = {
   bill_no: { label: '单号', defaultVisible: true },
@@ -215,6 +230,7 @@ async function loadList() {
   if (!accountingStore.currentAccountSetId) return
   const params = { account_set_id: accountingStore.currentAccountSetId, page: page.value, page_size: pageSize }
   if (filters.value.status) params.status = filters.value.status
+  if (searchQuery.value) params.search = searchQuery.value
   const res = await getReceiptBills(params)
   items.value = res.data.items
   total.value = res.data.total
