@@ -152,6 +152,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+
+const props = defineProps({ refreshKey: { type: Number, default: 0 } })
 import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
@@ -263,5 +265,6 @@ async function cancelBill(b) {
 }
 
 watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
+watch(() => props.refreshKey, () => { loadList() })
 onMounted(() => { loadList(); loadCustomers() })
 </script>

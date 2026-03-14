@@ -136,6 +136,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+
+const emit = defineEmits(['data-changed'])
 import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getReceiptBills, createReceiptBill, confirmReceiptBill, getReceivableBills } from '../../api/accounting'
@@ -276,6 +278,7 @@ async function confirmBill(b) {
     await confirmReceiptBill(b.id)
     appStore.showToast('确认成功', 'success')
     loadList()
+    emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '确认失败', 'error')
   }

@@ -113,6 +113,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+
+const emit = defineEmits(['data-changed'])
 import PageToolbar from '../common/PageToolbar.vue'
 import { getReceivableWriteOffs, createReceivableWriteOff, confirmReceivableWriteOff } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
@@ -180,6 +182,7 @@ async function confirmBill(b) {
     await confirmReceivableWriteOff(b.id)
     appStore.showToast('确认成功', 'success')
     loadList()
+    emit('data-changed')
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '确认失败', 'error')
   }

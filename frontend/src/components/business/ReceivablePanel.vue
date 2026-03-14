@@ -14,10 +14,10 @@
       </button>
     </div>
     <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <ReceivableBillsTab v-if="sub === 'bills'" key="bills" />
-      <ReceiptBillsTab v-else-if="sub === 'receipts'" key="receipts" />
-      <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" />
-      <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" />
+      <ReceivableBillsTab v-if="sub === 'bills'" key="bills" :refresh-key="receivableRefreshKey" />
+      <ReceiptBillsTab v-else-if="sub === 'receipts'" key="receipts" @data-changed="onSubTabDataChanged" />
+      <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" @data-changed="onSubTabDataChanged" />
+      <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" @data-changed="onSubTabDataChanged" />
       <SalesDeliveryTab v-else-if="sub === 'delivery'" key="delivery" />
       <SalesReturnTab v-else-if="sub === 'returns'" key="returns" />
     </Transition>
@@ -71,6 +71,11 @@ const accountingStore = useAccountingStore()
 const appStore = useAppStore()
 const sub = ref('bills')
 const generating = ref(false)
+const receivableRefreshKey = ref(0)
+
+function onSubTabDataChanged() {
+  receivableRefreshKey.value++
+}
 const showPeriodPicker = ref(false)
 const availablePeriods = ref([])
 const selectedPeriods = ref([])
