@@ -15,6 +15,10 @@
           </select>
           <input v-model="filters.date_from" type="date" class="toolbar-select" @change="loadList" placeholder="开始日期" />
           <input v-model="filters.date_to" type="date" class="toolbar-select" @change="loadList" placeholder="结束日期" />
+          <div class="toolbar-search-wrapper">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="searchQuery" @input="debouncedSearch" class="toolbar-search" placeholder="搜索发票号/客户...">
+          </div>
         </template>
         <template #actions>
           <button @click="openPushModal" class="btn btn-primary btn-sm">从应收单推送</button>
@@ -294,6 +298,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { Search } from 'lucide-vue-next'
 import PageToolbar from '../common/PageToolbar.vue'
 import { getInvoices, getInvoice, updateInvoice, pushInvoiceFromReceivable, confirmInvoice, cancelInvoice, getReceivableBills, uploadInvoicePdf, getInvoicePdfUrl, deleteInvoicePdf } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
@@ -310,6 +315,16 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 50
 const filters = ref({ status: '', customer_id: '', date_from: '', date_to: '' })
+const searchQuery = ref('')
+let _searchTimer
+
+function debouncedSearch() {
+  clearTimeout(_searchTimer)
+  _searchTimer = setTimeout(() => {
+    page.value = 1
+    loadList()
+  }, 300)
+}
 const customers = ref([])
 const showPush = ref(false)
 const submitting = ref(false)
@@ -411,6 +426,7 @@ async function loadList() {
   if (filters.value.customer_id) params.customer_id = filters.value.customer_id
   if (filters.value.date_from) params.date_from = filters.value.date_from
   if (filters.value.date_to) params.date_to = filters.value.date_to
+  if (searchQuery.value) params.search = searchQuery.value
   try {
     const res = await getInvoices(params)
     items.value = res.data.items
