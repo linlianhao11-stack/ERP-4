@@ -171,6 +171,7 @@ async def list_receipt_bills(
             "amount": str(b.amount),
             "payment_method": b.payment_method,
             "is_advance": b.is_advance,
+            "bill_type": getattr(b, 'bill_type', 'normal'),
             "status": b.status,
             "voucher_no": b.voucher_no,
             "remark": b.remark,

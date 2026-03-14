@@ -170,6 +170,7 @@ async def list_disbursement_bills(
             "disbursement_date": str(b.disbursement_date),
             "amount": str(b.amount),
             "disbursement_method": b.disbursement_method,
+            "bill_type": getattr(b, 'bill_type', 'normal'),
             "status": b.status,
             "voucher_no": b.voucher_no,
             "remark": b.remark,
