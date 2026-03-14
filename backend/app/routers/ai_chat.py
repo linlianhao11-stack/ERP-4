@@ -48,12 +48,22 @@ async def ai_status(user: User = Depends(get_current_user)):
 @router.post("/chat")
 async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai_chat"))):
     """AI 聊天接口 — SSE 流式响应"""
-    # 输入验证
+    import unicodedata
+
+    # 输入验证 — history 结构 + 大小
     if len(body.history) > 50:
         body.history = body.history[-50:]
+    valid_roles = {"user", "assistant"}
+    total_size = 0
     for h in body.history:
-        if len(h.get("content", "")) > 5000:
-            h["content"] = h["content"][:5000]
+        if not isinstance(h, dict) or h.get("role") not in valid_roles:
+            raise HTTPException(status_code=400, detail="无效的对话历史格式")
+        content = h.get("content", "")
+        if len(content) > 5000:
+            h["content"] = content[:5000]
+        total_size += len(h.get("content", ""))
+    if total_size > 200000:  # 200KB 总大小限制
+        raise HTTPException(status_code=400, detail="对话历史过长，请清空会话后重试")
 
     # 限流检查
     user_key = f"user:{user.id}"
@@ -62,9 +72,14 @@ async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai
     if not global_limiter.allow("global"):
         raise HTTPException(status_code=429, detail="系统繁忙，请稍后再试")
 
-    # 清洗输入
+    # 清洗输入 — 长度限制 + Unicode 控制字符过滤
     clean_msg = body.message.strip()
-    clean_msg = "".join(c for c in clean_msg if c == "\n" or (ord(c) >= 32))
+    if len(clean_msg) > 2000:
+        clean_msg = clean_msg[:2000]
+    clean_msg = "".join(
+        c for c in clean_msg
+        if c == "\n" or (not unicodedata.category(c).startswith("C"))
+    )
     if not clean_msg:
         raise HTTPException(status_code=400, detail="请输入查询内容")
 
@@ -139,38 +154,46 @@ async def ai_feedback(body: FeedbackRequest, user: User = Depends(require_permis
         f"feedback={body.feedback}, reason={body.negative_reason}"
     )
 
-    # 正面反馈 + 保存为示例
+    # 正面反馈 + 保存为示例（标记为待审批，管理员确认后才生效）
     if body.feedback == "positive" and body.save_as_example and body.original_question and body.sql:
         try:
-            setting = await SystemSetting.filter(key="ai.few_shots").first()
-            shots = []
-            if setting and setting.value:
-                shots = json.loads(setting.value)
+            from tortoise.transactions import in_transaction
+            async with in_transaction():
+                setting = await SystemSetting.filter(key="ai.few_shots").select_for_update().first()
+                shots = []
+                if setting and setting.value:
+                    shots = json.loads(setting.value)
 
-            new_shot = {
-                "question": body.original_question,
-                "sql": body.sql,
-                "source": "feedback",
-            }
-            shots.append(new_shot)
+                # 去重：相同问题不重复添加
+                if any(s.get("question") == body.original_question for s in shots):
+                    logger.info(f"few-shot 已存在，跳过: {body.original_question[:50]}")
+                else:
+                    new_shot = {
+                        "question": body.original_question,
+                        "sql": body.sql,
+                        "source": "feedback",
+                        "submitted_by": user.username,
+                        "approved": user.role == "admin",  # admin 直接生效，普通用户待审批
+                    }
+                    shots.append(new_shot)
 
-            # 限制 feedback 来源的示例不超过 50 条，超限移除最早的
-            MAX_FEEDBACK_SHOTS = 50
-            feedback_count = sum(1 for s in shots if s.get("source") == "feedback")
-            if feedback_count > MAX_FEEDBACK_SHOTS:
-                for idx, s in enumerate(shots):
-                    if s.get("source") == "feedback":
-                        shots.pop(idx)
-                        break
+                    # 限制 feedback 来源的示例不超过 50 条，超限移除最早的
+                    MAX_FEEDBACK_SHOTS = 50
+                    feedback_count = sum(1 for s in shots if s.get("source") == "feedback")
+                    if feedback_count > MAX_FEEDBACK_SHOTS:
+                        for idx, s in enumerate(shots):
+                            if s.get("source") == "feedback":
+                                shots.pop(idx)
+                                break
 
-            store_value = json.dumps(shots, ensure_ascii=False)
-            if setting:
-                setting.value = store_value
-                await setting.save()
-            else:
-                await SystemSetting.create(key="ai.few_shots", value=store_value)
+                    store_value = json.dumps(shots, ensure_ascii=False)
+                    if setting:
+                        setting.value = store_value
+                        await setting.save()
+                    else:
+                        await SystemSetting.create(key="ai.few_shots", value=store_value)
 
-            logger.info(f"新增 few-shot 示例: {body.original_question[:50]}")
+                    logger.info(f"新增 few-shot 示例 (approved={new_shot['approved']}): {body.original_question[:50]}")
         except Exception as e:
             logger.error(f"保存 few-shot 失败: {e}")
 

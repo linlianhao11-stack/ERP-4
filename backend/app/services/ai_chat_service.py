@@ -1,6 +1,7 @@
 """NL2SQL 主流程编排 — AI 聊天核心服务"""
 from __future__ import annotations
 import asyncio
+import hashlib
 import json
 import uuid
 import asyncpg
@@ -179,8 +180,11 @@ async def process_chat(
     import time as _time
     from datetime import date
 
-    # 查询缓存
-    cache_key = f"{user_id}:{date.today().isoformat()}:{message.strip().lower()}"
+    # 查询缓存（含 history 摘要，避免不同上下文命中同一缓存）
+    history_digest = hashlib.md5(
+        json.dumps(history[-6:], ensure_ascii=False).encode()
+    ).hexdigest()[:8] if history else "0"
+    cache_key = f"{user_id}:{date.today().isoformat()}:{history_digest}:{message.strip().lower()}"
     now = _time.time()
     cached = _query_cache.get(cache_key)
     if cached:
@@ -352,8 +356,10 @@ async def _process_chat_inner(
                 err_msg = str(exec_err)[:200]
                 logger.warning(f"SQL 执行失败（第{attempt+1}次）: {err_msg}")
                 if attempt < 2:
+                    # 脱敏：只告诉 LLM 错误类型，不暴露表结构等敏感信息
+                    safe_msg = _sanitize_db_error(err_msg)
                     messages.append({"role": "assistant", "content": json.dumps({"type": "sql", "sql": sql}, ensure_ascii=False)})
-                    messages.append({"role": "user", "content": f"SQL 执行报错: {err_msg}。请修正 SQL。"})
+                    messages.append({"role": "user", "content": f"查询失败: {safe_msg}。请用其他方式重新查询。"})
                     r1_result = await call_deepseek(
                         messages=messages,
                         api_key=api_key,
@@ -383,12 +389,17 @@ async def _execute_and_analyze(
     import time as _time
     _t0 = _time.monotonic()
 
+    MAX_ROWS = 5000  # 防止超大结果集 OOM
+
     pool = await get_ai_pool(db_dsn)
 
     async with pool.acquire() as conn:
         # READ ONLY 事务
         async with conn.transaction(readonly=True):
             rows = await conn.fetch(sql)
+            if len(rows) > MAX_ROWS:
+                logger.warning(f"结果集过大 ({len(rows)} 行)，截断到 {MAX_ROWS} 行")
+                rows = rows[:MAX_ROWS]
 
     _t1 = _time.monotonic()
     logger.info(f"SQL 执行耗时: {_t1 - _t0:.2f}s, 行数: {len(rows)}")
@@ -570,6 +581,27 @@ def _build_empty_message(question: str) -> str:
         return f"没有查到符合条件的{biz_part}数据，可以换个条件试试看。"
     else:
         return "暂时没有查到相关数据，可以换个说法或者调整一下查询条件试试。"
+
+
+_SAFE_DB_ERRORS = [
+    ("permission denied", "权限不足，无法访问该数据"),
+    ("does not exist", "查询的表或字段不存在，请换个方式查询"),
+    ("syntax error", "SQL 语法有误，请重新生成"),
+    ("division by zero", "计算出现除零错误，请调整查询逻辑"),
+    ("value too long", "数据超出长度限制"),
+    ("invalid input syntax", "数据格式不匹配，请检查查询条件"),
+    ("could not connect", "数据库连接失败"),
+    ("timeout", "查询超时，请简化查询条件"),
+]
+
+
+def _sanitize_db_error(err_msg: str) -> str:
+    """将数据库错误信息脱敏，避免向 LLM 暴露表结构等敏感信息"""
+    lower = err_msg.lower()
+    for pattern, safe in _SAFE_DB_ERRORS:
+        if pattern in lower:
+            return safe
+    return "数据库执行错误，请换个方式查询"
 
 
 def _serialize_value(val) -> str | int | float | None:

@@ -109,6 +109,22 @@ def build_sql_prompt(
     schema_text: str | None = None,
 ) -> str:
     """组装 SQL 生成的 system prompt"""
+    # 注入当前日期和时区信息，避免 CURRENT_DATE 与用户预期不一致
+    from datetime import datetime
+    import os
+    tz_name = os.environ.get("TZ", "Asia/Shanghai")
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        now = datetime.now()
+    date_context = (
+        f"\n## 当前时间上下文\n"
+        f"当前日期: {now.strftime('%Y-%m-%d')}（{['一','二','三','四','五','六','日'][now.weekday()]}），"
+        f"时区: {tz_name}。\n"
+        f"数据库的 CURRENT_DATE 与此一致，无需额外转换。\n"
+    )
+
     # 账套指令
     if account_sets:
         names = "、".join([s["name"] for s in account_sets])
@@ -125,7 +141,7 @@ def build_sql_prompt(
 
     template = custom_system_prompt or DEFAULT_SQL_SYSTEM_PROMPT
     fmt_kwargs = dict(
-        account_set_instruction=account_instruction,
+        account_set_instruction=account_instruction + date_context,
         schema=schema_text if schema_text is not None else get_view_schema_text(),
         business_dict=format_business_dict(custom_dict),
         few_shots=format_few_shots(custom_shots),

@@ -18,8 +18,13 @@ export function useAiChat() {
     { patterns: ['聊天', '闲聊', '除了工作', '别的事', '聊点别的', '讲个笑话', '天气', '今天心情'], reply: '不好意思，我是专门的业务数据助手，只能帮你查询和分析 ERP 系统中的数据哦。试试问我一些业务问题吧！' },
   ]
 
+  // 业务关键词 — 出现时说明用户想查数据，不应被本地回复拦截
+  const BIZ_KEYWORDS = ['销售', '采购', '库存', '订单', '应收', '应付', '欠款', '客户', '供应商', '产品', '利润', '毛利', '收入', '支出', '账款', '缺货', '退货', '发票']
+
   const tryLocalReply = (msg) => {
     const lower = msg.toLowerCase()
+    // 如果包含业务关键词，跳过本地回复，让后端处理
+    if (BIZ_KEYWORDS.some(kw => lower.includes(kw))) return null
     for (const item of LOCAL_REPLIES) {
       if (item.patterns.some(p => lower.includes(p))) return item.reply
     }
@@ -175,6 +180,7 @@ export function useAiChat() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let currentEventType = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -184,37 +190,42 @@ export function useAiChat() {
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
 
-        let eventType = ''
         for (const line of lines) {
           if (line.startsWith('event: ')) {
-            eventType = line.slice(7).trim()
-          } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6))
-            if (eventType === 'progress') {
-              messages.value[aiMsgIndex] = {
-                ...messages.value[aiMsgIndex],
-                stage: data.stage,
-                stageMessage: data.message,
+            currentEventType = line.slice(7).trim()
+          } else if (line.startsWith('data: ') && currentEventType) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (currentEventType === 'progress') {
+                messages.value[aiMsgIndex] = {
+                  ...messages.value[aiMsgIndex],
+                  stage: data.stage,
+                  stageMessage: data.message,
+                }
+              } else if (currentEventType === 'done') {
+                messages.value[aiMsgIndex] = {
+                  ...data, loading: false, role: 'assistant', _question: msg,
+                }
+              } else if (currentEventType === 'error') {
+                messages.value[aiMsgIndex] = {
+                  loading: false, role: 'assistant', type: 'error',
+                  message: data.message,
+                  _retryable: data.retryable !== false,
+                  _originalQuestion: msg,
+                  _errorType: data.error_type || 'unknown',
+                }
               }
-            } else if (eventType === 'done') {
-              messages.value[aiMsgIndex] = {
-                ...data, loading: false, role: 'assistant', _question: msg,
-              }
-            } else if (eventType === 'error') {
-              messages.value[aiMsgIndex] = {
-                loading: false, role: 'assistant', type: 'error',
-                message: data.message,
-                _retryable: data.retryable !== false,
-                _originalQuestion: msg,
-                _errorType: data.error_type || 'unknown',
-              }
-            }
+            } catch { /* 忽略格式异常的 SSE 数据行 */ }
+            currentEventType = ''  // 消费后重置，防止无 event 行的 data 误匹配
+          } else if (line === '') {
+            // SSE 空行分隔符，重置事件类型
+            currentEventType = ''
           }
         }
       }
     } catch (e) {
       if (e.name === 'AbortError') return
-      const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
+      const isTimeout = e.name === 'TimeoutError' || e.message?.includes('timeout') || e.message?.includes('Timeout')
       messages.value[aiMsgIndex] = {
         loading: false, role: 'assistant', type: 'error',
         message: isTimeout ? 'AI 思考超时了，请简化问题后重试' : '网络连接异常，请检查网络',
@@ -229,14 +240,13 @@ export function useAiChat() {
   }
 
   const retryMessage = (msg) => {
-    if (msg._originalQuestion) {
-      const idx = messages.value.indexOf(msg)
-      if (idx >= 0) messages.value.splice(idx, 1)
-      if (idx > 0 && messages.value[idx - 1]?.role === 'user') {
-        messages.value.splice(idx - 1, 1)
-      }
-      sendMessage(msg._originalQuestion)
+    if (loading.value || !msg._originalQuestion) return
+    const idx = messages.value.indexOf(msg)
+    if (idx >= 0) messages.value.splice(idx, 1)
+    if (idx > 0 && messages.value[idx - 1]?.role === 'user') {
+      messages.value.splice(idx - 1, 1)
     }
+    sendMessage(msg._originalQuestion)
   }
 
   const clearChat = () => {

@@ -1,5 +1,61 @@
 # 迭代记录
 
+## v4.23.0 — AI 数据助手 + 安全加固（2026-03-14）
+
+> 集成 AI 数据助手（NL2SQL），支持自然语言查询业务数据；全面修复 AI 模块 10 项安全/稳定性/体验问题。
+
+### 新增：AI 数据助手
+
+- **自然语言查询**：用户用大白话提问，系统自动生成 SQL 查询 ERP 数据（销售/采购/库存/应收应付等）
+- **预设快捷问题**：12 个高频查询模板，意图匹配直接执行，跳过 LLM 调用
+- **流式响应（SSE）**：思考→生成→执行→分析，分阶段实时反馈
+- **智能图表**：大数据集自动调用分析模型，生成 Chart.js 图表配置
+- **细粒度权限**：按 `ai_sales` / `ai_purchase` / `ai_stock` / `ai_ar` / `ai_ap` 控制可访问的数据视图
+- **反馈学习**：用户点赞可保存为 few-shot 示例，提升后续查询精度
+- **会话持久化**：sessionStorage 保存对话历史，页面刷新不丢失
+- **收藏功能**：常用问题可收藏，快速复用
+- **导出 Excel**：查询结果一键导出
+
+### 修复：AI 模块 10 项安全/稳定性问题
+
+| # | 类别 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | Bug | 前端本地回复拦截业务查询（"你好，今天销售怎么样"被当成问候语） | 加 BIZ_KEYWORDS 业务关键词保护，含业务词的消息跳过本地回复 |
+| 2 | 安全 | 缓存键碰撞（不同对话上下文返回相同结果） | 缓存键加入 history 的 MD5 摘要 |
+| 3 | 稳定性 | SQL 执行无行数上限，可能 OOM | 结果集超过 5000 行自动截断 |
+| 4 | 安全 | 数据库错误信息泄露给 LLM | 新增 `_sanitize_db_error()` 脱敏映射 |
+| 5 | 安全 | few-shot 反馈无审批机制，任意用户可污染示例库 | 普通用户提交标记 `approved=False` 待审批，admin 直接生效；加去重检查 |
+| 6 | 并发 | few-shot 写入竞态条件 | 用 `select_for_update()` + 事务保护 |
+| 7 | 安全 | History 输入验证不足 | 校验 role 合法性 + 200KB 总大小限制 |
+| 8 | 安全 | 消息清洗不完整（Unicode 控制字符绕过） | 用 `unicodedata.category` 过滤 + 2000 字长度限制 |
+| 9 | 准确性 | Prompt 缺少时区信息，CURRENT_DATE 可能与用户预期不一致 | 动态注入当前日期、星期、时区到 system prompt |
+| 10 | Bug | 前端 SSE 解析边界处理不完整 + 超时判断不适配 Fetch API + 重试无 loading 防护 | 重构 SSE 解析逻辑 + 修正超时检测 + 加 loading 守卫 |
+
+### 新增 API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/ai/status` | GET | AI 助手可用性检查（含预设问题列表） |
+| `/api/ai/chat` | POST | AI 聊天接口（SSE 流式响应） |
+| `/api/ai/chat/export` | POST | 导出查询结果为 Excel |
+| `/api/ai/chat/feedback` | POST | 用户反馈（点赞/点踩 + 保存为示例） |
+
+### 修改文件清单
+
+**后端（10+ 文件）：**
+- `backend/app/ai/` — AI 模块（意图分类/SQL 校验/DeepSeek 客户端/prompt 构建/schema 注册/限流器）
+- `backend/app/services/ai_chat_service.py` — 核心聊天服务（缓存/执行/分析/脱敏）
+- `backend/app/routers/ai_chat.py` — API 路由（输入验证/限流/SSE 流）
+- `backend/app/ai/prompt_builder.py` — 时区注入
+
+**前端（4 文件）：**
+- `frontend/src/composables/useAiChat.js` — 聊天逻辑（SSE 解析/本地回复/重试防护）
+- `frontend/src/components/business/AiChatbot.vue` — 聊天浮窗组件
+- `frontend/src/components/business/AiWelcome.vue` — 欢迎页组件
+- `frontend/src/App.vue` — 集成 AI 浮窗入口
+
+---
+
 ## v4.22.0 — 发票 PDF 附件管理 + 备份系统升级 + 安全加固（2026-03-11）
 
 > 发票支持 PDF 附件上传/预览/下载/删除，备份格式从 SQL 升级为 tar.gz（数据库 + 上传文件完整打包），全量代码审查修复 5 个安全漏洞。
