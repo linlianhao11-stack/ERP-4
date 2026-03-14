@@ -80,7 +80,7 @@
               <th v-if="isColumnVisible('last_info')" class="p-3">物流信息</th>
               <th v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('order_amount')">订单金额 <span v-if="shipmentSort.key === 'order_amount'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="isColumnVisible('remark')" class="px-2 py-2 text-left whitespace-nowrap">备注</th>
-              <th v-if="isColumnVisible('salesperson')" class="px-2 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('salesperson')">业务员 <span v-if="shipmentSort.key === 'salesperson'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('employee')" class="px-2 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('employee')">业务员 <span v-if="shipmentSort.key === 'employee'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="isColumnVisible('phone')" class="px-2 py-2 text-left whitespace-nowrap">收件电话</th>
               <th v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-left whitespace-nowrap">创建时间</th>
               <th v-if="isColumnVisible('actions')" class="p-3">操作</th>
@@ -129,7 +129,7 @@
               <td v-if="isColumnVisible('last_info')" class="p-3 text-xs text-secondary max-w-[200px] truncate" :title="s.last_info">{{ s.last_info || '-' }}</td>
               <td v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right font-semibold whitespace-nowrap">¥{{ fmt(s.total_amount) }}</td>
               <td v-if="isColumnVisible('remark')" class="px-2 py-2 text-muted text-xs max-w-[150px] truncate">{{ s.remark || '-' }}</td>
-              <td v-if="isColumnVisible('salesperson')" class="px-2 py-2 whitespace-nowrap">{{ s.salesperson_name || '-' }}</td>
+              <td v-if="isColumnVisible('employee')" class="px-2 py-2 whitespace-nowrap">{{ s.employee_name || '-' }}</td>
               <td v-if="isColumnVisible('phone')" class="px-2 py-2 text-xs whitespace-nowrap">{{ s.phone || '-' }}</td>
               <td v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-muted text-xs whitespace-nowrap">{{ fmtDate(s.created_at) }}</td>
               <td v-if="isColumnVisible('actions')" class="p-3" @click.stop>

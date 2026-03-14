@@ -21,7 +21,7 @@ VIEW_SCHEMAS = {
             ("order_date", "DATE", "订单日期"),
             ("order_type", "VARCHAR", "订单类型: normal/account_period"),
             ("customer_name", "VARCHAR", "客户名称"),
-            ("salesperson_name", "VARCHAR", "业务员"),
+            ("employee_name", "VARCHAR", "业务员"),
             ("sku", "VARCHAR", "产品SKU"),
             ("product_name", "VARCHAR", "产品名称"),
             ("brand", "VARCHAR", "品牌"),

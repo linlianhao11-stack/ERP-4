@@ -22,7 +22,10 @@
         <WarehouseSettings
           v-if="hasPermission('settings') || hasPermission('stock_edit')"
           @data-changed="onDataChanged" />
-        <SalespersonSettings
+        <DepartmentSettings
+          v-if="hasPermission('settings') || hasPermission('sales')"
+          @data-changed="onDataChanged" />
+        <EmployeeSettings
           v-if="hasPermission('settings') || hasPermission('sales')"
           @data-changed="onDataChanged" />
         <UserSettings
@@ -59,7 +62,7 @@
 <script setup>
 /**
  * 系统设置页面 — 标签页容器
- * 子组件：WarehouseSettings、SalespersonSettings、UserSettings、
+ * 子组件：WarehouseSettings、DepartmentSettings、EmployeeSettings、UserSettings、
  *         PaymentMethodSettings、LogsSettings、PermissionSettings、ApiKeysPanel
  */
 import { ref, nextTick } from 'vue'
@@ -68,7 +71,8 @@ import { useSettingsStore } from '../stores/settings'
 
 // 子组件导入
 import WarehouseSettings from '../components/business/settings/WarehouseSettings.vue'
-import SalespersonSettings from '../components/business/settings/SalespersonSettings.vue'
+import DepartmentSettings from '../components/business/settings/DepartmentSettings.vue'
+import EmployeeSettings from '../components/business/settings/EmployeeSettings.vue'
 import UserSettings from '../components/business/settings/UserSettings.vue'
 import PaymentMethodSettings from '../components/business/settings/PaymentMethodSettings.vue'
 import LogsSettings from '../components/business/settings/LogsSettings.vue'

@@ -306,7 +306,7 @@ async def migrate_add_timestamp_columns():
     additions = [
         ("customers", "updated_at", "TIMESTAMPTZ DEFAULT NOW()"),
         ("suppliers", "updated_at", "TIMESTAMPTZ DEFAULT NOW()"),
-        ("salespersons", "updated_at", "TIMESTAMPTZ DEFAULT NOW()"),
+        ("employees", "updated_at", "TIMESTAMPTZ DEFAULT NOW()"),
         ("purchase_order_items", "created_at", "TIMESTAMPTZ DEFAULT NOW()"),
         ("shipment_items", "created_at", "TIMESTAMPTZ DEFAULT NOW()"),
         ("payment_orders", "created_at", "TIMESTAMPTZ DEFAULT NOW()"),

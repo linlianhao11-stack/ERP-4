@@ -121,7 +121,7 @@ setApiUnauthorizedHandler(() => {
 
 // 仅加载全局必需的轻量数据
 const loadEssentials = () => {
-  settingsStore.loadSalespersons()
+  settingsStore.loadEmployees()
   settingsStore.loadPaymentMethods()
   settingsStore.loadCompanyName()
   appStore.loadTodoCounts()

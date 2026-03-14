@@ -7,7 +7,7 @@ SELECT
     o.created_at::date AS order_date,
     o.order_type,
     c.name AS customer_name,
-    s.name AS salesperson_name,
+    e.name AS employee_name,
     p.sku,
     p.name AS product_name,
     p.brand,
@@ -28,7 +28,7 @@ FROM orders o
 JOIN order_items oi ON oi.order_id = o.id
 JOIN products p ON p.id = oi.product_id
 LEFT JOIN customers c ON c.id = o.customer_id
-LEFT JOIN salespersons s ON s.id = o.salesperson_id
+LEFT JOIN employees e ON e.id = o.employee_id
 LEFT JOIN account_sets ast ON ast.id = o.account_set_id
 WHERE o.shipping_status != 'cancelled'
   AND o.order_type != 'return';

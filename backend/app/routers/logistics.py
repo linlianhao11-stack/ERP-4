@@ -136,7 +136,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
                 return []
             query = query.filter(order_id__in=matching_order_ids)
 
-    all_shipments = await query.order_by("id").select_related("order", "order__customer", "order__salesperson")
+    all_shipments = await query.order_by("id").select_related("order", "order__customer", "order__employee")
 
     order_map = OrderedDict()
     for s in all_shipments:
@@ -200,7 +200,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
             "created_at": order.created_at.isoformat(),
             "updated_at": first.updated_at.isoformat(),
             "remark": order.remark,
-            "salesperson_name": order.salesperson.name if order.salesperson else None,
+            "employee_name": order.employee.name if order.employee else None,
             "phone": first.phone if hasattr(first, 'phone') and first.phone else None,
         })
 
@@ -210,7 +210,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
         pending_query = Order.filter(
             shipping_status__in=["pending", "partial"],
             order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
-        ).select_related("customer", "salesperson")
+        ).select_related("customer", "employee")
         if existing_order_ids:
             pending_query = pending_query.exclude(id__in=list(existing_order_ids))
         pending_orders = await pending_query.order_by("-created_at").limit(200)
@@ -245,7 +245,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
                 "created_at": o.created_at.isoformat(),
                 "updated_at": o.created_at.isoformat(),
                 "remark": o.remark,
-                "salesperson_name": o.salesperson.name if o.salesperson else None,
+                "employee_name": o.employee.name if o.employee else None,
                 "phone": None,
             })
 
@@ -257,7 +257,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
 
 @router.get("/{order_id}")
 async def get_shipment_detail(order_id: int, user: User = Depends(require_permission("logistics", "sales"))):
-    order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "salesperson").first()
+    order = await Order.filter(id=order_id).select_related("customer", "warehouse", "creator", "employee").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
@@ -319,7 +319,7 @@ async def get_shipment_detail(order_id: int, user: User = Depends(require_permis
             "customer_name": order.customer.name if order.customer else None,
             "total_amount": float(order.total_amount),
             "shipping_status": order.shipping_status,
-            "salesperson_name": order.salesperson.name if order.salesperson else None,
+            "employee_name": order.employee.name if order.employee else None,
             "creator_name": order.creator.display_name if order.creator else None,
             "created_at": order.created_at.isoformat(),
             "remark": order.remark,

@@ -63,7 +63,7 @@ export function useShipment() {
       shipped_at: s => s.created_at || '',
       status: s => s.status || '',
       order_amount: s => Number(s.total_amount) || 0,
-      salesperson: s => s.salesperson_name || ''
+      employee: s => s.employee_name || ''
     })
   })
 
@@ -83,7 +83,7 @@ export function useShipment() {
     // 新增列（Task 11 添加，与后端 Task 5 和模板同步）
     order_amount: { label: '订单金额', defaultVisible: true, align: 'right' },
     remark: { label: '备注', defaultVisible: true },
-    salesperson: { label: '业务员', defaultVisible: false },
+    employee: { label: '业务员', defaultVisible: false },
     phone: { label: '收件电话', defaultVisible: false },
     order_created_at: { label: '创建时间', defaultVisible: false },
     actions: { label: '操作', defaultVisible: true }

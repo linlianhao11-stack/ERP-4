@@ -6,7 +6,7 @@ DEFAULT_BUSINESS_DICT = [
     {"term": "销售额", "meaning": "一笔交易的总金额", "field_hint": "amount, total_amount"},
     {"term": "账期/赊销", "meaning": "先发货后收款的交易方式", "field_hint": "order_type = account_period"},
     {"term": "现结", "meaning": "货到付款、即时结清的交易方式", "field_hint": "order_type = normal"},
-    {"term": "业务员", "meaning": "负责这笔交易的销售人员", "field_hint": "salesperson_name"},
+    {"term": "业务员", "meaning": "负责这笔交易的销售人员", "field_hint": "employee_name"},
     {"term": "含税价/去税价", "meaning": "含增值税的单价 / 不含税的单价", "field_hint": "tax_inclusive_price / tax_exclusive_price"},
     {"term": "库存/可用库存", "meaning": "仓库里的总数量 / 减去预留后实际可用的数量", "field_hint": "quantity / available_qty"},
     {"term": "库存金额", "meaning": "库存数量 × 平均成本价", "field_hint": "stock_value"},

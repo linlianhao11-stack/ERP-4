@@ -18,7 +18,7 @@ from app.services.backup_service import auto_backup_loop
 # 导入所有路由
 from app.routers import (
     auth, users, warehouses, locations, products, stock,
-    salespersons, customers, orders, finance, dashboard,
+    customers, orders, finance, dashboard,
     consignment, logistics, backup, payment_methods,
     rebates, suppliers, purchase_orders, operation_logs,
     settings, sn, product_brands, disbursement_methods,
@@ -144,7 +144,6 @@ app.include_router(warehouses.router)
 app.include_router(locations.router)
 app.include_router(products.router)
 app.include_router(stock.router)
-app.include_router(salespersons.router)
 app.include_router(customers.router)
 app.include_router(orders.router)
 app.include_router(finance.router)

@@ -70,7 +70,7 @@ async def get_customer_transactions(customer_id: int, year: Optional[int] = None
             end_date = datetime(year, month + 1, 1)
         query = query.filter(created_at__gte=start_date, created_at__lt=end_date)
 
-    orders = await query.order_by("-created_at").limit(500).select_related("warehouse", "creator", "salesperson")
+    orders = await query.order_by("-created_at").limit(500).select_related("warehouse", "creator", "employee")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
 
     stats = {
@@ -95,7 +95,7 @@ async def get_customer_transactions(customer_id: int, year: Optional[int] = None
             "total_amount": float(o.total_amount),
             "paid_amount": float(o.paid_amount),
             "is_cleared": o.is_cleared, "remark": o.remark,
-            "salesperson_name": o.salesperson.name if o.salesperson else "-",
+            "employee_name": o.employee.name if o.employee else "-",
             "creator_name": o.creator.display_name if o.creator else "-",
             "created_at": o.created_at.isoformat()
         }

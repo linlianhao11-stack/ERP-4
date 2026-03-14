@@ -246,7 +246,7 @@
               <div>
                 <div class="font-semibold">{{ orderDetail.order_no }}</div>
                 <div class="text-sm text-muted">
-                  <span v-if="orderDetail.salesperson_name">销售员: {{ orderDetail.salesperson_name }} · </span>
+                  <span v-if="orderDetail.employee_name">业务员: {{ orderDetail.employee_name }} · </span>
                   {{ orderDetail.creator_name }} · {{ fmtDate(orderDetail.created_at) }}
                 </div>
               </div>

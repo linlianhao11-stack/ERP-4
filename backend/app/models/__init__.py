@@ -11,7 +11,6 @@ from app.models.rebate import RebateLog
 from app.models.sn import SnConfig, SnCode
 from app.models.shipment import Shipment, ShipmentItem
 from app.models.operation_log import OperationLog
-from app.models.salesperson import Salesperson
 from app.models.system_setting import SystemSetting
 from app.models.accounting import AccountSet, ChartOfAccount, AccountingPeriod
 from app.models.voucher import Voucher, VoucherEntry
@@ -29,7 +28,7 @@ from app.models.department import Department, Employee
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
-    "Customer", "Salesperson", "Order", "OrderItem", "Payment", "PaymentOrder",
+    "Customer", "Order", "OrderItem", "Payment", "PaymentOrder",
     "PaymentMethod", "DisbursementMethod", "OperationLog", "Supplier", "PurchaseOrder", "PurchaseOrderItem",
     "PurchaseReturn", "PurchaseReturnItem",
     "RebateLog", "SnConfig", "SnCode", "Shipment",

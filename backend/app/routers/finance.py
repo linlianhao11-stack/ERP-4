@@ -100,7 +100,7 @@ async def get_all_orders(
 
     total = await query.count()
     orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related(
-        "customer", "warehouse", "creator", "related_order", "salesperson")
+        "customer", "warehouse", "creator", "related_order", "employee")
 
     filtered_orders = list(orders)
 
@@ -145,7 +145,7 @@ async def get_all_orders(
             "shipping_status": o.shipping_status,
             "refunded": o.refunded,
             "remark": o.remark,
-            "salesperson_name": o.salesperson.name if o.salesperson else "-",
+            "employee_name": o.employee.name if o.employee else "-",
             "creator_name": o.creator.display_name if o.creator else "-",
             "created_at": o.created_at.isoformat(),
             "related_order_no": o.related_order.order_no if o.related_order else None,
@@ -195,12 +195,12 @@ async def export_orders(
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
 
     orders = await query.order_by("-created_at").limit(10000).select_related(
-        "customer", "warehouse", "creator", "related_order", "salesperson")
+        "customer", "warehouse", "creator", "related_order", "employee")
 
     output = io.StringIO()
     output.write('\ufeff')
 
-    headers = ["订单号", "订单类型", "客户", "仓库", "金额", "成本", "毛利", "已付", "状态", "退款状态", "备注", "销售员", "创建人", "创建时间", "关联订单",
+    headers = ["订单号", "订单类型", "客户", "仓库", "金额", "成本", "毛利", "已付", "状态", "退款状态", "备注", "业务员", "创建人", "创建时间", "关联订单",
                "商品SKU", "商品名称", "数量", "单价", "成本价", "小计", "利润"]
     output.write(','.join(headers) + '\n')
 
@@ -231,7 +231,7 @@ async def export_orders(
             "已取消" if o.shipping_status == "cancelled" else ("已结清" if o.is_cleared else "未结清"),
             ("已退款" if o.refunded else "未退款") if o.order_type == "RETURN" else "-",
             (o.remark or "").replace('\n', ' '),
-            o.salesperson.name if o.salesperson else "-",
+            o.employee.name if o.employee else "-",
             o.creator.display_name if o.creator else "-",
             o.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             o.related_order.order_no if o.related_order else "-"
@@ -348,11 +348,11 @@ async def get_unpaid_orders(
         query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
     if search:
         query = query.filter(Q(order_no__icontains=search) | Q(customer__name__icontains=search))
-    orders = await query.order_by("created_at").select_related("customer", "salesperson")
+    orders = await query.order_by("created_at").select_related("customer", "employee")
     return [{
         "id": o.id, "order_no": o.order_no, "order_type": o.order_type,
         "customer_id": o.customer_id, "customer_name": o.customer.name if o.customer else None,
-        "salesperson_name": o.salesperson.name if o.salesperson else None,
+        "employee_name": o.employee.name if o.employee else None,
         "total_amount": float(o.total_amount), "paid_amount": float(o.paid_amount),
         "unpaid_amount": float(o.total_amount - o.paid_amount),
         "created_at": o.created_at.isoformat()

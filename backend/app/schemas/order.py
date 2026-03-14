@@ -13,7 +13,7 @@ class OrderItemRequest(BaseModel):
 class OrderCreate(BaseModel):
     order_type: Literal["CASH", "CREDIT", "RETURN", "CONSIGN_OUT", "CONSIGN_SETTLE"]
     customer_id: Optional[int] = None
-    salesperson_id: Optional[int] = None
+    employee_id: Optional[int] = None
     warehouse_id: Optional[int] = None
     location_id: Optional[int] = None
     related_order_id: Optional[int] = None
@@ -24,6 +24,8 @@ class OrderCreate(BaseModel):
     remark: Optional[str] = Field(None, max_length=2000)
     rebate_amount: Optional[Decimal] = Field(default=None, ge=0)
     account_set_id: Optional[int] = None
+    refund_method: Optional[str] = None
+    refund_amount: Optional[Decimal] = None
 
 class CancelItemAllocation(BaseModel):
     order_item_id: int
