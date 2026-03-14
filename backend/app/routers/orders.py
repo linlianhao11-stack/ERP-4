@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.models.department import Employee
 from app.models.customer_balance import CustomerAccountBalance
+from app.models.accounting import AccountSet, AccountingPeriod
 from app.schemas.order import OrderCreate, CancelRequest
 from app.services.order_service import (
     validate_order_entities, resolve_item_entities, process_item_stock,
@@ -58,11 +59,26 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     account_set_ids.add(wh.account_set_id)
 
             if len(account_set_ids) == 1:
-                account_set_id = account_set_ids.pop()
+                account_set_id = next(iter(account_set_ids))
             elif len(account_set_ids) > 1:
                 account_set_id = None  # 多账套订单
             else:
                 account_set_id = data.account_set_id  # 回退到手动指定
+
+            # 2.5 会计期间校验：确保相关账套的当前期间未关闭
+            _validate_as_ids = account_set_ids if account_set_ids else ({account_set_id} if account_set_id else set())
+            for _as_id in _validate_as_ids:
+                acct_set = await AccountSet.filter(id=_as_id).first()
+                if acct_set and acct_set.current_period:
+                    period = await AccountingPeriod.filter(
+                        account_set_id=_as_id,
+                        period_name=acct_set.current_period
+                    ).first()
+                    if period and period.is_closed:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"账套 {acct_set.name} 的当前期间 {acct_set.current_period} 已关闭，无法创建订单"
+                        )
 
             # 3. 创建订单主记录
             is_cleared = data.order_type == "CASH" or (data.order_type == "RETURN" and data.refunded)
@@ -90,6 +106,9 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             _products_map = {p.id: p for p in await Product.filter(id__in=_product_ids, is_active=True)} if _product_ids else {}
             _locations_map = {l.id: l for l in await Location.filter(id__in=_location_ids, is_active=True)} if _location_ids else {}
             _entities_cache = {'products': _products_map, 'warehouses': _warehouses_map, 'locations': _locations_map}
+
+            # 按账套汇总金额（用于多账套订单的财务单据拆分）
+            amount_by_account_set = {}
 
             for item in data.items:
                 product, working_warehouse, working_location, cost_price = await resolve_item_entities(
@@ -127,6 +146,11 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     amount=amount, profit=profit, rebate_amount=item_rebate
                 )
 
+                # 按账套汇总行金额
+                item_as_id = working_warehouse.account_set_id if working_warehouse else account_set_id
+                if item_as_id:
+                    amount_by_account_set[item_as_id] = amount_by_account_set.get(item_as_id, Decimal("0")) + amount
+
                 # 库存操作
                 await process_item_stock(
                     data.order_type, product, working_warehouse, working_location,
@@ -147,65 +171,71 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 order.paid_amount = abs(total_amount)
             await order.save()
 
-            # 6. 结算处理（挂账/收款/退款）
-            credit_used = await process_order_settlement(data, customer, order, total_amount, user, order_no)
+            # 6. 结算处理（挂账/收款/退款，多账套时拆分收款记录）
+            credit_used = await process_order_settlement(
+                data, customer, order, total_amount, user, order_no,
+                amount_by_account_set=amount_by_account_set
+            )
 
             actual_amount_due = total_amount - order.paid_amount
 
             # 6.5 钩子：寄售结算 → 应收单（pending，无发货流程所以在此创建）
-            if data.order_type == "CONSIGN_SETTLE" and getattr(order, "account_set_id", None):
+            # 支持多账套：按账套拆分生成应收单
+            if data.order_type == "CONSIGN_SETTLE" and amount_by_account_set:
                 try:
                     from app.services.ar_service import create_receivable_bill
-                    await create_receivable_bill(
-                        account_set_id=order.account_set_id,
-                        customer_id=order.customer_id,
-                        order_id=order.id,
-                        total_amount=abs(total_amount),
-                        status="pending",
-                        creator=user,
-                    )
+                    for as_id, group_amount in amount_by_account_set.items():
+                        await create_receivable_bill(
+                            account_set_id=as_id,
+                            customer_id=order.customer_id,
+                            order_id=order.id,
+                            total_amount=abs(group_amount),
+                            status="pending",
+                            creator=user,
+                        )
                 except Exception as e:
                     logger.error(f"寄售结算自动生成应收单失败: {e}")
 
-            # 6.5b 钩子：退货 → 红字应收单
-            if data.order_type == "RETURN" and getattr(order, "account_set_id", None):
+            # 6.5b 钩子：退货 → 红字应收单（按账套拆分）
+            if data.order_type == "RETURN" and amount_by_account_set:
                 try:
                     from app.services.ar_service import create_receivable_bill
-                    await create_receivable_bill(
-                        account_set_id=order.account_set_id,
-                        customer_id=order.customer_id,
-                        order_id=order.id,
-                        total_amount=total_amount,  # 已为负数
-                        status="completed",
-                        creator=user,
-                    )
+                    for as_id, group_amount in amount_by_account_set.items():
+                        await create_receivable_bill(
+                            account_set_id=as_id,
+                            customer_id=order.customer_id,
+                            order_id=order.id,
+                            total_amount=group_amount,  # 已为负数
+                            status="completed",
+                            creator=user,
+                        )
                 except Exception as e:
                     logger.error(f"退货自动生成红字应收单失败: {e}")
                     raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
 
-            # 6.6 钩子：销售退货 + 已退款 → 自动生成收款退款单（draft状态，待确认）
-            if data.order_type == "RETURN" and data.refunded and getattr(order, "account_set_id", None):
+            # 6.6 钩子：销售退货 + 已退款 → 自动生成收款退款单（按账套拆分）
+            if data.order_type == "RETURN" and data.refunded and amount_by_account_set:
                 try:
                     from app.models.ar_ap import ReceiptBill, ReceiptRefundBill
-                    # Find the most recent confirmed receipt bill for this customer/account set
-                    original_receipt = await ReceiptBill.filter(
-                        account_set_id=order.account_set_id,
-                        customer_id=order.customer_id,
-                        status="confirmed",
-                    ).order_by("-id").first()
-                    if original_receipt:
-                        refund_no = generate_order_no("SKTK")
-                        await ReceiptRefundBill.create(
-                            bill_no=refund_no,
-                            account_set_id=order.account_set_id,
+                    for as_id, group_amount in amount_by_account_set.items():
+                        original_receipt = await ReceiptBill.filter(
+                            account_set_id=as_id,
                             customer_id=order.customer_id,
-                            original_receipt=original_receipt,
-                            refund_date=datetime.now().date(),
-                            amount=abs(total_amount),
-                            reason=f"销售退货 {order.order_no}",
-                            status="draft",
-                            creator=user,
-                        )
+                            status="confirmed",
+                        ).order_by("-id").first()
+                        if original_receipt:
+                            refund_no = generate_order_no("SKTK")
+                            await ReceiptRefundBill.create(
+                                bill_no=refund_no,
+                                account_set_id=as_id,
+                                customer_id=order.customer_id,
+                                original_receipt=original_receipt,
+                                refund_date=datetime.now().date(),
+                                amount=abs(group_amount),
+                                reason=f"销售退货 {order.order_no}",
+                                status="draft",
+                                creator=user,
+                            )
                 except Exception as e:
                     logger.error(f"销售退货自动生成收款退款单失败: {e}")
 

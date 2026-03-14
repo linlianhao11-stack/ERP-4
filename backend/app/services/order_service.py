@@ -8,10 +8,11 @@ from fastapi import HTTPException
 from tortoise.expressions import F
 
 from app.models import (
-    User, Product, Warehouse, Location, Customer, Salesperson,
+    User, Product, Warehouse, Location, Customer,
     Order, OrderItem, WarehouseStock, StockLog, Payment,
     RebateLog
 )
+from app.models.department import Employee
 from app.models.customer_balance import CustomerAccountBalance
 from app.services.stock_service import (
     get_or_create_consignment_warehouse, update_weighted_entry_date,
@@ -25,8 +26,8 @@ logger = get_logger("order_service")
 
 async def validate_order_entities(data):
     """
-    校验订单关联实体（客户、仓库、销售员、关联订单）的存在性和合法性。
-    返回 (customer, warehouse, salesperson, consignment_wh)
+    校验订单关联实体（客户、仓库、业务员、关联订单）的存在性和合法性。
+    返回 (customer, warehouse, employee, consignment_wh)
     """
     customer = None
     if data.customer_id:
@@ -34,11 +35,11 @@ async def validate_order_entities(data):
         if not customer:
             raise HTTPException(status_code=404, detail="客户不存在")
 
-    salesperson = None
-    if data.salesperson_id:
-        salesperson = await Salesperson.filter(id=data.salesperson_id, is_active=True).first()
-        if not salesperson:
-            raise HTTPException(status_code=404, detail="销售员不存在")
+    employee = None
+    if data.employee_id:
+        employee = await Employee.filter(id=data.employee_id, is_active=True).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="业务员不存在")
 
     warehouse = None
     if data.warehouse_id:
@@ -87,7 +88,7 @@ async def validate_order_entities(data):
         if related_order.customer_id != customer.id:
             raise HTTPException(status_code=400, detail="退货客户必须与原订单客户一致")
 
-    return customer, warehouse, salesperson, consignment_wh
+    return customer, warehouse, employee, consignment_wh
 
 
 async def resolve_item_entities(item, warehouse, data, entities_cache=None):
@@ -266,9 +267,11 @@ async def process_rebate_deduction(data, customer, order, order_no, user):
     return total_rebate
 
 
-async def process_order_settlement(data, customer, order, total_amount, user, order_no):
+async def process_order_settlement(data, customer, order, total_amount, user, order_no,
+                                   amount_by_account_set=None):
     """
     处理订单结算：CREDIT 挂账、CASH 收款（含预付余额抵扣）、RETURN 退款到余额。
+    amount_by_account_set: 多账套订单时，各账套的金额分布 {account_set_id: Decimal}
     返回 credit_used 金额。
     """
     actual_credit_used = 0
@@ -313,19 +316,42 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
         if order.paid_amount > 0:
             credit_used = float(order.paid_amount)
 
-    # CASH 订单创建收款记录
+    # CASH 订单创建收款记录（多账套时按账套拆分）
     if data.order_type == "CASH" and customer:
         actual_pay = abs(Decimal(str(total_amount))) - Decimal(str(credit_used))
         if actual_pay > 0:
-            pay_no = generate_order_no("PAY")
-            await Payment.create(
-                payment_no=pay_no, customer=customer, order=order,
-                amount=actual_pay,
-                payment_method=data.payment_method or "cash",
-                source="CASH", is_confirmed=False,
-                remark=f"现款销售 {order_no}", creator=user,
-                account_set_id=order.account_set_id
-            )
+            if amount_by_account_set and len(amount_by_account_set) > 1:
+                # 多账套：按各账套金额比例拆分收款记录
+                total_abs = sum(abs(v) for v in amount_by_account_set.values())
+                remaining_pay = actual_pay
+                sorted_items = sorted(amount_by_account_set.items())
+                for idx, (as_id, group_amount) in enumerate(sorted_items):
+                    if idx < len(sorted_items) - 1:
+                        ratio = abs(group_amount) / total_abs if total_abs > 0 else Decimal("0")
+                        split_pay = (actual_pay * ratio).quantize(Decimal("0.01"))
+                    else:
+                        split_pay = remaining_pay  # 尾差归入最后一笔
+                    remaining_pay -= split_pay
+                    if split_pay > 0:
+                        pay_no = generate_order_no("PAY")
+                        await Payment.create(
+                            payment_no=pay_no, customer=customer, order=order,
+                            amount=split_pay,
+                            payment_method=data.payment_method or "cash",
+                            source="CASH", is_confirmed=False,
+                            remark=f"现款销售 {order_no}", creator=user,
+                            account_set_id=as_id
+                        )
+            else:
+                pay_no = generate_order_no("PAY")
+                await Payment.create(
+                    payment_no=pay_no, customer=customer, order=order,
+                    amount=actual_pay,
+                    payment_method=data.payment_method or "cash",
+                    source="CASH", is_confirmed=False,
+                    remark=f"现款销售 {order_no}", creator=user,
+                    account_set_id=order.account_set_id
+                )
 
     return credit_used
 
