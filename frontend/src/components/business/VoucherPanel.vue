@@ -154,6 +154,32 @@
                         <option v-for="a in leafAccounts" :key="a.id" :value="a.id">{{ a.code }} {{ a.name }}</option>
                       </select>
                       <span v-else>{{ entry.account_code }} {{ entry.account_name }}</span>
+                      <!-- 辅助核算选择器 -->
+                      <div v-if="(isEditing || isCreating) && entry.account_id" class="flex flex-wrap gap-1 mt-1">
+                        <select v-if="getAccountById(entry.account_id)?.aux_customer" v-model="entry.aux_customer_id" class="input text-xs" style="max-width:140px">
+                          <option :value="null">客户…</option>
+                          <option v-for="c in customerList" :key="c.id" :value="c.id">{{ c.name }}</option>
+                        </select>
+                        <select v-if="getAccountById(entry.account_id)?.aux_supplier" v-model="entry.aux_supplier_id" class="input text-xs" style="max-width:140px">
+                          <option :value="null">供应商…</option>
+                          <option v-for="s in supplierList" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                        <select v-if="getAccountById(entry.account_id)?.aux_employee" v-model="entry.aux_employee_id" class="input text-xs" style="max-width:140px">
+                          <option :value="null">员工…</option>
+                          <option v-for="emp in employeeList" :key="emp.id" :value="emp.id">{{ emp.name }}</option>
+                        </select>
+                        <select v-if="getAccountById(entry.account_id)?.aux_department" v-model="entry.aux_department_id" class="input text-xs" style="max-width:140px">
+                          <option :value="null">部门…</option>
+                          <option v-for="dep in departmentList" :key="dep.id" :value="dep.id">{{ dep.name }}</option>
+                        </select>
+                      </div>
+                      <!-- 查看模式下显示辅助核算名称 -->
+                      <div v-if="!(isEditing || isCreating) && (entry.aux_customer_name || entry.aux_supplier_name || entry.aux_employee_name || entry.aux_department_name)" class="flex flex-wrap gap-1 mt-0.5 text-[11px] text-muted">
+                        <span v-if="entry.aux_customer_name" class="badge badge-blue">{{ entry.aux_customer_name }}</span>
+                        <span v-if="entry.aux_supplier_name" class="badge badge-orange">{{ entry.aux_supplier_name }}</span>
+                        <span v-if="entry.aux_employee_name" class="badge badge-green">{{ entry.aux_employee_name }}</span>
+                        <span v-if="entry.aux_department_name" class="badge badge-purple">{{ entry.aux_department_name }}</span>
+                      </div>
                     </td>
                     <td>
                       <input v-if="isEditing || isCreating" v-model="entry.summary" class="input text-xs">
@@ -215,6 +241,9 @@ import {
   deleteVoucher, submitVoucher, approveVoucher, rejectVoucher,
   postVoucher, unpostVoucher, getVoucherPdf, batchVoucherPdf
 } from '../../api/accounting'
+import { getCustomers } from '../../api/customers'
+import { getSuppliers } from '../../api/purchase'
+import { getEmployees, getDepartments } from '../../api/employees'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
@@ -231,6 +260,10 @@ const isCreating = ref(false)
 const isEditing = ref(false)
 const detailVoucher = ref(null)
 const leafAccounts = ref([])
+const customerList = ref([])
+const supplierList = ref([])
+const employeeList = ref([])
+const departmentList = ref([])
 
 const selectedIds = ref([])
 const openMenuId = ref(null)
@@ -321,8 +354,10 @@ const formatAmount = (v) => {
   return isNaN(n) || n === 0 ? '' : fmtMoney(n)
 }
 
+const getAccountById = (id) => leafAccounts.value.find(a => a.id === id)
+
 const addEntry = () => {
-  editForm.value.entries.push({ account_id: null, summary: '', debit_amount: 0, credit_amount: 0, aux_customer_id: null, aux_supplier_id: null })
+  editForm.value.entries.push({ account_id: null, summary: '', debit_amount: 0, credit_amount: 0, aux_customer_id: null, aux_supplier_id: null, aux_employee_id: null, aux_department_id: null })
 }
 
 const loadList = async () => {
@@ -343,6 +378,17 @@ const loadList = async () => {
 const loadLeafAccounts = async () => {
   await accountingStore.loadChartOfAccounts()
   leafAccounts.value = accountingStore.chartOfAccounts.filter(a => a.is_leaf)
+  // 加载辅助核算选项列表
+  const needCustomer = leafAccounts.value.some(a => a.aux_customer)
+  const needSupplier = leafAccounts.value.some(a => a.aux_supplier)
+  const needEmployee = leafAccounts.value.some(a => a.aux_employee)
+  const needDepartment = leafAccounts.value.some(a => a.aux_department)
+  const tasks = []
+  if (needCustomer && !customerList.value.length) tasks.push(getCustomers().then(r => { customerList.value = r.data }).catch(() => {}))
+  if (needSupplier && !supplierList.value.length) tasks.push(getSuppliers().then(r => { supplierList.value = r.data }).catch(() => {}))
+  if (needEmployee && !employeeList.value.length) tasks.push(getEmployees().then(r => { employeeList.value = r.data }).catch(() => {}))
+  if (needDepartment && !departmentList.value.length) tasks.push(getDepartments().then(r => { departmentList.value = r.data }).catch(() => {}))
+  if (tasks.length) await Promise.all(tasks)
 }
 
 const viewVoucher = async (id) => {
@@ -395,6 +441,8 @@ const handleCreate = async () => {
         credit_amount: String(e.credit_amount || 0),
         aux_customer_id: e.aux_customer_id || null,
         aux_supplier_id: e.aux_supplier_id || null,
+        aux_employee_id: e.aux_employee_id || null,
+        aux_department_id: e.aux_department_id || null,
       }))
     }
     const { data } = await createVoucher(accountingStore.currentAccountSetId, payload)
@@ -418,6 +466,8 @@ const handleUpdate = async () => {
         credit_amount: String(e.credit_amount || 0),
         aux_customer_id: e.aux_customer_id || null,
         aux_supplier_id: e.aux_supplier_id || null,
+        aux_employee_id: e.aux_employee_id || null,
+        aux_department_id: e.aux_department_id || null,
       }))
     }
     await updateVoucher(detailVoucher.value.id, payload)

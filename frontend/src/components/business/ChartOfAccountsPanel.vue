@@ -30,6 +30,8 @@
               <td class="px-3 py-2">
                 <span v-if="a.aux_customer" class="badge badge-blue">客户</span>
                 <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
+                <span v-if="a.aux_employee" class="badge badge-green">员工</span>
+                <span v-if="a.aux_department" class="badge badge-purple">部门</span>
               </td>
               <td v-if="hasPermission('accounting_edit')" class="px-3 py-2">
                 <div class="flex gap-1">
@@ -83,12 +85,18 @@
                 </select>
               </div>
             </div>
-            <div class="flex gap-4">
+            <div class="flex flex-wrap gap-4">
               <label class="flex items-center gap-1.5 text-[13px]">
                 <input type="checkbox" v-model="form.aux_customer"> 辅助核算-客户
               </label>
               <label class="flex items-center gap-1.5 text-[13px]">
                 <input type="checkbox" v-model="form.aux_supplier"> 辅助核算-供应商
+              </label>
+              <label class="flex items-center gap-1.5 text-[13px]">
+                <input type="checkbox" v-model="form.aux_employee"> 辅助核算-员工
+              </label>
+              <label class="flex items-center gap-1.5 text-[13px]">
+                <input type="checkbox" v-model="form.aux_department"> 辅助核算-部门
               </label>
             </div>
           </div>
@@ -122,7 +130,7 @@ const editingAccountId = ref(null)
 const form = ref({
   parent_code: '', code: '', name: '',
   category: 'asset', direction: 'debit',
-  aux_customer: false, aux_supplier: false,
+  aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false,
 })
 
 const categoryNames = { asset: '资产', liability: '负债', equity: '权益', cost: '成本', profit_loss: '损益' }
@@ -138,7 +146,7 @@ const loadAccounts = async () => {
 const openAddForm = () => {
   isEditMode.value = false
   editingAccountId.value = null
-  form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false }
+  form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false }
   showAddForm.value = true
 }
 
@@ -153,6 +161,8 @@ const openEditAccount = (a) => {
     direction: a.direction,
     aux_customer: a.aux_customer || false,
     aux_supplier: a.aux_supplier || false,
+    aux_employee: a.aux_employee || false,
+    aux_department: a.aux_department || false,
   }
   showAddForm.value = true
 }
@@ -168,6 +178,8 @@ const handleEdit = async () => {
       name: form.value.name,
       aux_customer: form.value.aux_customer,
       aux_supplier: form.value.aux_supplier,
+      aux_employee: form.value.aux_employee,
+      aux_department: form.value.aux_department,
     })
     appStore.showToast('更新成功', 'success')
     showAddForm.value = false
@@ -189,7 +201,7 @@ const handleAdd = async () => {
     await createChartOfAccount(accountingStore.currentAccountSetId, form.value)
     appStore.showToast('创建成功', 'success')
     showAddForm.value = false
-    form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false }
+    form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false }
     await loadAccounts()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '创建失败', 'error')

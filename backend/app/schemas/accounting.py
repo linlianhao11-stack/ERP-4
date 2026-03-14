@@ -42,6 +42,8 @@ class ChartOfAccountCreate(BaseModel):
     is_leaf: bool = True
     aux_customer: bool = False
     aux_supplier: bool = False
+    aux_employee: bool = False
+    aux_department: bool = False
 
 
 class ChartOfAccountUpdate(BaseModel):
@@ -50,6 +52,8 @@ class ChartOfAccountUpdate(BaseModel):
     is_active: Optional[bool] = None
     aux_customer: Optional[bool] = None
     aux_supplier: Optional[bool] = None
+    aux_employee: Optional[bool] = None
+    aux_department: Optional[bool] = None
 
 
 # === 凭证 ===
@@ -61,6 +65,8 @@ class VoucherEntryInput(BaseModel):
     credit_amount: Decimal = Field(default=Decimal("0.00"), ge=0)
     aux_customer_id: Optional[int] = None
     aux_supplier_id: Optional[int] = None
+    aux_employee_id: Optional[int] = None
+    aux_department_id: Optional[int] = None
 
 
 class VoucherCreate(BaseModel):

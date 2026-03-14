@@ -73,7 +73,9 @@ async def get_voucher(
     v = await Voucher.filter(**q).first()
     if not v:
         raise HTTPException(status_code=404, detail="凭证不存在")
-    entries = await VoucherEntry.filter(voucher=v).order_by("line_no").prefetch_related("account")
+    entries = await VoucherEntry.filter(voucher=v).order_by("line_no").prefetch_related(
+        "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department"
+    )
     return {
         "id": v.id, "voucher_type": v.voucher_type,
         "voucher_no": v.voucher_no, "voucher_date": str(v.voucher_date),
@@ -93,6 +95,12 @@ async def get_voucher(
             "credit_amount": str(e.credit_amount),
             "aux_customer_id": e.aux_customer_id,
             "aux_supplier_id": e.aux_supplier_id,
+            "aux_employee_id": e.aux_employee_id,
+            "aux_department_id": e.aux_department_id,
+            "aux_customer_name": e.aux_customer.name if e.aux_customer else None,
+            "aux_supplier_name": e.aux_supplier.name if e.aux_supplier else None,
+            "aux_employee_name": e.aux_employee.name if e.aux_employee else None,
+            "aux_department_name": e.aux_department.name if e.aux_department else None,
         } for e in entries],
     }
 
@@ -165,6 +173,8 @@ async def create_voucher(
                 credit_amount=entry.credit_amount,
                 aux_customer_id=entry.aux_customer_id,
                 aux_supplier_id=entry.aux_supplier_id,
+                aux_employee_id=entry.aux_employee_id,
+                aux_department_id=entry.aux_department_id,
             )
 
     logger.info(f"创建凭证: {voucher_no}")
@@ -228,6 +238,8 @@ async def update_voucher(
                     credit_amount=entry.credit_amount,
                     aux_customer_id=entry.aux_customer_id,
                     aux_supplier_id=entry.aux_supplier_id,
+                    aux_employee_id=entry.aux_employee_id,
+                    aux_department_id=entry.aux_department_id,
                 )
             update_fields["total_debit"] = total_debit
             update_fields["total_credit"] = total_credit

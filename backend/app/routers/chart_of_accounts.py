@@ -24,6 +24,8 @@ async def list_accounts(
         "category": a.category, "direction": a.direction,
         "is_leaf": a.is_leaf, "aux_customer": a.aux_customer,
         "aux_supplier": a.aux_supplier,
+        "aux_employee": a.aux_employee,
+        "aux_department": a.aux_department,
     } for a in accounts]
 
 
@@ -57,6 +59,7 @@ async def create_account(
             category=data.category, direction=data.direction,
             is_leaf=data.is_leaf,
             aux_customer=data.aux_customer, aux_supplier=data.aux_supplier,
+            aux_employee=data.aux_employee, aux_department=data.aux_department,
         )
         if data.parent_code:
             await ChartOfAccount.filter(
