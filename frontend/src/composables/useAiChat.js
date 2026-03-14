@@ -34,11 +34,10 @@ export function useAiChat() {
   const buildAssistantContext = (m) => {
     const parts = []
     if (m.analysis) parts.push(m.analysis)
-    if (m.sql) parts.push(`[SQL: ${m.sql}]`)
+    // 只保留列名和行数作为上下文提示，不传 SQL 和原始数据行
+    // 避免历史中的 SQL/数据干扰模型生成新查询
     if (m.table_data?.columns && m.table_data?.rows?.length) {
-      const cols = m.table_data.columns.join(', ')
-      const preview = m.table_data.rows.slice(0, 5).map(r => r.join(' | ')).join('\n')
-      parts.push(`[数据 (${m.table_data.rows.length}行): ${cols}\n${preview}]`)
+      parts.push(`[查询结果: ${m.table_data.rows.length} 行, 列: ${m.table_data.columns.join(', ')}]`)
     }
     // clarification 或 text 回复的内容
     if (m.message) parts.push(m.message)

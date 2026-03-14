@@ -273,8 +273,9 @@ async def _process_chat_inner(
         )
 
         # 调用 DeepSeek 生成 SQL
+        # 限制最近 10 条（约 5 轮对话），避免过长历史干扰模型生成正确 SQL
         messages = [{"role": "system", "content": system_prompt}]
-        for h in history[-50:]:
+        for h in history[-10:]:
             messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
 
@@ -342,6 +343,7 @@ async def _process_chat_inner(
             return
 
         sql = r1_result["sql"]
+        logger.info(f"生成 SQL: {sql[:300]}")
 
         # 自动纠错循环
         for attempt in range(3):
@@ -525,9 +527,27 @@ _AMOUNT_COLS = {
 }
 
 
+_TOPIC_KEYWORDS = {
+    "客户": "客户", "供应商": "供应商", "产品": "产品", "库存": "库存",
+    "寄售": "寄售", "销售": "销售", "采购": "采购", "订单": "订单",
+    "应收": "应收", "应付": "应付", "退货": "退货", "收款": "收款",
+    "付款": "付款", "利润": "利润", "毛利": "毛利", "周转": "周转",
+}
+
+
+def _extract_topic(question: str) -> str:
+    """从用户问题中提取业务主题词"""
+    for kw, label in _TOPIC_KEYWORDS.items():
+        if kw in question:
+            return label
+    return ""
+
+
 def _build_local_summary(columns: list[str], row_data: list[list], question: str) -> str:
     """为小数据集生成自然语言摘要，避免调用分析 API"""
     n = len(row_data)
+    topic = _extract_topic(question)
+    topic_label = f"{topic}相关" if topic else ""
 
     # 提取金额类汇总
     summaries = []
@@ -546,20 +566,20 @@ def _build_local_summary(columns: list[str], row_data: list[list], question: str
     if n == 1:
         # 就一条，说得简洁
         if summaries:
-            return f"就找到 **1** 条记录，{summaries[0]}。"
+            return f"就找到 **1** 条{topic_label}记录，{summaries[0]}。"
         # 尝试用第一行首列的值给出更有信息量的回复
         first_val = row_data[0][0] if row_data[0] else None
         if first_val is not None:
-            return f"找到 **1** 条记录：**{first_val}**。"
-        return "就查到 **1** 条记录，看看下面的详情。"
+            return f"找到 **1** 条{topic_label}记录：**{first_val}**。"
+        return f"就查到 **1** 条{topic_label}记录，看看下面的详情。"
     elif n <= 5:
         if summaries:
-            return f"一共 **{n}** 条，{_join_cn(summaries)}。"
-        return f"查到 **{n}** 条记录，具体看下面。"
+            return f"一共 **{n}** 条{topic_label}记录，{_join_cn(summaries)}。"
+        return f"查到 **{n}** 条{topic_label}记录，具体看下面。"
     else:
         if summaries:
-            return f"共 **{n}** 条记录，{_join_cn(summaries)}，详情如下。"
-        return f"查到 **{n}** 条记录，详情如下。"
+            return f"共 **{n}** 条{topic_label}记录，{_join_cn(summaries)}，详情如下。"
+        return f"查到 **{n}** 条{topic_label}记录，详情如下。"
 
 
 def _join_cn(items: list[str]) -> str:
