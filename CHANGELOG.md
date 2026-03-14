@@ -1,5 +1,81 @@
 # 迭代记录
 
+## v4.24.0 — 财务闭环与多账套完整性（2026-03-14）
+
+> 五大财务完整性增强：退货退款自动推送收/付款模块、退款支持选择付款方式、账套从仓库自动推断、收付款方式按账套隔离、凭证辅助核算支持员工/部门维度。Salesperson 模型迁移为 Employee + Department 组织架构。
+
+### 模块 1：退货退款财务闭环
+
+- **销售退货**：确认退货时自动生成 `ReceiptBill(bill_type="return_refund")`，推送至收款模块
+- **采购退货**：确认退货时自动生成 `DisbursementBill(bill_type="return_refund")`，推送至付款模块
+- **退款方式选择**：退货表单新增退款方式（refund_method）和退款金额（refund_amount）字段
+- **退款标识**：收款单/付款单列表中退货退款条目显示红色退款标签和备注
+- **退款确认闭环**：确认退款收款单时自动标记退货订单 `is_cleared=True`；确认退款付款单时标记采购退货 `is_refunded=True`
+
+### 模块 2：账套自动推断
+
+- **去掉手动选择器**：订单确认弹窗中移除账套下拉选择器
+- **自动推断**：从订单商品所在仓库的 `warehouse.account_set` 自动推断账套
+- **多账套订单**：跨多个账套仓库的订单，应收单和收款单按账套拆分生成（事务安全）
+- **多账套提示**：购物车和订单确认弹窗中显示多账套警告横幅
+
+### 模块 3：收付款方式按账套隔离
+
+- **数据模型**：PaymentMethod/DisbursementMethod 新增 `account_set` 外键，唯一约束改为 `(account_set, code)`
+- **管理页**：收付款方式设置页新增账套 Tab 切换
+- **业务联动**：销售开单、收款单、付款单中的付款方式下拉自动按当前账套过滤
+- **CRUD Factory**：通用 CRUD 工厂支持 `account_set_id` 参数过滤和创建
+
+### 模块 4：员工/部门辅助核算
+
+- **组织架构**：新增 Department（部门）和 Employee（员工）模型，Employee 含 `is_salesperson` 标志
+- **Salesperson 迁移**：删除旧 Salesperson 模型，全局替换为 Employee（含迁移脚本自动映射数据）
+- **辅助核算扩展**：ChartOfAccount 新增 `aux_employee`/`aux_department` 标志，VoucherEntry 新增对应外键
+- **凭证录入**：凭证页面支持选择员工和部门辅助核算维度
+- **自动填充**：应收/应付凭证自动生成时，自动从订单的经办员工填充辅助核算
+
+### 数据库迁移
+
+- **迁移脚本**：`backend/migrations/2026-03-14-financial-integrity.sql`（15 步，仅已有数据库升级时需执行一次）
+- **幂等安全**：所有操作带 `IF NOT EXISTS` / `IF EXISTS` 保护
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `backend/app/models/department.py` | Department + Employee 模型 |
+| `backend/app/routers/departments.py` | 部门 CRUD API |
+| `backend/app/routers/employees.py` | 员工 CRUD API（含 is_salesperson/department_id 过滤） |
+| `frontend/src/api/employees.js` | 部门/员工 API 模块 |
+| `frontend/src/components/business/settings/DepartmentSettings.vue` | 部门管理页 |
+| `frontend/src/components/business/settings/EmployeeSettings.vue` | 员工管理页 |
+| `frontend/src/components/business/sales/CartItem.vue` | 购物车商品行组件 |
+| `backend/migrations/2026-03-14-financial-integrity.sql` | 迁移脚本 |
+| `backend/tests/test_employee_department.py` | 员工/部门/辅助核算测试（4 用例） |
+| `backend/tests/test_payment_method_account_set.py` | 收付款方式账套隔离测试（2 用例） |
+
+### 删除文件
+
+| 文件 | 说明 |
+|------|------|
+| `backend/app/models/salesperson.py` | 旧业务员模型（→ Employee） |
+| `backend/app/routers/salespersons.py` | 旧业务员 API |
+| `backend/app/schemas/salesperson.py` | 旧业务员 Schema |
+| `frontend/src/api/salespersons.js` | 旧业务员前端 API |
+| `frontend/src/components/business/settings/SalespersonSettings.vue` | 旧业务员管理页 |
+
+### 修改文件（40+ 文件）
+
+**后端模型：** order.py（salesperson→employee, refund_method/refund_amount）、payment.py（account_set FK）、ar_ap.py（bill_type, return_order FK）、purchase.py（refund_method）、accounting.py（aux_employee/aux_department）、voucher.py（aux_employee/aux_department FK）
+
+**后端路由：** orders.py（账套自动推断、多账套拆分、退款闭环）、purchase_orders.py（退款推送）、vouchers.py（辅助核算）、crud_factory.py（account_set_id）、receivables.py/payables.py（bill_type）、customers.py/finance.py/logistics.py（salesperson→employee）
+
+**后端服务：** ar_service.py（退款确认闭环）、ap_service.py（退款确认闭环）、order_service.py（Employee 替换）、accounting_init.py（辅助核算预置）
+
+**前端组件：** SalesView、ShoppingCart、OrderConfirmModal、VoucherPanel、ChartOfAccountsPanel、PaymentMethodSettings、ReceiptBillsTab、DisbursementBillsTab、FinanceOrdersTab、PurchaseOrderDetail、SettingsView、App.vue 等
+
+---
+
 ## v4.23.0 — AI 数据助手 + 安全加固（2026-03-14）
 
 > 集成 AI 数据助手（NL2SQL），支持自然语言查询业务数据；全面修复 AI 模块 10 项安全/稳定性/体验问题。
