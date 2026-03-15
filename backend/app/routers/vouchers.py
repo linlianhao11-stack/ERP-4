@@ -62,6 +62,20 @@ async def list_vouchers(
     return {"items": result, "total": total, "page": page, "page_size": page_size}
 
 
+@router.get("/next-number")
+async def get_next_voucher_number(
+    account_set_id: int = Query(...),
+    period: str = Query(...),
+    voucher_type: str = Query("记"),
+    user: User = Depends(require_permission("accounting_view")),
+):
+    """预览下一个凭证号（仅供前端显示，非最终分配）"""
+    async with transactions.in_transaction():
+        voucher_no = await _next_voucher_no(account_set_id, voucher_type, period)
+    sequence_no = extract_sequence_no(voucher_no)
+    return {"voucher_no": voucher_no, "sequence_no": sequence_no}
+
+
 @router.get("/{voucher_id}")
 async def get_voucher(
     voucher_id: int,

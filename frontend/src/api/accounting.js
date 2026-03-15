@@ -162,3 +162,5 @@ export const getInvoicePdfUrl = (invoiceId, index) =>
 
 export const deleteInvoicePdf = (invoiceId, index) =>
   api.delete(`/invoices/${invoiceId}/pdf/${index}`)
+
+export const getNextVoucherNumber = (params) => api.get('/vouchers/next-number', { params })
