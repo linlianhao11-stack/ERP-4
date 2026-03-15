@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """凭证管理 API"""
 from decimal import Decimal
 from datetime import datetime, timezone
@@ -39,6 +41,7 @@ async def list_vouchers(
     period_name: str = Query(None),
     status: str = Query(None),
     voucher_type: str = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(require_permission("accounting_view"))
@@ -50,6 +53,10 @@ async def list_vouchers(
         query = query.filter(status=status)
     if voucher_type:
         query = query.filter(voucher_type=voucher_type)
+    if search:
+        query = query.filter(
+            Q(voucher_no__icontains=search) | Q(summary__icontains=search)
+        )
 
     total = await query.count()
     vouchers = await query.order_by("voucher_no").offset((page - 1) * page_size).limit(page_size)
@@ -77,11 +84,17 @@ async def get_next_voucher_number(
     voucher_type: str = Query("记"),
     user: User = Depends(require_permission("accounting_view")),
 ):
-    """预览下一个凭证号（仅供前端显示，非最终分配）"""
-    async with transactions.in_transaction():
-        voucher_no = await _next_voucher_no(account_set_id, voucher_type, period)
-    sequence_no = extract_sequence_no(voucher_no)
-    return {"voucher_no": voucher_no, "sequence_no": sequence_no}
+    """预览下一个凭证号（仅供前端显示，非最终分配，不加行锁）"""
+    account_set = await AccountSet.filter(id=account_set_id).first()
+    if not account_set:
+        raise HTTPException(status_code=404, detail="账套不存在")
+    prefix = f"{account_set.code}-{voucher_type}-{period.replace('-', '')}-"
+    last = await Voucher.filter(
+        voucher_no__startswith=prefix,
+    ).order_by("-voucher_no").first()
+    seq = (int(last.voucher_no[len(prefix):]) + 1) if last else 1
+    voucher_no = f"{prefix}{seq:03d}"
+    return {"voucher_no": voucher_no, "sequence_no": seq}
 
 
 @router.post("/batch-submit")
@@ -91,14 +104,15 @@ async def batch_submit_vouchers(
 ):
     success = []
     failed = []
-    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
-    for v in vouchers:
-        if v.status != "draft":
-            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是草稿"})
-            continue
-        v.status = "pending"
-        await v.save()
-        success.append(v.id)
+    async with transactions.in_transaction():
+        vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+        for v in vouchers:
+            if v.status != "draft":
+                failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是草稿"})
+                continue
+            v.status = "pending"
+            await v.save()
+            success.append(v.id)
     return {"success": success, "failed": failed}
 
 
@@ -107,22 +121,23 @@ async def batch_approve_vouchers(
     req: BatchVoucherRequest,
     user: User = Depends(require_permission("accounting_approve")),
 ):
-    strict = await SystemSetting.filter(key="voucher_maker_checker").first()
     success = []
     failed = []
-    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
-    for v in vouchers:
-        if v.status != "pending":
-            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是待审核"})
-            continue
-        if strict and strict.value == "true" and v.creator_id == user.id:
-            failed.append({"id": v.id, "reason": "制单人不能审核自己的凭证"})
-            continue
-        v.status = "approved"
-        v.approved_by = user
-        v.approved_at = datetime.now(timezone.utc)
-        await v.save()
-        success.append(v.id)
+    async with transactions.in_transaction():
+        strict = await SystemSetting.filter(key="voucher_maker_checker").first()
+        vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+        for v in vouchers:
+            if v.status != "pending":
+                failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是待审核"})
+                continue
+            if strict and strict.value == "true" and v.creator_id == user.id:
+                failed.append({"id": v.id, "reason": "制单人不能审核自己的凭证"})
+                continue
+            v.status = "approved"
+            v.approved_by = user
+            v.approved_at = datetime.now(timezone.utc)
+            await v.save()
+            success.append(v.id)
     return {"success": success, "failed": failed}
 
 
@@ -133,23 +148,42 @@ async def batch_post_vouchers(
 ):
     success = []
     failed = []
-    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
-    for v in vouchers:
-        if v.status != "approved":
-            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是已审核"})
-            continue
-        period = await AccountingPeriod.filter(
-            account_set_id=v.account_set_id, period_name=v.period_name
-        ).first()
-        if period and period.is_closed:
-            failed.append({"id": v.id, "reason": "该期间已结账"})
-            continue
-        v.status = "posted"
-        v.posted_by = user
-        v.posted_at = datetime.now(timezone.utc)
-        await v.save()
-        success.append(v.id)
+    async with transactions.in_transaction():
+        vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+        for v in vouchers:
+            if v.status != "approved":
+                failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是已审核"})
+                continue
+            period = await AccountingPeriod.filter(
+                account_set_id=v.account_set_id, period_name=v.period_name
+            ).first()
+            if period and period.is_closed:
+                failed.append({"id": v.id, "reason": "该期间已结账"})
+                continue
+            v.status = "posted"
+            v.posted_by = user
+            v.posted_at = datetime.now(timezone.utc)
+            await v.save()
+            success.append(v.id)
     return {"success": success, "failed": failed}
+
+
+def _build_aux_info(entry) -> str:
+    """从分录对象构建辅助核算字符串"""
+    parts = []
+    if entry.aux_customer:
+        parts.append(f"客户:{entry.aux_customer.name}")
+    if entry.aux_supplier:
+        parts.append(f"供应商:{entry.aux_supplier.name}")
+    if entry.aux_employee:
+        parts.append(f"员工:{entry.aux_employee.name}")
+    if entry.aux_department:
+        parts.append(f"部门:{entry.aux_department.name}")
+    if entry.aux_product:
+        parts.append(f"商品:{entry.aux_product.name}")
+    if entry.aux_bank_account:
+        parts.append(f"银行:{entry.aux_bank_account.short_name or entry.aux_bank_account.bank_name}")
+    return " | ".join(parts)
 
 
 @router.get("/entries")
@@ -182,19 +216,7 @@ async def list_voucher_entries(
     items = []
     for e in entries:
         v = e.voucher
-        aux_parts = []
-        if e.aux_customer:
-            aux_parts.append(f"客户:{e.aux_customer.name}")
-        if e.aux_supplier:
-            aux_parts.append(f"供应商:{e.aux_supplier.name}")
-        if e.aux_employee:
-            aux_parts.append(f"员工:{e.aux_employee.name}")
-        if e.aux_department:
-            aux_parts.append(f"部门:{e.aux_department.name}")
-        if e.aux_product:
-            aux_parts.append(f"商品:{e.aux_product.name}")
-        if e.aux_bank_account:
-            aux_parts.append(f"银行:{e.aux_bank_account.short_name or e.aux_bank_account.bank_name}")
+        aux_info = _build_aux_info(e)
         items.append({
             "id": e.id,
             "voucher_id": v.id,
@@ -206,7 +228,7 @@ async def list_voucher_entries(
             "entry_summary": e.summary,
             "account_code": e.account.code,
             "account_name": e.account.name,
-            "aux_info": " | ".join(aux_parts) if aux_parts else "",
+            "aux_info": aux_info,
             "debit_amount": str(e.debit_amount),
             "credit_amount": str(e.credit_amount),
             "status": v.status,
@@ -245,24 +267,12 @@ async def export_voucher_entries(
     ws.append(headers)
     for e in entries:
         v = e.voucher
-        aux_parts = []
-        if e.aux_customer:
-            aux_parts.append(f"客户:{e.aux_customer.name}")
-        if e.aux_supplier:
-            aux_parts.append(f"供应商:{e.aux_supplier.name}")
-        if e.aux_employee:
-            aux_parts.append(f"员工:{e.aux_employee.name}")
-        if e.aux_department:
-            aux_parts.append(f"部门:{e.aux_department.name}")
-        if e.aux_product:
-            aux_parts.append(f"商品:{e.aux_product.name}")
-        if e.aux_bank_account:
-            aux_parts.append(f"银行:{e.aux_bank_account.short_name or e.aux_bank_account.bank_name}")
+        aux_info = _build_aux_info(e)
         ws.append([
             str(v.voucher_date), v.period_name, v.voucher_type,
             extract_sequence_no(v.voucher_no),
             e.summary, e.account.code, e.account.name,
-            " | ".join(aux_parts) if aux_parts else "",
+            aux_info,
             float(e.debit_amount), float(e.credit_amount),
             v.status,
         ])
