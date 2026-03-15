@@ -10,6 +10,8 @@ class Customer(models.Model):
     tax_id = fields.CharField(max_length=50, null=True)       # 纳税人识别号
     bank_name = fields.CharField(max_length=100, null=True)   # 开户行
     bank_account = fields.CharField(max_length=50, null=True) # 银行账号
+    invoice_address = fields.CharField(max_length=200, default="")  # 开票地址
+    invoice_phone = fields.CharField(max_length=50, default="")     # 开票电话
     balance = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     rebate_balance = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = fields.BooleanField(default=True)
