@@ -22,6 +22,8 @@ class Invoice(models.Model):
     voucher_no = fields.CharField(max_length=30, null=True)
     remark = fields.TextField(default="")
     creator = fields.ForeignKeyField("models.User", related_name="created_invoices", null=True, on_delete=fields.SET_NULL)
+    source_receivable_bill_ids = fields.JSONField(default=list)  # [int] 多单合并来源
+    source_payable_bill_ids = fields.JSONField(default=list)    # [int] 多单合并来源
     pdf_files = fields.JSONField(default=list)  # [{path, name, size, uploaded_at}]
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
