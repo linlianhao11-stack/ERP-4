@@ -126,14 +126,16 @@ async def export_products(user: User = Depends(require_permission("stock_view"))
 
     # 批量查询库存（避免 N+1）
     product_ids = [p.id for p in products]
-    all_stocks = await WarehouseStock.filter(product_id__in=product_ids, quantity__gt=0).select_related("warehouse") if product_ids else []
+    all_stocks = await WarehouseStock.filter(product_id__in=product_ids).select_related("warehouse") if product_ids else []
     stocks_by_product = {}
     for s in all_stocks:
         stocks_by_product.setdefault(s.product_id, []).append(s)
 
     data = []
+    cutoff = now() - timedelta(days=7)
     for p in products:
-        stocks = stocks_by_product.get(p.id, [])
+        raw_stocks = stocks_by_product.get(p.id, [])
+        stocks = [s for s in raw_stocks if s.quantity > 0 or (s.last_activity_at and to_naive(s.last_activity_at) > to_naive(cutoff))]
         total_qty = sum(s.quantity for s in stocks if not s.warehouse.is_virtual)
         row = {
             "SKU": p.sku, "名称": p.name, "品牌": p.brand or "",
