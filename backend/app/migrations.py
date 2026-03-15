@@ -9,6 +9,23 @@ logger = get_logger("migrations")
 
 async def run_migrations():
     """初始化默认数据（幂等操作）"""
+    # 使用 advisory lock 防止多 worker 同时执行迁移
+    conn = connections.get("default")
+    lock_acquired = (await conn.execute_query(
+        "SELECT pg_try_advisory_lock(20260315)"
+    ))[1][0]["pg_try_advisory_lock"]
+    if not lock_acquired:
+        logger.info("另一个 worker 正在执行迁移，跳过")
+        return
+
+    try:
+        await _run_migrations_inner()
+    finally:
+        await conn.execute_query("SELECT pg_advisory_unlock(20260315)")
+
+
+async def _run_migrations_inner():
+    """实际迁移逻辑"""
     # DDL 迁移必须在 ORM 查询之前执行（否则新字段不存在会报错）
     await migrate_user_must_change_password()
     await migrate_user_token_version()
@@ -871,9 +888,8 @@ async def migrate_stock_last_activity():
     await conn.execute_query(
         "UPDATE warehouse_stocks SET last_activity_at = updated_at WHERE last_activity_at IS NULL"
     )
-    await conn.execute_query("DROP FUNCTION IF EXISTS trg_update_last_activity() CASCADE")
     await conn.execute_query("""
-        CREATE FUNCTION trg_update_last_activity()
+        CREATE OR REPLACE FUNCTION trg_update_last_activity()
         RETURNS TRIGGER AS $$
         BEGIN
             NEW.last_activity_at = NOW();
