@@ -42,6 +42,8 @@ class VoucherEntry(models.Model):
     aux_supplier = fields.ForeignKeyField("models.Supplier", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
     aux_employee = fields.ForeignKeyField("models.Employee", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
     aux_department = fields.ForeignKeyField("models.Department", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries")
+    aux_product = fields.ForeignKeyField("models.Product", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries_product")
+    aux_bank_account = fields.ForeignKeyField("models.BankAccount", null=True, on_delete=fields.SET_NULL, related_name="voucher_entries_bank")
 
     class Meta:
         table = "voucher_entries"

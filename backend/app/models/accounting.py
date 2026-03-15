@@ -39,6 +39,8 @@ class ChartOfAccount(models.Model):
     aux_supplier = fields.BooleanField(default=False)
     aux_employee = fields.BooleanField(default=False)
     aux_department = fields.BooleanField(default=False)
+    aux_product = fields.BooleanField(default=False)
+    aux_bank = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
