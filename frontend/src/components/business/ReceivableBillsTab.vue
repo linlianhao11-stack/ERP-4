@@ -189,6 +189,7 @@ import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
 import { useColumnConfig } from '../../composables/useColumnConfig'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -208,8 +209,6 @@ const form = ref({ customer_id: '', bill_date: new Date().toISOString().slice(0,
 const showDetail = ref(false)
 const detail = ref(null)
 const detailLoading = ref(false)
-const searchQuery = ref('')
-
 // 多选相关
 const selectedIds = ref([])
 const showPushModal = ref(false)
@@ -241,8 +240,18 @@ async function openPushInvoice() {
   const bills = selectedBills.value
   if (!bills.length) return
 
+  // 过滤掉已取消的单据
+  const validBills = bills.filter(b => b.status !== 'cancelled')
+  if (validBills.length === 0) {
+    appStore.showToast('所选单据均已取消，无法推送', 'error')
+    return
+  }
+  if (validBills.length < bills.length) {
+    appStore.showToast(`已自动排除 ${bills.length - validBills.length} 张已取消的单据`, 'warning')
+  }
+
   // 校验同一客户
-  const customerIds = [...new Set(bills.map(b => b.customer_id))]
+  const customerIds = [...new Set(validBills.map(b => b.customer_id))]
   if (customerIds.length > 1) {
     appStore.showToast('请选择同一客户的应收单', 'error')
     return
@@ -261,7 +270,7 @@ async function openPushInvoice() {
       bank_account: c.bank_account,
     }
   } catch {
-    pushPartnerName.value = bills[0].customer_name
+    pushPartnerName.value = validBills[0].customer_name
     pushPartnerInfo.value = {}
   }
 
@@ -282,15 +291,6 @@ async function doPushInvoice(formData) {
 function onPushSuccess() {
   selectedIds.value = []
   loadList()
-}
-
-let _searchTimer
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
 }
 
 const receivableColumnDefs = {
@@ -341,6 +341,8 @@ async function loadList() {
   // 翻页后清除不在当前页的选中
   selectedIds.value = selectedIds.value.filter(id => items.value.some(b => b.id === id))
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadCustomers() {
   const res = await api.get('/customers', { params: { limit: 1000 } })

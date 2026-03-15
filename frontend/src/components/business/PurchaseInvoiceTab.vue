@@ -261,6 +261,7 @@ import { getInvoices, getInvoice, updateInvoice, createInputInvoice, confirmInvo
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -272,16 +273,6 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 50
 const filters = ref({ status: '', supplier_id: '', date_from: '', date_to: '' })
-const searchQuery = ref('')
-let _searchTimer
-
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
 const suppliers = ref([])
 const showCreate = ref(false)
 const submitting = ref(false)
@@ -376,8 +367,8 @@ async function loadList() {
   }
   if (filters.value.status) params.status = filters.value.status
   if (filters.value.supplier_id) params.supplier_id = filters.value.supplier_id
-  if (filters.value.date_from) params.date_from = filters.value.date_from
-  if (filters.value.date_to) params.date_to = filters.value.date_to
+  if (filters.value.date_from) params.start_date = filters.value.date_from
+  if (filters.value.date_to) params.end_date = filters.value.date_to
   if (searchQuery.value) params.search = searchQuery.value
   try {
     const res = await getInvoices(params)
@@ -388,6 +379,8 @@ async function loadList() {
     total.value = 0
   }
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadSuppliers() {
   const res = await api.get('/suppliers', { params: { limit: 1000 } })

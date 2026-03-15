@@ -128,6 +128,7 @@ import { getSalesDeliveries, getSalesDelivery, getSalesDeliveryPdf, batchSalesDe
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -139,16 +140,6 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 50
 const filters = ref({ customer_id: '', date_from: '', date_to: '' })
-const searchQuery = ref('')
-let _searchTimer
-
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
 const customers = ref([])
 const selectedIds = ref([])
 const showDetail = ref(false)
@@ -183,8 +174,8 @@ async function loadList() {
     page_size: pageSize,
   }
   if (filters.value.customer_id) params.customer_id = filters.value.customer_id
-  if (filters.value.date_from) params.date_from = filters.value.date_from
-  if (filters.value.date_to) params.date_to = filters.value.date_to
+  if (filters.value.date_from) params.start_date = filters.value.date_from
+  if (filters.value.date_to) params.end_date = filters.value.date_to
   if (searchQuery.value) params.search = searchQuery.value
   try {
     const res = await getSalesDeliveries(params)
@@ -196,6 +187,8 @@ async function loadList() {
     total.value = 0
   }
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadCustomers() {
   const res = await api.get('/customers', { params: { limit: 1000 } })

@@ -153,6 +153,7 @@ import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
 import { useColumnConfig } from '../../composables/useColumnConfig'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -195,17 +196,6 @@ const showCreate = ref(false)
 const submitting = ref(false)
 const customers = ref([])
 const form = ref({ customer_id: '', receipt_date: new Date().toISOString().slice(0, 10), amount: '', payment_method: '', receivable_bill_id: null, is_advance: false, remark: '' })
-const searchQuery = ref('')
-
-let _searchTimer
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
-
 const receiptColumnDefs = {
   bill_no: { label: '单号', defaultVisible: true },
   receipt_date: { label: '日期', defaultVisible: true },
@@ -235,6 +225,8 @@ async function loadList() {
   items.value = res.data.items
   total.value = res.data.total
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadCustomers() {
   const res = await api.get('/customers', { params: { limit: 1000 } })

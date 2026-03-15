@@ -134,6 +134,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -165,17 +166,6 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 50
 const filters = ref({ status: '' })
-const searchQuery = ref('')
-let _searchTimer
-
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
-
 const showCreate = ref(false)
 const submitting = ref(false)
 const suppliers = ref([])
@@ -190,6 +180,8 @@ async function loadList() {
   items.value = res.data.items
   total.value = res.data.total
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadSuppliers() {
   const res = await api.get('/suppliers', { params: { limit: 1000 } })

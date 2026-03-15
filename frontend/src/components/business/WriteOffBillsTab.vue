@@ -126,6 +126,7 @@ import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -142,17 +143,6 @@ const showCreate = ref(false)
 const submitting = ref(false)
 const customers = ref([])
 const form = ref({ customer_id: '', write_off_date: new Date().toISOString().slice(0, 10), advance_receipt_id: '', receivable_bill_id: '', amount: '', remark: '' })
-const searchQuery = ref('')
-
-let _searchTimer
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
-
 async function loadList() {
   if (!accountingStore.currentAccountSetId) return
   const params = { account_set_id: accountingStore.currentAccountSetId, page: page.value, page_size: pageSize }
@@ -162,6 +152,8 @@ async function loadList() {
   items.value = res.data.items
   total.value = res.data.total
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadCustomers() {
   const res = await api.get('/customers', { params: { limit: 1000 } })

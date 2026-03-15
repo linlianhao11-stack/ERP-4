@@ -60,6 +60,7 @@ import PageToolbar from '../common/PageToolbar.vue'
 import { getSalesReturns } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useFormat } from '../../composables/useFormat'
+import { useSearch } from '../../composables/useSearch'
 
 const accountingStore = useAccountingStore()
 const { fmtMoney } = useFormat()
@@ -68,17 +69,6 @@ const items = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 50
-const searchQuery = ref('')
-
-let _searchTimer
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
-
 async function loadList() {
   if (!accountingStore.currentAccountSetId) return
   const params = {
@@ -91,6 +81,8 @@ async function loadList() {
   items.value = res.data.items
   total.value = res.data.total
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 watch(() => accountingStore.currentAccountSetId, () => { page.value = 1; loadList() })
 onMounted(() => loadList())

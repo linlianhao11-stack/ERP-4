@@ -29,21 +29,25 @@
               <th class="px-3 py-2 w-8">
                 <input type="checkbox" :checked="allChecked" :indeterminate="someChecked" @change="toggleAll" />
               </th>
-              <th class="px-3 py-2">单号</th>
-              <th class="px-3 py-2">日期</th>
-              <th class="px-3 py-2">供应商</th>
-              <th class="px-3 py-2 text-right">应付金额</th>
-              <th class="px-3 py-2 text-right">已付金额</th>
-              <th class="px-3 py-2 text-right">未付金额</th>
-              <th class="px-3 py-2">状态</th>
-              <th class="px-3 py-2">凭证号</th>
-              <th class="px-3 py-2">来源采购单</th>
-              <th class="px-3 py-2">操作</th>
+              <th v-if="apIsColumnVisible('bill_no')" class="px-3 py-2">单号</th>
+              <th v-if="apIsColumnVisible('bill_date')" class="px-3 py-2">日期</th>
+              <th v-if="apIsColumnVisible('supplier')" class="px-3 py-2">供应商</th>
+              <th v-if="apIsColumnVisible('total_amount')" class="px-3 py-2 text-right">应付金额</th>
+              <th v-if="apIsColumnVisible('paid_amount')" class="px-3 py-2 text-right">已付金额</th>
+              <th v-if="apIsColumnVisible('unpaid_amount')" class="px-3 py-2 text-right">未付金额</th>
+              <th v-if="apIsColumnVisible('status')" class="px-3 py-2">状态</th>
+              <th v-if="apIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
+              <th v-if="apIsColumnVisible('purchase_order_no')" class="px-3 py-2">来源采购单</th>
+              <th v-if="apIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+              <th class="col-selector-th">
+                <ColumnMenu :labels="apColumnLabels" :visible="apVisibleColumns" pinned="bill_no"
+                  @toggle="apToggleColumn" @reset="apResetColumns" />
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-if="!items.length">
-              <td colspan="11" class="px-3 py-2">
+              <td colspan="100">
                 <div class="text-center py-12 text-muted">
                   <div class="text-3xl mb-3">📋</div>
                   <p class="text-sm font-medium mb-1">暂无应付单数据</p>
@@ -55,21 +59,24 @@
               <td class="px-3 py-2 w-8">
                 <input type="checkbox" :checked="selectedIds.includes(b.id)" @change="toggleRow(b.id)" />
               </td>
-              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="b.bill_no">{{ b.bill_no }}</td>
-              <td class="px-3 py-2">{{ b.bill_date }}</td>
-              <td class="px-3 py-2">{{ b.supplier_name }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(b.total_amount) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(b.paid_amount) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(b.unpaid_amount) }}</td>
-              <td class="px-3 py-2"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
-              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="b.voucher_no">{{ b.voucher_no || '-' }}</td>
-              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="b.purchase_order_no">{{ b.purchase_order_no || '-' }}</td>
-              <td class="px-3 py-2" @click.stop>
+              <td v-if="apIsColumnVisible('bill_no')" class="px-3 py-2 font-mono text-[12px]">
+                <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
+              </td>
+              <td v-if="apIsColumnVisible('bill_date')" class="px-3 py-2">{{ b.bill_date }}</td>
+              <td v-if="apIsColumnVisible('supplier')" class="px-3 py-2">{{ b.supplier_name }}</td>
+              <td v-if="apIsColumnVisible('total_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.total_amount) }}</td>
+              <td v-if="apIsColumnVisible('paid_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.paid_amount) }}</td>
+              <td v-if="apIsColumnVisible('unpaid_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.unpaid_amount) }}</td>
+              <td v-if="apIsColumnVisible('status')" class="px-3 py-2"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
+              <td v-if="apIsColumnVisible('voucher_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+              <td v-if="apIsColumnVisible('purchase_order_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.purchase_order_no">{{ b.purchase_order_no || '-' }}</span></td>
+              <td v-if="apIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
                 <div class="flex gap-1">
                   <button @click="viewDetail(b)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
                   <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">取消</button>
                 </div>
               </td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -173,6 +180,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Search } from 'lucide-vue-next'
 
 const props = defineProps({ refreshKey: { type: Number, default: 0 } })
+import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import InvoicePushModal from './InvoicePushModal.vue'
 import { getPayableBills, getPayableBill, createPayableBill, cancelPayableBill, pushInvoiceFromPayable } from '../../api/accounting'
@@ -180,6 +188,8 @@ import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { useFormat } from '../../composables/useFormat'
+import { useColumnConfig } from '../../composables/useColumnConfig'
+import { useSearch } from '../../composables/useSearch'
 import api from '../../api/index'
 
 const accountingStore = useAccountingStore()
@@ -192,16 +202,6 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 50
 const filters = ref({ status: '' })
-const searchQuery = ref('')
-let _searchTimer
-
-function debouncedSearch() {
-  clearTimeout(_searchTimer)
-  _searchTimer = setTimeout(() => {
-    page.value = 1
-    loadList()
-  }, 300)
-}
 const showCreate = ref(false)
 const submitting = ref(false)
 const suppliers = ref([])
@@ -241,8 +241,18 @@ async function openPushInvoice() {
   const bills = selectedBills.value
   if (!bills.length) return
 
+  // 过滤掉已取消的单据
+  const validBills = bills.filter(b => b.status !== 'cancelled')
+  if (validBills.length === 0) {
+    appStore.showToast('所选单据均已取消，无法推送', 'error')
+    return
+  }
+  if (validBills.length < bills.length) {
+    appStore.showToast(`已自动排除 ${bills.length - validBills.length} 张已取消的单据`, 'warning')
+  }
+
   // 校验同一供应商
-  const supplierIds = [...new Set(bills.map(b => b.supplier_id))]
+  const supplierIds = [...new Set(validBills.map(b => b.supplier_id))]
   if (supplierIds.length > 1) {
     appStore.showToast('请选择同一供应商的应付单', 'error')
     return
@@ -261,7 +271,7 @@ async function openPushInvoice() {
       bank_account: s.bank_account,
     }
   } catch {
-    pushPartnerName.value = bills[0].supplier_name
+    pushPartnerName.value = validBills[0].supplier_name
     pushPartnerInfo.value = {}
   }
 
@@ -301,6 +311,26 @@ async function viewDetail(b) {
 const statusName = (s) => ({ pending: '待付款', partial: '部分付款', completed: '已付清', cancelled: '已取消' }[s] || s)
 const statusBadge = (s) => ({ pending: 'badge badge-yellow', partial: 'badge badge-orange', completed: 'badge badge-green', cancelled: 'badge badge-gray' }[s] || 'badge')
 
+const payableColumnDefs = {
+  bill_no: { label: '单号', defaultVisible: true },
+  bill_date: { label: '日期', defaultVisible: true },
+  supplier: { label: '供应商', defaultVisible: true },
+  total_amount: { label: '应付金额', defaultVisible: true, align: 'right' },
+  paid_amount: { label: '已付金额', defaultVisible: true, align: 'right' },
+  unpaid_amount: { label: '未付金额', defaultVisible: true, align: 'right' },
+  status: { label: '状态', defaultVisible: true },
+  voucher_no: { label: '凭证号', defaultVisible: true },
+  purchase_order_no: { label: '来源采购单', defaultVisible: true },
+  actions: { label: '操作', defaultVisible: true },
+}
+
+const {
+  columnLabels: apColumnLabels, visibleColumns: apVisibleColumns,
+  showColumnMenu: apShowColumnMenu, menuAttr: apMenuAttr,
+  toggleColumn: apToggleColumn, isColumnVisible: apIsColumnVisible,
+  resetColumns: apResetColumns,
+} = useColumnConfig('payable_bill_columns', payableColumnDefs)
+
 async function loadList() {
   if (!accountingStore.currentAccountSetId) return
   const params = { account_set_id: accountingStore.currentAccountSetId, page: page.value, page_size: pageSize }
@@ -312,6 +342,8 @@ async function loadList() {
   // 翻页后清除不在当前页的选中
   selectedIds.value = selectedIds.value.filter(id => items.value.some(b => b.id === id))
 }
+
+const { searchQuery, debouncedSearch } = useSearch(loadList, page)
 
 async function loadSuppliers() {
   const res = await api.get('/suppliers', { params: { limit: 1000 } })
