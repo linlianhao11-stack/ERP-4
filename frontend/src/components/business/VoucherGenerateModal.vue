@@ -79,15 +79,15 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useAccountingStore } from '@/stores/accounting'
-import { useAppStore } from '@/stores/app'
+import { useAccountingStore } from '../../stores/accounting'
+import { useAppStore } from '../../stores/app'
 import {
   getAccountingPeriods,
   getPendingArBills,
   getPendingApBills,
   generateArVouchers,
   generateApVouchers,
-} from '@/api/accounting'
+} from '../../api/accounting'
 
 const props = defineProps({
   visible: Boolean,
