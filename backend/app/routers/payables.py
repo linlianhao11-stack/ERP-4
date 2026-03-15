@@ -363,10 +363,90 @@ async def list_purchase_returns_for_ap(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
+# ── 待处理单据查询 ──
+
+@router.get("/pending-voucher-bills")
+async def list_pending_voucher_bills(
+    account_set_id: int = Query(...),
+    period: str = Query(...),
+    user: User = Depends(require_permission("accounting_ap_view")),
+):
+    """查询指定期间待生成凭证的单据"""
+    import calendar
+    year, month = int(period[:4]), int(period[5:7])
+    _, last_day = calendar.monthrange(year, month)
+    from datetime import date as _date, datetime as _datetime, timezone as _tz
+    period_start = _date(year, month, 1)
+    period_end = _date(year, month, last_day)
+    result = []
+
+    # 付款单
+    disbursements = await DisbursementBill.filter(
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        disbursement_date__gte=period_start, disbursement_date__lte=period_end,
+    ).select_related("supplier").all()
+    for d in disbursements:
+        result.append({
+            "id": d.id, "type": "disbursement",
+            "bill_no": d.bill_no,
+            "type_label": "退款" if getattr(d, 'bill_type', '') == "return_refund" else "付款",
+            "partner_name": d.supplier.name if d.supplier else "",
+            "partner_id": d.supplier_id,
+            "amount": float(d.amount),
+            "date": str(d.disbursement_date),
+        })
+
+    # 付款退款单
+    refunds = await DisbursementRefundBill.filter(
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        refund_date__gte=period_start, refund_date__lte=period_end,
+    ).select_related("supplier").all()
+    for rf in refunds:
+        result.append({
+            "id": rf.id, "type": "refund",
+            "bill_no": rf.bill_no,
+            "type_label": "付款退款",
+            "partner_name": rf.supplier.name if rf.supplier else "",
+            "partner_id": rf.supplier_id,
+            "amount": float(-rf.amount),
+            "date": str(rf.refund_date),
+        })
+
+    # 采购退货单
+    purchase_returns = await PurchaseReturn.filter(
+        account_set_id=account_set_id,
+        voucher_id=None,
+        created_at__gte=_datetime(year, month, 1, 0, 0, 0, tzinfo=_tz.utc),
+        created_at__lte=_datetime(year, month, last_day, 23, 59, 59, tzinfo=_tz.utc),
+    ).select_related("supplier").all()
+    for pr in purchase_returns:
+        if pr.total_amount <= 0:
+            continue
+        result.append({
+            "id": pr.id, "type": "purchase_return",
+            "bill_no": pr.return_no,
+            "type_label": "采购退货",
+            "partner_name": pr.supplier.name if pr.supplier else "",
+            "partner_id": pr.supplier_id,
+            "amount": float(-pr.total_amount),
+            "date": str(pr.created_at.date()) if hasattr(pr.created_at, 'date') else str(pr.created_at),
+        })
+
+    return {"items": result, "total": len(result)}
+
+
 # ── 期末凭证生成 ──
 
+from typing import Optional, List
+
+class BillRef(BaseModel):
+    id: int
+    type: str
+
 class GenerateVouchersRequest(BaseModel):
-    period_names: list[str]
+    period_names: Optional[List[str]] = None
+    bills: Optional[List[BillRef]] = None
+    merge_by_partner: bool = False
 
 @router.post("/generate-ap-vouchers")
 async def generate_ap_vouchers_endpoint(
@@ -375,7 +455,13 @@ async def generate_ap_vouchers_endpoint(
     user: User = Depends(require_permission("accounting_ap_confirm")),
 ):
     try:
-        result = await generate_ap_vouchers(account_set_id, data.period_names, user)
+        result = await generate_ap_vouchers(
+            account_set_id,
+            data.period_names or [],
+            user,
+            bills=[{"id": b.id, "type": b.type} for b in (data.bills or [])],
+            merge_by_partner=data.merge_by_partner,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     total_count = len(result["vouchers"])

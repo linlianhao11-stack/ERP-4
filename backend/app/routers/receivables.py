@@ -457,10 +457,109 @@ async def list_sales_returns(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
+# ── 待处理单据查询 ──
+
+@router.get("/pending-voucher-bills")
+async def list_pending_voucher_bills(
+    account_set_id: int = Query(...),
+    period: str = Query(...),
+    user: User = Depends(require_permission("accounting_ar_view")),
+):
+    """查询指定期间待生成凭证的单据"""
+    import calendar
+    year, month = int(period[:4]), int(period[5:7])
+    _, last_day = calendar.monthrange(year, month)
+    from datetime import date as _date
+    period_start = _date(year, month, 1)
+    period_end = _date(year, month, last_day)
+    result = []
+
+    # 收款单
+    receipts = await ReceiptBill.filter(
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        receipt_date__gte=period_start, receipt_date__lte=period_end,
+    ).select_related("customer").all()
+    for r in receipts:
+        result.append({
+            "id": r.id, "type": "receipt",
+            "bill_no": r.bill_no,
+            "type_label": "退款" if getattr(r, 'bill_type', '') == "return_refund" else "收款",
+            "partner_name": r.customer.name if r.customer else "",
+            "partner_id": r.customer_id,
+            "amount": float(r.amount),
+            "date": str(r.receipt_date),
+        })
+
+    # 收款退款单
+    refunds = await ReceiptRefundBill.filter(
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        refund_date__gte=period_start, refund_date__lte=period_end,
+    ).select_related("customer").all()
+    for rf in refunds:
+        result.append({
+            "id": rf.id, "type": "refund",
+            "bill_no": rf.bill_no,
+            "type_label": "收款退款",
+            "partner_name": rf.customer.name if rf.customer else "",
+            "partner_id": rf.customer_id,
+            "amount": float(-rf.amount),
+            "date": str(rf.refund_date),
+        })
+
+    # 核销单
+    writeoffs = await ReceivableWriteOff.filter(
+        account_set_id=account_set_id, status="confirmed", voucher_id=None,
+        write_off_date__gte=period_start, write_off_date__lte=period_end,
+    ).select_related("customer").all()
+    for wo in writeoffs:
+        result.append({
+            "id": wo.id, "type": "write_off",
+            "bill_no": wo.bill_no,
+            "type_label": "核销",
+            "partner_name": wo.customer.name if wo.customer else "",
+            "partner_id": wo.customer_id,
+            "amount": float(wo.amount),
+            "date": str(wo.write_off_date),
+        })
+
+    # 销售退货单
+    from datetime import datetime as _datetime, timezone as _tz
+    return_orders = await Order.filter(
+        account_set_id=account_set_id,
+        order_type="RETURN",
+        voucher_id=None,
+        created_at__gte=_datetime(year, month, 1, 0, 0, 0, tzinfo=_tz.utc),
+        created_at__lte=_datetime(year, month, last_day, 23, 59, 59, tzinfo=_tz.utc),
+    ).select_related("customer").all()
+    for ro in return_orders:
+        cost = abs(float(ro.total_cost)) if ro.total_cost else 0
+        if cost <= 0:
+            continue
+        result.append({
+            "id": ro.id, "type": "sales_return",
+            "bill_no": ro.order_no,
+            "type_label": "销售退货",
+            "partner_name": ro.customer.name if ro.customer else "",
+            "partner_id": ro.customer_id,
+            "amount": float(-cost),
+            "date": str(ro.created_at.date()) if hasattr(ro.created_at, 'date') else str(ro.created_at),
+        })
+
+    return {"items": result, "total": len(result)}
+
+
 # ── 期末凭证生成 ──
 
+from typing import Optional, List
+
+class BillRef(BaseModel):
+    id: int
+    type: str
+
 class GenerateVouchersRequest(BaseModel):
-    period_names: list[str]
+    period_names: Optional[List[str]] = None
+    bills: Optional[List[BillRef]] = None
+    merge_by_partner: bool = False
 
 @router.post("/generate-ar-vouchers")
 async def generate_ar_vouchers_endpoint(
@@ -469,7 +568,13 @@ async def generate_ar_vouchers_endpoint(
     user: User = Depends(require_permission("accounting_ar_confirm")),
 ):
     try:
-        result = await generate_ar_vouchers(account_set_id, data.period_names, user)
+        result = await generate_ar_vouchers(
+            account_set_id,
+            data.period_names or [],
+            user,
+            bills=[{"id": b.id, "type": b.type} for b in (data.bills or [])],
+            merge_by_partner=data.merge_by_partner,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     total_count = len(result["vouchers"])

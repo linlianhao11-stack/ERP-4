@@ -183,7 +183,7 @@ async def _get_employee_department_from_receivable(receivable_bill_id: int | Non
     return employee, department
 
 
-async def generate_ar_vouchers(account_set_id: int, period_names: list[str], user) -> dict:
+async def generate_ar_vouchers(account_set_id: int, period_names: list, user, bills: list = None, merge_by_partner: bool = False) -> dict:
     # 科目查询只执行一次，放在循环外
     bank_account = await ChartOfAccount.filter(
         account_set_id=account_set_id, code="1002", is_active=True
@@ -207,6 +207,353 @@ async def generate_ar_vouchers(account_set_id: int, period_names: list[str], use
     vouchers = []
     summary = {}
 
+    # ── bills 模式：按勾选单据生成凭证 ──
+    if bills:
+        from collections import defaultdict
+        # 按 type 分组
+        grouped = defaultdict(list)
+        for b in bills:
+            grouped[b["type"]].append(b["id"])
+
+        # 查询各类单据对象
+        receipt_objs = await ReceiptBill.filter(id__in=grouped.get("receipt", [])).select_related("customer").all() if "receipt" in grouped else []
+        refund_objs = await ReceiptRefundBill.filter(id__in=grouped.get("refund", [])).select_related("customer").all() if "refund" in grouped else []
+        write_off_objs = await ReceivableWriteOff.filter(id__in=grouped.get("write_off", [])).select_related("customer").all() if "write_off" in grouped else []
+        sales_return_objs = await Order.filter(id__in=grouped.get("sales_return", [])).select_related("customer").all() if "sales_return" in grouped else []
+
+        # 统一放入列表，标记类型
+        all_bill_objs = []
+        for r in receipt_objs:
+            all_bill_objs.append(("receipt", r))
+        for rf in refund_objs:
+            all_bill_objs.append(("refund", rf))
+        for wo in write_off_objs:
+            all_bill_objs.append(("write_off", wo))
+        for ro in sales_return_objs:
+            all_bill_objs.append(("sales_return", ro))
+
+        if merge_by_partner:
+            # 按 customer_id 分组
+            partner_groups = defaultdict(list)
+            for bill_type, obj in all_bill_objs:
+                cid = obj.customer_id if hasattr(obj, 'customer_id') else None
+                partner_groups[cid].append((bill_type, obj))
+
+            for cid, group_bills in partner_groups.items():
+                # 确定客户名称
+                customer_name = ""
+                for _, obj in group_bills:
+                    if hasattr(obj, 'customer') and obj.customer:
+                        customer_name = obj.customer.name
+                        break
+
+                # 按类型分别生成合并凭证
+                # 收款单合并
+                receipts_in_group = [(t, o) for t, o in group_bills if t == "receipt"]
+                if receipts_in_group:
+                    total_amount = sum(o.amount for _, o in receipts_in_group)
+                    bill_nos = ", ".join(o.bill_no for _, o in receipts_in_group)
+                    latest_date = max(o.receipt_date for _, o in receipts_in_group)
+                    period_name = f"{latest_date.year}-{latest_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "收", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id,
+                            voucher_type="收",
+                            voucher_no=vno,
+                            period_name=period_name,
+                            voucher_date=latest_date,
+                            summary=f"收货款-{customer_name}（{bill_nos}）",
+                            total_debit=total_amount,
+                            total_credit=total_amount,
+                            status="draft",
+                            creator=user,
+                            source_type="receipt_bill",
+                            source_bill_id=receipts_in_group[0][1].id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1,
+                            account_id=bank_account.id,
+                            summary=f"收货款-{customer_name}（{bill_nos}）",
+                            debit_amount=total_amount,
+                            credit_amount=Decimal("0"),
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2,
+                            account_id=ar_account.id,
+                            summary=f"收货款-{customer_name}（{bill_nos}）",
+                            debit_amount=Decimal("0"),
+                            credit_amount=total_amount,
+                            aux_customer_id=cid,
+                        )
+                        for _, o in receipts_in_group:
+                            o.voucher = v
+                            o.voucher_no = vno
+                            await o.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收货款-{customer_name}（{bill_nos}）"})
+
+                # 收款退款单合并
+                refunds_in_group = [(t, o) for t, o in group_bills if t == "refund"]
+                if refunds_in_group:
+                    total_amount = sum(o.amount for _, o in refunds_in_group)
+                    bill_nos = ", ".join(o.bill_no for _, o in refunds_in_group)
+                    latest_date = max(o.refund_date for _, o in refunds_in_group)
+                    period_name = f"{latest_date.year}-{latest_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "收", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id,
+                            voucher_type="收",
+                            voucher_no=vno,
+                            period_name=period_name,
+                            voucher_date=latest_date,
+                            summary=f"收款退款-{customer_name}（{bill_nos}）",
+                            total_debit=total_amount,
+                            total_credit=total_amount,
+                            status="draft",
+                            creator=user,
+                            source_type="receipt_refund_bill",
+                            source_bill_id=refunds_in_group[0][1].id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1,
+                            account_id=ar_account.id,
+                            summary=f"收款退款-{customer_name}（{bill_nos}）",
+                            debit_amount=total_amount,
+                            credit_amount=Decimal("0"),
+                            aux_customer_id=cid,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2,
+                            account_id=bank_account.id,
+                            summary=f"收款退款-{customer_name}（{bill_nos}）",
+                            debit_amount=Decimal("0"),
+                            credit_amount=total_amount,
+                        )
+                        for _, o in refunds_in_group:
+                            o.voucher = v
+                            o.voucher_no = vno
+                            await o.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款退款-{customer_name}（{bill_nos}）"})
+
+                # 核销单合并
+                writeoffs_in_group = [(t, o) for t, o in group_bills if t == "write_off"]
+                if writeoffs_in_group and advance_account:
+                    total_amount = sum(o.amount for _, o in writeoffs_in_group)
+                    bill_nos = ", ".join(o.bill_no for _, o in writeoffs_in_group)
+                    latest_date = max(o.write_off_date for _, o in writeoffs_in_group)
+                    period_name = f"{latest_date.year}-{latest_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "记", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id,
+                            voucher_type="记",
+                            voucher_no=vno,
+                            period_name=period_name,
+                            voucher_date=latest_date,
+                            summary=f"核销-{customer_name}（{bill_nos}）",
+                            total_debit=total_amount,
+                            total_credit=total_amount,
+                            status="draft",
+                            creator=user,
+                            source_type="receivable_write_off",
+                            source_bill_id=writeoffs_in_group[0][1].id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1,
+                            account_id=advance_account.id,
+                            summary=f"核销-{customer_name}（{bill_nos}）",
+                            debit_amount=total_amount,
+                            credit_amount=Decimal("0"),
+                            aux_customer_id=cid,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2,
+                            account_id=ar_account.id,
+                            summary=f"核销-{customer_name}（{bill_nos}）",
+                            debit_amount=Decimal("0"),
+                            credit_amount=total_amount,
+                            aux_customer_id=cid,
+                        )
+                        for _, o in writeoffs_in_group:
+                            o.voucher = v
+                            o.voucher_no = vno
+                            await o.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"核销-{customer_name}（{bill_nos}）"})
+
+                # 销售退货单合并
+                returns_in_group = [(t, o) for t, o in group_bills if t == "sales_return"]
+                if returns_in_group and shipped_acct and inventory_acct:
+                    valid_returns = [(t, o) for t, o in returns_in_group if abs(float(o.total_cost)) > 0]
+                    if valid_returns:
+                        total_cost = sum(abs(o.total_cost) for _, o in valid_returns)
+                        bill_nos = ", ".join(o.order_no for _, o in valid_returns)
+                        latest_date = max(o.created_at for _, o in valid_returns)
+                        voucher_date = latest_date.date() if hasattr(latest_date, 'date') else latest_date
+                        period_name = f"{voucher_date.year}-{voucher_date.month:02d}"
+                        async with transactions.in_transaction():
+                            vno = await _next_voucher_no(account_set_id, "记", period_name)
+                            v = await Voucher.create(
+                                account_set_id=account_set_id,
+                                voucher_type="记",
+                                voucher_no=vno,
+                                period_name=period_name,
+                                voucher_date=voucher_date,
+                                summary=f"销售退货冲回-{customer_name}（{bill_nos}）",
+                                total_debit=-total_cost,
+                                total_credit=-total_cost,
+                                status="draft",
+                                creator=user,
+                                source_type="sales_return",
+                                source_bill_id=valid_returns[0][1].id,
+                            )
+                            await VoucherEntry.create(
+                                voucher=v, line_no=1,
+                                account_id=shipped_acct.id,
+                                summary=f"销售退货冲回-{customer_name}（{bill_nos}）",
+                                debit_amount=-total_cost,
+                                credit_amount=Decimal("0"),
+                            )
+                            await VoucherEntry.create(
+                                voucher=v, line_no=2,
+                                account_id=inventory_acct.id,
+                                summary=f"销售退货冲回-{customer_name}（{bill_nos}）",
+                                debit_amount=Decimal("0"),
+                                credit_amount=-total_cost,
+                            )
+                            for _, o in valid_returns:
+                                o.voucher = v
+                                o.voucher_no = vno
+                                await o.save()
+                            vouchers.append({"id": v.id, "voucher_no": vno, "source": f"销售退货冲回-{customer_name}（{bill_nos}）"})
+
+            summary["bills_mode"] = {"count": len(vouchers), "skipped": False}
+        else:
+            # 不合并，逐单生成
+            for bill_type, obj in all_bill_objs:
+                if bill_type == "receipt":
+                    employee, department = await _get_employee_department_from_receivable(obj.receivable_bill_id)
+                    period_name = f"{obj.receipt_date.year}-{obj.receipt_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "收", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id, voucher_type="收", voucher_no=vno,
+                            period_name=period_name, voucher_date=obj.receipt_date,
+                            summary=f"收款单 {obj.bill_no}", total_debit=obj.amount, total_credit=obj.amount,
+                            status="draft", creator=user, source_type="receipt_bill", source_bill_id=obj.id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1, account_id=bank_account.id,
+                            summary=f"收款 {obj.bill_no}", debit_amount=obj.amount, credit_amount=Decimal("0"),
+                            aux_employee=employee if bank_account.aux_employee else None,
+                            aux_department=department if bank_account.aux_department else None,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2, account_id=ar_account.id,
+                            summary=f"收款 {obj.bill_no}", debit_amount=Decimal("0"), credit_amount=obj.amount,
+                            aux_customer_id=obj.customer_id,
+                            aux_employee=employee if ar_account.aux_employee else None,
+                            aux_department=department if ar_account.aux_department else None,
+                        )
+                        obj.voucher = v
+                        obj.voucher_no = vno
+                        await obj.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款单 {obj.bill_no}"})
+
+                elif bill_type == "refund":
+                    original_receipt = await ReceiptBill.filter(id=obj.original_receipt_id).first()
+                    receivable_id = original_receipt.receivable_bill_id if original_receipt else None
+                    employee, department = await _get_employee_department_from_receivable(receivable_id)
+                    period_name = f"{obj.refund_date.year}-{obj.refund_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "收", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id, voucher_type="收", voucher_no=vno,
+                            period_name=period_name, voucher_date=obj.refund_date,
+                            summary=f"收款退款 {obj.bill_no}", total_debit=obj.amount, total_credit=obj.amount,
+                            status="draft", creator=user, source_type="receipt_refund_bill", source_bill_id=obj.id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1, account_id=ar_account.id,
+                            summary=f"收款退款 {obj.bill_no}", debit_amount=obj.amount, credit_amount=Decimal("0"),
+                            aux_customer_id=obj.customer_id,
+                            aux_employee=employee if ar_account.aux_employee else None,
+                            aux_department=department if ar_account.aux_department else None,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2, account_id=bank_account.id,
+                            summary=f"收款退款 {obj.bill_no}", debit_amount=Decimal("0"), credit_amount=obj.amount,
+                            aux_employee=employee if bank_account.aux_employee else None,
+                            aux_department=department if bank_account.aux_department else None,
+                        )
+                        obj.voucher = v
+                        obj.voucher_no = vno
+                        await obj.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"收款退款 {obj.bill_no}"})
+
+                elif bill_type == "write_off" and advance_account:
+                    employee, department = await _get_employee_department_from_receivable(obj.receivable_bill_id)
+                    period_name = f"{obj.write_off_date.year}-{obj.write_off_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "记", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id, voucher_type="记", voucher_no=vno,
+                            period_name=period_name, voucher_date=obj.write_off_date,
+                            summary=f"核销 {obj.bill_no}", total_debit=obj.amount, total_credit=obj.amount,
+                            status="draft", creator=user, source_type="receivable_write_off", source_bill_id=obj.id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1, account_id=advance_account.id,
+                            summary=f"核销 {obj.bill_no}", debit_amount=obj.amount, credit_amount=Decimal("0"),
+                            aux_customer_id=obj.customer_id,
+                            aux_employee=employee if advance_account.aux_employee else None,
+                            aux_department=department if advance_account.aux_department else None,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2, account_id=ar_account.id,
+                            summary=f"核销 {obj.bill_no}", debit_amount=Decimal("0"), credit_amount=obj.amount,
+                            aux_customer_id=obj.customer_id,
+                            aux_employee=employee if ar_account.aux_employee else None,
+                            aux_department=department if ar_account.aux_department else None,
+                        )
+                        obj.voucher = v
+                        obj.voucher_no = vno
+                        await obj.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"核销 {obj.bill_no}"})
+
+                elif bill_type == "sales_return" and shipped_acct and inventory_acct:
+                    cost = abs(obj.total_cost)
+                    if cost <= 0:
+                        continue
+                    voucher_date = obj.created_at.date() if hasattr(obj.created_at, 'date') else obj.created_at
+                    period_name = f"{voucher_date.year}-{voucher_date.month:02d}"
+                    async with transactions.in_transaction():
+                        vno = await _next_voucher_no(account_set_id, "记", period_name)
+                        v = await Voucher.create(
+                            account_set_id=account_set_id, voucher_type="记", voucher_no=vno,
+                            period_name=period_name, voucher_date=voucher_date,
+                            summary=f"销售退货冲回 {obj.order_no}", total_debit=-cost, total_credit=-cost,
+                            status="draft", creator=user, source_type="sales_return", source_bill_id=obj.id,
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=1, account_id=shipped_acct.id,
+                            summary=f"销售退货冲回 {obj.order_no}", debit_amount=-cost, credit_amount=Decimal("0"),
+                        )
+                        await VoucherEntry.create(
+                            voucher=v, line_no=2, account_id=inventory_acct.id,
+                            summary=f"销售退货冲回 {obj.order_no}", debit_amount=Decimal("0"), credit_amount=-cost,
+                        )
+                        obj.voucher = v
+                        obj.voucher_no = vno
+                        await obj.save()
+                        vouchers.append({"id": v.id, "voucher_no": vno, "source": f"销售退货 {obj.order_no}"})
+
+            summary["bills_mode"] = {"count": len(vouchers), "skipped": False}
+
+        logger.info(f"AR凭证生成完成(bills模式): {len(vouchers)} 张")
+        return {"vouchers": vouchers, "summary": summary}
+
+    # ── period_names 模式（原有逻辑） ──
     for period_name in period_names:
         period = await AccountingPeriod.filter(
             account_set_id=account_set_id, period_name=period_name
