@@ -1,5 +1,100 @@
 # 迭代记录
 
+## v4.25.0 — 凭证增强 + 辅助核算扩展 + 发票下推 + 全局搜索（2026-03-15）
+
+> 五大计划并行开发：凭证核心功能增强（Plan A）、辅助核算+勾单生成凭证（Plan B）、凭证 PDF 打印重写（Plan C）、发票多单合并下推（Plan D）、Bug 修复+体验优化（Plan E）。含 21 项 Code Review 修复。
+
+### Plan A：凭证核心功能增强
+
+- **VoucherPanel 重构**：619 行拆分为 3 个聚焦子组件（VoucherPanel 208 行 + VoucherListView + VoucherEntryListView），双视图切换（凭证列表/分录列表）
+- **凭证号预览**：`GET /api/vouchers/next-number` 端点，新建凭证时实时预览下一个凭证号
+- **批量操作**：`POST /api/vouchers/batch-submit`、`batch-approve`、`batch-post`，支持多选批量提交/审核/过账
+- **分录列表 API**：`GET /api/vouchers/entries` 分页查询 + `GET /api/vouchers/entries/export` Excel 导出
+- **凭证搜索**：`list_vouchers` 端点新增 `search` 参数，支持按凭证号/摘要模糊搜索
+- **制单与审核分离**：系统设置新增 maker-checker 开关，强制制单人与审核人不同
+
+### Plan B：辅助核算扩展 + 勾单生成凭证
+
+- **银行账户管理**：新增 BankAccount 模型 + CRUD API（`/api/bank-accounts`），设置页集成管理界面
+- **辅助核算扩展**：ChartOfAccount/VoucherEntry 新增 `aux_product`（商品）和 `aux_bank`（银行账户）维度，科目管理页支持 6 维辅助核算标志切换
+- **勾单生成凭证**：`GET /api/receivables/pending-voucher-bills` 和 `/api/payables/pending-voucher-bills` 查询待生成凭证的单据，前端 VoucherGenerateModal 支持勾选单据 + 合并模式（`merge_by_partner`）批量生成凭证
+- **凭证详情辅助核算展示**：VoucherDetailModal 展示商品/银行账户辅助核算 badge
+
+### Plan C：凭证 PDF 打印重写
+
+- **中式记账凭证格式**：重写 `generate_voucher_pdf`，标准 24x14cm 布局，含公司名/凭证类型/附件数/制单人/审核人等
+- **中文大写金额**：新增 `amount_to_chinese` 函数，支持到仟亿级（超限抛 ValueError）
+- **路由升级**：单张/批量 PDF 路由传递账套名称、凭证类型、附件数到 PDF 生成，分录含科目代码
+
+### Plan D：发票多单合并下推
+
+- **多单合并推送**：应收单/应付单支持多选合并推送发票，`InvoiceFromReceivableBatch` / `InvoiceFromPayable` Schema 接受 `bill_ids: list`
+- **通用推送弹窗**：InvoicePushModal.vue 通用组件，展示已选单据明细表格 + 开票信息
+- **防重复校验**：FK 关联 + JSON 字段交叉检查，防止同一单据被重复推送
+- **应付单下推**：新增 `POST /api/invoices/from-payable` 端点，PayableBillsTab 集成多选推送
+- **Customer 模型**：新增 `invoice_address` / `invoice_phone` 开票信息字段
+
+### Plan E：Bug 修复 + 搜索 + 跨 Tab 刷新
+
+- **全局搜索**：13 个 Tab 组件（应收/应付/发票/出入库）统一添加搜索框，后端 7 个 API 端点新增 `search` 参数
+- **跨 Tab 刷新**：ReceivablePanel/PayablePanel 实现 `refreshKey` 模式，收款/退款/核销操作后自动刷新应收/应付单列表
+- **useSearch composable**：提取通用搜索 debounce 逻辑（含 `onBeforeUnmount` timer 清理），13 个组件统一复用
+
+### Code Review 修复（21 项）
+
+- **[Critical]** 发票防重复校验从首单 FK 扩展为全量 `__in` 查询 + JSON 字段交叉检查
+- **[Critical]** 合并模式凭证补充 `aux_employee_id` / `aux_department_id` 辅助核算
+- **[Critical]** 批量提交/审核/过账添加 `transactions.in_transaction()` 事务包裹
+- **[Critical]** `list_vouchers` API 补充 `search` 参数 + VoucherListView 传递搜索条件
+- **[Critical]** `vouchers.py` 添加 `from __future__ import annotations`
+- **[Critical]** ChartOfAccountsPanel `openAddForm` 补充 `aux_product`/`aux_bank` 重置
+- **[Critical]** PDF 分录超页面时显示截断提示而非静默丢弃
+- **[Important]** invoice push 函数添加事务包裹
+- **[Important]** `int | None` 统一为 `Optional[int]`（Python 3.9 兼容）
+- **[Important]** 日期参数 `date_from`/`date_to` 修正为 `start_date`/`end_date`（4 个 Tab）
+- **[Important]** VoucherPanel 搜索添加 300ms debounce
+- **[Important]** PayableBillsTab 补充 ColumnMenu 列可见性控制
+- **[Important]** `invoice_type` 字段约束为 `Literal["special", "normal"]`
+- **[Important]** 前端推送发票时过滤已取消单据 + toast 提示
+- **[Important]** BillRef/GenerateVouchersRequest 提取到共享 `voucher_gen.py` Schema
+- **[Important]** 标准库 import 移到文件顶部（receivables.py/payables.py）
+- **[Important]** `next-number` 预览去除 `select_for_update` 行锁
+- **[Important]** PDF `amount_to_chinese` 支持到仟亿级 + 超限 ValueError
+- **[Important]** 清理死代码（`units_dec`/`table_w`）
+- **[Suggestion]** `downloadBlob` 提取到 `useDownload` composable
+- **[Suggestion]** VoucherDetailModal 银行账户 badge 用青色区分员工 badge
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `backend/app/models/bank_account.py` | BankAccount 银行账户模型 |
+| `backend/app/routers/bank_accounts.py` | 银行账户 CRUD API |
+| `backend/app/schemas/voucher_gen.py` | BillRef + GenerateVouchersRequest 共享 Schema |
+| `backend/migrations/2026-03-15-plan-b-aux-bank.sql` | 辅助核算扩展迁移 |
+| `backend/migrations/2026-03-15-plan-d-invoice-multi-source.sql` | 发票多源关联迁移 |
+| `frontend/src/composables/useSearch.js` | 通用搜索 debounce composable |
+| `frontend/src/composables/useDownload.js` | Blob 下载工具 composable |
+| `frontend/src/components/business/VoucherListView.vue` | 凭证列表视图子组件 |
+| `frontend/src/components/business/VoucherEntryListView.vue` | 分录列表视图子组件 |
+| `frontend/src/components/business/VoucherGenerateModal.vue` | 勾单生成凭证弹窗 |
+| `frontend/src/components/business/InvoicePushModal.vue` | 通用发票推送弹窗 |
+| `frontend/src/components/business/settings/BankAccountSettings.vue` | 银行账户管理页 |
+
+### 修改文件（27 个核心文件）
+
+**后端模型**: accounting.py（aux_product/aux_bank）、voucher.py（aux_product/aux_bank FK）、customer.py（invoice_address/phone）、invoice.py（source_bill_ids JSON）
+
+**后端路由**: vouchers.py（batch APIs/entries/search/next-number）、receivables.py（pending-voucher-bills/search/共享 Schema）、payables.py（同上）、invoices.py（from-payable）
+
+**后端服务**: ar_service.py（合并辅助核算/Optional 统一）、ap_service.py（同上）、invoice_service.py（全量防重复/事务包裹）、pdf_print.py（重写 PDF/大写金额/截断提示）
+
+**后端 Schema**: invoice.py（Literal 枚举/min_length）、voucher_gen.py（新建共享）
+
+**前端组件**: VoucherPanel（重构拆分/debounce）、ChartOfAccountsPanel（aux 重置/badge）、VoucherDetailModal（aux 展示）、ReceivableBillsTab（多选推送/状态校验/useSearch）、PayableBillsTab（ColumnMenu/多选推送/状态校验/useSearch）+ 其余 11 个 Tab（useSearch 迁移/日期参数修正）
+
+---
+
 ## v4.24.0 — 财务闭环与多账套完整性（2026-03-14）
 
 > 五大财务完整性增强：退货退款自动推送收/付款模块、退款支持选择付款方式、账套从仓库自动推断、收付款方式按账套隔离、凭证辅助核算支持员工/部门维度。Salesperson 模型迁移为 Employee + Department 组织架构。

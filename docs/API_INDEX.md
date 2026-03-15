@@ -1,6 +1,6 @@
 # ERP-4 API 端点索引
 
-> 基于 v4.14.0 代码生成，共 **192** 个端点
+> 基于 v4.25.0 代码生成，共 **210+** 个端点
 > 运行时 Swagger 文档：启动后端后访问 http://localhost:8090/docs（需设置 `DEBUG=true`）
 
 ## 目录
@@ -314,7 +314,13 @@
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/vouchers` | 凭证列表（分页） | `accounting_view` |
+| GET | `/api/vouchers` | 凭证列表（分页，支持 search 模糊搜索） | `accounting_view` |
+| GET | `/api/vouchers/next-number` | 预览下一个凭证号 | `accounting_view` |
+| GET | `/api/vouchers/entries` | 分录列表（跨凭证分页查询） | `accounting_view` |
+| GET | `/api/vouchers/entries/export` | 导出分录 Excel | `accounting_view` |
+| POST | `/api/vouchers/batch-submit` | 批量提交审核 | `accounting_edit` |
+| POST | `/api/vouchers/batch-approve` | 批量审核通过 | `accounting_approve` |
+| POST | `/api/vouchers/batch-post` | 批量过账 | `accounting_post` |
 | GET | `/api/vouchers/{voucher_id}` | 凭证详情（含分录） | `accounting_view` |
 | POST | `/api/vouchers` | 创建凭证 | `accounting_edit` |
 | PUT | `/api/vouchers/{voucher_id}` | 编辑凭证（仅草稿） | `accounting_edit` |
@@ -326,6 +332,17 @@
 | POST | `/api/vouchers/{voucher_id}/unpost` | 反过账 | `accounting_post` |
 | GET | `/api/vouchers/{voucher_id}/pdf` | 单张凭证 PDF 下载 | `accounting_view` |
 | POST | `/api/vouchers/batch-pdf` | 批量凭证 PDF 下载 | `accounting_view` |
+
+### 银行账户管理 (`/api/bank-accounts`)
+
+> 路由文件：`app/routers/bank_accounts.py`
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/bank-accounts` | 银行账户列表 | `accounting_view` |
+| POST | `/api/bank-accounts` | 创建银行账户 | `accounting_edit` |
+| PUT | `/api/bank-accounts/{bank_account_id}` | 更新银行账户 | `accounting_edit` |
+| DELETE | `/api/bank-accounts/{bank_account_id}` | 删除银行账户 | `accounting_edit` |
 
 ### 账簿查询 (`/api/ledgers`)
 
@@ -346,7 +363,8 @@
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/receivables/receivable-bills` | 应收单列表 | `accounting_ar_view` |
+| GET | `/api/receivables/pending-voucher-bills` | 待生成凭证的应收单据列表 | `accounting_ar_view` |
+| GET | `/api/receivables/receivable-bills` | 应收单列表（支持 search） | `accounting_ar_view` |
 | GET | `/api/receivables/receivable-bills/{bill_id}` | 应收单详情 | `accounting_ar_view` |
 | POST | `/api/receivables/receivable-bills` | 创建应收单 | `accounting_ar_edit` |
 | POST | `/api/receivables/receivable-bills/{bill_id}/cancel` | 取消应收单 | `accounting_ar_edit` |
@@ -367,7 +385,8 @@
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/payables/payable-bills` | 应付单列表 | `accounting_ap_view` |
+| GET | `/api/payables/pending-voucher-bills` | 待生成凭证的应付单据列表 | `accounting_ap_view` |
+| GET | `/api/payables/payable-bills` | 应付单列表（支持 search） | `accounting_ap_view` |
 | GET | `/api/payables/payable-bills/{bill_id}` | 应付单详情 | `accounting_ap_view` |
 | POST | `/api/payables/payable-bills` | 创建应付单 | `accounting_ap_edit` |
 | POST | `/api/payables/payable-bills/{bill_id}/cancel` | 取消应付单 | `accounting_ap_edit` |
@@ -387,7 +406,8 @@
 |------|------|------|------|
 | GET | `/api/invoices` | 发票列表 | `accounting_view` |
 | GET | `/api/invoices/{invoice_id}` | 发票详情（含明细行） | `accounting_view` |
-| POST | `/api/invoices/from-receivable` | 从应收单生成销项发票 | `accounting_edit` |
+| POST | `/api/invoices/from-receivable` | 从应收单生成销项发票（支持多单合并） | `accounting_edit` |
+| POST | `/api/invoices/from-payable` | 从应付单生成进项发票（支持多单合并） | `accounting_edit` |
 | POST | `/api/invoices` | 创建进项发票 | `accounting_edit` |
 | PUT | `/api/invoices/{invoice_id}` | 编辑发票（仅草稿） | `accounting_edit` |
 | POST | `/api/invoices/{invoice_id}/confirm` | 确认发票 | `accounting_approve` |

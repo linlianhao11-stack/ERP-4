@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.24.0
+# 轻量级 ERP 系统 v4.25.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -65,7 +65,7 @@ erp-4/
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
         │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
         │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect, DateRangePicker, ColumnMenu）
-        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig 等 13 个）
+        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig、useSearch、useDownload 等 17 个）
         └── styles/             # 全局样式
 ```
 
@@ -80,7 +80,7 @@ erp-4/
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
 | 物流管理 | `/logistics` | 发货确认、拆单发货、包裹商品明细、SN码记录、快递100对接 |
 | 财务管理 | `/finance` | 收款、对账、欠款管理、返利管理（客户/供应商双向），退货退款自动推送收/付款单，各子模块支持筛选/搜索/重置 |
-| 会计管理 | `/accounting` | 10 个标签页：多账套、科目体系（32 预置科目，员工/部门辅助核算）、会计期间、凭证管理（四级状态机，辅助核算维度）、账簿查询（总分类/明细/余额表）、应收管理（应收单/收款单/退款单/核销）、应付管理（应付单/付款单/退款单）、发票管理（销项/进项，支持 PDF 附件上传/预览/下载）、出入库单（销售出库/采购入库 + PDF 套打）、期末处理（损益结转/结账/年度结转）、财务报表（资产负债表/利润表/现金流量表 + Excel/PDF 导出） |
+| 会计管理 | `/accounting` | 10 个标签页：多账套、科目体系（32 预置科目，6 维辅助核算：客户/供应商/员工/部门/商品/银行）、会计期间、凭证管理（四级状态机，批量提交/审核/过账，凭证列表+分录列表双视图，Excel 导出）、账簿查询（总分类/明细/余额表）、应收管理（应收单/收款单/退款单/核销，多选推送发票，勾单生成凭证）、应付管理（应付单/付款单/退款单，多选推送发票，勾单生成凭证）、发票管理（销项/进项，多单合并下推，PDF 附件上传/预览/下载）、出入库单（销售出库/采购入库 + PDF 套打）、期末处理（损益结转/结账/年度结转）、财务报表（资产负债表/利润表/现金流量表 + Excel/PDF 导出） |
 | 客户管理 | `/customers` | 客户信息、余额、返利、欠款、交易明细 |
 | AI 数据助手 | 浮窗（全局） | NL2SQL 自然语言查数据，DeepSeek API 驱动，SSE 流式响应，图表分析，反馈学习 |
 | 系统设置 | `/settings` | 用户管理、权限管理、仓库/仓位、部门/员工、收款/付款方式（按账套隔离）、SN 码配置、备份管理 |
@@ -97,7 +97,7 @@ erp-4/
 - **销售**: Customer, Order, OrderItem
 - **采购**: Supplier, PurchaseOrder, PurchaseOrderItem, PurchaseReturn, PurchaseReturnItem
 - **财务**: Payment, PaymentOrder, PaymentMethod（按账套隔离）, DisbursementMethod（按账套隔离）, RebateLog
-- **会计基础**: AccountSet, ChartOfAccount（含员工/部门辅助核算）, AccountingPeriod, Voucher, VoucherEntry（含员工/部门辅助核算）
+- **会计基础**: AccountSet, ChartOfAccount（含 6 维辅助核算：客户/供应商/员工/部门/商品/银行）, AccountingPeriod, Voucher, VoucherEntry（含 6 维辅助核算）, BankAccount
 - **应收**: ReceivableBill, ReceiptBill（含退货退款 bill_type）, ReceiptRefundBill, ReceivableWriteOff
 - **应付**: PayableBill, DisbursementBill（含退货退款 bill_type）, DisbursementRefundBill
 - **发票**: Invoice, InvoiceItem
@@ -179,9 +179,13 @@ docker compose up -d
 ```bash
 # 在 Docker 环境中
 docker exec -i erp-db psql -U erp -d erp < backend/migrations/2026-03-14-financial-integrity.sql
+docker exec -i erp-db psql -U erp -d erp < backend/migrations/2026-03-15-plan-b-aux-bank.sql
+docker exec -i erp-db psql -U erp -d erp < backend/migrations/2026-03-15-plan-d-invoice-multi-source.sql
 
 # 或本地环境
 psql -U erp -d erp -f backend/migrations/2026-03-14-financial-integrity.sql
+psql -U erp -d erp -f backend/migrations/2026-03-15-plan-b-aux-bank.sql
+psql -U erp -d erp -f backend/migrations/2026-03-15-plan-d-invoice-multi-source.sql
 ```
 
 > **注意**：新部署无需执行此脚本，Tortoise ORM 会直接按最新模型创建表结构。脚本中所有操作均带 `IF NOT EXISTS` / `IF EXISTS` 保护，重复执行不会报错。
