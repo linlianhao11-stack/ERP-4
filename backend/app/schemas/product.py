@@ -19,3 +19,4 @@ class ProductUpdate(BaseModel):
     retail_price: Optional[Decimal] = Field(default=None, ge=0, le=99999999)
     cost_price: Optional[Decimal] = Field(default=None, ge=0, le=99999999)
     unit: Optional[str] = Field(default=None, max_length=20)
+    is_active: Optional[bool] = Field(default=None)
