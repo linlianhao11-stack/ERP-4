@@ -6,7 +6,7 @@
         <h3 class="modal-title">新建采购订单</h3>
         <button @click="close" class="modal-close">&times;</button>
       </div>
-      <div class="space-y-4 p-4">
+      <div class="modal-body"><div class="space-y-4">
         <div class="grid form-grid grid-cols-2 gap-3">
           <!-- 供应商搜索 -->
           <div class="relative">
@@ -166,12 +166,11 @@
           <label class="label">备注</label>
           <input v-model="poForm.remark" class="input" placeholder="可选">
         </div>
-        <!-- 操作按钮 -->
-        <div class="flex gap-3 pt-2">
-          <button type="button" @click="close" class="btn btn-secondary flex-1">取消</button>
-          <button type="button" @click="savePurchaseOrder" class="btn btn-primary flex-1" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
+      </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="close" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="savePurchaseOrder" class="btn btn-sm btn-primary" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
         </div>
-      </div>
     </div>
   </div>
 

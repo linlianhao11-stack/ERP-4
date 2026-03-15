@@ -6,7 +6,7 @@
         <h3 class="modal-title">采购订单详情</h3>
         <button @click="showPODetailModal = false" class="modal-close">&times;</button>
       </div>
-      <div class="space-y-4 p-4">
+      <div class="modal-body"><div class="space-y-4">
         <!-- 基本信息 -->
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div><span class="text-muted">采购单号:</span> <span class="font-mono font-semibold">{{ purchaseOrderDetail.po_no }}</span></div>
@@ -88,15 +88,14 @@
             </table>
           </div>
         </div>
-        <!-- 操作按钮 -->
-        <div class="flex gap-3 pt-2 flex-wrap">
-          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn flex-1" style="background:#0071e3;color:#fff">审核通过</button>
-          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn flex-1" style="background:#ff3b30;color:#fff">拒绝</button>
-          <button v-if="['paid','partial'].includes(purchaseOrderDetail.status) && hasPermission('purchase_receive')" @click="openReceiveFromDetail(purchaseOrderDetail.id)" class="btn btn-success flex-1">采购收货</button>
-          <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn flex-1" style="background:#ff9f0a;color:#fff">采购退货</button>
-          <button @click="showPODetailModal = false" class="btn btn-secondary flex-1">关闭</button>
+      </div></div>
+        <div class="modal-footer flex-wrap">
+          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:#0071e3;color:#fff">审核通过</button>
+          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:#ff3b30;color:#fff">拒绝</button>
+          <button v-if="['paid','partial'].includes(purchaseOrderDetail.status) && hasPermission('purchase_receive')" @click="openReceiveFromDetail(purchaseOrderDetail.id)" class="btn btn-sm btn-success">采购收货</button>
+          <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn btn-sm" style="background:#ff9f0a;color:#fff">采购退货</button>
+          <button @click="showPODetailModal = false" class="btn btn-sm btn-secondary">关闭</button>
         </div>
-      </div>
     </div>
   </div>
 
