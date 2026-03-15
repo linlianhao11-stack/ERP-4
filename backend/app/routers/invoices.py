@@ -14,9 +14,9 @@ from tortoise.expressions import Q
 from app.auth.dependencies import require_permission
 from app.models import User
 from app.models.invoice import Invoice, InvoiceItem
-from app.schemas.invoice import InvoiceFromReceivable, InvoiceCreate, InvoiceUpdate
+from app.schemas.invoice import InvoiceFromReceivable, InvoiceFromReceivableBatch, InvoiceFromPayable, InvoiceCreate, InvoiceUpdate
 from app.services.invoice_service import (
-    push_invoice_from_receivable, create_input_invoice, confirm_invoice, cancel_invoice,
+    push_invoice_from_receivable, push_invoice_from_payable, create_input_invoice, confirm_invoice, cancel_invoice,
 )
 from app.config import UPLOAD_ROOT
 from app.logger import get_logger
@@ -164,13 +164,35 @@ async def get_invoice(
 @router.post("/from-receivable")
 async def create_invoice_from_receivable(
     account_set_id: int = Query(...),
-    data: InvoiceFromReceivable = ...,
+    data: InvoiceFromReceivableBatch = ...,
     user: User = Depends(require_permission("accounting_edit")),
 ):
     try:
         inv = await push_invoice_from_receivable(
             account_set_id=account_set_id,
-            receivable_bill_id=data.receivable_bill_id,
+            receivable_bill_ids=data.receivable_bill_ids,
+            invoice_type=data.invoice_type,
+            items=[it.model_dump() for it in data.items] if data.items else [],
+            creator=user,
+            invoice_date=data.invoice_date,
+            tax_rate=data.tax_rate,
+            remark=data.remark,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"id": inv.id, "invoice_no": inv.invoice_no, "message": "创建成功"}
+
+
+@router.post("/from-payable")
+async def create_invoice_from_payable(
+    account_set_id: int = Query(...),
+    data: InvoiceFromPayable = ...,
+    user: User = Depends(require_permission("accounting_edit")),
+):
+    try:
+        inv = await push_invoice_from_payable(
+            account_set_id=account_set_id,
+            payable_bill_ids=data.payable_bill_ids,
             invoice_type=data.invoice_type,
             items=[it.model_dump() for it in data.items] if data.items else [],
             creator=user,
