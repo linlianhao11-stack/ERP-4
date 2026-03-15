@@ -120,6 +120,10 @@ export const pushInvoiceFromReceivable = (data) => {
   const { account_set_id, ...body } = data
   return api.post('/invoices/from-receivable', body, { params: { account_set_id } })
 }
+export const pushInvoiceFromPayable = (data) => {
+  const { account_set_id, ...body } = data
+  return api.post('/invoices/from-payable', body, { params: { account_set_id } })
+}
 export const createInputInvoice = (data) => api.post('/invoices', data)
 export const updateInvoice = (id, data) => api.put(`/invoices/${id}`, data)
 export const confirmInvoice = (id) => api.post(`/invoices/${id}/confirm`)
