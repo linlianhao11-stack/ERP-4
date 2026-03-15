@@ -25,6 +25,7 @@ from app.models.invoice import Invoice, InvoiceItem
 from app.models.supplier_balance import SupplierAccountBalance
 from app.models.customer_balance import CustomerAccountBalance
 from app.models.department import Department, Employee
+from app.models.bank_account import BankAccount
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
@@ -41,4 +42,5 @@ __all__ = [
     "SupplierAccountBalance",
     "CustomerAccountBalance",
     "Department", "Employee",
+    "BankAccount",
 ]
