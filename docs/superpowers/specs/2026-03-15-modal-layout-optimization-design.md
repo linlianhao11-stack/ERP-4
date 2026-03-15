@@ -1,7 +1,7 @@
 # 弹窗布局优化设计方案
 
 **日期**: 2026-03-15
-**版本**: v1.0
+**版本**: v1.1
 **状态**: 已确认
 
 ## 问题描述
@@ -20,11 +20,20 @@
 
 将 `.modal` 从单一滚动容器改为 Flex 列布局，仅 `.modal-body` 滚动。
 
-**改动前**：
+**注意**：`base.css` 中 `.modal` 和 `.modal-content` 是联合选择器。本次改动需要将两者**拆分**，仅对 `.modal` 添加 Flex 布局属性，`.modal-content` 保持原有样式不变（它用于非三段结构的弹窗内容容器）。
+
+**改动前**（`base.css` line 215-225）：
 ```css
-.modal {
+.modal,
+.modal-content {
+  background: var(--surface);
+  border-radius: 20px;
+  max-width: 800px;
+  width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: var(--shadow-lg);
 }
 .modal-header { padding: 20px 24px; }
 .modal-body { padding: 20px 24px; }
@@ -33,8 +42,25 @@
 
 **改动后**：
 ```css
-.modal {
+/* 共有样式保留联合选择器 */
+.modal,
+.modal-content {
+  background: var(--surface);
+  border-radius: 20px;
+  max-width: 800px;
+  width: 100%;
   max-height: 90vh;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: var(--shadow-lg);
+}
+
+/* .modal-content 保持原有滚动行为 */
+.modal-content {
+  overflow-y: auto;
+}
+
+/* .modal 改为 Flex 列布局 */
+.modal {
   overflow-y: hidden;
   display: flex;
   flex-direction: column;
@@ -68,6 +94,10 @@
 - 带 `transition` 过渡动画（0.25s ease-out）
 - 移动端隐藏展开按钮（`hidden md:inline-flex`），因为移动端弹窗已接近全屏
 
+**无障碍**：
+- 展开按钮设置 `aria-label="展开弹窗"` / `aria-label="收起弹窗"`，随状态切换
+- Escape 键行为：无论是否展开，Escape 直接关闭弹窗（不做"先收起再关闭"的二段式）
+
 **CSS**：
 ```css
 .modal.modal-expanded {
@@ -95,7 +125,7 @@
 扫描所有 `modal-footer` 内的按钮，将未使用 `btn-sm` 的统一加上。
 
 **已确认需要改动的文件**：
-- `VoucherDetailModal.vue` — `btn btn-primary` 改为 `btn btn-sm btn-primary`
+- `VoucherDetailModal.vue` — modal-footer 内所有按钮统一添加 `btn-sm`（涉及 `btn-secondary` x1、`btn-primary` x3、`btn-warning` x1，共 5 处）
 
 其余弹窗已使用 `btn-sm`，无需改动。
 
@@ -103,32 +133,41 @@
 
 **数据来源**：后端 API 已在 OrderItem 中返回 `warehouse_name` 字段（`orders.py` line 480），无需后端改动。
 
-**列顺序调整**：
+**影响文件及各自列顺序调整**（3 处表格）：
+
+**1. `FinanceOrdersTab.vue` — 订单详情弹窗内商品明细表（line 266 区域）**
 ```
 改前：商品 | 单价 | 数量 | [返利] | 金额 | [毛利]
 改后：商品 | 仓库 | 单价 | 数量 | [返利] | 金额 | [毛利]
 ```
 
-**影响文件**（3 处表格）：
+**2. `CustomersView.vue` — 客户页订单详情弹窗内商品明细表（line 326 区域）**
+```
+改前：商品 | 单价 | 数量 | [返利] | 金额 | [毛利]
+改后：商品 | 仓库 | 单价 | 数量 | [返利] | 金额 | [毛利]
+```
 
-1. `FinanceOrdersTab.vue` — 订单详情弹窗内的商品明细表（line 266 区域）
-2. `CustomersView.vue` — 客户页订单详情弹窗内的商品明细表（line 326 区域）
-3. `FinanceOrdersTab.vue` — 列表展开行的商品明细子表（line 122 区域）
+**3. `FinanceOrdersTab.vue` — 列表展开行商品明细子表（line 122 区域）**
+```
+改前：商品SKU | 商品名称 | 数量 | 单价 | [成本价] | 金额 | [毛利] | 已发货数
+改后：商品SKU | 商品名称 | 仓库 | 数量 | 单价 | [成本价] | 金额 | [毛利] | 已发货数
+```
 
-**仓库列样式**：`text-[13px] text-muted`，左对齐，无仓库时显示 `-`。
+**仓库列样式**：`text-[13px] text-muted`（弹窗表格）/ `text-xs text-muted`（子表），左对齐，无仓库时显示 `-`。
 
 ### 五、缺少 `modal-body` 的组件修补
 
 以下组件缺少 `.modal-body` 包裹层，需补上以配合 Flex 布局：
 
-| 组件文件 | 改动 |
-|----------|------|
-| `PurchaseOrderDetail.vue` | 内容区包裹 `<div class="modal-body">` |
-| `PurchaseOrderForm.vue` | 表单区包裹 `<div class="modal-body">` |
-| `EmployeeSettings.vue` | 内容区包裹 `modal-body` |
-| `DepartmentSettings.vue` | 同上 |
-| `UserSettings.vue` | 同上 |
-| `WarehouseSettings.vue` | 同上 |
+| 组件文件 | 现状 | 改动 |
+|----------|------|------|
+| `CustomersView.vue` | 3 个弹窗（编辑/交易/订单详情）用内联 `p-4 border-b` 代替 `modal-header`，无 `modal-body` | 迁移到标准 `modal-header` / `modal-body` / `modal-footer` 体系 |
+| `PurchaseOrderDetail.vue` | 有 `modal-header`，无 `modal-body` | 内容区包裹 `<div class="modal-body">` |
+| `PurchaseOrderForm.vue` | 有 `modal-header`，无 `modal-body` | 表单区包裹 `<div class="modal-body">` |
+| `EmployeeSettings.vue` | 有 `modal-header`，无 `modal-body` | 内容区包裹 `modal-body` |
+| `DepartmentSettings.vue` | 同上 | 同上 |
+| `UserSettings.vue` | 同上 | 同上 |
+| `WarehouseSettings.vue` | 同上 | 同上 |
 
 ## 技术决策
 
