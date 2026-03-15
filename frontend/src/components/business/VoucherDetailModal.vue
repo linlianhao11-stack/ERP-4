@@ -26,6 +26,10 @@
               <input id="vc-attachment-count" type="number" v-model.number="editForm.attachment_count" class="input text-sm" min="0" :disabled="!isEditing && !isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isEditing && !isCreating }">
             </div>
           </div>
+          <div class="mb-4" v-if="isCreating && previewVoucherNo">
+            <span class="text-xs text-muted">预计凭证号：</span>
+            <span class="text-sm font-mono font-medium">{{ previewVoucherNo }}</span>
+          </div>
           <div class="mb-4">
             <label for="vc-summary" class="label">摘要</label>
             <input id="vc-summary" v-model="editForm.summary" class="input text-sm" :disabled="!isEditing && !isCreating" :class="{ 'opacity-60 cursor-not-allowed bg-elevated': !isEditing && !isCreating }">
@@ -53,9 +57,13 @@
                     <span v-else>{{ entry.summary }}</span>
                   </td>
                   <td>
-                    <select v-if="isEditing || isCreating" v-model="entry.account_id" class="input text-xs">
-                      <option v-for="a in leafAccounts" :key="a.id" :value="a.id">{{ a.code }} {{ a.name }}</option>
-                    </select>
+                    <SearchableSelect v-if="isEditing || isCreating"
+                      :options="accountOptions"
+                      :model-value="entry.account_id"
+                      @update:model-value="entry.account_id = $event"
+                      placeholder="选择科目"
+                      search-placeholder="搜索编码或名称..."
+                    />
                     <span v-else>{{ entry.account_code }}</span>
                   </td>
                   <td>
@@ -137,7 +145,8 @@ import { useAccountingStore } from '../../stores/accounting'
 import { usePermission } from '../../composables/usePermission'
 import { useAppStore } from '../../stores/app'
 import { useFormat } from '../../composables/useFormat'
-import { getVoucher, createVoucher, updateVoucher, unpostVoucher } from '../../api/accounting'
+import { getVoucher, createVoucher, updateVoucher, unpostVoucher, getNextVoucherNumber } from '../../api/accounting'
+import SearchableSelect from '../common/SearchableSelect.vue'
 import { getCustomers } from '../../api/customers'
 import { getSuppliers } from '../../api/purchase'
 import { getEmployees, getDepartments } from '../../api/employees'
@@ -156,6 +165,7 @@ const { hasPermission } = usePermission()
 const { fmtMoney } = useFormat()
 
 const submitting = ref(false)
+const previewVoucherNo = ref('')
 const isCreating = ref(false)
 const isEditing = ref(false)
 const detailVoucher = ref(null)
@@ -169,6 +179,27 @@ const editForm = ref({
   voucher_type: '记', voucher_date: '', summary: '',
   attachment_count: 0, entries: []
 })
+
+const accountOptions = computed(() =>
+  leafAccounts.value.map(a => ({
+    id: a.id,
+    label: `${a.code} ${a.name}`,
+    sublabel: a.category || ''
+  }))
+)
+
+const fetchPreviewNo = async () => {
+  if (!isCreating.value || !props.accountSetId) return
+  try {
+    const period = editForm.value.voucher_date ? editForm.value.voucher_date.slice(0, 7) : new Date().toISOString().slice(0, 7)
+    const { data } = await getNextVoucherNumber({
+      account_set_id: props.accountSetId,
+      period: period,
+      voucher_type: editForm.value.voucher_type || '记'
+    })
+    previewVoucherNo.value = data.voucher_no
+  } catch (e) { previewVoucherNo.value = '' }
+}
 
 const totalDebit = computed(() =>
   editForm.value.entries.reduce((s, e) => s + (parseFloat(e.debit_amount) || 0), 0)
@@ -235,6 +266,7 @@ const openCreateForm = async () => {
   isCreating.value = true
   isEditing.value = false
   detailVoucher.value = null
+  fetchPreviewNo()
 }
 
 const startEdit = async () => {
@@ -302,6 +334,10 @@ const handleUnpost = async (v) => {
     emit('saved')
   } catch (e) { appStore.showToast(e.response?.data?.detail || '反过账失败', 'error') }
 }
+
+watch([() => editForm.value.voucher_type, () => editForm.value.voucher_date], () => {
+  if (isCreating.value) fetchPreviewNo()
+})
 
 // 当 visible 变为 true 时根据 mode 决定行为
 watch(() => props.visible, async (val) => {
