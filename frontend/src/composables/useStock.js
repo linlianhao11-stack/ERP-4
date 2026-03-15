@@ -28,7 +28,7 @@ const stockColumnDefs = {
 export function useStock() {
   const appStore = useAppStore()
   const warehousesStore = useWarehousesStore()
-  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(20)
 
   const {
     columnLabels, visibleColumns, showColumnMenu, menuAttr,

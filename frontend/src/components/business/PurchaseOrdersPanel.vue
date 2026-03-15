@@ -163,6 +163,30 @@
               </tr>
             </template>
           </tbody>
+          <tfoot v-if="sortedPurchaseOrders.length > 0" class="bg-elevated font-semibold text-sm border-t">
+            <tr>
+              <td v-if="viewMode === 'summary'" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left">本页合计</td>
+              <td v-if="isColumnVisible('supplier')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('date')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.total_amount) }}</td>
+              <td v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.tax_amount) }}</td>
+              <td v-if="isColumnVisible('item_count')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('status')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('remark')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('creator')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('account_set')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.return_amount) }}</td>
+              <td v-if="isColumnVisible('target_warehouse')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('target_location')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.rebate_used) }}</td>
+              <td v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.credit_used) }}</td>
+              <td v-if="isColumnVisible('reviewer')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('reviewed_at')" class="px-3 py-2"></td>
+              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2"></td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无采购订单</div>
@@ -196,7 +220,7 @@
  * 采购订单面板（瘦容器）
  * 负责筛选栏、列表展示，将弹窗逻辑委托给子组件
  */
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { Search, Plus } from 'lucide-vue-next'
 import ColumnMenu from '../common/ColumnMenu.vue'
 import { useFormat } from '../../composables/useFormat'
@@ -238,6 +262,21 @@ const {
   toggleColumn, isColumnVisible, resetColumns,
   viewMode, setViewMode,
 } = usePurchaseOrder()
+
+/** 本页合计 */
+const pageSummary = computed(() => {
+  const rows = sortedPurchaseOrders.value
+  const sum = { total_amount: 0, tax_amount: 0, return_amount: 0, rebate_used: 0, credit_used: 0 }
+  for (const o of rows) {
+    sum.total_amount += Number(o.total_amount) || 0
+    sum.tax_amount += Number(o.tax_amount) || 0
+    sum.return_amount += Number(o.return_amount) || 0
+    sum.rebate_used += Number(o.rebate_used) || 0
+    sum.credit_used += Number(o.credit_used) || 0
+  }
+  for (const k in sum) sum[k] = Math.round(sum[k] * 100) / 100
+  return sum
+})
 
 // 展开行状态
 const expandedRows = reactive({})

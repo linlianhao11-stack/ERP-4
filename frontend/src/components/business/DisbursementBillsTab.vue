@@ -164,7 +164,7 @@ const filteredDisbursementMethods = computed(() =>
 const items = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 50
+const pageSize = 20
 const filters = ref({ status: '' })
 const showCreate = ref(false)
 const submitting = ref(false)

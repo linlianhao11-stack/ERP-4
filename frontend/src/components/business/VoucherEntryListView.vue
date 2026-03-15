@@ -69,7 +69,7 @@ const { fmtMoney } = useFormat()
 const entries = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 50
+const pageSize = 20
 
 const statusNames = { draft: '草稿', pending: '待审核', approved: '已审核', posted: '已过账' }
 const statusBadgeMap = { draft: 'badge badge-gray', pending: 'badge badge-yellow', approved: 'badge badge-blue', posted: 'badge badge-green' }

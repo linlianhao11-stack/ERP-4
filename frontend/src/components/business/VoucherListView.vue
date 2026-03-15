@@ -101,7 +101,7 @@ const { fmtMoney } = useFormat()
 const vouchers = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 50
+const pageSize = 20
 
 const selectedIds = ref([])
 const openMenuId = ref(null)

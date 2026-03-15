@@ -149,6 +149,31 @@
               </tr>
             </template>
           </tbody>
+          <tfoot v-if="sortedOrders.length > 0" class="bg-elevated font-semibold text-sm border-t">
+            <tr>
+              <td v-if="financeViewMode === 'summary'" class="px-1 py-2"></td>
+              <td v-if="financeIsColumnVisible('order_no')" class="px-2 py-2 text-left">本页合计</td>
+              <td v-if="financeIsColumnVisible('order_type')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('customer')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('related_order')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('total_amount')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.total_amount) }}</td>
+              <td v-if="financeIsColumnVisible('total_cost') && hasPermission('finance')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.total_cost) }}</td>
+              <td v-if="financeIsColumnVisible('total_profit') && hasPermission('finance')" class="px-2 py-2 text-right" :class="pageSummary.total_profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(pageSummary.total_profit) }}</td>
+              <td v-if="financeIsColumnVisible('paid_amount')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.paid_amount) }}</td>
+              <td v-if="financeIsColumnVisible('status')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('shipping_status')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('item_count')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('remark')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('warehouse')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('employee')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('creator')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('created_at')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('refunded')" class="px-2 py-2"></td>
+              <td v-if="financeIsColumnVisible('rebate_used')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.rebate_used) }}</td>
+              <td v-if="financeIsColumnVisible('account_set')" class="px-2 py-2"></td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
         <div v-if="!allOrders.length" class="p-6 text-center text-muted text-sm">暂无订单</div>
       </div>
@@ -616,7 +641,7 @@ const settingsStore = useSettingsStore()
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
 const { sortState: orderSort, toggleSort: toggleOrderSort, genericSort: genericSortOrder } = useSort()
-const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(50)
+const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(20)
 
 // 视图模式选项
 const viewModeOptions = [
@@ -759,6 +784,21 @@ const sortedOrders = computed(() => {
     creator: o => (o.creator_name || '').toLowerCase(),
     time: o => o.created_at || ''
   })
+})
+
+/** 本页合计（基于当前排序/筛选后的数据） */
+const pageSummary = computed(() => {
+  const rows = sortedOrders.value
+  const sum = { total_amount: 0, total_cost: 0, total_profit: 0, paid_amount: 0, rebate_used: 0 }
+  for (const o of rows) {
+    sum.total_amount += Number(o.total_amount) || 0
+    sum.total_cost += Number(o.total_cost) || 0
+    sum.total_profit += Number(o.total_profit) || 0
+    sum.paid_amount += Number(o.paid_amount) || 0
+    sum.rebate_used += Number(o.rebate_used) || 0
+  }
+  for (const k in sum) sum[k] = Math.round(sum[k] * 100) / 100
+  return sum
 })
 
 /** 订单详情商品按账套分组 */

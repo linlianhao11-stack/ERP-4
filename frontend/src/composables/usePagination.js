@@ -1,11 +1,11 @@
 /**
  * 分页 composable
  * 提供分页状态管理，与后端 offset/limit 接口配合使用
- * @param {number} size - 每页条数，默认 50
+ * @param {number} size - 每页条数，默认 20
  */
 import { ref, computed } from 'vue'
 
-export function usePagination(size = 50) {
+export function usePagination(size = 20) {
   const page = ref(1)
   const pageSize = size
   const total = ref(0)

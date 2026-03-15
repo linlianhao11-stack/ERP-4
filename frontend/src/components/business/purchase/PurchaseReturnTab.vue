@@ -164,7 +164,7 @@ import api from '../../../api/index'
 
 const appStore = useAppStore()
 const { fmtMoney, fmtDate } = useFormat()
-const { page, pageSize, total, totalPages, hasPagination, paginationParams, setTotal, resetPage, prevPage, nextPage } = usePagination(50)
+const { page, pageSize, total, totalPages, hasPagination, paginationParams, setTotal, resetPage, prevPage, nextPage } = usePagination(20)
 
 const items = ref([])
 const filters = ref({ supplier_id: '' })
