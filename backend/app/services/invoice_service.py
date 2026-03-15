@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 from tortoise import transactions
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.ar_ap import ReceivableBill
@@ -30,33 +31,54 @@ def _calc_item_amounts(unit_price: Decimal, quantity: int, tax_rate: Decimal) ->
 
 async def push_invoice_from_receivable(
     account_set_id: int,
-    receivable_bill_id: int,
+    receivable_bill_ids: list,
     invoice_type: str,
-    items: list[dict],
+    items: list,
     creator=None,
-    invoice_date: date | None = None,
+    invoice_date: Optional[date] = None,
     tax_rate: Decimal = Decimal("13"),
     remark: str = "",
 ) -> Invoice:
-    """从应收单推送生成销项发票（草稿状态）"""
-    rb = await ReceivableBill.filter(id=receivable_bill_id, account_set_id=account_set_id).first()
-    if not rb:
-        raise ValueError("应收单不存在或不属于当前账套")
+    """从应收单推送生成销项发票（草稿状态），支持多单合并"""
+    if not receivable_bill_ids:
+        raise ValueError("请选择至少一张应收单")
+
+    # 查询所有源单据
+    rbs = await ReceivableBill.filter(
+        id__in=receivable_bill_ids, account_set_id=account_set_id
+    ).all()
+    if len(rbs) != len(receivable_bill_ids):
+        raise ValueError("部分应收单不存在或不属于当前账套")
+
+    # 校验同一客户
+    customer_ids = set(rb.customer_id for rb in rbs)
+    if len(customer_ids) > 1:
+        raise ValueError("多张应收单必须属于同一客户")
+
+    # 防重复：检查 receivable_bill_id FK
+    first_id = receivable_bill_ids[0]
+    existing = await Invoice.filter(
+        receivable_bill_id=first_id, status__not="cancelled"
+    ).first()
+    if existing:
+        raise ValueError(f"应收单已关联发票 {existing.invoice_no}，请勿重复推送")
 
     if invoice_date is None:
         invoice_date = date.today()
 
-    # 若未传入明细行，根据应收单总金额自动生成一条汇总行
+    # 若未传入明细行，按每张应收单汇总生成
     if not items:
-        total = rb.total_amount
-        rate = tax_rate / Decimal("100")
-        without_tax = (total / (1 + rate)).quantize(Decimal("0.01"))
-        items = [{
-            "product_name": f"应收单 {rb.bill_no} 汇总",
-            "quantity": 1,
-            "unit_price": str(without_tax),
-            "tax_rate": str(tax_rate),
-        }]
+        items = []
+        for rb in rbs:
+            total = rb.total_amount
+            rate = tax_rate / Decimal("100")
+            without_tax = (total / (1 + rate)).quantize(Decimal("0.01"))
+            items.append({
+                "product_name": f"应收单 {rb.bill_no} 汇总",
+                "quantity": 1,
+                "unit_price": str(without_tax),
+                "tax_rate": str(tax_rate),
+            })
 
     total_without_tax = Decimal("0")
     total_tax = Decimal("0")
@@ -65,8 +87,8 @@ async def push_invoice_from_receivable(
     for it in items:
         unit_price = Decimal(str(it["unit_price"]))
         quantity = int(it["quantity"])
-        tax_rate = Decimal(str(it.get("tax_rate", "13")))
-        without_tax, tax, amount = _calc_item_amounts(unit_price, quantity, tax_rate)
+        item_tax_rate = Decimal(str(it.get("tax_rate", "13")))
+        without_tax, tax, amount = _calc_item_amounts(unit_price, quantity, item_tax_rate)
         total_without_tax += without_tax
         total_tax += tax
         total_amount += amount
@@ -77,8 +99,9 @@ async def push_invoice_from_receivable(
         invoice_type=invoice_type,
         direction="output",
         account_set_id=account_set_id,
-        customer_id=rb.customer_id,
-        receivable_bill_id=receivable_bill_id,
+        customer_id=rbs[0].customer_id,
+        receivable_bill_id=first_id,
+        source_receivable_bill_ids=receivable_bill_ids,
         invoice_date=invoice_date,
         total_amount=total_amount,
         amount_without_tax=total_without_tax,
@@ -101,7 +124,7 @@ async def push_invoice_from_receivable(
             amount=it["amount"],
         )
 
-    logger.info(f"从应收单推送生成销项发票: {invoice.invoice_no}")
+    logger.info(f"从应收单推送生成销项发票: {invoice.invoice_no}, 源单据: {receivable_bill_ids}")
     return invoice
 
 
@@ -109,10 +132,10 @@ async def create_input_invoice(
     account_set_id: int,
     supplier_id: int,
     invoice_type: str,
-    items: list[dict],
-    payable_bill_id: int | None = None,
+    items: list,
+    payable_bill_id: Optional[int] = None,
     creator=None,
-    invoice_date: date | None = None,
+    invoice_date: Optional[date] = None,
     remark: str = "",
 ) -> Invoice:
     """手工创建进项发票"""
