@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Optional
 from tortoise import transactions
 from app.models.invoice import Invoice, InvoiceItem
-from app.models.ar_ap import ReceivableBill
+from app.models.ar_ap import ReceivableBill, PayableBill
 from app.models.delivery import SalesDeliveryBill
 from app.models.accounting import AccountSet, ChartOfAccount
 from app.models.voucher import Voucher, VoucherEntry
@@ -125,6 +125,105 @@ async def push_invoice_from_receivable(
         )
 
     logger.info(f"从应收单推送生成销项发票: {invoice.invoice_no}, 源单据: {receivable_bill_ids}")
+    return invoice
+
+
+async def push_invoice_from_payable(
+    account_set_id: int,
+    payable_bill_ids: list,
+    invoice_type: str,
+    items: list,
+    creator=None,
+    invoice_date: Optional[date] = None,
+    tax_rate: Decimal = Decimal("13"),
+    remark: str = "",
+) -> Invoice:
+    """从应付单推送生成进项发票（草稿状态），支持多单合并"""
+    if not payable_bill_ids:
+        raise ValueError("请选择至少一张应付单")
+
+    # 查询所有源单据
+    pbs = await PayableBill.filter(
+        id__in=payable_bill_ids, account_set_id=account_set_id
+    ).all()
+    if len(pbs) != len(payable_bill_ids):
+        raise ValueError("部分应付单不存在或不属于当前账套")
+
+    # 校验同一供应商
+    supplier_ids = set(pb.supplier_id for pb in pbs)
+    if len(supplier_ids) > 1:
+        raise ValueError("多张应付单必须属于同一供应商")
+
+    # 防重复：检查 payable_bill_id FK
+    first_id = payable_bill_ids[0]
+    existing = await Invoice.filter(
+        payable_bill_id=first_id, status__not="cancelled"
+    ).first()
+    if existing:
+        raise ValueError(f"应付单已关联发票 {existing.invoice_no}，请勿重复推送")
+
+    if invoice_date is None:
+        invoice_date = date.today()
+
+    # 若未传入明细行，按每张应付单汇总生成
+    if not items:
+        items = []
+        for pb in pbs:
+            total = pb.total_amount
+            rate = tax_rate / Decimal("100")
+            without_tax = (total / (1 + rate)).quantize(Decimal("0.01"))
+            items.append({
+                "product_name": f"应付单 {pb.bill_no} 汇总",
+                "quantity": 1,
+                "unit_price": str(without_tax),
+                "tax_rate": str(tax_rate),
+            })
+
+    total_without_tax = Decimal("0")
+    total_tax = Decimal("0")
+    total_amount = Decimal("0")
+    item_data = []
+    for it in items:
+        unit_price = Decimal(str(it["unit_price"]))
+        quantity = int(it["quantity"])
+        item_tax_rate = Decimal(str(it.get("tax_rate", "13")))
+        without_tax, tax, amount = _calc_item_amounts(unit_price, quantity, item_tax_rate)
+        total_without_tax += without_tax
+        total_tax += tax
+        total_amount += amount
+        item_data.append({**it, "amount_without_tax": without_tax, "tax_amount": tax, "amount": amount})
+
+    invoice = await Invoice.create(
+        invoice_no=generate_order_no("JX"),
+        invoice_type=invoice_type,
+        direction="input",
+        account_set_id=account_set_id,
+        supplier_id=pbs[0].supplier_id,
+        payable_bill_id=first_id,
+        source_payable_bill_ids=payable_bill_ids,
+        invoice_date=invoice_date,
+        total_amount=total_amount,
+        amount_without_tax=total_without_tax,
+        tax_amount=total_tax,
+        status="draft",
+        remark=remark,
+        creator=creator,
+    )
+
+    for it in item_data:
+        await InvoiceItem.create(
+            invoice=invoice,
+            product_id=it.get("product_id"),
+            product_name=it["product_name"],
+            quantity=it["quantity"],
+            unit_price=Decimal(str(it["unit_price"])),
+            tax_rate=Decimal(str(it.get("tax_rate", "13"))),
+            tax_amount=it["tax_amount"],
+            amount_without_tax=it["amount_without_tax"],
+            amount=it["amount"],
+        )
+
+    logger.info(f"从应付单推送生成进项发票: {invoice.invoice_no}, 源单据: {payable_bill_ids}")
     return invoice
 
 
