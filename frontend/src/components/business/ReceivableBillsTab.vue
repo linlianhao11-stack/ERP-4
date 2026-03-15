@@ -16,6 +16,9 @@
           </div>
         </template>
         <template #actions>
+          <button v-if="selectedIds.length" @click="openPushInvoice" class="btn btn-primary btn-sm">
+            推送发票 ({{ selectedIds.length }})
+          </button>
           <button v-if="hasPermission('accounting_ar_edit')" @click="showCreate = true" class="btn btn-primary btn-sm">手动新增</button>
         </template>
       </PageToolbar>
@@ -23,6 +26,9 @@
         <table class="w-full text-[13px]">
           <thead class="bg-elevated">
             <tr>
+              <th class="px-3 py-2 w-8">
+                <input type="checkbox" :checked="allChecked" :indeterminate="someChecked" @change="toggleAll" />
+              </th>
               <th v-if="arIsColumnVisible('bill_no')" class="px-3 py-2">单号</th>
               <th v-if="arIsColumnVisible('bill_date')" class="px-3 py-2">日期</th>
               <th v-if="arIsColumnVisible('customer')" class="px-3 py-2">客户</th>
@@ -50,6 +56,9 @@
               </td>
             </tr>
             <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
+              <td class="px-3 py-2 w-8">
+                <input type="checkbox" :checked="selectedIds.includes(b.id)" @change="toggleRow(b.id)" />
+              </td>
               <td v-if="arIsColumnVisible('bill_no')" class="px-3 py-2 font-mono text-[12px]">
                 <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
               </td>
@@ -151,17 +160,30 @@
         </div>
       </div>
     </Transition>
+
+    <!-- 推送发票弹窗 -->
+    <InvoicePushModal
+      :visible="showPushModal"
+      mode="sales"
+      :bills="selectedBills"
+      :partnerName="pushPartnerName"
+      :partnerInfo="pushPartnerInfo"
+      :pushFn="doPushInvoice"
+      @close="showPushModal = false"
+      @success="onPushSuccess"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Search } from 'lucide-vue-next'
 
 const props = defineProps({ refreshKey: { type: Number, default: 0 } })
 import ColumnMenu from '../common/ColumnMenu.vue'
 import PageToolbar from '../common/PageToolbar.vue'
-import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill } from '../../api/accounting'
+import InvoicePushModal from './InvoicePushModal.vue'
+import { getReceivableBills, getReceivableBill, createReceivableBill, cancelReceivableBill, pushInvoiceFromReceivable } from '../../api/accounting'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
@@ -187,6 +209,80 @@ const showDetail = ref(false)
 const detail = ref(null)
 const detailLoading = ref(false)
 const searchQuery = ref('')
+
+// 多选相关
+const selectedIds = ref([])
+const showPushModal = ref(false)
+const pushPartnerName = ref('')
+const pushPartnerInfo = ref({})
+
+const selectedBills = computed(() => items.value.filter(b => selectedIds.value.includes(b.id)))
+const allChecked = computed(() => items.value.length > 0 && items.value.every(b => selectedIds.value.includes(b.id)))
+const someChecked = computed(() => !allChecked.value && items.value.some(b => selectedIds.value.includes(b.id)))
+
+function toggleAll() {
+  if (allChecked.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = items.value.map(b => b.id)
+  }
+}
+
+function toggleRow(id) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+async function openPushInvoice() {
+  const bills = selectedBills.value
+  if (!bills.length) return
+
+  // 校验同一客户
+  const customerIds = [...new Set(bills.map(b => b.customer_id))]
+  if (customerIds.length > 1) {
+    appStore.showToast('请选择同一客户的应收单', 'error')
+    return
+  }
+
+  // 获取客户详情
+  try {
+    const res = await api.get(`/customers/${customerIds[0]}`)
+    const c = res.data
+    pushPartnerName.value = c.name
+    pushPartnerInfo.value = {
+      tax_id: c.tax_id,
+      address: c.invoice_address || c.address,
+      phone: c.invoice_phone || c.phone,
+      bank_name: c.bank_name,
+      bank_account: c.bank_account,
+    }
+  } catch {
+    pushPartnerName.value = bills[0].customer_name
+    pushPartnerInfo.value = {}
+  }
+
+  showPushModal.value = true
+}
+
+async function doPushInvoice(formData) {
+  return pushInvoiceFromReceivable({
+    account_set_id: accountingStore.currentAccountSetId,
+    receivable_bill_ids: selectedIds.value,
+    invoice_type: formData.invoice_type,
+    invoice_date: formData.invoice_date,
+    tax_rate: formData.tax_rate,
+    remark: formData.remark,
+  })
+}
+
+function onPushSuccess() {
+  selectedIds.value = []
+  loadList()
+}
 
 let _searchTimer
 function debouncedSearch() {
@@ -242,6 +338,8 @@ async function loadList() {
   const res = await getReceivableBills(params)
   items.value = res.data.items
   total.value = res.data.total
+  // 翻页后清除不在当前页的选中
+  selectedIds.value = selectedIds.value.filter(id => items.value.some(b => b.id === id))
 }
 
 async function loadCustomers() {
