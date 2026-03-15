@@ -113,7 +113,7 @@
         </div></div>
         <div class="modal-footer">
           <button @click="showRestoreModal = false" class="btn btn-sm btn-secondary">取消</button>
-          <button @click="handleUploadRestore" class="btn btn-sm btn-primary" :disabled="!restoreFile || restoreLoading" style="background:#16a34a">{{ restoreLoading ? '恢复中...' : '确认恢复' }}</button>
+          <button @click="handleUploadRestore" class="btn btn-sm btn-primary" :disabled="!restoreFile || restoreLoading" style="background:var(--success);color:#fff">{{ restoreLoading ? '恢复中...' : '确认恢复' }}</button>
         </div>
       </div>
     </div>

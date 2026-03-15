@@ -59,47 +59,49 @@
           <h3 class="font-semibold">{{ modal.title }}</h3>
           <button @click="closeModal" class="modal-close">&times;</button>
         </div>
-        <div class="modal-body">
-          <form @submit.prevent="saveCustomerHandler" class="space-y-3">
-            <div>
-              <label class="label">名称 *</label>
-              <input v-model="customerForm.name" class="input" required>
-            </div>
-            <div>
-              <label class="label">联系人</label>
-              <input v-model="customerForm.contact_person" class="input">
-            </div>
-            <div class="text-xs font-semibold text-secondary mt-3 mb-1">开票信息</div>
-            <div>
-              <label class="label">纳税人识别号</label>
-              <input v-model="customerForm.tax_id" class="input" placeholder="统一社会信用代码">
-            </div>
-            <div class="grid form-grid grid-cols-2 gap-3">
+        <form @submit.prevent="saveCustomerHandler">
+          <div class="modal-body">
+            <div class="space-y-3">
               <div>
-                <label class="label">地址</label>
-                <input v-model="customerForm.address" class="input" placeholder="注册地址">
+                <label class="label">名称 *</label>
+                <input v-model="customerForm.name" class="input" required>
               </div>
               <div>
-                <label class="label">电话</label>
-                <input v-model="customerForm.phone" class="input" placeholder="固定电话">
+                <label class="label">联系人</label>
+                <input v-model="customerForm.contact_person" class="input">
               </div>
-            </div>
-            <div class="grid form-grid grid-cols-2 gap-3">
+              <div class="text-xs font-semibold text-secondary mt-3 mb-1">开票信息</div>
               <div>
-                <label class="label">开户行</label>
-                <input v-model="customerForm.bank_name" class="input">
+                <label class="label">纳税人识别号</label>
+                <input v-model="customerForm.tax_id" class="input" placeholder="统一社会信用代码">
               </div>
-              <div>
-                <label class="label">银行账号</label>
-                <input v-model="customerForm.bank_account" class="input">
+              <div class="grid form-grid grid-cols-2 gap-3">
+                <div>
+                  <label class="label">地址</label>
+                  <input v-model="customerForm.address" class="input" placeholder="注册地址">
+                </div>
+                <div>
+                  <label class="label">电话</label>
+                  <input v-model="customerForm.phone" class="input" placeholder="固定电话">
+                </div>
+              </div>
+              <div class="grid form-grid grid-cols-2 gap-3">
+                <div>
+                  <label class="label">开户行</label>
+                  <input v-model="customerForm.bank_name" class="input">
+                </div>
+                <div>
+                  <label class="label">银行账号</label>
+                  <input v-model="customerForm.bank_account" class="input">
+                </div>
               </div>
             </div>
-            <div class="flex gap-3 pt-3">
-              <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">取消</button>
-              <button type="submit" class="btn btn-sm btn-primary">保存</button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">取消</button>
+            <button type="submit" class="btn btn-sm btn-primary">保存</button>
+          </div>
+        </form>
       </div>
     </div>
 

@@ -166,11 +166,12 @@
           <label class="label">备注</label>
           <input v-model="poForm.remark" class="input" placeholder="可选">
         </div>
-      </div></div>
-        <div class="modal-footer">
-          <button type="button" @click="close" class="btn btn-sm btn-secondary">取消</button>
-          <button type="button" @click="savePurchaseOrder" class="btn btn-sm btn-primary" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
-        </div>
+      </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" @click="close" class="btn btn-sm btn-secondary">取消</button>
+        <button type="button" @click="savePurchaseOrder" class="btn btn-sm btn-primary" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
+      </div>
     </div>
   </div>
 

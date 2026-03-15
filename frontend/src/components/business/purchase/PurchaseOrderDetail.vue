@@ -88,14 +88,15 @@
             </table>
           </div>
         </div>
-      </div></div>
-        <div class="modal-footer flex-wrap">
-          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:#0071e3;color:#fff">审核通过</button>
-          <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:#ff3b30;color:#fff">拒绝</button>
-          <button v-if="['paid','partial'].includes(purchaseOrderDetail.status) && hasPermission('purchase_receive')" @click="openReceiveFromDetail(purchaseOrderDetail.id)" class="btn btn-sm btn-success">采购收货</button>
-          <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn btn-sm" style="background:#ff9f0a;color:#fff">采购退货</button>
-          <button @click="showPODetailModal = false" class="btn btn-sm btn-secondary">关闭</button>
-        </div>
+      </div>
+      </div>
+      <div class="modal-footer flex-wrap">
+        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:var(--primary);color:#fff">审核通过</button>
+        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:var(--error);color:#fff">拒绝</button>
+        <button v-if="['paid','partial'].includes(purchaseOrderDetail.status) && hasPermission('purchase_receive')" @click="openReceiveFromDetail(purchaseOrderDetail.id)" class="btn btn-sm btn-success">采购收货</button>
+        <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn btn-sm" style="background:var(--warning);color:#fff">采购退货</button>
+        <button @click="showPODetailModal = false" class="btn btn-sm btn-secondary">关闭</button>
+      </div>
     </div>
   </div>
 
