@@ -93,6 +93,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai
                 user_id=user.id,
                 db_dsn=dsn,
                 user_permissions=None if user.role == "admin" else (user.permissions or []),
+                is_preset=body.is_preset,
             ):
                 evt_type = event.get("event", "progress")
                 evt_data = json.dumps(event.get("data", {}), ensure_ascii=False)

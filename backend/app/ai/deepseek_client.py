@@ -18,8 +18,8 @@ def _get_client() -> httpx.AsyncClient:
     """获取或创建 httpx 客户端（懒初始化）"""
     global _client
     if _client is None or _client.is_closed:
-        # deepseek-chat 通常 3-10s 响应，30s 超时足够
-        _client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0))
+        # 全局兜底 120s，单次请求可通过 timeout 参数覆盖
+        _client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0))
     return _client
 
 
@@ -39,6 +39,7 @@ async def call_deepseek(
     model: str = DEFAULT_MODEL_SQL,
     temperature: float = 0.0,
     max_tokens: int = 4096,
+    timeout: float = 30.0,
 ) -> dict | None:
     """
     调用 DeepSeek API。
@@ -68,7 +69,7 @@ async def call_deepseek(
 
     for attempt in range(2):  # 最多重试 1 次
         try:
-            resp = await client.post(url, json=payload, headers=headers)
+            resp = await client.post(url, json=payload, headers=headers, timeout=timeout)
             if resp.status_code == 200:
                 data = resp.json()
                 content = data["choices"][0]["message"]["content"]
