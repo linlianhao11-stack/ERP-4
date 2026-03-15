@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTabs from '../components/common/AppTabs.vue'
 import PurchaseOrdersPanel from '../components/business/PurchaseOrdersPanel.vue'
@@ -47,7 +47,9 @@ import MaterialsTab from '../components/business/purchase/MaterialsTab.vue'
 const route = useRoute()
 const router = useRouter()
 
-const purchaseTab = ref('orders')
+const validTabs = ['orders', 'returns', 'suppliers', 'materials']
+const purchaseTab = ref(validTabs.includes(route.query.tab) ? route.query.tab : 'orders')
+watch(purchaseTab, (val) => router.replace({ query: { ...route.query, tab: val === 'orders' ? undefined : val } }))
 const ordersPanel = ref(null)
 const suppliersPanel = ref(null)
 

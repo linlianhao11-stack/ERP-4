@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, nextTick, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useCustomersStore } from '../stores/customers'
 import { useSettingsStore } from '../stores/settings'
 import { useAccountingStore } from '../stores/accounting'
@@ -55,12 +55,15 @@ import FinanceLogsPanel from '../components/business/FinanceLogsPanel.vue'
 import FinanceRebatesPanel from '../components/business/FinanceRebatesPanel.vue'
 
 const route = useRoute()
+const router = useRouter()
 const customersStore = useCustomersStore()
 const settingsStore = useSettingsStore()
 const accountingStore = useAccountingStore()
 const { hasPermission } = usePermission()
 
-const financeTab = ref('orders')
+const financeValidTabs = ['orders', 'unpaid', 'payments', 'payables', 'logs', 'rebates']
+const financeTab = ref(financeValidTabs.includes(route.query.tab) ? route.query.tab : 'orders')
+watch(financeTab, (val) => router.replace({ query: { ...route.query, tab: val === 'orders' ? undefined : val } }))
 const ordersPanel = ref(null)
 const paymentsPanel = ref(null)
 

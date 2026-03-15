@@ -367,6 +367,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
@@ -412,7 +413,11 @@ const showToast = appStore.showToast
 const { previousModal } = storeToRefs(appStore)
 
 // Local state
-const customerTab = ref('transactions')
+const route = useRoute()
+const router = useRouter()
+const customerValidTabs = ['transactions', 'manage']
+const customerTab = ref(customerValidTabs.includes(route.query.tab) ? route.query.tab : 'transactions')
+watch(customerTab, (val) => router.replace({ query: { ...route.query, tab: val === 'transactions' ? undefined : val } }))
 const customerForm = reactive({ id: null, name: '', contact_person: '', phone: '', address: '', tax_id: '', bank_name: '', bank_account: '' })
 const customerTrans = ref({ customer: null, stats: null, transactions: [], available_months: [] })
 const transMonth = ref('')

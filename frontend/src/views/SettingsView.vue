@@ -73,7 +73,8 @@
  * 子组件：WarehouseSettings、DepartmentSettings、EmployeeSettings、UserSettings、
  *         PaymentMethodSettings、LogsSettings、PermissionSettings、ApiKeysPanel
  */
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { usePermission } from '../composables/usePermission'
 import { useSettingsStore } from '../stores/settings'
 import { useAppStore } from '../stores/app'
@@ -90,12 +91,16 @@ import PermissionSettings from '../components/business/settings/PermissionSettin
 import ApiKeysPanel from '../components/business/settings/ApiKeysPanel.vue'
 import BankAccountSettings from '../components/business/settings/BankAccountSettings.vue'
 
+const route = useRoute()
+const router = useRouter()
 const { hasPermission } = usePermission()
 const settingsStore = useSettingsStore()
 const appStore = useAppStore()
 
 // 当前标签页
-const settingsTab = ref('general')
+const settingsValidTabs = ['general', 'finance', 'logs', 'permissions', 'ai']
+const settingsTab = ref(settingsValidTabs.includes(route.query.tab) ? route.query.tab : 'general')
+watch(settingsTab, (val) => router.replace({ query: { ...route.query, tab: val === 'general' ? undefined : val } }))
 
 // 权限管理组件引用及初始用户ID（用于从用户管理跳转）
 const permissionSettingsRef = ref(null)

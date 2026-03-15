@@ -185,6 +185,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '../stores/accounting'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
@@ -200,10 +201,11 @@ import InvoicePanel from '../components/business/InvoicePanel.vue'
 import PeriodEndPanel from '../components/business/PeriodEndPanel.vue'
 import FinancialReportPanel from '../components/business/FinancialReportPanel.vue'
 
+const route = useRoute()
+const router = useRouter()
 const accountingStore = useAccountingStore()
 const authStore = useAuthStore()
 const appStore = useAppStore()
-const tab = ref('vouchers')
 const accountingTabs = [
   { value: 'vouchers', label: '凭证管理' },
   { value: 'accounts', label: '科目管理' },
@@ -215,6 +217,9 @@ const accountingTabs = [
   { value: 'period-end', label: '期末处理' },
   { value: 'reports', label: '财务报表' },
 ]
+const acctValidTabs = accountingTabs.map(t => t.value)
+const tab = ref(acctValidTabs.includes(route.query.tab) ? route.query.tab : 'vouchers')
+watch(tab, (val) => router.replace({ query: { ...route.query, tab: val === 'vouchers' ? undefined : val } }))
 
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
