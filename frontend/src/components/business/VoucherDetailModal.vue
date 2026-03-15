@@ -89,6 +89,14 @@
                         <option :value="null">部门…</option>
                         <option v-for="dep in departmentList" :key="dep.id" :value="dep.id">{{ dep.name }}</option>
                       </select>
+                      <select v-if="getAccountById(entry.account_id)?.aux_product" v-model="entry.aux_product_id" class="input text-xs" style="max-width:140px">
+                        <option :value="null">商品…</option>
+                        <option v-for="p in productList" :key="p.id" :value="p.id">{{ p.name }}</option>
+                      </select>
+                      <select v-if="getAccountById(entry.account_id)?.aux_bank" v-model="entry.aux_bank_account_id" class="input text-xs" style="max-width:140px">
+                        <option :value="null">银行账户…</option>
+                        <option v-for="b in bankAccountList" :key="b.id" :value="b.id">{{ b.short_name || b.bank_name }}</option>
+                      </select>
                     </div>
                     <!-- 查看模式下显示辅助核算名称 -->
                     <div v-if="!(isEditing || isCreating)" class="flex flex-wrap gap-1 text-[11px] text-muted">
@@ -96,6 +104,8 @@
                       <span v-if="entry.aux_supplier_name" class="badge badge-orange">{{ entry.aux_supplier_name }}</span>
                       <span v-if="entry.aux_employee_name" class="badge badge-green">{{ entry.aux_employee_name }}</span>
                       <span v-if="entry.aux_department_name" class="badge badge-purple">{{ entry.aux_department_name }}</span>
+                      <span v-if="entry.aux_product_name" class="badge badge-red">{{ entry.aux_product_name }}</span>
+                      <span v-if="entry.aux_bank_account_name" class="badge badge-green">{{ entry.aux_bank_account_name }}</span>
                     </div>
                   </td>
                   <td>
@@ -150,6 +160,8 @@ import SearchableSelect from '../common/SearchableSelect.vue'
 import { getCustomers } from '../../api/customers'
 import { getSuppliers } from '../../api/purchase'
 import { getEmployees, getDepartments } from '../../api/employees'
+import { getProducts } from '../../api/products'
+import { getBankAccounts } from '../../api/accounting'
 
 const props = defineProps({
   visible: Boolean,
@@ -174,6 +186,8 @@ const customerList = ref([])
 const supplierList = ref([])
 const employeeList = ref([])
 const departmentList = ref([])
+const productList = ref([])
+const bankAccountList = ref([])
 
 const editForm = ref({
   voucher_type: '记', voucher_date: '', summary: '',
@@ -216,7 +230,7 @@ const formatAmount = (v) => {
 const getAccountById = (id) => leafAccounts.value.find(a => a.id === id)
 
 const addEntry = () => {
-  editForm.value.entries.push({ account_id: null, summary: '', debit_amount: 0, credit_amount: 0, aux_customer_id: null, aux_supplier_id: null, aux_employee_id: null, aux_department_id: null })
+  editForm.value.entries.push({ account_id: null, summary: '', debit_amount: 0, credit_amount: 0, aux_customer_id: null, aux_supplier_id: null, aux_employee_id: null, aux_department_id: null, aux_product_id: null, aux_bank_account_id: null })
 }
 
 const close = () => {
@@ -231,11 +245,15 @@ const loadLeafAccounts = async () => {
   const needSupplier = leafAccounts.value.some(a => a.aux_supplier)
   const needEmployee = leafAccounts.value.some(a => a.aux_employee)
   const needDepartment = leafAccounts.value.some(a => a.aux_department)
+  const needProduct = leafAccounts.value.some(a => a.aux_product)
+  const needBank = leafAccounts.value.some(a => a.aux_bank)
   const tasks = []
   if (needCustomer && !customerList.value.length) tasks.push(getCustomers().then(r => { customerList.value = r.data }).catch(() => {}))
   if (needSupplier && !supplierList.value.length) tasks.push(getSuppliers().then(r => { supplierList.value = r.data }).catch(() => {}))
   if (needEmployee && !employeeList.value.length) tasks.push(getEmployees().then(r => { employeeList.value = r.data }).catch(() => {}))
   if (needDepartment && !departmentList.value.length) tasks.push(getDepartments().then(r => { departmentList.value = r.data }).catch(() => {}))
+  if (needProduct && !productList.value.length) tasks.push(getProducts().then(r => { productList.value = Array.isArray(r.data) ? r.data : (r.data.items || []) }).catch(() => {}))
+  if (needBank && !bankAccountList.value.length) tasks.push(getBankAccounts({ account_set_id: props.accountSetId }).then(r => { bankAccountList.value = r.data }).catch(() => {}))
   if (tasks.length) await Promise.all(tasks)
 }
 
@@ -290,6 +308,8 @@ const handleCreate = async () => {
         aux_supplier_id: e.aux_supplier_id || null,
         aux_employee_id: e.aux_employee_id || null,
         aux_department_id: e.aux_department_id || null,
+        aux_product_id: e.aux_product_id || null,
+        aux_bank_account_id: e.aux_bank_account_id || null,
       }))
     }
     const { data } = await createVoucher(props.accountSetId, payload)
@@ -315,6 +335,8 @@ const handleUpdate = async () => {
         aux_supplier_id: e.aux_supplier_id || null,
         aux_employee_id: e.aux_employee_id || null,
         aux_department_id: e.aux_department_id || null,
+        aux_product_id: e.aux_product_id || null,
+        aux_bank_account_id: e.aux_bank_account_id || null,
       }))
     }
     await updateVoucher(detailVoucher.value.id, payload)

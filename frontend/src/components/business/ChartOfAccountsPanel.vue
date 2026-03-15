@@ -32,6 +32,8 @@
                 <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
                 <span v-if="a.aux_employee" class="badge badge-green">员工</span>
                 <span v-if="a.aux_department" class="badge badge-purple">部门</span>
+                <span v-if="a.aux_product" class="badge badge-red">商品</span>
+                <span v-if="a.aux_bank" class="badge badge-green">银行</span>
               </td>
               <td v-if="hasPermission('accounting_edit')" class="px-3 py-2">
                 <div class="flex gap-1">
@@ -98,6 +100,12 @@
               <label class="flex items-center gap-1.5 text-[13px]">
                 <input type="checkbox" v-model="form.aux_department"> 辅助核算-部门
               </label>
+              <label class="flex items-center gap-1.5 text-[13px]">
+                <input type="checkbox" v-model="form.aux_product"> 辅助核算-商品
+              </label>
+              <label class="flex items-center gap-1.5 text-[13px]">
+                <input type="checkbox" v-model="form.aux_bank"> 辅助核算-银行
+              </label>
             </div>
           </div>
           <div class="modal-footer">
@@ -131,6 +139,7 @@ const form = ref({
   parent_code: '', code: '', name: '',
   category: 'asset', direction: 'debit',
   aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false,
+  aux_product: false, aux_bank: false,
 })
 
 const categoryNames = { asset: '资产', liability: '负债', equity: '权益', cost: '成本', profit_loss: '损益' }
@@ -163,6 +172,8 @@ const openEditAccount = (a) => {
     aux_supplier: a.aux_supplier || false,
     aux_employee: a.aux_employee || false,
     aux_department: a.aux_department || false,
+    aux_product: a.aux_product || false,
+    aux_bank: a.aux_bank || false,
   }
   showAddForm.value = true
 }
@@ -180,6 +191,8 @@ const handleEdit = async () => {
       aux_supplier: form.value.aux_supplier,
       aux_employee: form.value.aux_employee,
       aux_department: form.value.aux_department,
+      aux_product: form.value.aux_product,
+      aux_bank: form.value.aux_bank,
     })
     appStore.showToast('更新成功', 'success')
     showAddForm.value = false
