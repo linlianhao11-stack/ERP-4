@@ -169,3 +169,7 @@ export const getNextVoucherNumber = (params) => api.get('/vouchers/next-number',
 export const batchSubmitVouchers = (ids) => api.post('/vouchers/batch-submit', { voucher_ids: ids })
 export const batchApproveVouchers = (ids) => api.post('/vouchers/batch-approve', { voucher_ids: ids })
 export const batchPostVouchers = (ids) => api.post('/vouchers/batch-post', { voucher_ids: ids })
+
+// ========== 凭证分录 ==========
+export const getVoucherEntries = (params) => api.get('/vouchers/entries', { params })
+export const exportVoucherEntries = (params) => api.get('/vouchers/entries/export', { params, responseType: 'blob' })

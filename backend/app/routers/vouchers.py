@@ -12,6 +12,10 @@ from app.models.voucher import Voucher, VoucherEntry
 from app.models.system_setting import SystemSetting
 from app.schemas.accounting import VoucherCreate, VoucherUpdate
 from app.logger import get_logger
+from tortoise.expressions import Q
+from io import BytesIO
+from starlette.responses import StreamingResponse as _StreamingResponse
+import openpyxl
 
 
 class BatchPdfRequest(BaseModel):
@@ -146,6 +150,122 @@ async def batch_post_vouchers(
         await v.save()
         success.append(v.id)
     return {"success": success, "failed": failed}
+
+
+@router.get("/entries")
+async def list_voucher_entries(
+    account_set_id: int = Query(...),
+    period_name: str = Query(None),
+    voucher_type: str = Query(None),
+    status: str = Query(None),
+    search: str = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    user: User = Depends(require_permission("accounting_view")),
+):
+    query = VoucherEntry.filter(voucher__account_set_id=account_set_id)
+    if period_name:
+        query = query.filter(voucher__period_name=period_name)
+    if voucher_type:
+        query = query.filter(voucher__voucher_type=voucher_type)
+    if status:
+        query = query.filter(voucher__status=status)
+    if search:
+        query = query.filter(
+            Q(summary__icontains=search) | Q(account__name__icontains=search) | Q(account__code__icontains=search)
+        )
+    total = await query.count()
+    entries = await query.offset((page - 1) * page_size).limit(page_size) \
+        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department") \
+        .order_by("voucher__voucher_no", "line_no")
+
+    items = []
+    for e in entries:
+        v = e.voucher
+        aux_parts = []
+        if e.aux_customer:
+            aux_parts.append(f"客户:{e.aux_customer.name}")
+        if e.aux_supplier:
+            aux_parts.append(f"供应商:{e.aux_supplier.name}")
+        if e.aux_employee:
+            aux_parts.append(f"员工:{e.aux_employee.name}")
+        if e.aux_department:
+            aux_parts.append(f"部门:{e.aux_department.name}")
+        items.append({
+            "id": e.id,
+            "voucher_id": v.id,
+            "voucher_date": str(v.voucher_date),
+            "period_name": v.period_name,
+            "voucher_type": v.voucher_type,
+            "voucher_no": v.voucher_no,
+            "sequence_no": extract_sequence_no(v.voucher_no),
+            "entry_summary": e.summary,
+            "account_code": e.account.code,
+            "account_name": e.account.name,
+            "aux_info": " | ".join(aux_parts) if aux_parts else "",
+            "debit_amount": str(e.debit_amount),
+            "credit_amount": str(e.credit_amount),
+            "status": v.status,
+        })
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/entries/export")
+async def export_voucher_entries(
+    account_set_id: int = Query(...),
+    period_name: str = Query(None),
+    voucher_type: str = Query(None),
+    status: str = Query(None),
+    search: str = Query(None),
+    user: User = Depends(require_permission("accounting_view")),
+):
+    query = VoucherEntry.filter(voucher__account_set_id=account_set_id)
+    if period_name:
+        query = query.filter(voucher__period_name=period_name)
+    if voucher_type:
+        query = query.filter(voucher__voucher_type=voucher_type)
+    if status:
+        query = query.filter(voucher__status=status)
+    if search:
+        query = query.filter(
+            Q(summary__icontains=search) | Q(account__name__icontains=search) | Q(account__code__icontains=search)
+        )
+    entries = await query.limit(10000) \
+        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department") \
+        .order_by("voucher__voucher_no", "line_no")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "凭证分录"
+    headers = ["日期", "期间", "凭证字", "凭证号", "摘要", "科目编码", "科目名称", "核算维度", "借方金额", "贷方金额", "状态"]
+    ws.append(headers)
+    for e in entries:
+        v = e.voucher
+        aux_parts = []
+        if e.aux_customer:
+            aux_parts.append(f"客户:{e.aux_customer.name}")
+        if e.aux_supplier:
+            aux_parts.append(f"供应商:{e.aux_supplier.name}")
+        if e.aux_employee:
+            aux_parts.append(f"员工:{e.aux_employee.name}")
+        if e.aux_department:
+            aux_parts.append(f"部门:{e.aux_department.name}")
+        ws.append([
+            str(v.voucher_date), v.period_name, v.voucher_type,
+            extract_sequence_no(v.voucher_no),
+            e.summary, e.account.code, e.account.name,
+            " | ".join(aux_parts) if aux_parts else "",
+            float(e.debit_amount), float(e.credit_amount),
+            v.status,
+        ])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return _StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=voucher_entries.xlsx"},
+    )
 
 
 @router.get("/{voucher_id}")
