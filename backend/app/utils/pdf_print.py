@@ -64,8 +64,7 @@ def amount_to_chinese(amount) -> str:
         return "零元整"
 
     digits = "零壹贰叁肆伍陆柒捌玖"
-    units_int = ["", "拾", "佰", "仟", "万", "拾", "佰", "仟", "亿"]
-    units_dec = ["角", "分"]
+    units_int = ["", "拾", "佰", "仟", "万", "拾", "佰", "仟", "亿", "拾", "佰", "仟"]
 
     # 分离整数和小数
     amount = amount.quantize(Decimal("0.01"))
@@ -87,7 +86,7 @@ def amount_to_chinese(amount) -> str:
             d = int(ch)
             unit_idx = n - 1 - i
             if unit_idx >= len(units_int):
-                unit_idx = len(units_int) - 1
+                raise ValueError(f"金额 {amount} 超出大写转换范围（最大支持仟亿级）")
             if d != 0:
                 if zero_flag:
                     result += "零"
@@ -130,7 +129,6 @@ def generate_voucher_pdf(voucher: dict, entries: list[dict]) -> bytes:
     # 页面边距
     margin_l = 1 * cm
     margin_r = 23 * cm
-    table_w = margin_r - margin_l
 
     # === 标题 ===
     c.setFont(font, 16)
@@ -189,8 +187,10 @@ def generate_voucher_pdf(voucher: dict, entries: list[dict]) -> bytes:
     row_y = data_y
 
     max_rows = int((data_y - 3.2 * cm) / row_h)
+    truncated = False
     for i, entry in enumerate(entries):
         if i >= max_rows:
+            truncated = True
             break
         row_y = data_y - (i + 0.5) * row_h
         # 摘要（截断）
@@ -211,6 +211,13 @@ def generate_voucher_pdf(voucher: dict, entries: list[dict]) -> bytes:
         if entry.get("credit_amount") and Decimal(str(entry["credit_amount"])) > 0:
             c.drawRightString(col_x[4] - 0.15 * cm, row_y,
                               _fmt(entry["credit_amount"]))
+
+    # 如果有截断，显示提示
+    if truncated:
+        tip_y = data_y - max_rows * row_h + 0.1 * cm
+        c.setFont(font, 7)
+        c.drawCentredString(PAGE_W / 2, tip_y,
+                            f"（共 {len(entries)} 条分录，本页仅显示前 {max_rows} 条）")
 
     # 数据区底部横线
     total_top_y = data_y - max(len(entries), 1) * row_h - 0.1 * cm
