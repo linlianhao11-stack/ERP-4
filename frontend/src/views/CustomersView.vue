@@ -55,11 +55,11 @@
     <!-- Customer Form Modal -->
     <div v-if="modal.show && modal.type === 'customer'" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
-        <div class="p-4 border-b flex justify-between items-center">
+        <div class="modal-header">
           <h3 class="font-semibold">{{ modal.title }}</h3>
           <button @click="closeModal" class="modal-close">&times;</button>
         </div>
-        <div class="p-4">
+        <div class="modal-body">
           <form @submit.prevent="saveCustomerHandler" class="space-y-3">
             <div>
               <label class="label">名称 *</label>
@@ -95,8 +95,8 @@
               </div>
             </div>
             <div class="flex gap-3 pt-3">
-              <button type="button" @click="closeModal" class="btn btn-secondary flex-1">取消</button>
-              <button type="submit" class="btn btn-primary flex-1">保存</button>
+              <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">取消</button>
+              <button type="submit" class="btn btn-sm btn-primary">保存</button>
             </div>
           </form>
         </div>
@@ -106,11 +106,11 @@
     <!-- Customer Transactions Modal -->
     <div v-if="modal.show && modal.type === 'customer_trans'" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
-        <div class="p-4 border-b flex justify-between items-center">
+        <div class="modal-header">
           <h3 class="font-semibold">{{ modal.title }}</h3>
           <button @click="closeModal" class="modal-close">&times;</button>
         </div>
-        <div class="p-4">
+        <div class="modal-body">
           <!-- Customer summary and filters -->
           <div class="mb-4 p-3 bg-elevated rounded-lg flex flex-wrap gap-2 justify-between items-center">
             <div>
@@ -190,7 +190,7 @@
           <div class="font-semibold mb-2 text-sm">
             交易记录 <span v-if="transType" class="text-primary">({{ orderTypeNames[transType] || transType }})</span>
           </div>
-          <div class="max-h-64 overflow-y-auto">
+          <div>
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">
                 <tr>
@@ -222,24 +222,30 @@
             </table>
             <div v-if="!filteredTransactions?.length" class="p-6 text-center text-muted text-sm">暂无交易记录</div>
           </div>
-          <div class="flex gap-3 pt-4">
-            <button type="button" @click="closeModal" class="btn btn-secondary flex-1">关闭</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">关闭</button>
         </div>
       </div>
     </div>
 
     <!-- Order Detail Modal -->
     <div v-if="modal.show && modal.type === 'order_detail'" class="modal-overlay" @click.self="closeModal">
-      <div class="modal">
-        <div class="p-4 border-b flex justify-between items-center">
+      <div class="modal" :class="{ 'modal-expanded': isDetailExpanded }">
+        <div class="modal-header">
           <div class="flex items-center gap-2">
             <button v-if="previousModal" @click="goBackToPrevious" class="text-muted hover:text-primary text-xl" title="返回上一页">←</button>
             <h3 class="font-semibold">{{ modal.title }}</h3>
           </div>
-          <button @click="closeModal" class="modal-close">&times;</button>
+          <div class="flex items-center gap-1">
+            <button @click="isDetailExpanded = !isDetailExpanded" class="modal-expand-btn hidden md:inline-flex" :aria-label="isDetailExpanded ? '收起弹窗' : '展开弹窗'">
+              <Minimize2 v-if="isDetailExpanded" :size="16" />
+              <Maximize2 v-else :size="16" />
+            </button>
+            <button @click="closeModal" class="modal-close">&times;</button>
+          </div>
         </div>
-        <div class="p-4">
+        <div class="modal-body">
           <!-- Order header -->
           <div class="mb-4 p-3 bg-elevated rounded-lg">
             <div class="flex justify-between items-start mb-2">
@@ -324,6 +330,7 @@
               <thead class="bg-elevated">
                 <tr>
                   <th class="px-2 py-1 text-left">商品</th>
+                  <th class="px-2 py-1 text-left">仓库</th>
                   <th class="px-2 py-1 text-right">单价</th>
                   <th class="px-2 py-1 text-right">数量</th>
                   <th v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right">返利</th>
@@ -337,6 +344,7 @@
                     <div>{{ item.product_name }}</div>
                     <div class="text-xs text-muted">{{ item.product_sku }}</div>
                   </td>
+                  <td class="px-2 py-1 text-muted">{{ item.warehouse_name || '-' }}</td>
                   <td class="px-2 py-1 text-right">{{ fmt(item.unit_price) }}</td>
                   <td class="px-2 py-1 text-right">{{ item.quantity }}</td>
                   <td v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
@@ -346,9 +354,9 @@
               </tbody>
             </table>
           </div>
-          <div class="flex gap-3 pt-4">
-            <button type="button" @click="closeModal" class="btn btn-secondary flex-1">关闭</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">关闭</button>
         </div>
       </div>
     </div>
@@ -357,6 +365,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onMounted } from 'vue'
+import { Maximize2, Minimize2 } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
 import { useCustomersStore } from '../stores/customers'
@@ -392,7 +401,11 @@ const getPaymentMethodName = (code) => {
 // App store shortcuts
 const modal = appStore.modal
 const openModal = appStore.openModal
-const closeModal = appStore.closeModal
+const _closeModal = appStore.closeModal
+const closeModal = () => {
+  isDetailExpanded.value = false
+  _closeModal()
+}
 const showToast = appStore.showToast
 const { previousModal } = storeToRefs(appStore)
 
@@ -403,6 +416,7 @@ const customerTrans = ref({ customer: null, stats: null, transactions: [], avail
 const transMonth = ref('')
 const transType = ref('')
 const orderDetail = ref({})
+const isDetailExpanded = ref(false)
 
 // Computed
 const filteredCustomers = computed(() => customersStore.filteredCustomers)
