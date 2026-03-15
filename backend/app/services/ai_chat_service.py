@@ -175,6 +175,7 @@ async def process_chat(
     user_id: int,
     db_dsn: str,
     user_permissions: list[str] | None = None,
+    is_preset: bool = False,
 ):
     """处理用户聊天消息，yield SSE 事件 dict"""
     import time as _time
@@ -186,21 +187,23 @@ async def process_chat(
     ).hexdigest()[:8] if history else "0"
     cache_key = f"{user_id}:{date.today().isoformat()}:{history_digest}:{message.strip().lower()}"
     now = _time.time()
-    cached = _query_cache.get(cache_key)
-    if cached:
-        cached_time, cached_result = cached
-        if now - cached_time < QUERY_CACHE_TTL:
-            logger.info(f"命中查询缓存: {message[:30]}")
-            yield {"event": "done", "data": {**cached_result, "message_id": str(uuid.uuid4())}}
-            return
-        else:
-            del _query_cache[cache_key]
+    # is_preset 跳过缓存（预设本身极快，且避免 preset/非 preset 同文本缓存冲突）
+    if not is_preset:
+        cached = _query_cache.get(cache_key)
+        if cached:
+            cached_time, cached_result = cached
+            if now - cached_time < QUERY_CACHE_TTL:
+                logger.info(f"命中查询缓存: {message[:30]}")
+                yield {"event": "done", "data": {**cached_result, "message_id": str(uuid.uuid4())}}
+                return
+            else:
+                del _query_cache[cache_key]
 
     message_id = str(uuid.uuid4())
 
     async with _ai_semaphore:
         try:
-            async for event in _process_chat_inner(message, history, user_id, db_dsn, message_id, user_permissions=user_permissions):
+            async for event in _process_chat_inner(message, history, user_id, db_dsn, message_id, user_permissions=user_permissions, is_preset=is_preset):
                 yield event
                 # 缓存最终结果
                 if event.get("event") == "done":
@@ -226,6 +229,7 @@ async def _process_chat_inner(
     db_dsn: str,
     message_id: str,
     user_permissions: list[str] | None = None,
+    is_preset: bool = False,
 ):
     try:
         import time as _time
@@ -242,22 +246,23 @@ async def _process_chat_inner(
         # 计算用户允许访问的视图/表（None=admin 不限制）
         allowed = get_allowed_views(user_permissions) if user_permissions is not None else None
 
-        # 意图预分类（按权限过滤预设）
-        all_presets = config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES
-        if user_permissions is not None:
-            filtered_presets = [p for p in all_presets if p.get("permission", "ai_chat") in user_permissions]
-        else:
-            filtered_presets = all_presets
-        preset = classify_intent(message, filtered_presets)
-        if preset and preset.get("sql"):
-            ok, _, reason = validate_sql(preset["sql"], allowed_tables=allowed)
-            if not ok:
-                yield {"event": "error", "data": {"message": f"你没有查询该数据的权限", "retryable": False, "error_type": "forbidden"}}
+        # 意图预分类（仅预设点击时触发，手动输入直接走 LLM）
+        if is_preset:
+            all_presets = config.get("ai.preset_queries") or DEFAULT_PRESET_QUERIES
+            if user_permissions is not None:
+                filtered_presets = [p for p in all_presets if p.get("permission", "ai_chat") in user_permissions]
+            else:
+                filtered_presets = all_presets
+            preset = classify_intent(message, filtered_presets)
+            if preset and preset.get("sql"):
+                ok, _, reason = validate_sql(preset["sql"], allowed_tables=allowed)
+                if not ok:
+                    yield {"event": "error", "data": {"message": "你没有查询该数据的权限", "retryable": False, "error_type": "forbidden"}}
+                    return
+                yield {"event": "progress", "data": {"stage": "executing", "message": "正在查询数据库..."}}
+                result = await _execute_and_analyze(sql=preset["sql"], message=message, config=config, db_dsn=db_dsn, message_id=message_id)
+                yield {"event": "done", "data": result}
                 return
-            yield {"event": "progress", "data": {"stage": "executing", "message": "正在查询数据库..."}}
-            result = await _execute_and_analyze(sql=preset["sql"], message=message, config=config, db_dsn=db_dsn, message_id=message_id)
-            yield {"event": "done", "data": result}
-            return
 
         # 获取账套列表
         account_sets = await AccountSet.filter(is_active=True).values("id", "name")
@@ -288,6 +293,7 @@ async def _process_chat_inner(
             base_url=config.get("base_url", DEFAULT_BASE_URL),
             model=config.get("model_sql", DEFAULT_MODEL_SQL),
             temperature=0.0,
+            timeout=90.0,
         )
         _t2 = _time.monotonic()
         logger.info(f"SQL 生成耗时: {_t2 - _t1:.1f}s")
@@ -307,28 +313,6 @@ async def _process_chat_inner(
                 "options": r1_result.get("options", []),
             }}
             return
-
-        # 复合问题回退：模型返回 text 但问题明显涉及业务数据时，重试要求生成 SQL
-        _BIZ_DATA_KEYWORDS = ["销售", "采购", "库存", "订单", "应收", "应付", "欠款", "客户", "供应商", "产品", "利润", "毛利", "退货", "缺货", "收入", "支出", "账款"]
-        if resp_type == "text":
-            has_biz_keyword = any(kw in message for kw in _BIZ_DATA_KEYWORDS)
-            if has_biz_keyword:
-                logger.info(f"text 回退重试: 问题含业务关键词，追加指令要求生成 SQL")
-                messages.append({"role": "assistant", "content": json.dumps(r1_result, ensure_ascii=False)})
-                messages.append({"role": "user", "content": "这个问题需要从数据库查数据来回答。请生成 SQL 查询相关的业务数据，用 type=sql 格式返回。你的分析和建议可以之后再补充。"})
-                retry_result = await call_deepseek(
-                    messages=messages,
-                    api_key=api_key,
-                    base_url=config.get("base_url", DEFAULT_BASE_URL),
-                    model=config.get("model_sql", DEFAULT_MODEL_SQL),
-                    temperature=0.0,
-                )
-                if retry_result and retry_result.get("type") == "sql" and retry_result.get("sql"):
-                    logger.info(f"text 回退成功，获得 SQL")
-                    r1_result = retry_result
-                    resp_type = "sql"
-                else:
-                    logger.info(f"text 回退未获得 SQL，使用原始 text 回复")
 
         if resp_type == "text":
             yield {"event": "done", "data": {
@@ -359,6 +343,7 @@ async def _process_chat_inner(
                         base_url=config.get("base_url", DEFAULT_BASE_URL),
                         model=config.get("model_sql", DEFAULT_MODEL_SQL),
                         temperature=0.0,
+                        timeout=90.0,
                     )
                     if r1_result and r1_result.get("sql"):
                         sql = r1_result["sql"]
@@ -391,6 +376,7 @@ async def _process_chat_inner(
                         base_url=config.get("base_url", DEFAULT_BASE_URL),
                         model=config.get("model_sql", DEFAULT_MODEL_SQL),
                         temperature=0.0,
+                        timeout=90.0,
                     )
                     if r1_result and r1_result.get("sql"):
                         sql = r1_result["sql"]
@@ -446,22 +432,7 @@ async def _execute_and_analyze(
     for r in rows:
         row_data.append([_serialize_value(r[c]) for c in columns])
 
-    # 小数据集（≤10 行）：本地生成摘要，跳过分析 API 调用（省 15-20s）
-    if len(rows) <= 10:
-        analysis_text = _build_local_summary(columns, row_data, message)
-        logger.info(f"本地摘要（{len(rows)} 行），跳过分析 API，总耗时: {_time.monotonic() - _t0:.1f}s")
-        return {
-            "type": "answer",
-            "message_id": message_id,
-            "analysis": analysis_text,
-            "table_data": {"columns": columns, "rows": row_data},
-            "chart_config": None,
-            "sql": sql,
-            "row_count": len(rows),
-            "suggestions": _get_local_suggestions(sql),
-        }
-
-    # 大数据集：调用分析模型（限制 max_tokens 加速）
+    # 调用分析模型生成自然语言摘要
     analysis_rows = row_data[:100]
     analysis_prompt = build_analysis_prompt(config.get("ai.prompt.analysis"))
     data_summary = f"用户问题: {message}\n\nSQL: {sql}\n\n查询结果 ({len(rows)} 行):\n列: {columns}\n数据（前 {len(analysis_rows)} 行）:\n"
@@ -479,17 +450,21 @@ async def _execute_and_analyze(
         model=config.get("model_analysis", DEFAULT_MODEL_ANALYSIS),
         temperature=0.7,
         max_tokens=1024,
+        timeout=30.0,
     )
     _t3 = _time.monotonic()
     logger.info(f"数据分析耗时: {_t3 - _t2:.1f}s, 总耗时: {_t3 - _t0:.1f}s")
 
-    analysis_text = "查询完成。"
     chart_config = None
     suggestions = None
     if v3_result:
-        analysis_text = v3_result.get("analysis", analysis_text)
+        analysis_text = v3_result.get("analysis", "查询完成。")
         chart_config = v3_result.get("chart_config")
         suggestions = v3_result.get("suggestions")
+    else:
+        # V3 失败降级：用本地摘要代替"查询完成。"
+        analysis_text = _build_local_summary(columns, row_data, message)
+        suggestions = _get_local_suggestions(sql)
 
     return {
         "type": "answer",
