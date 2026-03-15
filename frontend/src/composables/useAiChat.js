@@ -34,14 +34,19 @@ export function useAiChat() {
   const buildAssistantContext = (m) => {
     const parts = []
     if (m.analysis) parts.push(m.analysis)
-    // 只保留列名和行数作为上下文提示，不传 SQL 和原始数据行
-    // 避免历史中的 SQL/数据干扰模型生成新查询
     if (m.table_data?.columns && m.table_data?.rows?.length) {
-      parts.push(`[查询结果: ${m.table_data.rows.length} 行, 列: ${m.table_data.columns.join(', ')}]`)
+      const cols = m.table_data.columns
+      const rows = m.table_data.rows
+      parts.push(`[查询结果: ${rows.length} 行, 列: ${cols.join(', ')}]`)
+      // 保留前 5 行数据摘要，便于追问时 LLM 知道具体内容
+      const preview = rows.slice(0, 5).map(row =>
+        cols.map((c, i) => `${c}=${row[i] ?? '-'}`).join(', ')
+      )
+      const summary = '前' + Math.min(5, rows.length) + '行: ' + preview.join('; ')
+      // 限制摘要长度
+      parts.push(summary.length > 500 ? summary.slice(0, 500) + '...' : summary)
     }
-    // clarification 或 text 回复的内容
     if (m.message) parts.push(m.message)
-    // 过期消息（sessionStorage 恢复后 table_data 丢失）也保留已有上下文
     if (m._expired && m._hasTableData) parts.push('[之前有表格数据，已过期]')
     return parts.join('\n') || ''
   }
@@ -91,12 +96,11 @@ export function useAiChat() {
     if (raw) {
       try {
         const restored = JSON.parse(raw)
-        messages.value = restored.map(m => {
-          if (m._hasTableData || m._hasChartConfig) {
-            return { ...m, _expired: true }
-          }
-          return m
-        })
+        messages.value = restored.map(m => ({
+          ...m,
+          _isRestored: true,
+          ...(m._hasTableData || m._hasChartConfig ? { _expired: true } : {}),
+        }))
       } catch { /* 忽略损坏数据 */ }
     }
   }
@@ -107,7 +111,7 @@ export function useAiChat() {
     }
   }
 
-  const sendMessage = async (text) => {
+  const sendMessage = async (text, options = {}) => {
     if (!text || !text.trim() || loading.value) return
     const msg = text.trim()
 
@@ -140,7 +144,7 @@ export function useAiChat() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: msg, history }),
+        body: JSON.stringify({ message: msg, history, is_preset: !!options.preset }),
         signal: abortController.signal,
       })
 

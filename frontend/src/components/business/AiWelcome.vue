@@ -22,7 +22,7 @@
     <div v-if="presetQueries.length">
       <p class="text-xs text-muted mb-2 px-1 text-left">常用查询</p>
       <div class="flex flex-wrap gap-2">
-        <button v-for="pq in presetQueries" :key="pq.display" class="btn btn-secondary btn-sm text-xs" @click="$emit('send', pq.display)">
+        <button v-for="pq in presetQueries" :key="pq.display" class="btn btn-secondary btn-sm text-xs" @click="$emit('send', pq.display, { preset: true })">
           {{ pq.display }}
         </button>
       </div>
