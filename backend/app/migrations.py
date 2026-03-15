@@ -871,8 +871,9 @@ async def migrate_stock_last_activity():
     await conn.execute_query(
         "UPDATE warehouse_stocks SET last_activity_at = updated_at WHERE last_activity_at IS NULL"
     )
+    await conn.execute_query("DROP FUNCTION IF EXISTS trg_update_last_activity() CASCADE")
     await conn.execute_query("""
-        CREATE OR REPLACE FUNCTION trg_update_last_activity()
+        CREATE FUNCTION trg_update_last_activity()
         RETURNS TRIGGER AS $$
         BEGIN
             NEW.last_activity_at = NOW();

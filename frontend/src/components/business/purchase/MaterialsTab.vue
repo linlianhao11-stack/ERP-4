@@ -96,7 +96,7 @@
               </td>
               <td class="px-3 py-2 text-center" @click.stop>
                 <button @click="openEdit(p)" class="text-primary text-xs mr-2">编辑</button>
-                <button v-if="hasPermission('stock_edit')" @click="toggleActive(p)" class="text-xs" :class="p.is_active ? 'text-error' : 'text-success'">
+                <button v-if="hasPermission('stock_edit')" @click="toggleActive(p)" :class="p.is_active ? 'text-error' : 'text-success'" class="text-xs">
                   {{ p.is_active ? '停用' : '启用' }}
                 </button>
               </td>
@@ -211,7 +211,7 @@ const onProductSaved = () => {
 
 const toggleActive = async (product) => {
   const action = product.is_active ? '停用' : '启用'
-  if (!confirm(`确定${action}「${product.name}」？`)) return
+  if (!await appStore.customConfirm(`${action}确认`, `确定${action}「${product.name}」？`)) return
   try {
     await updateProduct(product.id, { is_active: !product.is_active })
     appStore.showToast(`${action}成功`)
