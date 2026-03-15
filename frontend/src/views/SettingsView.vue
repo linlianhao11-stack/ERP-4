@@ -36,6 +36,7 @@
       <!-- 财务设置标签页 -->
       <div v-else-if="settingsTab === 'finance'" key="finance">
         <PaymentMethodSettings @data-changed="onDataChanged" />
+        <BankAccountSettings @data-changed="onDataChanged" />
         <div class="card p-4 mt-4">
           <h3 class="text-sm font-medium mb-3">凭证审核规则</h3>
           <label class="flex items-center gap-2 text-sm cursor-pointer">
@@ -87,6 +88,7 @@ import PaymentMethodSettings from '../components/business/settings/PaymentMethod
 import LogsSettings from '../components/business/settings/LogsSettings.vue'
 import PermissionSettings from '../components/business/settings/PermissionSettings.vue'
 import ApiKeysPanel from '../components/business/settings/ApiKeysPanel.vue'
+import BankAccountSettings from '../components/business/settings/BankAccountSettings.vue'
 
 const { hasPermission } = usePermission()
 const settingsStore = useSettingsStore()

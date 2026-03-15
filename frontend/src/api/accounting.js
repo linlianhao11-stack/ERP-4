@@ -173,3 +173,9 @@ export const batchPostVouchers = (ids) => api.post('/vouchers/batch-post', { vou
 // ========== 凭证分录 ==========
 export const getVoucherEntries = (params) => api.get('/vouchers/entries', { params })
 export const exportVoucherEntries = (params) => api.get('/vouchers/entries/export', { params, responseType: 'blob' })
+
+// ========== 银行账户 ==========
+export const getBankAccounts = (params) => api.get('/bank-accounts', { params })
+export const createBankAccount = (data) => api.post('/bank-accounts', data)
+export const updateBankAccount = (id, data) => api.put(`/bank-accounts/${id}`, data)
+export const deleteBankAccount = (id) => api.delete(`/bank-accounts/${id}`)
