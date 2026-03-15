@@ -54,7 +54,7 @@
           <h3 class="modal-title">{{ empForm.id ? '编辑员工 - ' + empForm.name : '新建员工' }}</h3>
           <button @click="showEmpModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveEmployee" class="space-y-3 p-4">
+        <div class="modal-body"><div class="space-y-3">
           <div><label class="label" for="emp-code">编码 *</label><input id="emp-code" v-model="empForm.code" class="input" required placeholder="员工编码"></div>
           <div><label class="label" for="emp-name">姓名 *</label><input id="emp-name" v-model="empForm.name" class="input" required placeholder="员工姓名"></div>
           <div><label class="label" for="emp-phone">电话</label><input id="emp-phone" v-model="empForm.phone" class="input" placeholder="可选"></div>
@@ -71,11 +71,11 @@
               <span class="text-sm">标记为业务员</span>
             </label>
           </div>
-          <div class="flex gap-3 pt-3">
-            <button type="button" @click="showEmpModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button type="submit" class="btn btn-primary flex-1">保存</button>
-          </div>
-        </form>
+        </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="showEmpModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveEmployee()" class="btn btn-sm btn-primary">保存</button>
+        </div>
       </div>
     </div>
   </div>

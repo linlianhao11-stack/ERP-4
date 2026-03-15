@@ -84,7 +84,7 @@
           <h3 class="modal-title">{{ warehouseForm.id ? '编辑仓库 - ' + warehouseForm.name : '新建仓库' }}</h3>
           <button @click="showWarehouseModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveWarehouse" class="space-y-3 p-4">
+        <div class="modal-body"><div class="space-y-3">
           <div><label class="label">仓库名称 *</label><input v-model="warehouseForm.name" class="input" required placeholder="请输入新名称"></div>
           <div><label class="flex items-center"><input type="checkbox" v-model="warehouseForm.is_default" class="mr-2">设为默认仓库</label></div>
           <div v-if="accountSets.length">
@@ -94,11 +94,11 @@
               <option v-for="s in accountSets" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
-          <div class="flex gap-3 pt-3">
-            <button type="button" @click="showWarehouseModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button type="submit" class="btn btn-primary flex-1">保存</button>
-          </div>
-        </form>
+        </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="showWarehouseModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveWarehouse()" class="btn btn-sm btn-primary">保存</button>
+        </div>
       </div>
     </div>
 
@@ -109,14 +109,14 @@
           <h3 class="modal-title">编辑仓位 - {{ locationForm.code }}</h3>
           <button @click="showLocationModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveLocation" class="space-y-3 p-4">
+        <div class="modal-body"><div class="space-y-3">
           <div><label class="label">仓位编号 *</label><input v-model="locationForm.code" class="input" required placeholder="如 A-01-02"></div>
           <div><label class="label">仓位名称</label><input v-model="locationForm.name" class="input" placeholder="可选，如：主通道左侧"></div>
-          <div class="flex gap-3 pt-3">
-            <button type="button" @click="showLocationModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button type="submit" class="btn btn-primary flex-1">保存</button>
-          </div>
-        </form>
+        </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="showLocationModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveLocation()" class="btn btn-sm btn-primary">保存</button>
+        </div>
       </div>
     </div>
   </div>

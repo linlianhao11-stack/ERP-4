@@ -37,14 +37,14 @@
           <h3 class="modal-title">{{ deptForm.id ? '编辑部门 - ' + deptForm.name : '新建部门' }}</h3>
           <button @click="showDeptModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveDepartment" class="space-y-3 p-4">
+        <div class="modal-body"><div class="space-y-3">
           <div><label class="label" for="dept-code">编码 *</label><input id="dept-code" v-model="deptForm.code" class="input" required placeholder="部门编码"></div>
           <div><label class="label" for="dept-name">名称 *</label><input id="dept-name" v-model="deptForm.name" class="input" required placeholder="部门名称"></div>
-          <div class="flex gap-3 pt-3">
-            <button type="button" @click="showDeptModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button type="submit" class="btn btn-primary flex-1">保存</button>
-          </div>
-        </form>
+        </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="showDeptModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveDepartment()" class="btn btn-sm btn-primary">保存</button>
+        </div>
       </div>
     </div>
   </div>

@@ -63,7 +63,7 @@
           <h3 class="modal-title">{{ userForm.id ? '编辑用户' : '新增用户' }}</h3>
           <button @click="showUserModal = false" class="modal-close">&times;</button>
         </div>
-        <form @submit.prevent="saveUser" class="space-y-3 p-4">
+        <div class="modal-body"><div class="space-y-3">
           <div><label class="label">用户名 *</label><input v-model="userForm.username" class="input" required :disabled="!!userForm.id"></div>
           <div><label class="label">显示名称</label><input v-model="userForm.display_name" class="input"></div>
           <div><label class="label">密码 {{ userForm.id ? '(留空不修改)' : '*' }}</label><input v-model="userForm.password" type="password" class="input" :required="!userForm.id"></div>
@@ -84,11 +84,11 @@
                 class="text-primary hover:underline">前往权限管理</button>
             </div>
           </div>
-          <div class="flex gap-3 pt-3">
-            <button type="button" @click="showUserModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button type="submit" class="btn btn-primary flex-1">保存</button>
-          </div>
-        </form>
+        </div></div>
+        <div class="modal-footer">
+          <button type="button" @click="showUserModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveUser()" class="btn btn-sm btn-primary">保存</button>
+        </div>
       </div>
     </div>
 
@@ -99,7 +99,7 @@
           <h3 class="modal-title">备份恢复</h3>
           <button @click="showRestoreModal = false" class="modal-close">&times;</button>
         </div>
-        <div class="p-4 space-y-4">
+        <div class="modal-body"><div class="space-y-4">
           <div class="text-sm text-secondary">上传 <span class="font-medium">.sql</span> 或 <span class="font-medium">.db</span> 备份文件来恢复数据库。恢复前会自动备份当前数据。</div>
           <div class="border-2 border-dashed border-line-strong rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors" @click="$refs.restoreFileInput.click()" @dragover.prevent @drop.prevent="handleRestoreFileDrop">
             <div v-if="!restoreFile" class="text-muted text-sm">点击选择文件 或 拖拽文件到此处</div>
@@ -110,10 +110,10 @@
           </div>
           <input ref="restoreFileInput" type="file" accept=".sql,.db" class="hidden" @change="handleRestoreFileSelect">
           <div class="bg-warning-subtle border border-warning rounded p-3 text-xs text-warning">注意：恢复操作将覆盖当前数据库，请确认备份文件正确。恢复后页面将自动刷新。</div>
-          <div class="flex gap-3">
-            <button @click="showRestoreModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button @click="handleUploadRestore" class="btn btn-primary flex-1" :disabled="!restoreFile || restoreLoading" style="background:#16a34a">{{ restoreLoading ? '恢复中...' : '确认恢复' }}</button>
-          </div>
+        </div></div>
+        <div class="modal-footer">
+          <button @click="showRestoreModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button @click="handleUploadRestore" class="btn btn-sm btn-primary" :disabled="!restoreFile || restoreLoading" style="background:#16a34a">{{ restoreLoading ? '恢复中...' : '确认恢复' }}</button>
         </div>
       </div>
     </div>
