@@ -28,7 +28,7 @@ const stockColumnDefs = {
 export function useStock() {
   const appStore = useAppStore()
   const warehousesStore = useWarehousesStore()
-  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(20)
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
 
   const {
     columnLabels, visibleColumns, showColumnMenu, menuAttr,
@@ -173,7 +173,7 @@ export function useStock() {
     sortedStockRows,
     hasStockProducts,
     // 分页
-    page, totalPages, hasPagination, resetPage, prevPage, nextPage,
+    page, total, totalPages, hasPagination, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage,
     // 方法
     loadProductsData,
     debouncedSearch,

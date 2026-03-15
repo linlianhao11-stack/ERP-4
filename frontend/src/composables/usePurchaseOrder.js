@@ -33,7 +33,7 @@ const purchaseColumnDefs = {
 
 export function usePurchaseOrder() {
   const appStore = useAppStore()
-  const { page, pageSize, total, totalPages, hasPagination, paginationParams, resetPage, prevPage, nextPage } = usePagination(20)
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
 
   // 排序
   const { sortState: purchaseSort, toggleSort: togglePurchaseSort, genericSort } = useSort()
@@ -126,7 +126,7 @@ export function usePurchaseOrder() {
   return {
     purchaseOrders,
     // 分页
-    page, pageSize, total, totalPages, hasPagination, resetPage, prevPage, nextPage,
+    page, pageSize, total, totalPages, hasPagination, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage,
     purchaseStatusFilter,
     purchaseAccountSetFilter,
     purchaseDateStart,

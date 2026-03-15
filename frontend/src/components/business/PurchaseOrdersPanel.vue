@@ -163,7 +163,7 @@
               </tr>
             </template>
           </tbody>
-          <tfoot v-if="sortedPurchaseOrders.length > 0" class="bg-elevated font-semibold text-sm border-t">
+          <tfoot v-if="sortedPurchaseOrders.length > 0" class="bg-elevated font-semibold text-sm">
             <tr>
               <td v-if="viewMode === 'summary'" class="px-3 py-2"></td>
               <td v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left">本页合计</td>
@@ -186,16 +186,26 @@
               <td v-if="isColumnVisible('payment_method')" class="px-3 py-2"></td>
               <td></td>
             </tr>
+            <tr v-if="hasPagination" class="font-normal">
+              <td :colspan="100" class="px-3.5 py-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted">共 {{ pageItemCount }} 条</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="prevPage(); loadPurchaseOrders()" :disabled="page <= 1" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
+                    <template v-for="(p, i) in visiblePages" :key="i">
+                      <span v-if="p === '…'" class="w-7 h-7 flex items-center justify-center text-xs text-muted cursor-default">…</span>
+                      <button v-else @click="goToPage(p); loadPurchaseOrders()" :class="p === page ? 'bg-primary text-white font-medium' : 'text-muted hover:bg-surface-hover hover:text-text'" class="w-7 h-7 flex items-center justify-center rounded-md text-xs">{{ p }}</button>
+                    </template>
+                    <button @click="nextPage(); loadPurchaseOrders()" :disabled="page >= totalPages" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">›</button>
+                  </div>
+                  <span class="text-xs text-muted w-16"></span>
+                </div>
+              </td>
+            </tr>
           </tfoot>
         </table>
       </div>
       <div v-if="!purchaseOrders.length" class="p-8 text-center text-muted text-sm">暂无采购订单</div>
-    </div>
-    <!-- 分页 -->
-    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
-      <button @click="prevPage(); loadPurchaseOrders()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
-      <button @click="nextPage(); loadPurchaseOrders()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
     <!-- 新建采购单弹窗（子组件） -->
@@ -254,7 +264,7 @@ const {
   purchaseOrders, purchaseStatusFilter, purchaseAccountSetFilter,
   purchaseDateStart, purchaseDateEnd, purchaseSearch,
   loadPurchaseOrders, debouncedLoad, handleExport,
-  page, totalPages, hasPagination, resetPage, prevPage, nextPage,
+  page, total, totalPages, hasPagination, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage,
   // 排序
   purchaseSort, togglePurchaseSort, sortedPurchaseOrders,
   // 列配置

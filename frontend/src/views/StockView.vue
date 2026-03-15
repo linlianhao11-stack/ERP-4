@@ -150,15 +150,27 @@
               <td></td>
             </tr>
           </tbody>
+          <tfoot v-if="hasPagination" class="bg-elevated text-sm">
+            <tr>
+              <td :colspan="100" class="px-3.5 py-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted">共 {{ pageItemCount }} 条</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="prevPage(); loadProductsData()" :disabled="page <= 1" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
+                    <template v-for="(p, i) in visiblePages" :key="i">
+                      <span v-if="p === '…'" class="w-7 h-7 flex items-center justify-center text-xs text-muted cursor-default">…</span>
+                      <button v-else @click="goToPage(p); loadProductsData()" :class="p === page ? 'bg-primary text-white font-medium' : 'text-muted hover:bg-surface-hover hover:text-text'" class="w-7 h-7 flex items-center justify-center rounded-md text-xs">{{ p }}</button>
+                    </template>
+                    <button @click="nextPage(); loadProductsData()" :disabled="page >= totalPages" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">›</button>
+                  </div>
+                  <span class="text-xs text-muted w-16"></span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div v-if="!hasStockProducts" class="p-8 text-center text-muted text-sm">暂无库存商品</div>
-    </div>
-    <!-- 分页 -->
-    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
-      <button @click="prevPage(); loadProductsData()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
-      <button @click="nextPage(); loadProductsData()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
     <!-- 商品新增/编辑弹窗 -->
@@ -231,7 +243,7 @@ const {
   productSearch, stockSort, toggleStockSort,
   stockProducts, sortedStockRows, hasStockProducts,
   loadProductsData, debouncedSearch, onToggleVirtualStock, handleExportStock,
-  page, totalPages, hasPagination, resetPage, prevPage, nextPage,
+  page, total, totalPages, hasPagination, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage,
   columnLabels, visibleColumns, showColumnMenu, menuAttr,
   toggleColumn, isColumnVisible, resetColumns,
 } = useStock()

@@ -142,6 +142,24 @@
               <td></td>
             </tr>
           </tbody>
+          <tfoot v-if="hasPagination" class="bg-elevated text-sm">
+            <tr>
+              <td :colspan="100" class="px-3.5 py-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted">共 {{ pageItemCount }} 条</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="prevPage(); loadShipments()" :disabled="page <= 1" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
+                    <template v-for="(p, i) in visiblePages" :key="i">
+                      <span v-if="p === '…'" class="w-7 h-7 flex items-center justify-center text-xs text-muted cursor-default">…</span>
+                      <button v-else @click="goToPage(p); loadShipments()" :class="p === page ? 'bg-primary text-white font-medium' : 'text-muted hover:bg-surface-hover hover:text-text'" class="w-7 h-7 flex items-center justify-center rounded-md text-xs">{{ p }}</button>
+                    </template>
+                    <button @click="nextPage(); loadShipments()" :disabled="page >= totalPages" class="w-7 h-7 flex items-center justify-center rounded-md text-xs text-muted hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed">›</button>
+                  </div>
+                  <span class="text-xs text-muted w-16"></span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
         </table>
         <div v-if="!shipments.length" class="p-6 text-center text-muted text-sm">暂无物流记录</div>
       </div>
@@ -185,12 +203,6 @@
         <div v-if="s.last_info" class="text-xs text-muted truncate">{{ s.last_info }}</div>
       </div>
       <div v-if="!shipments.length" class="card p-6 text-center text-muted text-sm">暂无物流记录</div>
-    </div>
-    <!-- 分页 -->
-    <div v-if="hasPagination" class="flex items-center justify-center gap-2 py-3">
-      <button @click="prevPage(); loadShipments()" :disabled="page <= 1" class="btn btn-secondary btn-sm">上一页</button>
-      <span class="text-[13px] text-muted leading-8">{{ page }} / {{ totalPages }}</span>
-      <button @click="nextPage(); loadShipments()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm">下一页</button>
     </div>
 
     <!-- 物流详情弹窗 -->
@@ -239,7 +251,7 @@ const {
   toggleSort,
   loadShipments,
   debouncedLoadShipments,
-  page, totalPages, hasPagination, resetPage, prevPage, nextPage
+  page, total, totalPages, hasPagination, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage
 } = useShipment()
 
 // ---- 弹窗控制 ----
