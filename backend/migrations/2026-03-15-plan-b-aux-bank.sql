@@ -29,3 +29,9 @@ CREATE INDEX IF NOT EXISTS idx_voucher_entries_aux_bank ON voucher_entries(aux_b
 -- 5. 预设科目辅助核算标记
 UPDATE chart_of_accounts SET aux_product = TRUE WHERE code IN ('1405', '1403', '1407');
 UPDATE chart_of_accounts SET aux_bank = TRUE WHERE code = '1002';
+
+-- 6. orders / purchase_returns 补充 voucher 关联列（模型已有，DB 缺失）
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(30);
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL;
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS voucher_no VARCHAR(30);
