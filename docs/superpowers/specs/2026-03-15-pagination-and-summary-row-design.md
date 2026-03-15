@@ -20,6 +20,7 @@
 | `composables/useStock.js` | `usePagination(50)` → `usePagination(20)` |
 | `finance/FinanceOrdersTab.vue` | `usePagination(50)` → `usePagination(20)` |
 | `purchase/PurchaseReturnTab.vue` | `usePagination(50)` → `usePagination(20)` |
+| `PurchaseReturnTab.vue`（business 根目录） | `const pageSize = 50` → `20` |
 | `PayableBillsTab.vue` | `const pageSize = 50` → `20` |
 | `ReceivableBillsTab.vue` | 同上 |
 | `DisbursementBillsTab.vue` | 同上 |
@@ -35,47 +36,43 @@
 | `VoucherListView.vue` | 同上 |
 | `VoucherEntryListView.vue` | 同上 |
 
+**注意**：`SalesInvoiceTab.vue:444` 和 `ReceiptBillsTab.vue:241` 有 `page_size: 200` 的特殊调用（用于下拉加载全量），不受此次变更影响。
+
 ### 2. 合计行（方案 A — tfoot）
 
 在 `<table>` 的 `</tbody>` 之后、`</table>` 之前添加 `<tfoot>`，随表格自然滚动。
+
+**合计仅为当前页数据合计**，不是跨页全量合计。
 
 #### FinanceOrdersTab
 
 computed 属性 `pageSummary`，遍历 `sortedOrders` 求和：
 - `total_amount` — 金额
-- `total_cost` — 成本（需 finance 权限才显示）
-- `total_profit` — 毛利（需 finance 权限才显示）
+- `total_cost` — 成本（需 `financeIsColumnVisible('total_cost') && hasPermission('finance')`）
+- `total_profit` — 毛利（需 `financeIsColumnVisible('total_profit') && hasPermission('finance')`）
 - `paid_amount` — 已付
 - `rebate_used` — 返利已用
-
-模板：
-```html
-<tfoot class="bg-elevated font-semibold text-sm border-t">
-  <tr>
-    <!-- 非数字列留空，第一个可见列显示"本页合计" -->
-    <td ...>本页合计</td>
-    ...
-    <td class="text-right">¥{{ fmt(pageSummary.total_amount) }}</td>
-    <td class="text-right">¥{{ fmt(pageSummary.total_cost) }}</td>
-    <td class="text-right">{{ fmt(pageSummary.total_profit) }}</td>
-    <td class="text-right">¥{{ fmt(pageSummary.paid_amount) }}</td>
-    <td class="text-right">¥{{ fmt(pageSummary.rebate_used) }}</td>
-    ...
-  </tr>
-</tfoot>
-```
 
 #### PurchaseOrdersPanel
 
 computed 属性 `pageSummary`，遍历 `sortedPurchaseOrders` 求和：
 - `total_amount` — 总金额
 - `tax_amount` — 含税金额
+- `return_amount` — 退货金额
+- `rebate_used` — 返利已用
+- `credit_used` — 在账资金
 
-模板结构同上，第一个可见列显示"本页合计"。
+### tfoot 模板要点
+
+1. **空数据不显示**：`<tfoot v-if="sortedOrders.length > 0">`
+2. **展开箭头列占位**：汇总模式下 `<td v-if="viewMode === 'summary'"></td>`
+3. **ColumnMenu 尾部占位**：末尾加空 `<td></td>`
+4. **动态列 v-if**：每个 `<td>` 使用与 thead/tbody 完全相同的 `v-if` 条件（含权限判断）
+5. **第一个可见列**显示"本页合计"文字
 
 ### 样式规范
 - `<tfoot>` 行使用 `bg-elevated` 背景 + `font-semibold` + `border-t`
 - 数字列右对齐，使用 `fmt()` 格式化 + `¥` 前缀
-- 毛利列保留正负色：正值 `text-success`，负值 `text-error`
+- 毛利列正负色：`>= 0` 时 `text-success`，`< 0` 时 `text-error`
 - 非数字列 `<td>` 内容为空
-- 动态列配置（ColumnMenu 隐藏的列）在 tfoot 中同步使用 `v-if` 控制
+- 求和结果做 `Math.round(sum * 100) / 100` 避免浮点精度问题
