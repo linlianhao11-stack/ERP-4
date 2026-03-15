@@ -20,7 +20,7 @@
 
 将 `.modal` 从单一滚动容器改为 Flex 列布局，仅 `.modal-body` 滚动。
 
-**注意**：`base.css` 中 `.modal` 和 `.modal-content` 是联合选择器。本次改动需要将两者**拆分**，仅对 `.modal` 添加 Flex 布局属性，`.modal-content` 保持原有样式不变（它用于非三段结构的弹窗内容容器）。
+**注意**：`base.css` 中 `.modal` 和 `.modal-content` 是联合选择器，在代码库中被交替使用（如 `CustomersView` 用 `.modal`，`FinanceOrdersTab` / Settings 等用 `.modal-content`）。由于所有弹窗都使用 `modal-header` 且都需要 Flex 布局，**对两者统一应用 Flex 布局**，不做拆分。
 
 **改动前**（`base.css` line 215-225）：
 ```css
@@ -42,7 +42,6 @@
 
 **改动后**：
 ```css
-/* 共有样式保留联合选择器 */
 .modal,
 .modal-content {
   background: var(--surface);
@@ -50,18 +49,9 @@
   max-width: 800px;
   width: 100%;
   max-height: 90vh;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-lg);
-}
-
-/* .modal-content 保持原有滚动行为 */
-.modal-content {
-  overflow-y: auto;
-}
-
-/* .modal 改为 Flex 列布局 */
-.modal {
-  overflow-y: hidden;
   display: flex;
   flex-direction: column;
 }

@@ -349,7 +349,12 @@ git commit -m "feat(FinanceOrdersTab): 订单详情展开模式 + 仓库列 + fo
 **Files:**
 - Modify: `frontend/src/views/CustomersView.vue`
 
-**注意**：该文件订单详情弹窗用 `<div class="modal">` 但 header 用内联 `p-4 border-b` 而非 `modal-header`，body 用 `p-4` 而非 `modal-body`，footer 用内联按钮而非 `modal-footer`。需要迁移到标准三段结构。
+**注意**：该文件有 **3 个弹窗**，全都用 `<div class="modal">` + 内联 `p-4 border-b`（非 `modal-header`）+ `p-4`（非 `modal-body`）。需要全部迁移到标准三段结构。展开按钮只加给订单详情弹窗，仓库列也只加给订单详情弹窗。
+
+**3 个弹窗**：
+1. `modal.type === 'customer'`（客户编辑，line 56-104）— form 结构
+2. `modal.type === 'customer_trans'`（交易明细，line 107-230）— 包含内联 `max-h-64 overflow-y-auto` 的交易列表
+3. `modal.type === 'order_detail'`（订单详情，line 233-354）— 需要展开按钮 + 仓库列
 
 - [ ] **Step 1: 添加 lucide 图标导入**
 
@@ -364,7 +369,105 @@ import { Maximize2, Minimize2 } from 'lucide-vue-next'
 const isDetailExpanded = ref(false)
 ```
 
-- [ ] **Step 3: 修改订单详情弹窗容器添加展开 class**
+- [ ] **Step 3: 迁移客户编辑弹窗（customer）到标准结构**
+
+找到（line 58-60）：
+```html
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="font-semibold">{{ modal.title }}</h3>
+          <button @click="closeModal" class="modal-close">&times;</button>
+        </div>
+```
+
+替换为：
+```html
+        <div class="modal-header">
+          <h3 class="font-semibold">{{ modal.title }}</h3>
+          <button @click="closeModal" class="modal-close">&times;</button>
+        </div>
+```
+
+找到（line 62）：
+```html
+        <div class="p-4">
+```
+
+替换为：
+```html
+        <div class="modal-body">
+```
+
+找到底部按钮区（line 97-100）：
+```html
+            <div class="flex gap-3 pt-3">
+              <button type="button" @click="closeModal" class="btn btn-secondary flex-1">取消</button>
+              <button type="submit" class="btn btn-primary flex-1">保存</button>
+            </div>
+```
+
+将这个 div 移出 `modal-body`（放在 form 和 `modal-body` 的闭合 `</div>` 之后），改为：
+```html
+        <div class="modal-footer">
+          <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="saveCustomerHandler" class="btn btn-sm btn-primary">保存</button>
+        </div>
+```
+
+并将 `<form @submit.prevent="saveCustomerHandler">` 改为普通 `<div>`（因为 submit 逻辑已移到按钮 `@click`）。
+
+- [ ] **Step 4: 迁移交易明细弹窗（customer_trans）到标准结构**
+
+找到（line 109-111）：
+```html
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="font-semibold">{{ modal.title }}</h3>
+          <button @click="closeModal" class="modal-close">&times;</button>
+        </div>
+```
+
+替换为：
+```html
+        <div class="modal-header">
+          <h3 class="font-semibold">{{ modal.title }}</h3>
+          <button @click="closeModal" class="modal-close">&times;</button>
+        </div>
+```
+
+找到（line 113）：
+```html
+        <div class="p-4">
+```
+
+替换为：
+```html
+        <div class="modal-body">
+```
+
+**移除内联滚动容器**（line 193）：
+```html
+          <div class="max-h-64 overflow-y-auto">
+```
+
+改为无滚动限制的 div（依赖 `modal-body` 的自然滚动）：
+```html
+          <div>
+```
+
+找到底部按钮区（line 225-227）：
+```html
+          <div class="flex gap-3 pt-4">
+            <button type="button" @click="closeModal" class="btn btn-secondary flex-1">关闭</button>
+          </div>
+```
+
+移出 `modal-body`，改为：
+```html
+        <div class="modal-footer">
+          <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">关闭</button>
+        </div>
+```
+
+- [ ] **Step 5: 修改订单详情弹窗容器添加展开 class**
 
 找到（line 234）：
 ```html
@@ -376,7 +479,7 @@ const isDetailExpanded = ref(false)
       <div class="modal" :class="{ 'modal-expanded': isDetailExpanded }">
 ```
 
-- [ ] **Step 4: 迁移 header 到标准 modal-header**
+- [ ] **Step 7: 迁移订单详情 header 到标准 modal-header（含展开按钮）**
 
 找到（line 235-241）：
 ```html
@@ -406,7 +509,7 @@ const isDetailExpanded = ref(false)
         </div>
 ```
 
-- [ ] **Step 5: 迁移 body 到标准 modal-body**
+- [ ] **Step 8: 迁移订单详情 body 到标准 modal-body**
 
 找到（line 242）：
 ```html
@@ -418,7 +521,7 @@ const isDetailExpanded = ref(false)
         <div class="modal-body">
 ```
 
-- [ ] **Step 6: 迁移 footer 到标准 modal-footer + btn-sm**
+- [ ] **Step 9: 迁移订单详情 footer 到标准 modal-footer + btn-sm**
 
 找到（约 line 349-351）：
 ```html
@@ -427,17 +530,16 @@ const isDetailExpanded = ref(false)
           </div>
 ```
 
-替换为：
+将这个 div 移出 `modal-body`（关闭 `modal-body` 的 `</div>` 后），改为：
 ```html
-        </div>
         <div class="modal-footer">
           <button type="button" @click="closeModal" class="btn btn-sm btn-secondary">关闭</button>
         </div>
 ```
 
-**注意**：需要在 footer 之前先关闭 `modal-body` 的 `</div>`，并去掉原来 `modal-body` 结尾的 `</div>`（原 `<div class="p-4">` 的闭合）。确保 DOM 结构为：`modal-header` → `modal-body`(包含所有内容) → `modal-footer`。仔细对照原文件缩进。
+确保 DOM 结构为：`modal-header` → `modal-body`(包含所有内容) → `modal-footer`。
 
-- [ ] **Step 7: 在商品明细表格 thead 中添加仓库列**
+- [ ] **Step 10: 在商品明细表格 thead 中添加仓库列**
 
 找到（line 326-327）：
 ```html
@@ -450,7 +552,7 @@ const isDetailExpanded = ref(false)
                   <th class="px-2 py-1 text-left">仓库</th>
 ```
 
-- [ ] **Step 8: 在商品明细表格 tbody 中添加仓库列**
+- [ ] **Step 11: 在商品明细表格 tbody 中添加仓库列**
 
 找到（line 336-340）：
 ```html
@@ -466,11 +568,11 @@ const isDetailExpanded = ref(false)
                   <td class="px-2 py-1 text-muted">{{ item.warehouse_name || '-' }}</td>
 ```
 
-- [ ] **Step 9: 重置展开状态**
+- [ ] **Step 12: 重置展开状态**
 
 在 `closeModal` 方法中添加 `isDetailExpanded.value = false`。
 
-- [ ] **Step 10: 运行 `npm run build` 验证**
+- [ ] **Step 13: 运行 `npm run build` 验证**
 
 ```bash
 cd /Users/lin/Desktop/ERP-4-main/frontend && npm run build
@@ -478,7 +580,7 @@ cd /Users/lin/Desktop/ERP-4-main/frontend && npm run build
 
 Expected: Build succeeds (exit 0)
 
-- [ ] **Step 11: 提交**
+- [ ] **Step 14: 提交**
 
 ```bash
 git add frontend/src/views/CustomersView.vue
@@ -562,7 +664,7 @@ git commit -m "style(VoucherDetailModal): footer 按钮统一 btn-sm"
       </div>
 ```
 
-- [ ] **Step 2: PurchaseOrderForm — 包裹 modal-body**
+- [ ] **Step 2: PurchaseOrderForm — 包裹 modal-body + 迁移 footer**
 
 找到（line 9）：
 ```html
@@ -575,7 +677,26 @@ git commit -m "style(VoucherDetailModal): footer 按钮统一 btn-sm"
         <div class="space-y-4">
 ```
 
-找到表单底部的提交按钮区，将其移到 `modal-footer`。确保 `</div>` 闭合正确。
+找到底部操作按钮区（line 169-173）：
+```html
+        <!-- 操作按钮 -->
+        <div class="flex gap-3 pt-2">
+          <button type="button" @click="close" class="btn btn-secondary flex-1">取消</button>
+          <button type="button" @click="savePurchaseOrder" class="btn btn-primary flex-1" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
+        </div>
+```
+
+将操作按钮 div 移出 `modal-body`，关闭内层 `space-y-4` 和 `modal-body` 的 `</div>` 后，改为 `modal-footer`：
+```html
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" @click="close" class="btn btn-sm btn-secondary">取消</button>
+        <button type="button" @click="savePurchaseOrder" class="btn btn-sm btn-primary" :disabled="appStore.submitting">{{ appStore.submitting ? '提交中...' : '确认提交' }}</button>
+      </div>
+```
+
+确保去掉原来的 `</div></div>` 闭合标签（原 `space-y-4` 和 `p-4` 的闭合），保持 DOM 树平衡。
 
 - [ ] **Step 3: 运行 `npm run build` 验证**
 
