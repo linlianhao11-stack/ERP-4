@@ -593,13 +593,17 @@ async def get_voucher_pdf(
     if not v:
         raise HTTPException(status_code=404, detail="凭证不存在")
     entries = await VoucherEntry.filter(voucher_id=v.id).order_by("line_no").all()
+    # 获取账套名称
+    acct_set = await AccountSet.filter(id=v.account_set_id).first()
     # Build dicts
     voucher_dict = {
         "voucher_no": v.voucher_no,
+        "voucher_type": v.voucher_type,
         "voucher_date": str(v.voucher_date),
-        "attachment_count": 0,
+        "attachment_count": v.attachment_count or 0,
         "total_debit": v.total_debit,
         "total_credit": v.total_credit,
+        "account_set_name": acct_set.name if acct_set else "",
         "creator_name": v.creator.username if v.creator else "",
         "approved_by_name": v.approved_by.username if v.approved_by else "",
         "posted_by_name": v.posted_by.username if v.posted_by else "",
@@ -646,6 +650,10 @@ async def batch_voucher_pdf(
     vouchers = await Voucher.filter(id__in=ids).prefetch_related("creator", "approved_by", "posted_by").all()
     voucher_map = {v.id: v for v in vouchers}
 
+    # 获取账套名称（批量凭证可能属于不同账套）
+    acct_set_ids = {v.account_set_id for v in vouchers}
+    acct_sets = {a.id: a for a in await AccountSet.filter(id__in=list(acct_set_ids)).all()}
+
     # 批量加载所有分录
     all_entries = await VoucherEntry.filter(voucher_id__in=ids).order_by("voucher_id", "line_no").all()
 
@@ -664,12 +672,15 @@ async def batch_voucher_pdf(
         v = voucher_map.get(vid)
         if not v:
             continue
+        acct_set = acct_sets.get(v.account_set_id)
         voucher_dict = {
             "voucher_no": v.voucher_no,
+            "voucher_type": v.voucher_type,
             "voucher_date": str(v.voucher_date),
-            "attachment_count": 0,
+            "attachment_count": v.attachment_count or 0,
             "total_debit": v.total_debit,
             "total_credit": v.total_credit,
+            "account_set_name": acct_set.name if acct_set else "",
             "creator_name": v.creator.username if v.creator else "",
             "approved_by_name": v.approved_by.username if v.approved_by else "",
             "posted_by_name": v.posted_by.username if v.posted_by else "",
