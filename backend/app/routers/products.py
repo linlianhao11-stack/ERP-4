@@ -32,16 +32,20 @@ async def _generate_next_sku() -> str:
 
 @router.get("")
 async def list_products(keyword: Optional[str] = None, category: Optional[str] = None,
+                        brand: Optional[str] = None,
                         warehouse_id: Optional[int] = None,
+                        include_inactive: bool = False,
                         offset: int = 0, limit: int = 200,
                         user: User = Depends(get_current_user)):
     limit = min(limit, 1000)  # 安全上限
-    query = Product.filter(is_active=True)
+    query = Product.all() if include_inactive else Product.filter(is_active=True)
     if keyword:
         for word in keyword.split():
             query = query.filter(Q(sku__icontains=word) | Q(name__icontains=word) | Q(brand__icontains=word) | Q(category__icontains=word))
     if category:
         query = query.filter(category=category)
+    if brand:
+        query = query.filter(brand=brand)
     total = await query.count()
     products = await query.order_by("-updated_at").offset(offset).limit(limit)
 
@@ -59,6 +63,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
     result = []
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
     current_time = now()
+    cutoff = now() - timedelta(days=7)
 
     for p in products:
         stocks = stocks_by_product.get(p.id, [])
@@ -75,7 +80,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
 
         stock_details = []
         for s in stocks:
-            if s.quantity > 0:
+            if s.quantity > 0 or (s.last_activity_at and to_naive(s.last_activity_at) > to_naive(cutoff)):
                 reserved = s.reserved_qty if hasattr(s, 'reserved_qty') else 0
                 stock_details.append({
                     "warehouse_id": s.warehouse_id,
@@ -91,7 +96,9 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
         item = {
             "id": p.id, "sku": p.sku, "name": p.name, "brand": p.brand,
             "category": p.category, "retail_price": float(p.retail_price),
-            "unit": p.unit, "total_stock": total_qty, "age_days": age_days,
+            "unit": p.unit, "tax_rate": float(p.tax_rate),
+            "is_active": p.is_active,
+            "total_stock": total_qty, "age_days": age_days,
             "stocks": stock_details
         }
         if has_finance:
