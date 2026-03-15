@@ -24,6 +24,9 @@
           </select>
         </template>
         <template #actions>
+          <button v-if="selectedCount > 0" @click="handleBatchSubmit" class="btn btn-primary btn-sm">批量提交({{ selectedCount }})</button>
+          <button v-if="selectedCount > 0" @click="handleBatchApprove" class="btn btn-sm" style="background:var(--success-subtle);color:var(--success-emphasis);border:none">批量审核({{ selectedCount }})</button>
+          <button v-if="selectedCount > 0" @click="handleBatchPost" class="btn btn-sm" style="background:var(--purple-subtle);color:var(--purple-emphasis);border:none">批量过账({{ selectedCount }})</button>
           <button v-if="selectedCount > 0" @click="handleBatchPdf" class="btn btn-secondary btn-sm">批量打印({{ selectedCount }})</button>
           <button v-if="hasPermission('accounting_edit')" @click="openCreate" class="btn btn-primary btn-sm">新增凭证</button>
         </template>
@@ -48,12 +51,15 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useAccountingStore } from '../../stores/accounting'
+import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
+import { batchSubmitVouchers, batchApproveVouchers, batchPostVouchers } from '../../api/accounting'
 import PageToolbar from '../common/PageToolbar.vue'
 import VoucherListView from './VoucherListView.vue'
 import VoucherDetailModal from './VoucherDetailModal.vue'
 
 const accountingStore = useAccountingStore()
+const appStore = useAppStore()
 const { hasPermission } = usePermission()
 
 // 筛选条件
@@ -106,5 +112,50 @@ const onSaved = () => {
 
 const handleBatchPdf = () => {
   listViewRef.value?.handleBatchPdf()
+}
+
+const handleBatchSubmit = async () => {
+  const ids = listViewRef.value?.selectedIds || []
+  if (!ids.length) return
+  if (!await appStore.customConfirm('批量提交', `确认提交 ${ids.length} 张凭证？`)) return
+  try {
+    const { data } = await batchSubmitVouchers(ids)
+    const msg = `成功 ${data.success.length} 条` + (data.failed.length ? `，失败 ${data.failed.length} 条` : '')
+    appStore.showToast(msg, data.failed.length ? 'warning' : 'success')
+    if (listViewRef.value) listViewRef.value.selectedIds = []
+    listViewRef.value?.loadList()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
+  }
+}
+
+const handleBatchApprove = async () => {
+  const ids = listViewRef.value?.selectedIds || []
+  if (!ids.length) return
+  if (!await appStore.customConfirm('批量审核', `确认审核 ${ids.length} 张凭证？`)) return
+  try {
+    const { data } = await batchApproveVouchers(ids)
+    const msg = `成功 ${data.success.length} 条` + (data.failed.length ? `，失败 ${data.failed.length} 条` : '')
+    appStore.showToast(msg, data.failed.length ? 'warning' : 'success')
+    if (listViewRef.value) listViewRef.value.selectedIds = []
+    listViewRef.value?.loadList()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
+  }
+}
+
+const handleBatchPost = async () => {
+  const ids = listViewRef.value?.selectedIds || []
+  if (!ids.length) return
+  if (!await appStore.customConfirm('批量过账', `确认过账 ${ids.length} 张凭证？过账后将影响账簿数据。`)) return
+  try {
+    const { data } = await batchPostVouchers(ids)
+    const msg = `成功 ${data.success.length} 条` + (data.failed.length ? `，失败 ${data.failed.length} 条` : '')
+    appStore.showToast(msg, data.failed.length ? 'warning' : 'success')
+    if (listViewRef.value) listViewRef.value.selectedIds = []
+    listViewRef.value?.loadList()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
+  }
 }
 </script>
