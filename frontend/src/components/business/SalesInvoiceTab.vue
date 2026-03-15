@@ -483,7 +483,7 @@ async function handlePush() {
   try {
     await pushInvoiceFromReceivable({
       account_set_id: accountingStore.currentAccountSetId,
-      receivable_bill_id: pushForm.value.receivable_bill_id,
+      receivable_bill_ids: [pushForm.value.receivable_bill_id],
       invoice_type: pushForm.value.invoice_type,
       invoice_date: pushForm.value.invoice_date,
       tax_rate: pushForm.value.tax_rate,
