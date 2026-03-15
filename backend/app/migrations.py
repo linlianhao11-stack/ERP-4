@@ -24,6 +24,7 @@ async def run_migrations():
     await migrate_purchase_returns()
     await migrate_invoice_pdf_files()
     await migrate_ai_readonly_user()
+    await migrate_stock_last_activity()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -859,3 +860,43 @@ async def migrate_ai_readonly_user():
             logger.info("AI 语义视图已创建/更新")
     except Exception as e:
         logger.warning(f"语义视图创建失败: {e}")
+
+
+async def migrate_stock_last_activity():
+    """新增 last_activity_at 字段 + 触发器自动维护"""
+    conn = connections.get("default")
+    await conn.execute_query(
+        "ALTER TABLE warehouse_stocks ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ"
+    )
+    await conn.execute_query(
+        "UPDATE warehouse_stocks SET last_activity_at = updated_at WHERE last_activity_at IS NULL"
+    )
+    await conn.execute_query("""
+        CREATE OR REPLACE FUNCTION trg_update_last_activity()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.last_activity_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+    """)
+    await conn.execute_query(
+        "DROP TRIGGER IF EXISTS trg_stock_last_activity_update ON warehouse_stocks"
+    )
+    await conn.execute_query("""
+        CREATE TRIGGER trg_stock_last_activity_update
+        BEFORE UPDATE ON warehouse_stocks
+        FOR EACH ROW
+        WHEN (OLD.quantity IS DISTINCT FROM NEW.quantity
+              OR OLD.reserved_qty IS DISTINCT FROM NEW.reserved_qty)
+        EXECUTE FUNCTION trg_update_last_activity()
+    """)
+    await conn.execute_query(
+        "DROP TRIGGER IF EXISTS trg_stock_last_activity_insert ON warehouse_stocks"
+    )
+    await conn.execute_query("""
+        CREATE TRIGGER trg_stock_last_activity_insert
+        BEFORE INSERT ON warehouse_stocks
+        FOR EACH ROW
+        EXECUTE FUNCTION trg_update_last_activity()
+    """)
