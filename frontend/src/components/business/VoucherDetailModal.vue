@@ -138,11 +138,11 @@
           <button v-if="isEditing || isCreating" @click="addEntry" class="btn btn-secondary btn-sm mt-2">+ 添加分录</button>
         </div>
         <div class="modal-footer">
-          <button @click="close" class="btn btn-secondary">{{ (isEditing || isCreating) ? '取消' : '关闭' }}</button>
-          <button v-if="isCreating" @click="handleCreate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
-          <button v-if="isEditing" @click="handleUpdate" class="btn btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
-          <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(detailVoucher)" class="btn btn-warning">反过账</button>
-          <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'draft' && hasPermission('accounting_edit')" @click="startEdit" class="btn btn-primary">编辑</button>
+          <button @click="close" class="btn btn-sm btn-secondary">{{ (isEditing || isCreating) ? '取消' : '关闭' }}</button>
+          <button v-if="isCreating" @click="handleCreate" class="btn btn-sm btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
+          <button v-if="isEditing" @click="handleUpdate" class="btn btn-sm btn-primary" :disabled="submitting || totalDebit !== totalCredit">{{ submitting ? '保存中...' : '保存' }}</button>
+          <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'posted' && hasPermission('accounting_post')" @click="handleUnpost(detailVoucher)" class="btn btn-sm btn-warning">反过账</button>
+          <button v-if="!isEditing && !isCreating && detailVoucher?.status === 'draft' && hasPermission('accounting_edit')" @click="startEdit" class="btn btn-sm btn-primary">编辑</button>
         </div>
       </div>
     </div>
