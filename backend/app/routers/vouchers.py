@@ -17,6 +17,10 @@ from app.logger import get_logger
 class BatchPdfRequest(BaseModel):
     ids: List[int]
 
+
+class BatchVoucherRequest(BaseModel):
+    voucher_ids: List[int]
+
 logger = get_logger("vouchers")
 
 router = APIRouter(prefix="/api/vouchers", tags=["凭证管理"])
@@ -74,6 +78,74 @@ async def get_next_voucher_number(
         voucher_no = await _next_voucher_no(account_set_id, voucher_type, period)
     sequence_no = extract_sequence_no(voucher_no)
     return {"voucher_no": voucher_no, "sequence_no": sequence_no}
+
+
+@router.post("/batch-submit")
+async def batch_submit_vouchers(
+    req: BatchVoucherRequest,
+    user: User = Depends(require_permission("accounting_edit")),
+):
+    success = []
+    failed = []
+    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+    for v in vouchers:
+        if v.status != "draft":
+            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是草稿"})
+            continue
+        v.status = "pending"
+        await v.save()
+        success.append(v.id)
+    return {"success": success, "failed": failed}
+
+
+@router.post("/batch-approve")
+async def batch_approve_vouchers(
+    req: BatchVoucherRequest,
+    user: User = Depends(require_permission("accounting_approve")),
+):
+    strict = await SystemSetting.filter(key="voucher_maker_checker").first()
+    success = []
+    failed = []
+    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+    for v in vouchers:
+        if v.status != "pending":
+            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是待审核"})
+            continue
+        if strict and strict.value == "true" and v.creator_id == user.id:
+            failed.append({"id": v.id, "reason": "制单人不能审核自己的凭证"})
+            continue
+        v.status = "approved"
+        v.approved_by = user
+        v.approved_at = datetime.now(timezone.utc)
+        await v.save()
+        success.append(v.id)
+    return {"success": success, "failed": failed}
+
+
+@router.post("/batch-post")
+async def batch_post_vouchers(
+    req: BatchVoucherRequest,
+    user: User = Depends(require_permission("accounting_post")),
+):
+    success = []
+    failed = []
+    vouchers = await Voucher.filter(id__in=req.voucher_ids).all()
+    for v in vouchers:
+        if v.status != "approved":
+            failed.append({"id": v.id, "reason": f"凭证状态为{v.status}，不是已审核"})
+            continue
+        period = await AccountingPeriod.filter(
+            account_set_id=v.account_set_id, period_name=v.period_name
+        ).first()
+        if period and period.is_closed:
+            failed.append({"id": v.id, "reason": "该期间已结账"})
+            continue
+        v.status = "posted"
+        v.posted_by = user
+        v.posted_at = datetime.now(timezone.utc)
+        await v.save()
+        success.append(v.id)
+    return {"success": success, "failed": failed}
 
 
 @router.get("/{voucher_id}")

@@ -164,3 +164,8 @@ export const deleteInvoicePdf = (invoiceId, index) =>
   api.delete(`/invoices/${invoiceId}/pdf/${index}`)
 
 export const getNextVoucherNumber = (params) => api.get('/vouchers/next-number', { params })
+
+// ========== 批量操作 ==========
+export const batchSubmitVouchers = (ids) => api.post('/vouchers/batch-submit', { voucher_ids: ids })
+export const batchApproveVouchers = (ids) => api.post('/vouchers/batch-approve', { voucher_ids: ids })
+export const batchPostVouchers = (ids) => api.post('/vouchers/batch-post', { voucher_ids: ids })
