@@ -73,8 +73,10 @@ export const confirmReceivableWriteOff = (id) => api.post(`/receivables/receivab
 
 export const getSalesReturns = (params) => api.get('/receivables/sales-returns', { params })
 
-export const generateArVouchers = (accountSetId, periodNames) =>
-  api.post('/receivables/generate-ar-vouchers', { period_names: periodNames }, { params: { account_set_id: accountSetId } })
+export const getPendingArBills = (params) => api.get('/receivables/pending-voucher-bills', { params })
+
+export const generateArVouchers = (accountSetId, data) =>
+  api.post('/receivables/generate-ar-vouchers', data, { params: { account_set_id: accountSetId } })
 
 // === 应付管理 ===
 export const getPayableBills = (params) => api.get('/payables/payable-bills', { params })
@@ -95,8 +97,10 @@ export const confirmDisbursementRefundBill = (id) => api.post(`/payables/disburs
 
 export const getPurchaseReturnsForAP = (params) => api.get('/payables/purchase-returns', { params })
 
-export const generateApVouchers = (accountSetId, periodNames) =>
-  api.post('/payables/generate-ap-vouchers', { period_names: periodNames }, { params: { account_set_id: accountSetId } })
+export const getPendingApBills = (params) => api.get('/payables/pending-voucher-bills', { params })
+
+export const generateApVouchers = (accountSetId, data) =>
+  api.post('/payables/generate-ap-vouchers', data, { params: { account_set_id: accountSetId } })
 
 // ========== 出入库单 ==========
 export const getSalesDeliveries = (params) => api.get('/sales-delivery', { params })
