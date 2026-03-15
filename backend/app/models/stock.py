@@ -11,6 +11,7 @@ class WarehouseStock(models.Model):
     weighted_cost = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
     weighted_entry_date = fields.DatetimeField(null=True)
     updated_at = fields.DatetimeField(auto_now=True)
+    last_activity_at = fields.DatetimeField(null=True)
 
     class Meta:
         table = "warehouse_stocks"
