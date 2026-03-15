@@ -49,6 +49,77 @@ def _fmt(val) -> str:
         return str(val)
 
 
+def amount_to_chinese(amount) -> str:
+    """将数字金额转换为中文大写金额，如 9137.00 → 玖仟壹佰叁拾柒元整"""
+    if amount is None:
+        return ""
+    if isinstance(amount, str):
+        amount = Decimal(amount)
+    elif not isinstance(amount, Decimal):
+        amount = Decimal(str(amount))
+
+    if amount < 0:
+        return "负" + amount_to_chinese(-amount)
+    if amount == 0:
+        return "零元整"
+
+    digits = "零壹贰叁肆伍陆柒捌玖"
+    units_int = ["", "拾", "佰", "仟", "万", "拾", "佰", "仟", "亿"]
+    units_dec = ["角", "分"]
+
+    # 分离整数和小数
+    amount = amount.quantize(Decimal("0.01"))
+    s = str(amount)
+    if "." in s:
+        int_part, dec_part = s.split(".")
+    else:
+        int_part, dec_part = s, "00"
+    dec_part = dec_part.ljust(2, "0")[:2]
+
+    result = ""
+    # 整数部分
+    int_val = int(int_part)
+    if int_val > 0:
+        int_str = str(int_val)
+        n = len(int_str)
+        zero_flag = False
+        for i, ch in enumerate(int_str):
+            d = int(ch)
+            unit_idx = n - 1 - i
+            if unit_idx >= len(units_int):
+                unit_idx = len(units_int) - 1
+            if d != 0:
+                if zero_flag:
+                    result += "零"
+                    zero_flag = False
+                result += digits[d] + units_int[unit_idx]
+            else:
+                zero_flag = True
+                # 万、亿位即使为零也要加单位
+                if unit_idx == 4 and not result.endswith("亿"):
+                    result += "万"
+                elif unit_idx == 8:
+                    result += "亿"
+        result += "元"
+    else:
+        result = "零元"
+
+    # 小数部分
+    jiao = int(dec_part[0])
+    fen = int(dec_part[1])
+    if jiao == 0 and fen == 0:
+        result += "整"
+    else:
+        if jiao > 0:
+            result += digits[jiao] + "角"
+        elif int_val > 0:
+            result += "零"
+        if fen > 0:
+            result += digits[fen] + "分"
+
+    return result
+
+
 def generate_voucher_pdf(voucher: dict, entries: list[dict]) -> bytes:
     """生成记账凭证 PDF"""
     _ensure_font()
