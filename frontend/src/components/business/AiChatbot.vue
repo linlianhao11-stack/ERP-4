@@ -57,7 +57,7 @@
           placeholder="输入你的问题..."
           aria-label="输入你的问题"
           rows="1"
-          @keydown.enter.exact.prevent="handleSend(input)"
+          @keydown.enter.exact="handleEnter"
           @input="autoResize"
         />
         <button class="ai-send-btn" @click="handleSend(input)" :disabled="!input.trim() || loading">
@@ -118,6 +118,12 @@ const scrollToBottom = () => {
 // 监听消息变化自动滚动
 watch(() => messages.value.length, scrollToBottom)
 watch(loading, scrollToBottom)
+
+const handleEnter = (e) => {
+  if (e.isComposing) return
+  e.preventDefault()
+  handleSend(input.value)
+}
 
 const handleSend = async (text, options) => {
   if (!text || !text.trim()) return
