@@ -22,17 +22,20 @@ AI Chat 当前存在多个影响用户体验的问题：预设查询匹配过于
 #### 前端 — `useAiChat.js`
 - `sendMessage(text, options)` 新增第二参数 `options`，支持 `{ preset: true }`
 - 请求体 `body` 新增 `is_preset` 布尔字段
-- 欢迎页按钮（AiWelcome.vue）和建议标签（AiMessage.vue）的点击事件传 `{ preset: true }`
+- `retryMessage` 调用 `sendMessage` 时不传 options，即重试始终走 LLM 路径（正确行为：重试说明原始结果有问题，应该让 LLM 重新生成）
 
 #### 前端 — `AiChatbot.vue`
 - `handleSend(text)` 改为 `handleSend(text, options)`
 - 将 options 透传给 `sendMessage`
 
 #### 前端 — `AiWelcome.vue`
-- `@send` emit 时附带 `{ preset: true }` 标记
+- **预设查询按钮**的 `@send` emit 时附带 `{ preset: true }` 标记
+- **收藏按钮**的 `@send` emit **不带** preset 标记（收藏是用户之前的自由输入，应走 LLM 路径）
 
 #### 前端 — `AiMessage.vue`
-- 建议标签和澄清选项的 `@select-option` emit 时附带 `{ preset: true }` 标记
+- **建议标签**（suggestions）的 `@select-option` emit 时附带 `{ preset: true }` 标记
+- **澄清选项**（clarification options）**不带** preset 标记（澄清是对话上下文中的动态选项，需走 LLM）
+- **重新查询按钮**（过期数据）**不带** preset 标记
 
 #### 后端 — `schemas/ai.py`
 - `ChatRequest` 新增 `is_preset: bool = Field(default=False)`
@@ -41,6 +44,7 @@ AI Chat 当前存在多个影响用户体验的问题：预设查询匹配过于
 - `process_chat` 和 `_process_chat_inner` 新增 `is_preset` 参数
 - 只有 `is_preset=True` 时才执行 `classify_intent()`
 - `is_preset=False`（用户手动输入）直接跳过意图分类，走 LLM 路径
+- `is_preset=True` 时跳过查询缓存（预设查询本身已极快，无需缓存；避免 preset/非 preset 同文本命中同一缓存返回不同结果）
 
 #### 后端 — `routers/ai_chat.py`
 - `ai_chat` 将 `body.is_preset` 传给 `process_chat`
@@ -125,18 +129,18 @@ AI Chat 当前存在多个影响用户体验的问题：预设查询匹配过于
 - 输出：`displayText` ref，逐字符递增
 - 速度：每字符 20ms，总长度 > 200 字时降至 8ms
 - 在 AiMessage.vue 中，新消息（非历史恢复）的 analysis 使用打字机效果
-- 历史消息直接全量显示（通过判断 `msg._expired` 或消息是否在初始化时已存在）
+- 历史消息直接全量显示：在 `restoreFromStorage` 中对**所有**恢复的消息设置 `_isRestored: true` 标记（不仅是有 table_data 的），打字机根据 `_isRestored` 判断是否跳过
 
 #### 5c. 表格高度优化 — `AiMessage.vue` + `AiChatbot.vue`
 - AiChatbot 通过 `provide('aiExpanded', expanded)` 传递窗口状态
 - AiMessage 通过 `inject('aiExpanded')` 接收
-- 表格 max-height：普通窗口 `200px`，展开窗口 `350px`
+- 表格 max-height：普通窗口 `250px`（从当前 300px 略降，给分析文本留更多空间），展开窗口 `400px`
 
 ---
 
 ## 涉及文件清单
 
-### 后端（4 文件）
+### 后端（5 文件）
 | 文件 | 改动类型 |
 |------|---------|
 | `backend/app/schemas/ai.py` | ChatRequest 新增 is_preset 字段 |
