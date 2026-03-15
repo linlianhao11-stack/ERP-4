@@ -44,6 +44,8 @@ class ChartOfAccountCreate(BaseModel):
     aux_supplier: bool = False
     aux_employee: bool = False
     aux_department: bool = False
+    aux_product: bool = False
+    aux_bank: bool = False
 
 
 class ChartOfAccountUpdate(BaseModel):
@@ -54,6 +56,8 @@ class ChartOfAccountUpdate(BaseModel):
     aux_supplier: Optional[bool] = None
     aux_employee: Optional[bool] = None
     aux_department: Optional[bool] = None
+    aux_product: Optional[bool] = None
+    aux_bank: Optional[bool] = None
 
 
 # === 凭证 ===
@@ -67,6 +71,8 @@ class VoucherEntryInput(BaseModel):
     aux_supplier_id: Optional[int] = None
     aux_employee_id: Optional[int] = None
     aux_department_id: Optional[int] = None
+    aux_product_id: Optional[int] = None
+    aux_bank_account_id: Optional[int] = None
 
 
 class VoucherCreate(BaseModel):

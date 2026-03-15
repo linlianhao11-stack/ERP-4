@@ -176,7 +176,7 @@ async def list_voucher_entries(
         )
     total = await query.count()
     entries = await query.offset((page - 1) * page_size).limit(page_size) \
-        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department") \
+        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department", "aux_product", "aux_bank_account") \
         .order_by("voucher__voucher_no", "line_no")
 
     items = []
@@ -191,6 +191,10 @@ async def list_voucher_entries(
             aux_parts.append(f"员工:{e.aux_employee.name}")
         if e.aux_department:
             aux_parts.append(f"部门:{e.aux_department.name}")
+        if e.aux_product:
+            aux_parts.append(f"商品:{e.aux_product.name}")
+        if e.aux_bank_account:
+            aux_parts.append(f"银行:{e.aux_bank_account.short_name or e.aux_bank_account.bank_name}")
         items.append({
             "id": e.id,
             "voucher_id": v.id,
@@ -231,7 +235,7 @@ async def export_voucher_entries(
             Q(summary__icontains=search) | Q(account__name__icontains=search) | Q(account__code__icontains=search)
         )
     entries = await query.limit(10000) \
-        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department") \
+        .select_related("voucher", "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department", "aux_product", "aux_bank_account") \
         .order_by("voucher__voucher_no", "line_no")
 
     wb = openpyxl.Workbook()
@@ -250,6 +254,10 @@ async def export_voucher_entries(
             aux_parts.append(f"员工:{e.aux_employee.name}")
         if e.aux_department:
             aux_parts.append(f"部门:{e.aux_department.name}")
+        if e.aux_product:
+            aux_parts.append(f"商品:{e.aux_product.name}")
+        if e.aux_bank_account:
+            aux_parts.append(f"银行:{e.aux_bank_account.short_name or e.aux_bank_account.bank_name}")
         ws.append([
             str(v.voucher_date), v.period_name, v.voucher_type,
             extract_sequence_no(v.voucher_no),
@@ -281,7 +289,7 @@ async def get_voucher(
     if not v:
         raise HTTPException(status_code=404, detail="凭证不存在")
     entries = await VoucherEntry.filter(voucher=v).order_by("line_no").prefetch_related(
-        "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department"
+        "account", "aux_customer", "aux_supplier", "aux_employee", "aux_department", "aux_product", "aux_bank_account"
     )
     return {
         "id": v.id, "voucher_type": v.voucher_type,
@@ -305,10 +313,14 @@ async def get_voucher(
             "aux_supplier_id": e.aux_supplier_id,
             "aux_employee_id": e.aux_employee_id,
             "aux_department_id": e.aux_department_id,
+            "aux_product_id": e.aux_product_id,
+            "aux_bank_account_id": e.aux_bank_account_id,
             "aux_customer_name": e.aux_customer.name if e.aux_customer else None,
             "aux_supplier_name": e.aux_supplier.name if e.aux_supplier else None,
             "aux_employee_name": e.aux_employee.name if e.aux_employee else None,
             "aux_department_name": e.aux_department.name if e.aux_department else None,
+            "aux_product_name": e.aux_product.name if e.aux_product else None,
+            "aux_bank_account_name": (e.aux_bank_account.short_name or e.aux_bank_account.bank_name) if e.aux_bank_account else None,
         } for e in entries],
     }
 
@@ -383,6 +395,8 @@ async def create_voucher(
                 aux_supplier_id=entry.aux_supplier_id,
                 aux_employee_id=entry.aux_employee_id,
                 aux_department_id=entry.aux_department_id,
+                aux_product_id=entry.aux_product_id,
+                aux_bank_account_id=entry.aux_bank_account_id,
             )
 
     logger.info(f"创建凭证: {voucher_no}")
@@ -448,6 +462,8 @@ async def update_voucher(
                     aux_supplier_id=entry.aux_supplier_id,
                     aux_employee_id=entry.aux_employee_id,
                     aux_department_id=entry.aux_department_id,
+                    aux_product_id=entry.aux_product_id,
+                    aux_bank_account_id=entry.aux_bank_account_id,
                 )
             update_fields["total_debit"] = total_debit
             update_fields["total_credit"] = total_credit
