@@ -34,6 +34,7 @@
           <thead class="bg-elevated">
             <tr>
               <th v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2 w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
+              <th v-if="voucherIsColumnVisible('voucher_type_col')" class="px-3 py-2">凭证字</th>
               <th v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
               <th v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">日期</th>
               <th v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">摘要</th>
@@ -51,7 +52,8 @@
           <tbody class="divide-y">
             <tr v-for="v in vouchers" :key="v.id" @click="viewVoucher(v.id)" class="cursor-pointer hover:bg-elevated">
               <td v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
-              <td v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2 font-medium max-w-48 truncate" :title="v.voucher_no">{{ v.voucher_no }}</td>
+              <td v-if="voucherIsColumnVisible('voucher_type_col')" class="px-3 py-2 font-medium">{{ v.voucher_type }}</td>
+              <td v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2 font-medium">{{ v.sequence_no }}</td>
               <td v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">{{ v.voucher_date }}</td>
               <td v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">{{ v.summary || '-' }}</td>
               <td v-if="voucherIsColumnVisible('total_debit')" class="px-3 py-2 text-right">{{ formatAmount(v.total_debit) }}</td>
@@ -139,8 +141,10 @@
                 <thead>
                   <tr>
                     <th class="w-8">#</th>
-                    <th>科目</th>
                     <th>摘要</th>
+                    <th>科目编码</th>
+                    <th>科目名称</th>
+                    <th>核算维度</th>
                     <th class="w-32">借方金额</th>
                     <th class="w-32">贷方金额</th>
                     <th v-if="isEditing || isCreating" class="w-10"></th>
@@ -150,12 +154,22 @@
                   <tr v-for="(entry, idx) in editForm.entries" :key="idx">
                     <td>{{ idx + 1 }}</td>
                     <td>
+                      <input v-if="isEditing || isCreating" v-model="entry.summary" class="input text-xs">
+                      <span v-else>{{ entry.summary }}</span>
+                    </td>
+                    <td>
                       <select v-if="isEditing || isCreating" v-model="entry.account_id" class="input text-xs">
                         <option v-for="a in leafAccounts" :key="a.id" :value="a.id">{{ a.code }} {{ a.name }}</option>
                       </select>
-                      <span v-else>{{ entry.account_code }} {{ entry.account_name }}</span>
-                      <!-- 辅助核算选择器 -->
-                      <div v-if="(isEditing || isCreating) && entry.account_id" class="flex flex-wrap gap-1 mt-1">
+                      <span v-else>{{ entry.account_code }}</span>
+                    </td>
+                    <td>
+                      <span v-if="isEditing || isCreating">{{ getAccountById(entry.account_id)?.name || '' }}</span>
+                      <span v-else>{{ entry.account_name }}</span>
+                    </td>
+                    <td>
+                      <!-- 编辑模式下的辅助核算选择器 -->
+                      <div v-if="(isEditing || isCreating) && entry.account_id" class="flex flex-wrap gap-1">
                         <select v-if="getAccountById(entry.account_id)?.aux_customer" v-model="entry.aux_customer_id" class="input text-xs" style="max-width:140px">
                           <option :value="null">客户…</option>
                           <option v-for="c in customerList" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -174,16 +188,12 @@
                         </select>
                       </div>
                       <!-- 查看模式下显示辅助核算名称 -->
-                      <div v-if="!(isEditing || isCreating) && (entry.aux_customer_name || entry.aux_supplier_name || entry.aux_employee_name || entry.aux_department_name)" class="flex flex-wrap gap-1 mt-0.5 text-[11px] text-muted">
+                      <div v-if="!(isEditing || isCreating)" class="flex flex-wrap gap-1 text-[11px] text-muted">
                         <span v-if="entry.aux_customer_name" class="badge badge-blue">{{ entry.aux_customer_name }}</span>
                         <span v-if="entry.aux_supplier_name" class="badge badge-orange">{{ entry.aux_supplier_name }}</span>
                         <span v-if="entry.aux_employee_name" class="badge badge-green">{{ entry.aux_employee_name }}</span>
                         <span v-if="entry.aux_department_name" class="badge badge-purple">{{ entry.aux_department_name }}</span>
                       </div>
-                    </td>
-                    <td>
-                      <input v-if="isEditing || isCreating" v-model="entry.summary" class="input text-xs">
-                      <span v-else>{{ entry.summary }}</span>
                     </td>
                     <td>
                       <input v-if="isEditing || isCreating" type="number" v-model.number="entry.debit_amount" class="input text-right text-xs" min="0" step="0.01">
@@ -200,7 +210,7 @@
                 </tbody>
                 <tfoot>
                   <tr class="font-semibold">
-                    <td colspan="3" class="text-right">合计</td>
+                    <td colspan="5" class="text-right">合计</td>
                     <td class="text-right">{{ formatAmount(totalDebit) }}</td>
                     <td class="text-right">{{ formatAmount(totalCredit) }}</td>
                     <td v-if="isEditing || isCreating"></td>
@@ -272,6 +282,7 @@ const menuTriggerRefs = ref([])
 
 const voucherColumnDefs = {
   checkbox: { label: '选择', defaultVisible: true },
+  voucher_type_col: { label: '凭证字', defaultVisible: true },
   voucher_no: { label: '凭证号', defaultVisible: true },
   voucher_date: { label: '日期', defaultVisible: true },
   summary: { label: '摘要', defaultVisible: true },
