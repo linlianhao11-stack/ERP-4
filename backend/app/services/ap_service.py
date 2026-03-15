@@ -4,6 +4,7 @@ from __future__ import annotations
 import calendar
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from typing import Optional
 from tortoise import transactions
 from app.models.ar_ap import PayableBill, DisbursementBill, DisbursementRefundBill
 from app.models.purchase import PurchaseReturn, PurchaseReturnItem, PurchaseOrderItem
@@ -18,12 +19,12 @@ logger = get_logger("ap_service")
 async def create_payable_bill(
     account_set_id: int,
     supplier_id: int,
-    purchase_order_id: int | None = None,
+    purchase_order_id: Optional[int] = None,
     total_amount: Decimal = Decimal("0"),
     status: str = "pending",
     creator=None,
     remark: str = "",
-    bill_date: date | None = None,
+    bill_date: Optional[date] = None,
 ) -> PayableBill:
     if bill_date is None:
         bill_date = date.today()
@@ -49,7 +50,7 @@ async def create_payable_bill(
 async def create_disbursement_for_po_payment(
     account_set_id: int,
     supplier_id: int,
-    payable_bill: PayableBill | None,
+    payable_bill: Optional[PayableBill],
     amount: Decimal,
     disbursement_method: str,
     creator=None,

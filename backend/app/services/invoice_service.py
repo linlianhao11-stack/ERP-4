@@ -55,13 +55,21 @@ async def push_invoice_from_receivable(
     if len(customer_ids) > 1:
         raise ValueError("多张应收单必须属于同一客户")
 
-    # 防重复：检查 receivable_bill_id FK
-    first_id = receivable_bill_ids[0]
-    existing = await Invoice.filter(
-        receivable_bill_id=first_id, status__not="cancelled"
+    # 防重复：检查所有 bill_id 的 FK 关联 + JSON 字段引用
+    existing_by_fk = await Invoice.filter(
+        receivable_bill_id__in=receivable_bill_ids, status__not="cancelled"
     ).first()
-    if existing:
-        raise ValueError(f"应收单已关联发票 {existing.invoice_no}，请勿重复推送")
+    if existing_by_fk:
+        raise ValueError(f"应收单已关联发票 {existing_by_fk.invoice_no}，请勿重复推送")
+    # 检查 JSON 字段中的引用
+    all_invoices = await Invoice.filter(
+        account_set_id=account_set_id, status__not="cancelled",
+        source_receivable_bill_ids__not=[]
+    ).all()
+    for inv in all_invoices:
+        overlap = set(inv.source_receivable_bill_ids or []) & set(receivable_bill_ids)
+        if overlap:
+            raise ValueError(f"应收单已包含在发票 {inv.invoice_no} 中，请勿重复推送")
 
     if invoice_date is None:
         invoice_date = date.today()
@@ -94,35 +102,36 @@ async def push_invoice_from_receivable(
         total_amount += amount
         item_data.append({**it, "amount_without_tax": without_tax, "tax_amount": tax, "amount": amount})
 
-    invoice = await Invoice.create(
-        invoice_no=generate_order_no("XS"),
-        invoice_type=invoice_type,
-        direction="output",
-        account_set_id=account_set_id,
-        customer_id=rbs[0].customer_id,
-        receivable_bill_id=first_id,
-        source_receivable_bill_ids=receivable_bill_ids,
-        invoice_date=invoice_date,
-        total_amount=total_amount,
-        amount_without_tax=total_without_tax,
-        tax_amount=total_tax,
-        status="draft",
-        remark=remark,
-        creator=creator,
-    )
-
-    for it in item_data:
-        await InvoiceItem.create(
-            invoice=invoice,
-            product_id=it.get("product_id"),
-            product_name=it["product_name"],
-            quantity=it["quantity"],
-            unit_price=Decimal(str(it["unit_price"])),
-            tax_rate=Decimal(str(it.get("tax_rate", "13"))),
-            tax_amount=it["tax_amount"],
-            amount_without_tax=it["amount_without_tax"],
-            amount=it["amount"],
+    async with transactions.in_transaction():
+        invoice = await Invoice.create(
+            invoice_no=generate_order_no("XS"),
+            invoice_type=invoice_type,
+            direction="output",
+            account_set_id=account_set_id,
+            customer_id=rbs[0].customer_id,
+            receivable_bill_id=receivable_bill_ids[0],
+            source_receivable_bill_ids=receivable_bill_ids,
+            invoice_date=invoice_date,
+            total_amount=total_amount,
+            amount_without_tax=total_without_tax,
+            tax_amount=total_tax,
+            status="draft",
+            remark=remark,
+            creator=creator,
         )
+
+        for it in item_data:
+            await InvoiceItem.create(
+                invoice=invoice,
+                product_id=it.get("product_id"),
+                product_name=it["product_name"],
+                quantity=it["quantity"],
+                unit_price=Decimal(str(it["unit_price"])),
+                tax_rate=Decimal(str(it.get("tax_rate", "13"))),
+                tax_amount=it["tax_amount"],
+                amount_without_tax=it["amount_without_tax"],
+                amount=it["amount"],
+            )
 
     logger.info(f"从应收单推送生成销项发票: {invoice.invoice_no}, 源单据: {receivable_bill_ids}")
     return invoice
@@ -154,13 +163,21 @@ async def push_invoice_from_payable(
     if len(supplier_ids) > 1:
         raise ValueError("多张应付单必须属于同一供应商")
 
-    # 防重复：检查 payable_bill_id FK
-    first_id = payable_bill_ids[0]
-    existing = await Invoice.filter(
-        payable_bill_id=first_id, status__not="cancelled"
+    # 防重复：检查所有 bill_id 的 FK 关联 + JSON 字段引用
+    existing_by_fk = await Invoice.filter(
+        payable_bill_id__in=payable_bill_ids, status__not="cancelled"
     ).first()
-    if existing:
-        raise ValueError(f"应付单已关联发票 {existing.invoice_no}，请勿重复推送")
+    if existing_by_fk:
+        raise ValueError(f"应付单已关联发票 {existing_by_fk.invoice_no}，请勿重复推送")
+    # 检查 JSON 字段中的引用
+    all_invoices = await Invoice.filter(
+        account_set_id=account_set_id, status__not="cancelled",
+        source_payable_bill_ids__not=[]
+    ).all()
+    for inv in all_invoices:
+        overlap = set(inv.source_payable_bill_ids or []) & set(payable_bill_ids)
+        if overlap:
+            raise ValueError(f"应付单已包含在发票 {inv.invoice_no} 中，请勿重复推送")
 
     if invoice_date is None:
         invoice_date = date.today()
@@ -193,35 +210,36 @@ async def push_invoice_from_payable(
         total_amount += amount
         item_data.append({**it, "amount_without_tax": without_tax, "tax_amount": tax, "amount": amount})
 
-    invoice = await Invoice.create(
-        invoice_no=generate_order_no("JX"),
-        invoice_type=invoice_type,
-        direction="input",
-        account_set_id=account_set_id,
-        supplier_id=pbs[0].supplier_id,
-        payable_bill_id=first_id,
-        source_payable_bill_ids=payable_bill_ids,
-        invoice_date=invoice_date,
-        total_amount=total_amount,
-        amount_without_tax=total_without_tax,
-        tax_amount=total_tax,
-        status="draft",
-        remark=remark,
-        creator=creator,
-    )
-
-    for it in item_data:
-        await InvoiceItem.create(
-            invoice=invoice,
-            product_id=it.get("product_id"),
-            product_name=it["product_name"],
-            quantity=it["quantity"],
-            unit_price=Decimal(str(it["unit_price"])),
-            tax_rate=Decimal(str(it.get("tax_rate", "13"))),
-            tax_amount=it["tax_amount"],
-            amount_without_tax=it["amount_without_tax"],
-            amount=it["amount"],
+    async with transactions.in_transaction():
+        invoice = await Invoice.create(
+            invoice_no=generate_order_no("JX"),
+            invoice_type=invoice_type,
+            direction="input",
+            account_set_id=account_set_id,
+            supplier_id=pbs[0].supplier_id,
+            payable_bill_id=payable_bill_ids[0],
+            source_payable_bill_ids=payable_bill_ids,
+            invoice_date=invoice_date,
+            total_amount=total_amount,
+            amount_without_tax=total_without_tax,
+            tax_amount=total_tax,
+            status="draft",
+            remark=remark,
+            creator=creator,
         )
+
+        for it in item_data:
+            await InvoiceItem.create(
+                invoice=invoice,
+                product_id=it.get("product_id"),
+                product_name=it["product_name"],
+                quantity=it["quantity"],
+                unit_price=Decimal(str(it["unit_price"])),
+                tax_rate=Decimal(str(it.get("tax_rate", "13"))),
+                tax_amount=it["tax_amount"],
+                amount_without_tax=it["amount_without_tax"],
+                amount=it["amount"],
+            )
 
     logger.info(f"从应付单推送生成进项发票: {invoice.invoice_no}, 源单据: {payable_bill_ids}")
     return invoice

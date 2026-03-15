@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from datetime import date
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class InvoiceItemCreate(BaseModel):
@@ -26,8 +26,8 @@ class InvoiceFromReceivable(BaseModel):
 
 class InvoiceFromReceivableBatch(BaseModel):
     """多张应收单合并推送销项发票"""
-    receivable_bill_ids: List[int]
-    invoice_type: str = "special"
+    receivable_bill_ids: List[int] = Field(min_length=1)
+    invoice_type: Literal["special", "normal"] = "special"
     invoice_date: Optional[date] = None
     tax_rate: Decimal = Field(max_digits=5, decimal_places=2, default=Decimal("13"))
     items: List[InvoiceItemCreate] = []
@@ -36,8 +36,8 @@ class InvoiceFromReceivableBatch(BaseModel):
 
 class InvoiceFromPayable(BaseModel):
     """从应付单推送进项发票"""
-    payable_bill_ids: List[int]
-    invoice_type: str = "special"
+    payable_bill_ids: List[int] = Field(min_length=1)
+    invoice_type: Literal["special", "normal"] = "special"
     invoice_date: Optional[date] = None
     tax_rate: Decimal = Field(max_digits=5, decimal_places=2, default=Decimal("13"))
     items: List[InvoiceItemCreate] = []

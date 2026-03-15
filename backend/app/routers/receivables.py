@@ -1,9 +1,11 @@
 """应收管理 API"""
 from __future__ import annotations
 
+import calendar
+from datetime import date as _date, datetime as _datetime, timezone as _tz
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from tortoise.expressions import Q
-from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import require_permission
 from app.models import User, Customer
@@ -13,6 +15,7 @@ from app.models.ar_ap import ReceivableBill, ReceiptBill, ReceiptRefundBill, Rec
 from app.schemas.ar_ap import (
     ReceivableBillCreate, ReceiptBillCreate, ReceiptRefundBillCreate, ReceivableWriteOffCreate,
 )
+from app.schemas.voucher_gen import BillRef, GenerateVouchersRequest
 from app.services.ar_service import (
     create_receivable_bill, confirm_receipt_bill, confirm_receipt_refund,
     confirm_write_off, generate_ar_vouchers,
@@ -466,10 +469,8 @@ async def list_pending_voucher_bills(
     user: User = Depends(require_permission("accounting_ar_view")),
 ):
     """查询指定期间待生成凭证的单据"""
-    import calendar
     year, month = int(period[:4]), int(period[5:7])
     _, last_day = calendar.monthrange(year, month)
-    from datetime import date as _date
     period_start = _date(year, month, 1)
     period_end = _date(year, month, last_day)
     result = []
@@ -523,7 +524,6 @@ async def list_pending_voucher_bills(
         })
 
     # 销售退货单
-    from datetime import datetime as _datetime, timezone as _tz
     return_orders = await Order.filter(
         account_set_id=account_set_id,
         order_type="RETURN",
@@ -549,17 +549,6 @@ async def list_pending_voucher_bills(
 
 
 # ── 期末凭证生成 ──
-
-from typing import Optional, List
-
-class BillRef(BaseModel):
-    id: int
-    type: str
-
-class GenerateVouchersRequest(BaseModel):
-    period_names: Optional[List[str]] = None
-    bills: Optional[List[BillRef]] = None
-    merge_by_partner: bool = False
 
 @router.post("/generate-ar-vouchers")
 async def generate_ar_vouchers_endpoint(

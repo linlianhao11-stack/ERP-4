@@ -1,9 +1,11 @@
 """应付管理 API"""
 from __future__ import annotations
 
+import calendar
+from datetime import date as _date, datetime as _datetime, timezone as _tz
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from tortoise.expressions import Q
-from pydantic import BaseModel
 from tortoise import transactions
 from app.auth.dependencies import require_permission
 from app.models import User, Supplier
@@ -13,6 +15,7 @@ from app.models.purchase import PurchaseReturn
 from app.schemas.ar_ap import (
     PayableBillCreate, DisbursementBillCreate, DisbursementRefundBillCreate,
 )
+from app.schemas.voucher_gen import BillRef, GenerateVouchersRequest
 from app.services.ap_service import (
     create_payable_bill, confirm_disbursement_bill,
     confirm_disbursement_refund, generate_ap_vouchers,
@@ -372,10 +375,8 @@ async def list_pending_voucher_bills(
     user: User = Depends(require_permission("accounting_ap_view")),
 ):
     """查询指定期间待生成凭证的单据"""
-    import calendar
     year, month = int(period[:4]), int(period[5:7])
     _, last_day = calendar.monthrange(year, month)
-    from datetime import date as _date, datetime as _datetime, timezone as _tz
     period_start = _date(year, month, 1)
     period_end = _date(year, month, last_day)
     result = []
@@ -436,17 +437,6 @@ async def list_pending_voucher_bills(
 
 
 # ── 期末凭证生成 ──
-
-from typing import Optional, List
-
-class BillRef(BaseModel):
-    id: int
-    type: str
-
-class GenerateVouchersRequest(BaseModel):
-    period_names: Optional[List[str]] = None
-    bills: Optional[List[BillRef]] = None
-    merge_by_partner: bool = False
 
 @router.post("/generate-ap-vouchers")
 async def generate_ap_vouchers_endpoint(
