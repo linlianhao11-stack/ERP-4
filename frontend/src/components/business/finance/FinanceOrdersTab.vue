@@ -121,6 +121,7 @@
                       <tr class="text-muted border-b">
                         <th class="px-2 py-1.5 text-left font-medium">商品SKU</th>
                         <th class="px-2 py-1.5 text-left font-medium">商品名称</th>
+                        <th class="px-2 py-1.5 text-left font-medium">仓库</th>
                         <th class="px-2 py-1.5 text-center font-medium">数量</th>
                         <th class="px-2 py-1.5 text-right font-medium">单价</th>
                         <th v-if="hasPermission('finance')" class="px-2 py-1.5 text-right font-medium">成本价</th>
@@ -133,6 +134,7 @@
                       <tr v-for="item in expandedItems[o.id]" :key="item.id">
                         <td class="px-2 py-1.5 text-primary font-mono">{{ item.product_sku }}</td>
                         <td class="px-2 py-1.5">{{ item.product_name }}</td>
+                        <td class="px-2 py-1.5 text-muted">{{ item.warehouse_name || '-' }}</td>
                         <td class="px-2 py-1.5 text-center">{{ item.quantity }}</td>
                         <td class="px-2 py-1.5 text-right">&#xA5;{{ fmt(item.unit_price) }}</td>
                         <td v-if="hasPermission('finance')" class="px-2 py-1.5 text-right">&#xA5;{{ fmt(item.cost_price) }}</td>
@@ -181,11 +183,17 @@
   </div>
 
   <!-- ============ 弹窗：订单详情 ============ -->
-  <div v-if="showOrderDetailModal" class="modal-overlay" @click.self="showOrderDetailModal = false; showReturnForm = false">
-    <div class="modal-content" style="max-width:920px">
+  <div v-if="showOrderDetailModal" class="modal-overlay" @click.self="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false">
+    <div class="modal-content" :class="{ 'modal-expanded': isDetailExpanded }" style="max-width:920px">
       <div class="modal-header">
         <h3 class="font-semibold">订单详情</h3>
-        <button @click="showOrderDetailModal = false; showReturnForm = false" class="modal-close">&times;</button>
+        <div class="flex items-center gap-1">
+          <button @click="isDetailExpanded = !isDetailExpanded" class="modal-expand-btn hidden md:inline-flex" :aria-label="isDetailExpanded ? '收起弹窗' : '展开弹窗'">
+            <Minimize2 v-if="isDetailExpanded" :size="16" />
+            <Maximize2 v-else :size="16" />
+          </button>
+          <button @click="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false" class="modal-close">&times;</button>
+        </div>
       </div>
       <div class="modal-body" v-if="orderDetail.order_no">
         <!-- 订单基本信息 -->
@@ -264,6 +272,7 @@
                 <thead class="bg-elevated" v-if="gIdx === 0 || detailItemsByAccountSet.length > 1">
                   <tr>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">仓库</th>
                     <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
                     <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">数量</th>
                     <th v-if="orderDetail.rebate_used > 0" class="px-3 py-2 text-right text-xs font-semibold text-secondary">返利</th>
@@ -277,6 +286,7 @@
                       <div class="font-medium">{{ item.product_name }}</div>
                       <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
                     </td>
+                    <td class="px-3 py-2.5 text-muted">{{ item.warehouse_name || '-' }}</td>
                     <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
                     <td class="px-3 py-2.5 text-right">{{ item.quantity }}</td>
                     <td v-if="orderDetail.rebate_used > 0" class="px-3 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
@@ -403,10 +413,10 @@
         </div>
       </div>
       <!-- 底部操作按钮（独立于滚动区域） -->
-      <div v-if="!showReturnForm" class="flex gap-3 px-6 py-4 border-t border-line">
-        <button type="button" @click="showOrderDetailModal = false; showReturnForm = false" class="btn btn-secondary flex-1">关闭</button>
-        <button v-if="canReturn" type="button" @click="openReturnForm" class="btn btn-primary flex-1">销售退货</button>
-        <button v-if="orderDetail.shipping_status && ['pending', 'partial'].includes(orderDetail.shipping_status)" type="button" @click="handleCancelOrder(orderDetail.id)" class="btn flex-1" style="background:var(--error);color:#fff">取消订单</button>
+      <div v-if="!showReturnForm" class="modal-footer">
+        <button type="button" @click="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false" class="btn btn-secondary btn-sm">关闭</button>
+        <button v-if="canReturn" type="button" @click="openReturnForm" class="btn btn-primary btn-sm">销售退货</button>
+        <button v-if="orderDetail.shipping_status && ['pending', 'partial'].includes(orderDetail.shipping_status)" type="button" @click="handleCancelOrder(orderDetail.id)" class="btn btn-sm" style="background:var(--error);color:#fff">取消订单</button>
       </div>
     </div>
   </div>
@@ -580,7 +590,7 @@ import { getOrder, cancelOrder, cancelPreview, createOrder } from '../../../api/
 import { getLocations } from '../../../api/warehouses'
 import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import StatusBadge from '../../common/StatusBadge.vue'
-import { RotateCcw, Search } from 'lucide-vue-next'
+import { RotateCcw, Search, Maximize2, Minimize2 } from 'lucide-vue-next'
 import ColumnMenu from '../../common/ColumnMenu.vue'
 import PageToolbar from '../../common/PageToolbar.vue'
 import DateRangePicker from '../../common/DateRangePicker.vue'
@@ -701,6 +711,8 @@ const allOrders = ref([])
 
 /** 订单详情弹窗可见性 */
 const showOrderDetailModal = ref(false)
+/** 订单详情弹窗展开状态 */
+const isDetailExpanded = ref(false)
 /** 订单详情数据 */
 const orderDetail = reactive({})
 
