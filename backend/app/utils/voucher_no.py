@@ -20,3 +20,12 @@ async def next_voucher_no(account_set_id: int, voucher_type: str, period_name: s
     else:
         seq = 1
     return f"{prefix}{seq:03d}"
+
+
+def extract_sequence_no(voucher_no: str) -> int:
+    """从复合凭证号 'A01-记-202603-007' 中提取序号 7"""
+    parts = voucher_no.rsplit("-", 1)
+    try:
+        return int(parts[-1])
+    except (ValueError, IndexError):
+        return 0

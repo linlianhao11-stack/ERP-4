@@ -22,7 +22,7 @@ logger = get_logger("vouchers")
 router = APIRouter(prefix="/api/vouchers", tags=["凭证管理"])
 
 
-from app.utils.voucher_no import next_voucher_no as _next_voucher_no
+from app.utils.voucher_no import next_voucher_no as _next_voucher_no, extract_sequence_no
 
 
 @router.get("")
@@ -57,6 +57,7 @@ async def list_vouchers(
             "creator_id": v.creator_id,
             "approved_by_id": v.approved_by_id,
             "created_at": v.created_at.isoformat() if v.created_at else None,
+            "sequence_no": extract_sequence_no(v.voucher_no),
         })
     return {"items": result, "total": total, "page": page, "page_size": page_size}
 
@@ -85,6 +86,7 @@ async def get_voucher(
         "creator_id": v.creator_id,
         "approved_by_id": v.approved_by_id, "approved_at": v.approved_at,
         "posted_by_id": v.posted_by_id, "posted_at": v.posted_at,
+        "sequence_no": extract_sequence_no(v.voucher_no),
         "entries": [{
             "id": e.id, "line_no": e.line_no,
             "account_id": e.account_id,
