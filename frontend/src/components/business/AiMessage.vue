@@ -31,7 +31,7 @@
       <!-- 正常回答 -->
       <template v-else-if="msg.type === 'answer'">
         <!-- 文字分析 -->
-        <div v-if="msg.analysis" class="ai-analysis text-sm" v-html="renderMarkdown(msg.analysis)" />
+        <div v-if="msg.analysis" class="ai-analysis text-sm" v-html="renderMarkdown(typedAnalysis)" />
 
         <!-- 数据已过期 -->
         <div v-if="msg._expired && (msg._hasTableData || msg._hasChartConfig)" class="mt-3 p-3 bg-elevated rounded-lg text-center">
@@ -40,7 +40,7 @@
         </div>
         <!-- 数据表格 -->
         <div v-else-if="msg.table_data" class="mt-3 border rounded-lg overflow-hidden">
-          <div class="overflow-x-auto max-h-[300px]">
+          <div class="overflow-x-auto" :class="tableMaxH">
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">
                 <tr>
@@ -77,7 +77,7 @@
           <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="copyTable" title="复制表格">
             <Copy :size="14" />
           </button>
-          <div class="relative" v-if="msg.table_data">
+          <div ref="exportMenuRef" class="relative" v-if="msg.table_data">
             <button class="text-xs text-muted hover:text-primary" @click="showExportMenu = !showExportMenu" title="导出">
               <Download :size="14" />
             </button>
@@ -96,7 +96,7 @@
             <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'positive' ? 'bg-success-subtle text-success-emphasis' : 'text-muted hover:text-success'" @click="handlePositiveFeedback">
               <ThumbsUp :size="14" />
             </button>
-            <div class="relative">
+            <div ref="negativeMenuRef" class="relative">
               <button class="text-xs px-2 py-1 rounded" :class="msg.feedback === 'negative' ? 'bg-error-subtle text-error-emphasis' : 'text-muted hover:text-error'" @click="showNegativeMenu = !showNegativeMenu">
                 <ThumbsDown :size="14" />
               </button>
@@ -111,7 +111,7 @@
 
         <!-- 相关问题建议 -->
         <div v-if="msg.suggestions?.length" class="flex flex-wrap gap-1.5 mt-2">
-          <button v-for="s in msg.suggestions" :key="s" class="text-xs px-2 py-1 rounded-full border text-muted hover:text-primary hover:border-primary transition-colors" @click="$emit('select-option', s)">
+          <button v-for="s in msg.suggestions" :key="s" class="text-xs px-2 py-1 rounded-full border text-muted hover:text-primary hover:border-primary transition-colors" @click="$emit('select-option', s, { preset: true })">
             {{ s }}
           </button>
         </div>
@@ -121,13 +121,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { Copy, Download, ThumbsUp, ThumbsDown, RotateCcw, Star } from 'lucide-vue-next'
 import AiChartRenderer from './AiChartRenderer.vue'
 import AiProgressIndicator from './AiProgressIndicator.vue'
 import { useAppStore } from '../../stores/app'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { useTypewriter } from '../../composables/useTypewriter'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -138,6 +139,17 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['select-option', 'export', 'feedback', 'retry', 'favorite'])
+
+// 打字机效果（仅新消息的 answer 类型，历史恢复的直接全量显示）
+const analysisSource = computed(() => props.msg.analysis || '')
+const typewriterEnabled = computed(() => !props.msg._isRestored && props.msg.type === 'answer')
+const { displayText: typedAnalysis } = useTypewriter(analysisSource, {
+  enabled: typewriterEnabled,
+})
+
+// 表格高度动态（由父级 AiChatbot provide）
+const aiExpanded = inject('aiExpanded', ref(false))
+const tableMaxH = computed(() => aiExpanded.value ? 'max-h-[400px]' : 'max-h-[250px]')
 
 const showNegativeMenu = ref(false)
 const feedbackToast = ref(false)
@@ -175,6 +187,22 @@ const renderMarkdown = (text) => {
 }
 
 const showExportMenu = ref(false)
+
+// 菜单外部点击关闭
+const exportMenuRef = ref(null)
+const negativeMenuRef = ref(null)
+
+const handleOutsideClick = (e) => {
+  if (showExportMenu.value && exportMenuRef.value && !exportMenuRef.value.contains(e.target)) {
+    showExportMenu.value = false
+  }
+  if (showNegativeMenu.value && negativeMenuRef.value && !negativeMenuRef.value.contains(e.target)) {
+    showNegativeMenu.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('pointerdown', handleOutsideClick))
+onUnmounted(() => document.removeEventListener('pointerdown', handleOutsideClick))
 
 const exportCsv = () => {
   if (!props.msg.table_data) return

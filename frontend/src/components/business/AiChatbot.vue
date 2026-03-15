@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { Sparkles, X, RotateCcw, Send, Maximize2, Minimize2 } from 'lucide-vue-next'
 import AiMessage from './AiMessage.vue'
 import AiWelcome from './AiWelcome.vue'
@@ -104,6 +104,7 @@ const toggleExpand = () => {
   expanded.value = !expanded.value
   localStorage.setItem('ai_window_expanded', String(expanded.value))
 }
+provide('aiExpanded', expanded)
 
 // 自动滚动到底部
 const scrollToBottom = () => {
@@ -118,11 +119,11 @@ const scrollToBottom = () => {
 watch(() => messages.value.length, scrollToBottom)
 watch(loading, scrollToBottom)
 
-const handleSend = async (text) => {
+const handleSend = async (text, options) => {
   if (!text || !text.trim()) return
   input.value = ''
   autoResize()
-  await sendMessage(text)
+  await sendMessage(text, options)
   scrollToBottom()
 }
 
