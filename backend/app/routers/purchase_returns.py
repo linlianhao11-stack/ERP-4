@@ -1,6 +1,7 @@
 """采购退货单路由"""
 from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import require_permission
 from app.models import User
@@ -11,8 +12,8 @@ router = APIRouter(prefix="/api/purchase-returns", tags=["purchase-returns"])
 
 @router.get("")
 async def list_purchase_returns(
-    supplier_id: int | None = None,
-    purchase_order_id: int | None = None,
+    supplier_id: Optional[int] = None,
+    purchase_order_id: Optional[int] = None,
     offset: int = 0,
     limit: int = 50,
     user: User = Depends(require_permission("purchase")),

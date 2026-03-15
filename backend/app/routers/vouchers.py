@@ -62,10 +62,10 @@ async def list_vouchers(
             "period_name": v.period_name, "summary": v.summary,
             "total_debit": str(v.total_debit), "total_credit": str(v.total_credit),
             "status": v.status, "attachment_count": v.attachment_count,
+            "sequence_no": extract_sequence_no(v.voucher_no),
             "creator_id": v.creator_id,
             "approved_by_id": v.approved_by_id,
             "created_at": v.created_at.isoformat() if v.created_at else None,
-            "sequence_no": extract_sequence_no(v.voucher_no),
         })
     return {"items": result, "total": total, "page": page, "page_size": page_size}
 
