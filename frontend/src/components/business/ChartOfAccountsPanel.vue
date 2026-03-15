@@ -33,7 +33,7 @@
                 <span v-if="a.aux_employee" class="badge badge-green">员工</span>
                 <span v-if="a.aux_department" class="badge badge-purple">部门</span>
                 <span v-if="a.aux_product" class="badge badge-red">商品</span>
-                <span v-if="a.aux_bank" class="badge badge-green">银行</span>
+                <span v-if="a.aux_bank" class="badge" style="background: oklch(0.55 0.15 195 / 0.1); color: oklch(0.45 0.15 195)">银行</span>
               </td>
               <td v-if="hasPermission('accounting_edit')" class="px-3 py-2">
                 <div class="flex gap-1">
@@ -155,7 +155,7 @@ const loadAccounts = async () => {
 const openAddForm = () => {
   isEditMode.value = false
   editingAccountId.value = null
-  form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false }
+  form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false, aux_product: false, aux_bank: false }
   showAddForm.value = true
 }
 
@@ -214,7 +214,7 @@ const handleAdd = async () => {
     await createChartOfAccount(accountingStore.currentAccountSetId, form.value)
     appStore.showToast('创建成功', 'success')
     showAddForm.value = false
-    form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false }
+    form.value = { parent_code: '', code: '', name: '', category: 'asset', direction: 'debit', aux_customer: false, aux_supplier: false, aux_employee: false, aux_department: false, aux_product: false, aux_bank: false }
     await loadAccounts()
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '创建失败', 'error')

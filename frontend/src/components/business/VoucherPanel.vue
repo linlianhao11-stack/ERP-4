@@ -24,7 +24,7 @@
           </select>
           <div class="toolbar-search-wrapper">
             <Search :size="14" class="toolbar-search-icon" />
-            <input v-model="searchQuery" class="toolbar-search" placeholder="搜索凭证号/摘要/科目...">
+            <input v-model="searchInput" @input="debouncedSearch" class="toolbar-search" placeholder="搜索凭证号/摘要/科目...">
           </div>
         </template>
         <template #actions>
@@ -63,12 +63,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { Search, Download } from 'lucide-vue-next'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { usePermission } from '../../composables/usePermission'
 import { batchSubmitVouchers, batchApproveVouchers, batchPostVouchers, exportVoucherEntries } from '../../api/accounting'
+import { downloadBlob } from '../../composables/useDownload'
 import PageToolbar from '../common/PageToolbar.vue'
 import SegmentedControl from '../common/SegmentedControl.vue'
 import VoucherListView from './VoucherListView.vue'
@@ -82,6 +83,15 @@ const { hasPermission } = usePermission()
 // 视图模式和搜索
 const viewMode = ref('voucher')
 const searchQuery = ref('')
+const searchInput = ref('')
+let _searchTimer
+function debouncedSearch() {
+  clearTimeout(_searchTimer)
+  _searchTimer = setTimeout(() => {
+    searchQuery.value = searchInput.value
+  }, 300)
+}
+onBeforeUnmount(() => clearTimeout(_searchTimer))
 
 // 筛选条件
 const filters = ref({ period_name: '', voucher_type: '', status: '' })
@@ -184,15 +194,6 @@ const handleBatchPost = async () => {
 }
 
 // 导出分录
-const downloadBlob = (blob, filename) => {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 const handleExport = async () => {
   try {
     const params = {

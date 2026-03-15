@@ -105,7 +105,7 @@
                       <span v-if="entry.aux_employee_name" class="badge badge-green">{{ entry.aux_employee_name }}</span>
                       <span v-if="entry.aux_department_name" class="badge badge-purple">{{ entry.aux_department_name }}</span>
                       <span v-if="entry.aux_product_name" class="badge badge-red">{{ entry.aux_product_name }}</span>
-                      <span v-if="entry.aux_bank_account_name" class="badge badge-green">{{ entry.aux_bank_account_name }}</span>
+                      <span v-if="entry.aux_bank_account_name" class="badge" style="background: oklch(0.55 0.15 195 / 0.1); color: oklch(0.45 0.15 195)">{{ entry.aux_bank_account_name }}</span>
                     </div>
                   </td>
                   <td>

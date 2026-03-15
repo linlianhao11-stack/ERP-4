@@ -86,6 +86,7 @@ import {
   getVouchers, submitVoucher, approveVoucher, rejectVoucher,
   postVoucher, unpostVoucher, deleteVoucher, getVoucherPdf, batchVoucherPdf
 } from '../../api/accounting'
+import { downloadBlob } from '../../composables/useDownload'
 
 const props = defineProps({
   accountSetId: { type: Number, required: true },
@@ -178,6 +179,7 @@ const loadList = async () => {
       period_name: props.filters.period_name || undefined,
       voucher_type: props.filters.voucher_type || undefined,
       status: props.filters.status || undefined,
+      search: props.filters.search || undefined,
       page: page.value, page_size: pageSize,
     })
     vouchers.value = data.items
@@ -221,15 +223,6 @@ const handleDelete = async (v) => {
 }
 
 // PDF 操作
-const downloadBlob = (blob, filename) => {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 const handlePrintPdf = async (v) => {
   try {
     const res = await getVoucherPdf(v.id)
