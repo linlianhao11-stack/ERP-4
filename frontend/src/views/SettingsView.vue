@@ -36,6 +36,13 @@
       <!-- 财务设置标签页 -->
       <div v-else-if="settingsTab === 'finance'" key="finance">
         <PaymentMethodSettings @data-changed="onDataChanged" />
+        <div class="card p-4 mt-4">
+          <h3 class="text-sm font-medium mb-3">凭证审核规则</h3>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" v-model="makerCheckerEnabled" @change="saveMakerCheckerSetting" class="rounded">
+            <span>强制制单人与审核人分离（开启后制单人不可自行审核）</span>
+          </label>
+        </div>
       </div>
 
       <!-- 系统日志标签页 -->
@@ -65,9 +72,11 @@
  * 子组件：WarehouseSettings、DepartmentSettings、EmployeeSettings、UserSettings、
  *         PaymentMethodSettings、LogsSettings、PermissionSettings、ApiKeysPanel
  */
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { usePermission } from '../composables/usePermission'
 import { useSettingsStore } from '../stores/settings'
+import { useAppStore } from '../stores/app'
+import { getVoucherMakerChecker, saveVoucherMakerChecker } from '../api/settings'
 
 // 子组件导入
 import WarehouseSettings from '../components/business/settings/WarehouseSettings.vue'
@@ -81,6 +90,7 @@ import ApiKeysPanel from '../components/business/settings/ApiKeysPanel.vue'
 
 const { hasPermission } = usePermission()
 const settingsStore = useSettingsStore()
+const appStore = useAppStore()
 
 // 当前标签页
 const settingsTab = ref('general')
@@ -93,6 +103,29 @@ const permInitialUserId = ref(null)
 const onDataChanged = () => {
   // 子组件已自行刷新各自的 store 数据，此处可添加跨组件联动逻辑
 }
+
+// maker-checker 开关
+const makerCheckerEnabled = ref(false)
+
+const loadMakerChecker = async () => {
+  try {
+    const { data } = await getVoucherMakerChecker()
+    makerCheckerEnabled.value = data.value === 'true'
+  } catch (e) { /* 未设置时默认 false */ }
+}
+
+const saveMakerCheckerSetting = async () => {
+  try {
+    await saveVoucherMakerChecker({ value: makerCheckerEnabled.value ? 'true' : 'false' })
+    appStore.showToast('保存成功', 'success')
+  } catch (e) {
+    appStore.showToast('保存失败', 'error')
+  }
+}
+
+onMounted(() => {
+  loadMakerChecker()
+})
 
 // 从用户管理弹窗跳转到权限管理标签页
 const handleGoToPermissions = async (userId) => {

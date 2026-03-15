@@ -309,7 +309,7 @@ async def approve_voucher(
         raise HTTPException(status_code=400, detail="只有待审核状态的凭证可以审核")
 
     strict = await SystemSetting.filter(key="voucher_maker_checker").first()
-    if not strict or strict.value != "false":
+    if strict and strict.value == "true":
         if v.creator_id == user.id:
             raise HTTPException(status_code=400, detail="制单人不能审核自己的凭证")
 

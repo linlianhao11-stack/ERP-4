@@ -6,7 +6,7 @@ from app.schemas.settings import SettingUpdate
 router = APIRouter(prefix="/api/settings", tags=["系统设置"])
 
 # 允许读写的 settings key 白名单
-ALLOWED_KEYS = {"company_name"}
+ALLOWED_KEYS = {"company_name", "voucher_maker_checker"}
 
 
 @router.get("/{key}")

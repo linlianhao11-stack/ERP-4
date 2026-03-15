@@ -21,6 +21,9 @@ export const getOpLogs = (params) => api.get('/operation-logs', { params })
 export const getCompanyName = () => api.get('/settings/company_name')
 export const saveCompanyName = (data) => api.put('/settings/company_name', data)
 
+export const getVoucherMakerChecker = () => api.get('/settings/voucher_maker_checker')
+export const saveVoucherMakerChecker = (data) => api.put('/settings/voucher_maker_checker', data)
+
 export const getPaymentMethods = (params) => api.get('/payment-methods', { params })
 export const createPaymentMethod = (data) => api.post('/payment-methods', data)
 export const getPaymentMethodsByAccountSet = (accountSetId) => api.get('/payment-methods', { params: { account_set_id: accountSetId } })
