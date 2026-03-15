@@ -23,7 +23,6 @@
       <div class="flex-1"></div>
       <button @click="openPurchaseReceive" class="btn btn-success btn-sm" v-if="hasPermission('purchase_receive')">采购收货</button>
       <button @click="showRestockModal = true" class="btn btn-primary btn-sm" v-if="hasPermission('stock_edit')">入库</button>
-      <button @click="openProductModal()" class="btn btn-secondary btn-sm" v-if="hasPermission('stock_edit')">新增商品</button>
       <button @click="showImportModal = true" class="btn btn-secondary btn-sm hidden md:inline-block" v-if="hasPermission('stock_edit')">导入</button>
       <button @click="handleExportStock" class="btn btn-secondary btn-sm hidden md:inline-block">导出</button>
     </div>
@@ -40,7 +39,7 @@
           v-for="(s, idx) in (p.stocks?.length ? (showVirtualStock ? p.stocks : p.stocks.filter(x => !x.is_virtual)) : [])"
           :key="'m' + p.id + '-' + idx"
           class="card p-3"
-          :class="{ 'bg-purple-subtle': s.is_virtual }"
+          :class="{ 'bg-purple-subtle': s.is_virtual, 'text-muted': s.quantity === 0 }"
         >
           <div class="flex justify-between items-start mb-1.5">
             <div class="flex-1 min-w-0 mr-2">
@@ -66,7 +65,6 @@
             </div>
             <div class="flex items-center gap-2 text-xs flex-shrink-0">
               <template v-if="!s.is_virtual">
-                <button @click="openProductModal(p)" class="text-primary">编辑</button>
                 <button v-if="hasPermission('stock_edit')" @click="openTransferModal(p, s)" class="text-success">调拨</button>
               </template>
               <span v-else class="text-muted">只读</span>
@@ -119,7 +117,7 @@
               v-for="(row, idx) in sortedStockRows"
               :key="row.p.id + '-' + idx"
               class="hover:bg-elevated"
-              :class="{ 'bg-purple-subtle': row.s.is_virtual }"
+              :class="{ 'bg-purple-subtle': row.s.is_virtual, 'text-muted': row.s.quantity === 0 }"
             >
               <td v-if="isColumnVisible('brand')" class="px-3 py-2 text-secondary text-xs">{{ row.p.brand || '-' }}</td>
               <td v-if="isColumnVisible('name')" class="px-3 py-2">
@@ -142,7 +140,6 @@
               </td>
               <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
                 <template v-if="!row.s.is_virtual">
-                  <button @click="openProductModal(row.p)" class="text-primary text-xs mr-2">编辑</button>
                   <button v-if="hasPermission('stock_edit')" @click="openTransferModal(row.p, row.s)" class="text-success text-xs">调拨</button>
                 </template>
                 <span v-else class="text-xs text-muted">只读</span>
@@ -172,13 +169,6 @@
       </div>
       <div v-if="!hasStockProducts" class="p-8 text-center text-muted text-sm">暂无库存商品</div>
     </div>
-
-    <!-- 商品新增/编辑弹窗 -->
-    <ProductFormModal
-      v-model:visible="showProductModal"
-      :product="editingProduct"
-      @saved="loadProductsData"
-    />
 
     <!-- 入库弹窗 -->
     <RestockModal
@@ -226,7 +216,6 @@ import { useStock } from '../composables/useStock'
 import ColumnMenu from '../components/common/ColumnMenu.vue'
 
 // 弹窗子组件
-import ProductFormModal from '../components/business/stock/ProductFormModal.vue'
 import RestockModal from '../components/business/stock/RestockModal.vue'
 import TransferModal from '../components/business/stock/TransferModal.vue'
 import ImportModal from '../components/business/stock/ImportModal.vue'
@@ -249,15 +238,12 @@ const {
 } = useStock()
 
 // ---- 弹窗可见性 ----
-const showProductModal = ref(false)
 const showRestockModal = ref(false)
 const showTransferModal = ref(false)
 const showImportModal = ref(false)
 const showImportPreviewModal = ref(false)
 
 // ---- 弹窗数据 ----
-/** 当前正在编辑的商品（null=新增） */
-const editingProduct = ref(null)
 /** 调拨目标商品 */
 const transferProduct = ref(null)
 /** 调拨源库存信息 */
@@ -274,12 +260,6 @@ onMounted(() => {
 })
 
 // ---- 弹窗控制方法 ----
-
-/** 打开商品弹窗（新增或编辑） */
-const openProductModal = (product = null) => {
-  editingProduct.value = product
-  showProductModal.value = true
-}
 
 /** 打开调拨弹窗 */
 const openTransferModal = (product, stock) => {
