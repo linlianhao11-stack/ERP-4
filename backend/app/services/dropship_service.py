@@ -13,7 +13,9 @@ from tortoise import transactions
 from app.logger import get_logger
 from app.models import Supplier, Product, User, Employee
 from app.models.accounting import ChartOfAccount
-from app.models.ar_ap import PayableBill, DisbursementBill
+from app.models.ar_ap import PayableBill, DisbursementBill, ReceivableBill
+from app.models.stock import WarehouseStock, StockLog
+from app.models.warehouse import Warehouse
 from app.models.dropship import DropshipOrder
 from app.models.voucher import Voucher, VoucherEntry
 from app.schemas.dropship import DropshipOrderCreate
@@ -372,3 +374,124 @@ async def batch_pay_dropship(
         "total_amount": float(sum(o.purchase_total for o in orders)),
         "vouchers": vouchers_created,
     }
+
+
+async def ship_dropship_order(
+    order_id: int,
+    carrier_code: str,
+    carrier_name: str,
+    tracking_no: str,
+    user: User,
+) -> DropshipOrder:
+    """
+    确认发货：更新物流信息、创建应收单、处理过手转发出入库、订阅快递100。
+
+    流程:
+    1. 校验订单状态为 paid_pending_ship
+    2. 更新物流信息 (carrier_code, carrier_name, tracking_no)
+    3. 创建应收单 (ReceivableBill)
+    4. 若 shipping_mode == 'transit'，通过虚拟中转仓创建入库+出库记录
+    5. 订阅快递100 (失败不阻断主流程)
+    6. 状态 → shipped
+    """
+
+    async with transactions.in_transaction():
+        # 1. 加锁查询订单
+        order = await DropshipOrder.filter(id=order_id).select_for_update().first()
+        if not order:
+            raise HTTPException(status_code=404, detail="订单不存在")
+        if order.status != "paid_pending_ship":
+            raise HTTPException(
+                status_code=400,
+                detail=f"只有已付待发状态可以发货，当前状态: {order.status}",
+            )
+
+        # 2. 更新物流信息
+        order.carrier_code = carrier_code
+        order.carrier_name = carrier_name
+        order.tracking_no = tracking_no
+
+        # 3. 创建应收单
+        bill_no = generate_order_no("YS-DS")
+        receivable = await ReceivableBill.create(
+            bill_no=bill_no,
+            account_set_id=order.account_set_id,
+            customer_id=order.customer_id,
+            bill_date=date.today(),
+            total_amount=order.sale_total,
+            received_amount=Decimal("0"),
+            unreceived_amount=order.sale_total,
+            status="pending",
+            platform_order_no=order.platform_order_no,
+            dropship_order_id=order.id,
+            remark=f"代采代发订单 {order.ds_no}",
+            creator=user,
+        )
+        logger.info(f"创建应收单: {bill_no}, 金额: {order.sale_total}")
+
+        # 4. 过手转发：通过虚拟中转仓记录出入库
+        if order.shipping_mode == "transit":
+            # 查找或创建虚拟中转仓
+            transit_wh, _ = await Warehouse.get_or_create(
+                name="代采代发中转仓",
+                defaults={"is_virtual": True, "is_active": True},
+            )
+
+            # 入库记录
+            await StockLog.create(
+                product_id=order.product_id,
+                warehouse=transit_wh,
+                change_type="PURCHASE_IN",
+                quantity=order.quantity,
+                before_qty=0,
+                after_qty=order.quantity,
+                reference_type="DROPSHIP",
+                reference_id=order.id,
+                remark=f"代采代发入库 {order.ds_no}",
+                creator=user,
+            )
+
+            # 出库记录
+            await StockLog.create(
+                product_id=order.product_id,
+                warehouse=transit_wh,
+                change_type="SALE",
+                quantity=-order.quantity,
+                before_qty=order.quantity,
+                after_qty=0,
+                reference_type="DROPSHIP",
+                reference_id=order.id,
+                remark=f"代采代发出库 {order.ds_no}",
+                creator=user,
+            )
+
+            # 更新库存记录（净库存为0）
+            ws, _ = await WarehouseStock.get_or_create(
+                warehouse=transit_wh,
+                product_id=order.product_id,
+                location=None,
+                defaults={"quantity": 0, "reserved_qty": 0},
+            )
+            ws.quantity = 0
+            ws.last_activity_at = now()
+            await ws.save()
+
+            logger.info(f"过手转发出入库: {order.ds_no}, 中转仓={transit_wh.name}")
+
+        # 5. 关联应收单并更新状态
+        order.receivable_bill_id = receivable.id
+        order.status = "shipped"
+        await order.save()
+
+    # 6. 订阅快递100（事务外，失败不阻断）
+    try:
+        from app.services.logistics_service import subscribe_kd100
+        await subscribe_kd100(carrier_code, tracking_no, order.id)
+        order.kd100_subscribed = True
+        await order.save()
+        logger.info(f"快递100订阅成功: {order.ds_no}, 快递={carrier_code}, 单号={tracking_no}")
+    except Exception as e:
+        logger.warning(f"快递100订阅失败（不影响发货）: {order.ds_no}, 错误: {e}")
+
+    logger.info(f"代采代发发货: {order.ds_no} → shipped, 应收单={bill_no}")
+    return order

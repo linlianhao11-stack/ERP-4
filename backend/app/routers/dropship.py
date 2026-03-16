@@ -19,7 +19,7 @@ from app.schemas.dropship import (
 )
 from app.services.dropship_service import (
     create_dropship_order, submit_dropship_order, calculate_gross_profit,
-    batch_pay_dropship,
+    batch_pay_dropship, ship_dropship_order,
 )
 from app.utils.time import now
 from app.utils.errors import parse_date
@@ -422,9 +422,21 @@ async def ship_order(
     data: DropshipShipRequest,
     user: User = Depends(require_permission("dropship")),
 ):
-    """发货 (TODO)"""
-    # Task 5 skeleton
-    return {"message": "TODO"}
+    """确认发货：更新物流信息 + 创建应收单 + 出入库 + 订阅快递100"""
+    order = await ship_dropship_order(
+        order_id=order_id,
+        carrier_code=data.carrier_code,
+        carrier_name=data.carrier_name,
+        tracking_no=data.tracking_no,
+        user=user,
+    )
+    return {
+        "id": order.id,
+        "ds_no": order.ds_no,
+        "status": order.status,
+        "receivable_bill_id": order.receivable_bill_id,
+        "tracking_no": order.tracking_no,
+    }
 
 
 # ── 手动完成 ──
