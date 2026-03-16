@@ -17,6 +17,8 @@ class ReceivableBill(models.Model):
     voucher = fields.ForeignKeyField("models.Voucher", null=True, on_delete=fields.SET_NULL, related_name="receivable_bill")
     voucher_no = fields.CharField(max_length=30, null=True)
     remark = fields.TextField(default="")
+    platform_order_no = fields.CharField(max_length=100, null=True)
+    dropship_order = fields.ForeignKeyField("models.DropshipOrder", related_name="linked_receivables", null=True, on_delete=fields.SET_NULL)
     creator = fields.ForeignKeyField("models.User", related_name="created_receivables", null=True, on_delete=fields.SET_NULL)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
