@@ -121,7 +121,7 @@ async def export_products(user: User = Depends(require_permission("stock_view"))
     except ImportError:
         raise HTTPException(status_code=500, detail="pandas未安装")
 
-    products = await Product.filter(is_active=True)
+    products = await Product.filter(is_active=True).limit(10000)
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
 
     # 批量查询库存（避免 N+1）
