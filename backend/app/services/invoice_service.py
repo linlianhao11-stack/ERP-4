@@ -306,6 +306,137 @@ async def create_input_invoice(
     return invoice
 
 
+async def _generate_dropship_invoice_voucher(inv: Invoice, ds, user):
+    """代采代发发票确认 → 生成凭证B（收入确认+成本结转）
+
+    专票场景：成本拆分为不含税成本+进项税额，有进项抵扣
+    普票场景：含税全额入成本，无进项抵扣
+    """
+    acct_set_id = inv.account_set_id
+
+    # 查找科目
+    ar_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="1122", is_active=True
+    ).first()
+    output_tax_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="222102", is_active=True
+    ).first()
+    # 代采专用收入/成本科目（优先找含"代采"的子科目，fallback到主科目）
+    revenue_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code__startswith="6001", name__contains="代采", is_active=True
+    ).first() or await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="6001", is_active=True
+    ).first()
+    cogs_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code__startswith="6401", name__contains="代采", is_active=True
+    ).first() or await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="6401", is_active=True
+    ).first()
+    prepaid_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="1123", is_active=True
+    ).first()
+    input_tax_acct = await ChartOfAccount.filter(
+        account_set_id=acct_set_id, code="222101", is_active=True
+    ).first()
+
+    if not all([ar_acct, output_tax_acct, revenue_acct, cogs_acct, prepaid_acct]):
+        logger.warning(f"代采代发凭证B缺少必要科目，跳过生成: invoice={inv.invoice_no}")
+        return
+
+    # 计算金额
+    # 销项：不含税售价 = sale_total / (1 + sale_tax_rate / 100)
+    sale_without_tax = (ds.sale_total / (1 + ds.sale_tax_rate / Decimal("100"))).quantize(Decimal("0.01"))
+    sale_tax = ds.sale_total - sale_without_tax
+
+    if ds.invoice_type == "special":
+        # 专票：成本不含税，有进项抵扣
+        cost_without_tax = (ds.purchase_total / (1 + ds.purchase_tax_rate / Decimal("100"))).quantize(Decimal("0.01"))
+        input_tax = ds.purchase_total - cost_without_tax
+    else:
+        # 普票：含税全额入成本，无进项抵扣
+        cost_without_tax = ds.purchase_total
+        input_tax = Decimal("0")
+
+    # 计算凭证总额（借=贷）
+    # 借方：应收账款(sale_total) + 进项税额(input_tax) + 成本(cost_without_tax)
+    # 贷方：销项税(sale_tax) + 收入(sale_without_tax) + 预付账款(purchase_total)
+    total_debit = ds.sale_total + input_tax + cost_without_tax
+    total_credit = sale_tax + sale_without_tax + ds.purchase_total
+
+    bill_date = inv.invoice_date
+    period_name = f"{bill_date.year}-{bill_date.month:02d}"
+
+    vno = await _next_voucher_no(acct_set_id, "记", period_name)
+    v = await Voucher.create(
+        account_set_id=acct_set_id,
+        voucher_type="记",
+        voucher_no=vno,
+        period_name=period_name,
+        voucher_date=bill_date,
+        summary=f"代采代发收入确认 {ds.ds_no}",
+        total_debit=total_debit,
+        total_credit=total_credit,
+        status="draft",
+        creator=user,
+        source_type="invoice",
+        source_bill_id=inv.id,
+    )
+
+    line = 1
+    # 借: 应收账款
+    await VoucherEntry.create(
+        voucher=v, line_no=line, account_id=ar_acct.id,
+        summary=f"代采代发收入 {ds.ds_no}",
+        debit_amount=ds.sale_total, credit_amount=Decimal("0"),
+        aux_customer_id=ds.customer_id,
+    )
+    line += 1
+    # 贷: 销项税额
+    await VoucherEntry.create(
+        voucher=v, line_no=line, account_id=output_tax_acct.id,
+        summary=f"代采代发销项税 {ds.ds_no}",
+        debit_amount=Decimal("0"), credit_amount=sale_tax,
+    )
+    line += 1
+    # 贷: 主营业务收入-代采
+    await VoucherEntry.create(
+        voucher=v, line_no=line, account_id=revenue_acct.id,
+        summary=f"代采代发收入 {ds.ds_no}",
+        debit_amount=Decimal("0"), credit_amount=sale_without_tax,
+    )
+
+    # 专票: 借进项税额
+    if ds.invoice_type == "special" and input_tax > 0 and input_tax_acct:
+        line += 1
+        await VoucherEntry.create(
+            voucher=v, line_no=line, account_id=input_tax_acct.id,
+            summary=f"代采代发进项税 {ds.ds_no}",
+            debit_amount=input_tax, credit_amount=Decimal("0"),
+        )
+
+    line += 1
+    # 借: 主营业务成本-代采
+    await VoucherEntry.create(
+        voucher=v, line_no=line, account_id=cogs_acct.id,
+        summary=f"代采代发成本 {ds.ds_no}",
+        debit_amount=cost_without_tax, credit_amount=Decimal("0"),
+    )
+    line += 1
+    # 贷: 预付账款-供应商
+    await VoucherEntry.create(
+        voucher=v, line_no=line, account_id=prepaid_acct.id,
+        summary=f"代采代发成本 {ds.ds_no}",
+        debit_amount=Decimal("0"), credit_amount=ds.purchase_total,
+        aux_supplier_id=ds.supplier_id,
+    )
+
+    inv.voucher = v
+    inv.voucher_no = vno
+    await inv.save()
+
+    logger.info(f"代采代发凭证B: {vno}, 发票={inv.invoice_no}, DS单号={ds.ds_no}")
+
+
 async def confirm_invoice(invoice_id: int, user) -> Invoice:
     """确认发票。销项发票生成复合凭证（收入确认+成本结转），进项发票不生成凭证。"""
     async with transactions.in_transaction():
@@ -320,100 +451,113 @@ async def confirm_invoice(invoice_id: int, user) -> Invoice:
 
         # 销项发票 → 生成复合凭证
         if inv.direction == "output":
-            ar_acct = await ChartOfAccount.filter(
-                account_set_id=inv.account_set_id, code="1122", is_active=True
-            ).first()
-            revenue_acct = await ChartOfAccount.filter(
-                account_set_id=inv.account_set_id, code="6001", is_active=True
-            ).first()
-            output_tax_acct = await ChartOfAccount.filter(
-                account_set_id=inv.account_set_id, code="222102", is_active=True
-            ).first()
-            cogs_acct = await ChartOfAccount.filter(
-                account_set_id=inv.account_set_id, code="6401", is_active=True
-            ).first()
-            shipped_acct = await ChartOfAccount.filter(
-                account_set_id=inv.account_set_id, code="1407", is_active=True
-            ).first()
+            # 检查是否为代采代发来源
+            dropship_order = None
+            if inv.receivable_bill_id:
+                rb = await ReceivableBill.filter(id=inv.receivable_bill_id).first()
+                if rb and rb.dropship_order_id:
+                    from app.models.dropship import DropshipOrder
+                    dropship_order = await DropshipOrder.get(id=rb.dropship_order_id)
 
-            if ar_acct and revenue_acct and output_tax_acct and cogs_acct and shipped_acct:
-                # 获取关联的出库单成本
-                cost_total = Decimal("0")
-                if inv.receivable_bill_id:
-                    rb = await ReceivableBill.filter(id=inv.receivable_bill_id).first()
-                    if rb and rb.order_id:
-                        delivery = await SalesDeliveryBill.filter(
-                            order_id=rb.order_id, account_set_id=inv.account_set_id
-                        ).first()
-                        if delivery:
-                            cost_total = delivery.total_cost
+            if dropship_order:
+                # 代采代发专用凭证B（收入确认+成本结转+税）
+                await _generate_dropship_invoice_voucher(inv, dropship_order, user)
+            else:
+                # 常规发票凭证逻辑
+                ar_acct = await ChartOfAccount.filter(
+                    account_set_id=inv.account_set_id, code="1122", is_active=True
+                ).first()
+                revenue_acct = await ChartOfAccount.filter(
+                    account_set_id=inv.account_set_id, code="6001", is_active=True
+                ).first()
+                output_tax_acct = await ChartOfAccount.filter(
+                    account_set_id=inv.account_set_id, code="222102", is_active=True
+                ).first()
+                cogs_acct = await ChartOfAccount.filter(
+                    account_set_id=inv.account_set_id, code="6401", is_active=True
+                ).first()
+                shipped_acct = await ChartOfAccount.filter(
+                    account_set_id=inv.account_set_id, code="1407", is_active=True
+                ).first()
 
-                bill_date = inv.invoice_date
-                period_name = f"{bill_date.year}-{bill_date.month:02d}"
-                total_debit = inv.total_amount + cost_total
-                total_credit = inv.amount_without_tax + inv.tax_amount + cost_total
+                if ar_acct and revenue_acct and output_tax_acct and cogs_acct and shipped_acct:
+                    # 获取关联的出库单成本
+                    cost_total = Decimal("0")
+                    if inv.receivable_bill_id:
+                        rb = await ReceivableBill.filter(id=inv.receivable_bill_id).first()
+                        if rb and rb.order_id:
+                            delivery = await SalesDeliveryBill.filter(
+                                order_id=rb.order_id, account_set_id=inv.account_set_id
+                            ).first()
+                            if delivery:
+                                cost_total = delivery.total_cost
 
-                vno = await _next_voucher_no(inv.account_set_id, "记", period_name)
-                v = await Voucher.create(
-                    account_set_id=inv.account_set_id,
-                    voucher_type="记",
-                    voucher_no=vno,
-                    period_name=period_name,
-                    voucher_date=bill_date,
-                    summary=f"销项发票 {inv.invoice_no} 收入确认",
-                    total_debit=total_debit,
-                    total_credit=total_credit,
-                    status="draft",
-                    creator=user,
-                    source_type="invoice",
-                    source_bill_id=inv.id,
-                )
-                line = 1
-                await VoucherEntry.create(
-                    voucher=v, line_no=line,
-                    account_id=ar_acct.id,
-                    summary=f"销项发票 {inv.invoice_no}",
-                    debit_amount=inv.total_amount,
-                    credit_amount=Decimal("0"),
-                    aux_customer_id=inv.customer_id,
-                )
-                line += 1
-                await VoucherEntry.create(
-                    voucher=v, line_no=line,
-                    account_id=revenue_acct.id,
-                    summary=f"销项发票 {inv.invoice_no}",
-                    debit_amount=Decimal("0"),
-                    credit_amount=inv.amount_without_tax,
-                )
-                line += 1
-                await VoucherEntry.create(
-                    voucher=v, line_no=line,
-                    account_id=output_tax_acct.id,
-                    summary=f"销项发票 {inv.invoice_no} 销项税",
-                    debit_amount=Decimal("0"),
-                    credit_amount=inv.tax_amount,
-                )
-                if cost_total > 0:
-                    line += 1
+                    bill_date = inv.invoice_date
+                    period_name = f"{bill_date.year}-{bill_date.month:02d}"
+                    total_debit = inv.total_amount + cost_total
+                    total_credit = inv.amount_without_tax + inv.tax_amount + cost_total
+
+                    vno = await _next_voucher_no(inv.account_set_id, "记", period_name)
+                    v = await Voucher.create(
+                        account_set_id=inv.account_set_id,
+                        voucher_type="记",
+                        voucher_no=vno,
+                        period_name=period_name,
+                        voucher_date=bill_date,
+                        summary=f"销项发票 {inv.invoice_no} 收入确认",
+                        total_debit=total_debit,
+                        total_credit=total_credit,
+                        status="draft",
+                        creator=user,
+                        source_type="invoice",
+                        source_bill_id=inv.id,
+                    )
+                    line = 1
                     await VoucherEntry.create(
                         voucher=v, line_no=line,
-                        account_id=cogs_acct.id,
-                        summary=f"销售成本结转 {inv.invoice_no}",
-                        debit_amount=cost_total,
+                        account_id=ar_acct.id,
+                        summary=f"销项发票 {inv.invoice_no}",
+                        debit_amount=inv.total_amount,
                         credit_amount=Decimal("0"),
+                        aux_customer_id=inv.customer_id,
                     )
                     line += 1
                     await VoucherEntry.create(
                         voucher=v, line_no=line,
-                        account_id=shipped_acct.id,
-                        summary=f"销售成本结转 {inv.invoice_no}",
+                        account_id=revenue_acct.id,
+                        summary=f"销项发票 {inv.invoice_no}",
                         debit_amount=Decimal("0"),
-                        credit_amount=cost_total,
+                        credit_amount=inv.amount_without_tax,
                     )
+                    line += 1
+                    await VoucherEntry.create(
+                        voucher=v, line_no=line,
+                        account_id=output_tax_acct.id,
+                        summary=f"销项发票 {inv.invoice_no} 销项税",
+                        debit_amount=Decimal("0"),
+                        credit_amount=inv.tax_amount,
+                    )
+                    if cost_total > 0:
+                        line += 1
+                        await VoucherEntry.create(
+                            voucher=v, line_no=line,
+                            account_id=cogs_acct.id,
+                            summary=f"销售成本结转 {inv.invoice_no}",
+                            debit_amount=cost_total,
+                            credit_amount=Decimal("0"),
+                        )
+                        line += 1
+                        await VoucherEntry.create(
+                            voucher=v, line_no=line,
+                            account_id=shipped_acct.id,
+                            summary=f"销售成本结转 {inv.invoice_no}",
+                            debit_amount=Decimal("0"),
+                            credit_amount=cost_total,
+                        )
 
-                inv.voucher = v
-                inv.voucher_no = vno
-                await inv.save()
+                    inv.voucher = v
+                    inv.voucher_no = vno
+                    await inv.save()
 
     logger.info(f"确认发票: {inv.invoice_no}, 方向: {inv.direction}")
     return inv
