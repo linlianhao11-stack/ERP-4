@@ -19,6 +19,7 @@ from app.schemas.dropship import (
 )
 from app.services.dropship_service import (
     create_dropship_order, submit_dropship_order, calculate_gross_profit,
+    batch_pay_dropship,
 )
 from app.utils.time import now
 from app.utils.errors import parse_date
@@ -60,11 +61,61 @@ async def report_receivable(
 
 @router.get("/payment-workbench")
 async def payment_workbench(
+    account_set_id: int,
     user: User = Depends(require_permission("dropship")),
 ):
-    """付款工作台 (TODO)"""
-    # Task 4 skeleton
-    return {"message": "TODO"}
+    """付款工作台：按供应商分组显示待付款订单"""
+    orders = await (
+        DropshipOrder.filter(status="pending_payment", account_set_id=account_set_id)
+        .select_related("supplier", "customer")
+        .order_by("-created_at")
+    )
+
+    # 按供应商分组
+    from collections import defaultdict
+    supplier_map: dict = defaultdict(lambda: {"orders": [], "subtotal": Decimal("0")})
+
+    for o in orders:
+        group = supplier_map[o.supplier_id]
+        group["supplier_id"] = o.supplier_id
+        group["supplier_name"] = o.supplier.name if o.supplier else ""
+        group["subtotal"] += o.purchase_total
+        group["orders"].append({
+            "id": o.id,
+            "ds_no": o.ds_no,
+            "product_name": f"{o.product_name} \u00d7{o.quantity}",
+            "purchase_total": float(o.purchase_total),
+            "sale_total": float(o.sale_total),
+            "gross_profit": float(o.gross_profit),
+            "customer_name": o.customer.name if o.customer else "",
+            "settlement_type": o.settlement_type,
+            "urged_at": o.urged_at.isoformat() if o.urged_at else None,
+        })
+
+    groups = []
+    for sid, data in supplier_map.items():
+        groups.append({
+            "supplier_id": data["supplier_id"],
+            "supplier_name": data["supplier_name"],
+            "order_count": len(data["orders"]),
+            "subtotal": float(data["subtotal"]),
+            "orders": data["orders"],
+        })
+
+    # 按订单数降序排列
+    groups.sort(key=lambda g: g["order_count"], reverse=True)
+
+    total_amount = sum(g["subtotal"] for g in groups)
+    prepaid_count = sum(
+        1 for o in orders if o.settlement_type == "prepaid"
+    )
+
+    return {
+        "groups": groups,
+        "total_count": len(orders),
+        "total_amount": total_amount,
+        "prepaid_count": prepaid_count,
+    }
 
 
 # ── 列表 ──
@@ -350,11 +401,16 @@ async def urge_payment(
 @router.post("/batch-pay")
 async def batch_pay(
     data: DropshipPaymentRequest,
-    user: User = Depends(require_permission("dropship")),
+    user: User = Depends(require_permission("dropship", "dropship_pay")),
 ):
-    """批量付款 (TODO)"""
-    # Task 4 skeleton
-    return {"message": "TODO"}
+    """批量付款：创建付款单 + 更新应付单 + 生成凭证A"""
+    result = await batch_pay_dropship(
+        order_ids=data.order_ids,
+        payment_method=data.payment_method,
+        employee_id=data.employee_id,
+        user=user,
+    )
+    return result
 
 
 # ── 发货 ──
