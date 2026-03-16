@@ -258,6 +258,14 @@
               </tbody>
             </table>
             <div v-if="!filteredTransactions?.length" class="p-6 text-center text-muted text-sm">暂无交易记录</div>
+            <div v-if="customerTrans.total > 20" class="flex items-center justify-between mt-3 text-sm text-secondary">
+              <span>共 {{ customerTrans.total }} 条</span>
+              <div class="flex gap-2">
+                <button class="btn btn-sm" :disabled="transPage <= 1" @click="transPage--; loadCustomerTrans(customerTrans.customer?.id)">上一页</button>
+                <span class="px-2 leading-8">{{ transPage }} / {{ Math.ceil(customerTrans.total / 20) }}</span>
+                <button class="btn btn-sm" :disabled="transPage >= Math.ceil(customerTrans.total / 20)" @click="transPage++; loadCustomerTrans(customerTrans.customer?.id)">下一页</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -457,6 +465,7 @@ const customerForm = reactive({ id: null, name: '', contact_person: '', phone: '
 const customerTrans = ref({ customer: null, stats: null, transactions: [], available_months: [] })
 const transMonth = ref('')
 const transType = ref('')
+const transPage = ref(1)
 const orderDetail = ref({})
 const isDetailExpanded = ref(false)
 
@@ -507,7 +516,7 @@ const saveCustomerHandler = async () => {
 const loadCustomerTrans = async (cid) => {
   if (!cid) return
   try {
-    const params = {}
+    const params = { page: transPage.value, page_size: 20 }
     if (transMonth.value) {
       const [y, m] = transMonth.value.split('-')
       params.year = parseInt(y)
@@ -524,6 +533,7 @@ const loadCustomerTrans = async (cid) => {
 const openCustomerTrans = async (c) => {
   transMonth.value = ''
   transType.value = ''
+  transPage.value = 1
   await loadCustomerTrans(c.id)
   openModal('customer_trans', '客户交易明细 - ' + c.name)
 }

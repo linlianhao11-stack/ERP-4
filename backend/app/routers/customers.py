@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Customer, Order, OrderItem
 from app.models.customer_balance import CustomerAccountBalance
@@ -56,7 +56,7 @@ async def delete_customer(customer_id: int, user: User = Depends(require_permiss
 
 
 @router.get("/{customer_id}/transactions")
-async def get_customer_transactions(customer_id: int, year: Optional[int] = None, month: Optional[int] = None, user: User = Depends(require_permission("customer", "finance"))):
+async def get_customer_transactions(customer_id: int, year: Optional[int] = None, month: Optional[int] = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), user: User = Depends(require_permission("customer", "finance"))):
     customer = await Customer.filter(id=customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
@@ -70,7 +70,8 @@ async def get_customer_transactions(customer_id: int, year: Optional[int] = None
             end_date = datetime(year, month + 1, 1)
         query = query.filter(created_at__gte=start_date, created_at__lt=end_date)
 
-    orders = await query.order_by("-created_at").limit(500).select_related("warehouse", "creator", "employee")
+    total = await query.count()
+    orders = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("warehouse", "creator", "employee")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
 
     stats = {
@@ -117,5 +118,8 @@ async def get_customer_transactions(customer_id: int, year: Optional[int] = None
         "customer": {"id": customer.id, "name": customer.name, "balance": float(customer.balance)},
         "stats": stats if has_finance else None,
         "transactions": transactions_list,
-        "available_months": available_months
+        "available_months": available_months,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
     }
