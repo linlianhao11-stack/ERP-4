@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, Package, ShoppingBag,
-  ArrowLeftRight, Truck, Wallet, Users, Settings, BookOpen, Sparkles
+  ArrowLeftRight, Truck, Wallet, Users, Settings, BookOpen, Sparkles, Repeat
 } from 'lucide-vue-next'
 
 export const iconMap = {
@@ -9,6 +9,7 @@ export const iconMap = {
   stock: Package,
   purchase: ShoppingBag,
   consignment: ArrowLeftRight,
+  dropship: Repeat,
   logistics: Truck,
   finance: Wallet,
   customers: Users,
@@ -23,6 +24,7 @@ export const menuItems = [
   { key: 'stock', name: '库存', perm: 'stock_view', group: '业务' },
   { key: 'purchase', name: '采购', perm: 'purchase', group: '业务' },
   { key: 'consignment', name: '寄售', perm: 'consignment', group: '业务' },
+  { key: 'dropship', name: '代采代发', perm: 'dropship', group: '业务' },
   { key: 'logistics', name: '物流', perm: 'logistics', group: '业务' },
   { key: 'customers', name: '客户', perm: 'customer', group: '业务' },
   { key: 'finance', name: '财务', perm: 'finance', group: '财务' },
@@ -44,6 +46,8 @@ export const allPermissions = [
   { key: 'sales', name: '销售开单' },
   { key: 'logistics', name: '物流管理' },
   { key: 'consignment', name: '寄售管理' },
+  { key: 'dropship', name: '代采代发管理' },
+  { key: 'dropship_pay', name: '代采代发付款' },
   { key: 'stock_view', name: '查看库存' },
   { key: 'stock_edit', name: '库存操作' },
   { key: 'purchase', name: '采购下单' },
@@ -82,6 +86,9 @@ export const permissionGroups = [
     { key: 'purchase_receive', name: '采购收货' },
   ]},
   { label: '寄售管理', icon: 'consignment', main: 'consignment', children: [] },
+  { label: '代采代发', icon: 'dropship', main: 'dropship', children: [
+    { key: 'dropship_pay', name: '代采付款' },
+  ]},
   { label: '物流管理', icon: 'logistics', main: 'logistics', children: [] },
   { label: '财务管理', icon: 'finance', main: 'finance', children: [
     { key: 'finance_confirm', name: '确认收款' },
@@ -181,6 +188,17 @@ export const shippingStatusNames = {
 export const shippingStatusBadges = {
   pending: 'badge badge-yellow', partial: 'badge badge-orange',
   completed: 'badge badge-green', cancelled: 'badge badge-gray'
+}
+
+export const dropshipStatusNames = {
+  draft: '草稿', pending_payment: '待付款', paid_pending_ship: '已付待发',
+  shipped: '已发货', completed: '已完成', cancelled: '已取消'
+}
+
+export const dropshipStatusBadges = {
+  draft: 'badge badge-gray', pending_payment: 'badge badge-yellow',
+  paid_pending_ship: 'badge badge-blue', shipped: 'badge badge-purple',
+  completed: 'badge badge-green', cancelled: 'badge badge-red'
 }
 
 export const IDLE_TIMEOUT = 4 * 60 * 60 * 1000

@@ -9,7 +9,8 @@ import {
   logTypeBadges, logTypeNames,
   purchaseStatusBadges, purchaseStatusNames,
   shipmentStatusBadges, shipmentStatusNames,
-  shippingStatusBadges, shippingStatusNames
+  shippingStatusBadges, shippingStatusNames,
+  dropshipStatusBadges, dropshipStatusNames
 } from '../../utils/constants'
 
 const props = defineProps({
@@ -33,7 +34,8 @@ const badgeMap = {
   logType: logTypeBadges,
   purchaseStatus: purchaseStatusBadges,
   shipmentStatus: shipmentStatusBadges,
-  shippingStatus: shippingStatusBadges
+  shippingStatus: shippingStatusBadges,
+  dropshipStatus: dropshipStatusBadges
 }
 
 const nameMap = {
@@ -41,7 +43,8 @@ const nameMap = {
   logType: logTypeNames,
   purchaseStatus: purchaseStatusNames,
   shipmentStatus: shipmentStatusNames,
-  shippingStatus: shippingStatusNames
+  shippingStatus: shippingStatusNames,
+  dropshipStatus: dropshipStatusNames
 }
 
 const badgeClass = computed(() => badgeMap[props.type]?.[props.status] || 'badge badge-gray')

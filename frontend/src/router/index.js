@@ -10,6 +10,7 @@ const routes = [
   { path: '/purchase', name: 'purchase', component: () => import('../views/PurchaseView.vue'), meta: { perm: 'purchase' } },
   { path: '/consignment', name: 'consignment', component: () => import('../views/ConsignmentView.vue'), meta: { perm: 'consignment' } },
   { path: '/logistics', name: 'logistics', component: () => import('../views/LogisticsView.vue'), meta: { perm: 'logistics' } },
+  { path: '/dropship', name: 'dropship', component: () => import('../views/DropshipView.vue'), meta: { perm: 'dropship' } },
   { path: '/finance', name: 'finance', component: () => import('../views/FinanceView.vue'), meta: { perm: 'finance' } },
   { path: '/accounting', name: 'accounting', component: () => import('../views/AccountingView.vue'), meta: { perm: 'accounting_view' } },
   { path: '/customers', name: 'customers', component: () => import('../views/CustomersView.vue'), meta: { perm: 'customer' } },
