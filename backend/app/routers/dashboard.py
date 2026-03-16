@@ -164,7 +164,7 @@ async def get_todo_counts(user: User = Depends(get_current_user)):
                 FROM warehouse_stocks ws
                 JOIN warehouses w ON ws.warehouse_id = w.id
                 JOIN products p ON ws.product_id = p.id
-                WHERE NOT w.is_virtual AND p.is_active = true
+                WHERE NOT w.is_virtual AND p.is_active = true AND ws.quantity >= 0
                 GROUP BY ws.product_id
                 HAVING SUM(ws.quantity) < 10
             ) sub
