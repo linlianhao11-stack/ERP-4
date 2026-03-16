@@ -19,7 +19,7 @@ from app.schemas.dropship import (
 )
 from app.services.dropship_service import (
     create_dropship_order, submit_dropship_order, calculate_gross_profit,
-    batch_pay_dropship, ship_dropship_order,
+    batch_pay_dropship, ship_dropship_order, cancel_dropship_order,
 )
 from app.utils.time import now
 from app.utils.errors import parse_date
@@ -477,6 +477,11 @@ async def cancel_order(
     data: DropshipCancelRequest,
     user: User = Depends(require_permission("dropship")),
 ):
-    """取消订单 (TODO)"""
-    # Task 7 skeleton
-    return {"message": "TODO"}
+    """取消订单：按状态分别处理冲销逻辑"""
+    order = await cancel_dropship_order(order_id, data.reason, user)
+    return {
+        "id": order.id,
+        "ds_no": order.ds_no,
+        "status": order.status,
+        "cancel_reason": order.cancel_reason,
+    }

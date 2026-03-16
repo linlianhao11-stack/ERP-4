@@ -495,3 +495,128 @@ async def ship_dropship_order(
 
     logger.info(f"代采代发发货: {order.ds_no} → shipped, 应收单={bill_no}")
     return order
+
+
+async def _create_reverse_voucher(original_voucher_id: int, user: User) -> Optional[Voucher]:
+    """基于原凭证创建红冲凭证（所有金额取反）"""
+
+    original = await Voucher.filter(id=original_voucher_id).first()
+    if not original:
+        return None
+
+    entries = await VoucherEntry.filter(voucher_id=original.id).all()
+
+    period_name = f"{date.today().year}-{date.today().month:02d}"
+    vno = await next_voucher_no(original.account_set_id, original.voucher_type, period_name)
+
+    reverse_v = await Voucher.create(
+        account_set_id=original.account_set_id,
+        voucher_type=original.voucher_type,
+        voucher_no=vno,
+        period_name=period_name,
+        voucher_date=date.today(),
+        summary=f"【红冲】{original.summary}",
+        total_debit=-original.total_debit,
+        total_credit=-original.total_credit,
+        status="draft",
+        creator=user,
+        source_type="dropship_cancel",
+        source_bill_id=original.source_bill_id,
+    )
+
+    for entry in entries:
+        await VoucherEntry.create(
+            voucher=reverse_v,
+            line_no=entry.line_no,
+            account_id=entry.account_id,
+            summary=f"【红冲】{entry.summary}",
+            debit_amount=-entry.debit_amount,
+            credit_amount=-entry.credit_amount,
+            aux_customer_id=entry.aux_customer_id,
+            aux_supplier_id=entry.aux_supplier_id,
+            aux_employee_id=entry.aux_employee_id,
+        )
+
+    logger.info(f"创建红冲凭证: {vno}, 原凭证={original.voucher_no}")
+    return reverse_v
+
+
+async def cancel_dropship_order(order_id: int, reason: str, user: User) -> DropshipOrder:
+    """
+    取消代采代发订单
+
+    按取消时的状态分别处理：
+    - 草稿(draft): 直接取消
+    - 待付款(pending_payment): 冲销应付单
+    - 已付待发(paid_pending_ship): 冲销应付单 + 付款单 + 红冲凭证
+    - 已发货及之后: 不允许取消
+    """
+
+    async with transactions.in_transaction():
+        # 加锁查询订单
+        order = await DropshipOrder.filter(id=order_id).select_for_update().first()
+        if not order:
+            raise HTTPException(status_code=404, detail="订单不存在")
+
+        # 已发货及之后不允许取消
+        if order.status in ("shipped", "completed", "cancelled"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"当前状态({order.status})不允许取消",
+            )
+
+        # 1. 草稿 → 直接取消
+        if order.status == "draft":
+            order.status = "cancelled"
+            order.cancel_reason = reason
+            await order.save()
+            logger.info(f"代采代发取消(草稿): {order.ds_no}, 原因: {reason}")
+            return order
+
+        # 2. 待付款 → 冲销应付单
+        if order.status == "pending_payment":
+            if order.payable_bill_id:
+                pb = await PayableBill.filter(id=order.payable_bill_id).select_for_update().first()
+                if pb:
+                    pb.status = "cancelled"
+                    await pb.save()
+                    logger.info(f"冲销应付单: {pb.bill_no}")
+
+            order.status = "cancelled"
+            order.cancel_reason = reason
+            await order.save()
+            logger.info(f"代采代发取消(待付款): {order.ds_no}, 原因: {reason}")
+            return order
+
+        # 3. 已付待发 → 冲销应付单 + 付款单 + 红冲凭证
+        if order.status == "paid_pending_ship":
+            # 冲销应付单
+            if order.payable_bill_id:
+                pb = await PayableBill.filter(id=order.payable_bill_id).select_for_update().first()
+                if pb:
+                    pb.status = "cancelled"
+                    await pb.save()
+                    logger.info(f"冲销应付单: {pb.bill_no}")
+
+            # 冲销付款单 + 红冲凭证
+            if order.disbursement_bill_id:
+                disb = await DisbursementBill.filter(id=order.disbursement_bill_id).select_for_update().first()
+                if disb:
+                    disb.status = "cancelled"
+                    await disb.save()
+                    logger.info(f"冲销付款单: {disb.bill_no}")
+
+                    # 红冲关联凭证
+                    if disb.voucher_id:
+                        reverse_v = await _create_reverse_voucher(disb.voucher_id, user)
+                        if reverse_v:
+                            logger.info(f"红冲凭证已生成: {reverse_v.voucher_no}")
+
+            order.status = "cancelled"
+            order.cancel_reason = reason
+            await order.save()
+            logger.info(f"代采代发取消(已付待发): {order.ds_no}, 原因: {reason}")
+            return order
+
+    # 兜底（理论上不会走到这里）
+    raise HTTPException(status_code=400, detail=f"无法取消，当前状态: {order.status}")
