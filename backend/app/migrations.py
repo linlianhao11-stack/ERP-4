@@ -208,6 +208,15 @@ async def migrate_add_indexes():
         ("idx_stock_logs_warehouse_product", "stock_logs", "warehouse_id, product_id"),
         ("idx_purchase_orders_status", "purchase_orders", "status"),
         ("idx_purchase_orders_supplier_created", "purchase_orders", "supplier_id, created_at"),
+        # --- 性能优化批次 2026-03-16 ---
+        ("idx_products_is_active", "products", "is_active"),
+        ("idx_customers_is_active", "customers", "is_active"),
+        ("idx_suppliers_is_active", "suppliers", "is_active"),
+        ("idx_orders_shipping_status", "orders", "shipping_status"),
+        ("idx_warehouse_stocks_wh_product", "warehouse_stocks", "warehouse_id, product_id"),
+        ("idx_vouchers_status", "vouchers", "status"),
+        ("idx_shipments_status_date", "shipments", "status, created_at"),
+        ("idx_operation_logs_operator_date", "operation_logs", "operator_id, created_at"),
     ]
     created = 0
     for name, table, columns in indexes:
