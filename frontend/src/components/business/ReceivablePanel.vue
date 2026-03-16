@@ -13,14 +13,12 @@
         批量生成凭证
       </button>
     </div>
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <ReceivableBillsTab v-if="sub === 'bills'" key="bills" :refresh-key="receivableRefreshKey" />
-      <ReceiptBillsTab v-else-if="sub === 'receipts'" key="receipts" @data-changed="onSubTabDataChanged" />
-      <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" @data-changed="onSubTabDataChanged" />
-      <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" @data-changed="onSubTabDataChanged" />
-      <SalesDeliveryTab v-else-if="sub === 'delivery'" key="delivery" />
-      <SalesReturnTab v-else-if="sub === 'returns'" key="returns" />
-    </Transition>
+    <ReceivableBillsTab v-if="sub === 'bills'" key="bills" :refresh-key="receivableRefreshKey" />
+    <ReceiptBillsTab v-else-if="sub === 'receipts'" key="receipts" @data-changed="onSubTabDataChanged" />
+    <ReceiptRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" @data-changed="onSubTabDataChanged" />
+    <WriteOffBillsTab v-else-if="sub === 'writeoffs'" key="writeoffs" @data-changed="onSubTabDataChanged" />
+    <SalesDeliveryTab v-else-if="sub === 'delivery'" key="delivery" />
+    <SalesReturnTab v-else-if="sub === 'returns'" key="returns" />
 
     <VoucherGenerateModal
       :visible="showVoucherModal"

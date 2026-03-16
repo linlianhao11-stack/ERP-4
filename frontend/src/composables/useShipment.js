@@ -11,7 +11,7 @@ import { getShipments, getCarriers } from '../api/logistics'
 export function useShipment() {
   // ---- 排序 ----
   const { sortState: shipmentSort, toggleSort, genericSort } = useSort()
-  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage, saveNextCursor } = usePagination(20)
 
   // ---- 列表数据 ----
   const shipments = ref([])
@@ -38,6 +38,7 @@ export function useShipment() {
       const { data } = await getShipments(params)
       shipments.value = data.items || data
       total.value = data.total ?? 0
+      saveNextCursor(data.next_cursor)
     } catch (e) {
       console.error(e)
     }

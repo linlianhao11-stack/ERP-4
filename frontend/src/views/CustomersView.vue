@@ -7,7 +7,6 @@
       <button v-if="customerTab === 'manage'" @click="openCustomerModal" class="btn btn-primary btn-sm ml-auto">新增客户</button>
     </div>
 
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
     <!-- Transactions Tab -->
     <div v-if="customerTab === 'transactions'" key="transactions">
       <div class="card" style="overflow: visible">
@@ -85,7 +84,6 @@
         </div>
       </div>
     </div>
-    </Transition>
 
     <!-- Customer Form Modal -->
     <div v-if="modal.show && modal.type === 'customer'" class="modal-overlay" @click.self="closeModal">

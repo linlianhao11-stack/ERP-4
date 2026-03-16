@@ -217,6 +217,18 @@ async def migrate_add_indexes():
         ("idx_vouchers_status", "vouchers", "status"),
         ("idx_shipments_status_date", "shipments", "status, created_at"),
         ("idx_operation_logs_operator_date", "operation_logs", "operator_id, created_at"),
+        # --- 游标分页 + unpaid 优化索引 ---
+        ("idx_orders_is_cleared", "orders", "is_cleared"),
+        ("idx_orders_created_desc", "orders", "created_at DESC, id DESC"),
+        ("idx_orders_updated_desc", "orders", "updated_at DESC, id DESC"),
+        ("idx_stock_logs_created_desc", "stock_logs", "created_at DESC, id DESC"),
+        ("idx_operation_logs_created_desc", "operation_logs", "created_at DESC, id DESC"),
+        ("idx_payments_is_confirmed", "payments", "is_confirmed"),
+        ("idx_orders_account_set", "orders", "account_set_id"),
+        # --- 寄售页面优化索引 ---
+        ("idx_orders_order_type", "orders", "order_type"),
+        ("idx_stock_logs_change_ref", "stock_logs", "change_type, reference_type, reference_id"),
+        ("idx_warehouse_stocks_qty", "warehouse_stocks", "quantity"),
     ]
     created = 0
     for name, table, columns in indexes:

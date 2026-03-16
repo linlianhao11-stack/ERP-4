@@ -31,11 +31,9 @@
     </div>
 
     <!-- 报表内容 -->
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <BalanceSheetTab v-if="sub === 'balance-sheet'" key="balance-sheet" :data="balanceSheetData" />
-      <IncomeStatementTab v-else-if="sub === 'income'" key="income" :data="incomeData" />
-      <CashFlowTab v-else-if="sub === 'cash-flow'" key="cash-flow" :data="cashFlowData" />
-    </Transition>
+    <BalanceSheetTab v-if="sub === 'balance-sheet'" key="balance-sheet" :data="balanceSheetData" />
+    <IncomeStatementTab v-else-if="sub === 'income'" key="income" :data="incomeData" />
+    <CashFlowTab v-else-if="sub === 'cash-flow'" key="cash-flow" :data="cashFlowData" />
   </div>
 </template>
 

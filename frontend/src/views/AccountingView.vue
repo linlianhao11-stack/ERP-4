@@ -45,9 +45,7 @@
     </div>
 
     <!-- Panels -->
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }" v-if="accountingStore.currentAccountSetId">
-      <component :is="panelComponent" :key="tab" />
-    </Transition>
+    <component v-if="accountingStore.currentAccountSetId" :is="panelComponent" :key="tab" />
 
     <!-- 账套管理弹窗 -->
     <Transition name="fade">

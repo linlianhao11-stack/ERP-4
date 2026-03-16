@@ -12,13 +12,11 @@
         批量生成凭证
       </button>
     </div>
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <PayableBillsTab v-if="sub === 'bills'" key="bills" :refresh-key="payableRefreshKey" />
-      <DisbursementBillsTab v-else-if="sub === 'disbursements'" key="disbursements" @data-changed="onSubTabDataChanged" />
-      <DisbursementRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" @data-changed="onSubTabDataChanged" />
-      <PurchaseReceiptTab v-else-if="sub === 'receipt'" key="receipt" />
-      <PurchaseReturnTab v-else-if="sub === 'returns'" key="returns" />
-    </Transition>
+    <PayableBillsTab v-if="sub === 'bills'" key="bills" :refresh-key="payableRefreshKey" />
+    <DisbursementBillsTab v-else-if="sub === 'disbursements'" key="disbursements" @data-changed="onSubTabDataChanged" />
+    <DisbursementRefundBillsTab v-else-if="sub === 'refunds'" key="refunds" @data-changed="onSubTabDataChanged" />
+    <PurchaseReceiptTab v-else-if="sub === 'receipt'" key="receipt" />
+    <PurchaseReturnTab v-else-if="sub === 'returns'" key="returns" />
 
     <VoucherGenerateModal
       :visible="showVoucherModal"

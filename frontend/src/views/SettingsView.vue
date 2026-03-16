@@ -16,54 +16,52 @@
       <button v-if="hasPermission('admin')" @click="settingsTab = 'ai'" :class="['tab', settingsTab === 'ai' ? 'active' : '']">AI 助手配置</button>
     </div>
 
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <!-- 常规设置标签页 -->
-      <div v-if="settingsTab === 'general'" key="general" class="grid md:grid-cols-2 gap-5">
-        <WarehouseSettings
-          v-if="hasPermission('settings') || hasPermission('stock_edit')"
-          @data-changed="onDataChanged" />
-        <DepartmentSettings
-          v-if="hasPermission('settings') || hasPermission('sales')"
-          @data-changed="onDataChanged" />
-        <EmployeeSettings
-          v-if="hasPermission('settings') || hasPermission('sales')"
-          @data-changed="onDataChanged" />
-        <UserSettings
-          @data-changed="onDataChanged"
-          @go-to-permissions="handleGoToPermissions" />
-      </div>
+    <!-- 常规设置标签页 -->
+    <div v-if="settingsTab === 'general'" key="general" class="grid md:grid-cols-2 gap-5">
+      <WarehouseSettings
+        v-if="hasPermission('settings') || hasPermission('stock_edit')"
+        @data-changed="onDataChanged" />
+      <DepartmentSettings
+        v-if="hasPermission('settings') || hasPermission('sales')"
+        @data-changed="onDataChanged" />
+      <EmployeeSettings
+        v-if="hasPermission('settings') || hasPermission('sales')"
+        @data-changed="onDataChanged" />
+      <UserSettings
+        @data-changed="onDataChanged"
+        @go-to-permissions="handleGoToPermissions" />
+    </div>
 
-      <!-- 财务设置标签页 -->
-      <div v-else-if="settingsTab === 'finance'" key="finance">
-        <PaymentMethodSettings @data-changed="onDataChanged" />
-        <BankAccountSettings @data-changed="onDataChanged" />
-        <div class="card p-4 mt-4">
-          <h3 class="text-sm font-medium mb-3">凭证审核规则</h3>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" v-model="makerCheckerEnabled" @change="saveMakerCheckerSetting" class="rounded">
-            <span>强制制单人与审核人分离（开启后制单人不可自行审核）</span>
-          </label>
-        </div>
+    <!-- 财务设置标签页 -->
+    <div v-else-if="settingsTab === 'finance'" key="finance">
+      <PaymentMethodSettings @data-changed="onDataChanged" />
+      <BankAccountSettings @data-changed="onDataChanged" />
+      <div class="card p-4 mt-4">
+        <h3 class="text-sm font-medium mb-3">凭证审核规则</h3>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" v-model="makerCheckerEnabled" @change="saveMakerCheckerSetting" class="rounded">
+          <span>强制制单人与审核人分离（开启后制单人不可自行审核）</span>
+        </label>
       </div>
+    </div>
 
-      <!-- 系统日志标签页 -->
-      <div v-else-if="settingsTab === 'logs'" key="logs">
-        <LogsSettings />
-      </div>
+    <!-- 系统日志标签页 -->
+    <div v-else-if="settingsTab === 'logs'" key="logs">
+      <LogsSettings />
+    </div>
 
-      <!-- 权限管理标签页 -->
-      <div v-else-if="settingsTab === 'permissions'" key="permissions">
-        <PermissionSettings
-          ref="permissionSettingsRef"
-          :initial-user-id="permInitialUserId"
-          @data-changed="onDataChanged" />
-      </div>
+    <!-- 权限管理标签页 -->
+    <div v-else-if="settingsTab === 'permissions'" key="permissions">
+      <PermissionSettings
+        ref="permissionSettingsRef"
+        :initial-user-id="permInitialUserId"
+        @data-changed="onDataChanged" />
+    </div>
 
-      <!-- AI 助手配置标签页 -->
-      <div v-else-if="settingsTab === 'ai'" key="ai">
-        <ApiKeysPanel />
-      </div>
-    </Transition>
+    <!-- AI 助手配置标签页 -->
+    <div v-else-if="settingsTab === 'ai'" key="ai">
+      <ApiKeysPanel />
+    </div>
   </div>
 </template>
 

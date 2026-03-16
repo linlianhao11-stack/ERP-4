@@ -10,7 +10,7 @@ export const useProductsStore = defineStore('products', () => {
   const loadProducts = async (warehouseId) => {
     error.value = null
     try {
-      const params = warehouseId ? { warehouse_id: warehouseId } : {}
+      const params = warehouseId ? { warehouse_id: warehouseId } : { limit: 10000 }
       const { data } = await getProducts(params)
       if (!warehouseId) {
         products.value = data.items ?? data

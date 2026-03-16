@@ -35,9 +35,10 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
                         brand: Optional[str] = None,
                         warehouse_id: Optional[int] = None,
                         include_inactive: bool = False,
+                        has_stock: bool = False,
                         offset: int = 0, limit: int = 200,
                         user: User = Depends(get_current_user)):
-    limit = min(limit, 1000)  # 安全上限
+    limit = min(limit, 10000)  # 安全上限
     query = Product.all() if include_inactive else Product.filter(is_active=True)
     if keyword:
         for word in keyword.split():
@@ -46,6 +47,12 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
         query = query.filter(category=category)
     if brand:
         query = query.filter(brand=brand)
+    # 仅返回有库存的产品（库存页面使用）
+    if has_stock:
+        stock_pids = list(await WarehouseStock.filter(quantity__gt=0).distinct().values_list("product_id", flat=True))
+        if not stock_pids:
+            return {"items": [], "total": 0}
+        query = query.filter(id__in=stock_pids)
     total = await query.count()
     products = await query.order_by("-updated_at").offset(offset).limit(limit)
 

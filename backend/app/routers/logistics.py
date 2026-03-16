@@ -20,6 +20,7 @@ from app.services.logistics_service import (
 from app.services.sn_service import validate_and_consume_sn_codes
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
 from app.utils.generators import generate_sequential_no
+from app.utils.pagination import apply_cursor_pagination, encode_cursor
 from app.logger import get_logger
 
 logger = get_logger("logistics")
@@ -107,65 +108,62 @@ async def list_pending_orders(offset: int = 0, limit: int = 50, user: User = Dep
 
 
 @router.get("")
-async def list_shipments(status: Optional[str] = None, search: Optional[str] = None, shipping_status: Optional[str] = None, offset: int = 0, limit: int = 50, user: User = Depends(require_permission("logistics", "sales"))):
-    """物流列表 - 按订单分组"""
-    # 数据库级预筛选（减少加载量）
-    query = Shipment.all()
-    if shipping_status:
-        matching_orders = await Order.filter(shipping_status=shipping_status).values_list("id", flat=True)
-        if not matching_orders:
-            return []
-        query = query.filter(order_id__in=matching_orders)
-    if status:
-        if status == 'pending':
-            # "待发货" tab: 查找 shipping_status 为 pending/partial 的订单
-            matching_order_ids = list(
-                await Order.filter(
-                    shipping_status__in=["pending", "partial"],
-                    order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
-                ).values_list("id", flat=True)
+async def list_shipments(status: Optional[str] = None, search: Optional[str] = None, shipping_status: Optional[str] = None, cursor: Optional[str] = None, offset: int = 0, limit: int = 20, user: User = Depends(require_permission("logistics", "sales"))):
+    """物流列表 - 按订单分组（数据库级分页，避免全量加载）"""
+    from tortoise.expressions import Q
+    limit = min(limit, 100)
+
+    # 1. 以订单为主体构建查询（而非加载全部 shipments）
+    if status == 'pending':
+        order_query = Order.filter(
+            shipping_status__in=["pending", "partial"],
+            order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
+        )
+    elif status:
+        # 其他物流状态 tab：找到有该状态 shipment 的订单
+        shipment_oids = list(await Shipment.filter(status=status).distinct().values_list("order_id", flat=True))
+        if not shipment_oids:
+            return {"items": [], "total": 0}
+        order_query = Order.filter(id__in=shipment_oids)
+    elif shipping_status:
+        order_query = Order.filter(shipping_status=shipping_status)
+    else:
+        # 默认：所有物流相关订单
+        order_query = Order.filter(
+            order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
+        )
+
+    # 2. SQL 级搜索（订单号、客户名）
+    if search:
+        for w in search.strip().split():
+            order_query = order_query.filter(
+                Q(order_no__icontains=w) | Q(customer__name__icontains=w)
             )
-            if matching_order_ids:
-                query = query.filter(order_id__in=matching_order_ids)
-            else:
-                query = query.filter(id=-1)  # 无匹配，返回空
-        else:
-            # 其他物流状态 tab: 按 Shipment.status 过滤
-            matching_order_ids = await Shipment.filter(status=status).distinct().values_list("order_id", flat=True)
-            if not matching_order_ids:
-                return []
-            query = query.filter(order_id__in=matching_order_ids)
 
-    all_shipments = await query.order_by("id").select_related("order", "order__customer", "order__employee")
+    # 3. 数据库级分页
+    total = await order_query.count()
+    base_query = order_query.select_related("customer", "employee")
+    orders = await apply_cursor_pagination(base_query, cursor, "updated_at", limit, offset)
 
-    order_map = OrderedDict()
-    for s in all_shipments:
-        oid = s.order_id
-        if oid not in order_map:
-            order_map[oid] = []
-        order_map[oid].append(s)
+    if not orders:
+        return {"items": [], "total": total}
 
+    # 4. 仅加载当前页订单的物流记录
+    page_order_ids = [o.id for o in orders]
+    shipments = await Shipment.filter(order_id__in=page_order_ids).order_by("id")
+
+    ship_map = {}
+    for s in shipments:
+        ship_map.setdefault(s.order_id, []).append(s)
+
+    # 5. 构建结果
     result = []
-    for oid, slist in order_map.items():
-        order = slist[0].order
-        first = slist[0]
-
-        if status and status != 'pending' and first.status != status:
-            continue
-
-        if search:
-            keywords = search.lower().split()
-            fields = [
-                (order.order_no or "").lower(),
-                (order.customer.name if order.customer else "").lower(),
-            ] + [(s.tracking_no or "").lower() for s in slist] + [(s.carrier_name or "").lower() for s in slist]
-            combined = " ".join(fields)
-            combined_nospace = combined.replace(" ", "")
-            if not all(w in combined or w in combined_nospace for w in keywords):
-                continue
+    for order in orders:
+        slist = ship_map.get(order.id, [])
+        first = slist[0] if slist else None
 
         last_info = None
-        if first.last_tracking_info:
+        if first and first.last_tracking_info:
             try:
                 info_list = json.loads(first.last_tracking_info)
                 if info_list:
@@ -189,70 +187,27 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
             "customer_name": order.customer.name if order.customer else None,
             "total_amount": float(order.total_amount),
             "shipping_status": order.shipping_status if hasattr(order, 'shipping_status') else "completed",
-            "carrier_name": first.carrier_name,
-            "tracking_no": first.tracking_no,
-            "status": first.status,
-            "status_text": first.status_text,
+            "carrier_name": first.carrier_name if first else None,
+            "tracking_no": first.tracking_no if first else None,
+            "status": first.status if first else "pending",
+            "status_text": first.status_text if first else "待发货",
             "last_info": last_info,
             "shipment_count": len(slist),
             "all_tracking": all_tracking,
             "sn_status": "已添加" if any(s.sn_code for s in slist) else "未添加",
             "created_at": order.created_at.isoformat(),
-            "updated_at": first.updated_at.isoformat(),
+            "updated_at": order.updated_at.isoformat(),
             "remark": order.remark,
             "employee_name": order.employee.name if order.employee else None,
-            "phone": first.phone if hasattr(first, 'phone') and first.phone else None,
+            "phone": first.phone if first and hasattr(first, 'phone') and first.phone else None,
         })
 
-    # 补充没有 Shipment 记录的待发货订单（全部 或 待发货 tab）
-    if not status or status == 'pending':
-        existing_order_ids = set(order_map.keys())
-        pending_query = Order.filter(
-            shipping_status__in=["pending", "partial"],
-            order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
-        ).select_related("customer", "employee")
-        if existing_order_ids:
-            pending_query = pending_query.exclude(id__in=list(existing_order_ids))
-        pending_orders = await pending_query.order_by("-created_at").limit(200)
-
-        for o in pending_orders:
-            if search:
-                keywords = search.lower().split()
-                fields = [
-                    (o.order_no or "").lower(),
-                    (o.customer.name if o.customer else "").lower(),
-                ]
-                combined = " ".join(fields)
-                combined_nospace = combined.replace(" ", "")
-                if not all(w in combined or w in combined_nospace for w in keywords):
-                    continue
-
-            result.append({
-                "order_id": o.id,
-                "order_no": o.order_no,
-                "order_type": o.order_type,
-                "customer_name": o.customer.name if o.customer else None,
-                "total_amount": float(o.total_amount),
-                "shipping_status": o.shipping_status,
-                "carrier_name": None,
-                "tracking_no": None,
-                "status": "pending",
-                "status_text": "待发货",
-                "last_info": None,
-                "shipment_count": 0,
-                "all_tracking": [],
-                "sn_status": "未添加",
-                "created_at": o.created_at.isoformat(),
-                "updated_at": o.created_at.isoformat(),
-                "remark": o.remark,
-                "employee_name": o.employee.name if o.employee else None,
-                "phone": None,
-            })
-
-    result.sort(key=lambda x: x["updated_at"], reverse=True)
-    total = len(result)
-    limit = min(limit, 500)
-    return {"items": result[offset:offset + limit], "total": total}
+    # 构建下一页游标
+    next_cursor = None
+    if orders:
+        last_order = orders[-1]
+        next_cursor = encode_cursor(last_order.id, last_order.updated_at)
+    return {"items": result, "total": total, "next_cursor": next_cursor}
 
 
 @router.get("/{order_id}")

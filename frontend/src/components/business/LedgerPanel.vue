@@ -5,11 +5,9 @@
       { value: 'detail', label: '明细分类账' },
       { value: 'trial', label: '科目余额表' },
     ]" container-class="mb-4" />
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
-      <GeneralLedgerTab v-if="sub === 'general'" key="general" @viewVoucher="$emit('viewVoucher', $event)" />
-      <DetailLedgerTab v-else-if="sub === 'detail'" key="detail" @viewVoucher="$emit('viewVoucher', $event)" />
-      <TrialBalanceTab v-else-if="sub === 'trial'" key="trial" />
-    </Transition>
+    <GeneralLedgerTab v-if="sub === 'general'" key="general" @viewVoucher="$emit('viewVoucher', $event)" />
+    <DetailLedgerTab v-else-if="sub === 'detail'" key="detail" @viewVoucher="$emit('viewVoucher', $event)" />
+    <TrialBalanceTab v-else-if="sub === 'trial'" key="trial" />
   </div>
 </template>
 

@@ -18,6 +18,7 @@ from app.models import (
 from app.schemas.finance import PaymentCreate
 from app.services.operation_log_service import log_operation
 from app.utils.generators import generate_order_no
+from app.utils.pagination import apply_cursor_pagination, build_next_cursor
 from app.utils.time import now
 from app.utils.errors import parse_date
 
@@ -33,6 +34,7 @@ async def get_all_orders(
     search: Optional[str] = None,
     account_set_id: Optional[int] = None,
     unpaid_only: bool = False,
+    cursor: Optional[str] = None,
     offset: int = 0,
     limit: int = 200,
     user: User = Depends(require_permission("finance"))
@@ -41,14 +43,17 @@ async def get_all_orders(
     limit = min(limit, 1000)
     query = Order.all()
     if unpaid_only:
-        # 未结清 或 有待确认收款的订单都算欠款
-        unconfirmed_pay_order_ids = set()
-        for p in await Payment.filter(is_confirmed=False).all():
-            unconfirmed_pay_order_ids.add(p.order_id)
-        for po in await PaymentOrder.filter(payment__is_confirmed=False).all():
-            unconfirmed_pay_order_ids.add(po.order_id)
-        if unconfirmed_pay_order_ids:
-            query = query.filter(Q(is_cleared=False) | Q(id__in=list(unconfirmed_pay_order_ids)))
+        # 未结清 或 有待确认收款的订单都算欠款（用 SQL 子查询代替 Python 内存 set）
+        from tortoise import connections
+        conn = connections.get("default")
+        uc_rows = await conn.execute_query_dict(
+            "SELECT DISTINCT order_id FROM payments WHERE is_confirmed = false AND order_id IS NOT NULL "
+            "UNION "
+            "SELECT DISTINCT po.order_id FROM payment_orders po JOIN payments p ON p.id = po.payment_id WHERE p.is_confirmed = false"
+        )
+        uc_ids = [r["order_id"] for r in uc_rows]
+        if uc_ids:
+            query = query.filter(Q(is_cleared=False) | Q(id__in=uc_ids))
         else:
             query = query.filter(is_cleared=False)
     if order_type:
@@ -61,14 +66,16 @@ async def get_all_orders(
         elif payment_status == "uncleared":
             query = query.filter(is_cleared=False).exclude(shipping_status="cancelled")
         elif payment_status == "unconfirmed":
-            uc_ids = set()
-            for p in await Payment.filter(is_confirmed=False).all():
-                if p.order_id:
-                    uc_ids.add(p.order_id)
-            for po in await PaymentOrder.filter(payment__is_confirmed=False).all():
-                uc_ids.add(po.order_id)
+            from tortoise import connections
+            conn = connections.get("default")
+            uc_rows = await conn.execute_query_dict(
+                "SELECT DISTINCT order_id FROM payments WHERE is_confirmed = false AND order_id IS NOT NULL "
+                "UNION "
+                "SELECT DISTINCT po.order_id FROM payment_orders po JOIN payments p ON p.id = po.payment_id WHERE p.is_confirmed = false"
+            )
+            uc_ids = [r["order_id"] for r in uc_rows]
             if uc_ids:
-                query = query.filter(id__in=list(uc_ids))
+                query = query.filter(id__in=uc_ids)
             else:
                 query = query.filter(id=-1)
     if account_set_id:
@@ -99,8 +106,8 @@ async def get_all_orders(
             query = query.filter(order_q)
 
     total = await query.count()
-    orders = await query.order_by("-created_at").offset(offset).limit(limit).select_related(
-        "customer", "warehouse", "creator", "related_order", "employee")
+    base_query = query.select_related("customer", "warehouse", "creator", "related_order", "employee")
+    orders = await apply_cursor_pagination(base_query, cursor, "created_at", limit, offset)
 
     filtered_orders = list(orders)
 
@@ -162,7 +169,7 @@ async def get_all_orders(
             "rebate_used": float(o.rebate_used) if o.rebate_used else 0,
             "account_set_name": as_map.get(o.account_set_id) if o.account_set_id else None,
         })
-    return {"items": result, "total": total}
+    return {"items": result, "total": total, "next_cursor": build_next_cursor(filtered_orders, "created_at")}
 
 
 @router.get("/all-orders/{order_id}/items")
@@ -276,6 +283,7 @@ async def get_finance_stock_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
+    cursor: Optional[str] = None,
     offset: int = 0,
     limit: int = 20,
     user: User = Depends(require_permission("finance"))
@@ -312,7 +320,8 @@ async def get_finance_stock_logs(
         )
 
     total = await query.count()
-    logs = await query.order_by("-created_at").offset(offset).limit(limit).select_related("product", "warehouse", "creator")
+    base_query = query.select_related("product", "warehouse", "creator")
+    logs = await apply_cursor_pagination(base_query, cursor, "created_at", limit, offset)
 
     return {"items": [{
         "id": l.id,
@@ -329,7 +338,7 @@ async def get_finance_stock_logs(
         "remark": l.remark,
         "creator_name": l.creator.display_name if l.creator else "-",
         "created_at": l.created_at.isoformat()
-    } for l in logs], "total": total}
+    } for l in logs], "total": total, "next_cursor": build_next_cursor(logs, "created_at")}
 
 
 @router.get("/unpaid-orders")

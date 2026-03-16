@@ -28,7 +28,7 @@ const stockColumnDefs = {
 export function useStock() {
   const appStore = useAppStore()
   const warehousesStore = useWarehousesStore()
-  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
+  const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage, saveNextCursor } = usePagination(20)
 
   const {
     columnLabels, visibleColumns, showColumnMenu, menuAttr,
@@ -96,12 +96,13 @@ export function useStock() {
   /** 加载商品列表（服务端分页 + 搜索） */
   const loadProductsData = async () => {
     try {
-      const params = { ...paginationParams.value }
+      const params = { ...paginationParams.value, has_stock: true }
       if (stockWarehouseFilter.value) params.warehouse_id = stockWarehouseFilter.value
       if (productSearch.value) params.keyword = productSearch.value
       const { data } = await getProducts(params)
       stockProducts.value = data.items || data
       total.value = data.total ?? 0
+      saveNextCursor(data.next_cursor)
     } catch (e) {
       console.error(e)
     }

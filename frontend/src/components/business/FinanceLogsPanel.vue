@@ -83,7 +83,7 @@ import StatusBadge from '../common/StatusBadge.vue'
 
 const { fmtDate } = useFormat()
 const { sortState: logSort, toggleSort: toggleLogSort, genericSort: genericSortLog } = useSort()
-const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
+const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage, saveNextCursor } = usePagination(20)
 
 const stockLogs = ref([])
 const logFilter = reactive({ type: '', start: '', end: '', search: '' })
@@ -108,6 +108,7 @@ const loadLogs = async () => {
     const { data } = await getStockLogs(params)
     stockLogs.value = data.items || data
     total.value = data.total ?? 0
+    saveNextCursor(data.next_cursor)
   } catch (e) {
     console.error(e)
   }

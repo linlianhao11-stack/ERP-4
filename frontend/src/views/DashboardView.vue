@@ -136,15 +136,116 @@
         <div v-if="!recentOrders.length" class="p-8 text-center text-muted text-sm">暂无订单</div>
       </div>
     </div>
+
+    <!-- 订单详情弹窗 -->
+    <teleport to="body">
+      <div v-if="showOrderDetail" class="modal-overlay" @click.self="closeOrderDetail">
+        <div class="modal-content" style="max-width:920px">
+          <div class="modal-header">
+            <h3 class="font-semibold">订单详情</h3>
+            <button @click="closeOrderDetail" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <!-- 加载中 -->
+            <div v-if="orderDetailLoading" class="flex items-center justify-center py-16 text-muted">
+              <span class="text-sm">加载中...</span>
+            </div>
+            <template v-else-if="orderDetail.order_no">
+              <!-- 订单基本信息 -->
+              <div class="mb-5 p-4 bg-elevated rounded-xl">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <div class="text-[15px] font-bold font-mono">{{ orderDetail.order_no }}</div>
+                    <div class="text-xs text-muted mt-0.5">
+                      <span v-if="orderDetail.employee_name">销售员: {{ orderDetail.employee_name }} · </span>
+                      {{ orderDetail.creator_name }} · {{ fmtDate(orderDetail.created_at) }}
+                    </div>
+                  </div>
+                  <StatusBadge type="orderType" :status="orderDetail.order_type" />
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 gap-x-4 text-[13px]">
+                  <div><span class="text-muted">客户:</span> {{ orderDetail.customer?.name || '-' }}</div>
+                  <div><span class="text-muted">仓库:</span> {{ orderDetail.warehouse?.name || '-' }}</div>
+                  <div><span class="text-muted">金额:</span> <span class="font-semibold">¥{{ fmt(orderDetail.total_amount) }}</span></div>
+                  <div v-if="hasPermission('finance')"><span class="text-muted">毛利:</span> <span :class="orderDetail.total_profit >= 0 ? 'text-success' : 'text-error'">¥{{ fmt(orderDetail.total_profit) }}</span></div>
+                  <div><span class="text-muted">已付:</span> ¥{{ fmt(orderDetail.paid_amount) }}</div>
+                  <div><span class="text-muted">状态:</span> <span :class="orderDetail.is_cleared ? 'text-success' : 'text-error'">{{ orderDetail.is_cleared ? '已结清' : '未结清' }}</span></div>
+                  <div v-if="orderDetail.shipping_status"><span class="text-muted">发货:</span> <StatusBadge type="shippingStatus" :status="orderDetail.shipping_status" /></div>
+                  <div v-if="orderDetail.remark" class="col-span-2 pt-2 border-t border-line"><span class="text-muted">备注:</span> <span class="text-secondary">{{ orderDetail.remark }}</span></div>
+                </div>
+              </div>
+
+              <!-- 商品明细 -->
+              <div v-if="orderDetail.items?.length" class="mb-5">
+                <div class="flex items-center gap-2 mb-2.5">
+                  <span class="text-[13px] font-semibold text-secondary">商品明细</span>
+                  <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.items.length }} 件商品</span>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-elevated">
+                      <tr>
+                        <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                        <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                        <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">数量</th>
+                        <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">金额</th>
+                        <th v-if="hasPermission('finance')" class="px-2 py-2 text-right text-xs font-semibold text-secondary">毛利</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-line">
+                      <tr v-for="item in orderDetail.items" :key="item.id || item.product_id">
+                        <td class="px-2 py-2.5">
+                          <div class="font-medium">{{ item.product_name }}</div>
+                          <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
+                        </td>
+                        <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                        <td class="px-2 py-2.5 text-right">{{ item.quantity }}</td>
+                        <td class="px-2 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
+                        <td v-if="hasPermission('finance')" class="px-2 py-2.5 text-right" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 物流信息 -->
+              <div v-if="orderDetail.shipments?.length" class="mb-2">
+                <div class="flex items-center gap-2 mb-2.5">
+                  <span class="text-[13px] font-semibold text-secondary">物流信息</span>
+                  <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.shipments.length }} 个物流单</span>
+                </div>
+                <div v-for="sh in orderDetail.shipments" :key="sh.id" class="border border-line rounded-[10px] overflow-hidden mb-2.5 last:mb-0">
+                  <div class="flex justify-between items-center px-3.5 py-2.5 bg-elevated">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-xs text-muted">{{ sh.carrier_name || '未填写承运商' }}</span>
+                    </div>
+                    <StatusBadge type="shipmentStatus" :status="sh.status" />
+                  </div>
+                  <div v-if="sh.tracking_no" class="flex items-center gap-1.5 px-3.5 py-2 border-b border-line">
+                    <span class="text-[11px] text-muted">运单号:</span>
+                    <span class="text-xs font-mono font-medium text-primary">{{ sh.tracking_no }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="closeOrderDetail" class="btn btn-secondary btn-sm">关闭</button>
+            <button type="button" @click="closeOrderDetail(); router.push({ path: '/finance', query: { orderId: orderDetail.id } })" class="btn btn-primary btn-sm">查看完整详情</button>
+          </div>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '../stores/app'
 import { useSettingsStore } from '../stores/settings'
 import { getDashboard, getSalesTrend, getRecentOrders } from '../api/dashboard'
+import { getOrder } from '../api/orders'
 import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
 import {
@@ -160,7 +261,7 @@ Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryS
 const router = useRouter()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
-const { fmt } = useFormat()
+const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
 
 const dashboard = ref({
@@ -305,8 +406,36 @@ watch(() => appStore.theme, () => {
   }
 })
 
-const goToOrder = (id) => {
-  router.push({ path: '/finance', query: { orderId: id } })
+// --- 订单详情弹窗 ---
+const showOrderDetail = ref(false)
+const orderDetail = reactive({})
+const orderDetailLoading = ref(false)
+
+const lockScroll = (lock) => {
+  const el = document.querySelector('.app-content')
+  if (el) el.style.overflow = lock ? 'hidden' : ''
+}
+
+const goToOrder = async (id) => {
+  orderDetailLoading.value = true
+  showOrderDetail.value = true
+  lockScroll(true)
+  try {
+    const { data } = await getOrder(id)
+    Object.keys(orderDetail).forEach(k => delete orderDetail[k])
+    Object.assign(orderDetail, data)
+  } catch (e) {
+    appStore.showToast('加载订单详情失败', 'error')
+    showOrderDetail.value = false
+    lockScroll(false)
+  } finally {
+    orderDetailLoading.value = false
+  }
+}
+
+const closeOrderDetail = () => {
+  showOrderDetail.value = false
+  lockScroll(false)
 }
 
 onMounted(() => {

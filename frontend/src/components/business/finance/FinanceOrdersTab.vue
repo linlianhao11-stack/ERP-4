@@ -651,7 +651,7 @@ const settingsStore = useSettingsStore()
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
 const { sortState: orderSort, toggleSort: toggleOrderSort, genericSort: genericSortOrder } = useSort()
-const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage } = usePagination(20)
+const { page, pageSize, total, totalPages, hasPagination, paginationParams, visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage, saveNextCursor } = usePagination(20)
 
 // 视图模式选项
 const viewModeOptions = [
@@ -926,6 +926,7 @@ const loadOrders = async () => {
     const { data } = await getAllOrders(params)
     allOrders.value = data.items || data
     total.value = data.total ?? 0
+    saveNextCursor(data.next_cursor)
   } catch (e) {
     console.error('加载订单失败', e)
   }

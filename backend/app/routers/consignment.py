@@ -22,143 +22,164 @@ router = APIRouter(prefix="/api/consignment", tags=["寄售管理"])
 
 @router.get("/summary")
 async def get_consignment_summary(user: User = Depends(require_permission("sales"))):
-    """获取寄售汇总数据"""
-    stocks = await WarehouseStock.filter(warehouse__is_virtual=True, quantity__gt=0).select_related("product")
+    """获取寄售汇总数据（全部使用原生 SQL 避免 ORM 对象构造开销）"""
+    from tortoise import connections
+    conn = connections.get("default")
 
-    consign_orders = await Order.filter(order_type="CONSIGN_OUT").select_related("customer").distinct()
-    customer_ids = list(set(o.customer_id for o in consign_orders if o.customer_id))
+    # ---- 1. 按 (客户, 类型) 聚合订单统计（替代加载 12,500+ Order 对象）----
+    order_agg = await conn.execute_query_dict("""
+        SELECT customer_id, order_type,
+               COUNT(*) as order_count,
+               COALESCE(SUM(total_cost), 0) as total_cost,
+               COALESCE(SUM(CASE WHEN is_cleared = false THEN total_amount - paid_amount ELSE 0 END), 0) as settle_unpaid
+        FROM orders
+        WHERE order_type IN ('CONSIGN_OUT', 'CONSIGN_SETTLE', 'CONSIGN_RETURN')
+          AND customer_id IS NOT NULL
+        GROUP BY customer_id, order_type
+    """)
+    # 收集有 CONSIGN_OUT 记录的客户
+    customer_ids = list(set(r["customer_id"] for r in order_agg if r["order_type"] == "CONSIGN_OUT"))
+    if not customer_ids:
+        return {
+            "total_cost_value": 0, "total_sales_value": 0, "total_settle_unpaid": 0,
+            "total_items": 0, "total_quantity": 0, "customer_stats": [], "stock_details": []
+        }
+    agg_map = {}
+    for r in order_agg:
+        agg_map[(r["customer_id"], r["order_type"])] = r
 
-    # 批量查询客户和订单（避免 N+1）
-    customers = await Customer.filter(id__in=customer_ids) if customer_ids else []
+    # ---- 2. 批量查询客户信息 ----
+    customers = await Customer.filter(id__in=customer_ids)
     customer_map = {c.id: c for c in customers}
 
-    all_consign_orders = await Order.filter(
-        customer_id__in=customer_ids,
-        order_type__in=["CONSIGN_OUT", "CONSIGN_SETTLE", "CONSIGN_RETURN"]
-    ) if customer_ids else []
+    # ---- 3. 旧退货日志按客户聚合退货成本 ----
+    return_cost_rows = await conn.execute_query_dict("""
+        SELECT sl.reference_id as customer_id,
+               COALESCE(SUM(ABS(sl.quantity) * p.cost_price), 0) as return_cost
+        FROM stock_logs sl
+        JOIN warehouses w ON w.id = sl.warehouse_id
+        JOIN products p ON p.id = sl.product_id
+        WHERE sl.change_type = 'CONSIGN_RETURN' AND sl.reference_type = 'CONSIGN_RETURN'
+          AND w.is_virtual = true AND sl.quantity < 0
+        GROUP BY sl.reference_id
+    """)
+    return_cost_map = {r["customer_id"]: float(r["return_cost"]) for r in return_cost_rows}
 
-    # 按客户+类型分组
-    orders_by_customer_type = {}
-    for o in all_consign_orders:
-        key = (o.customer_id, o.order_type)
-        orders_by_customer_type.setdefault(key, []).append(o)
-
-    # 批量查询旧退货日志
-    old_return_logs = await StockLog.filter(
-        change_type="CONSIGN_RETURN", reference_type="CONSIGN_RETURN",
-        reference_id__in=customer_ids, warehouse__is_virtual=True, quantity__lt=0
-    ).select_related("product") if customer_ids else []
-    return_logs_by_customer = {}
-    for log in old_return_logs:
-        return_logs_by_customer.setdefault(log.reference_id, []).append(log)
-
+    # ---- 4. 构建客户统计 ----
     customer_stats = {}
     total_settle_unpaid = 0
-
     for cid in customer_ids:
         customer = customer_map.get(cid)
-        if customer:
-            out_orders = orders_by_customer_type.get((cid, "CONSIGN_OUT"), [])
-            settle_orders = orders_by_customer_type.get((cid, "CONSIGN_SETTLE"), [])
-            return_orders = orders_by_customer_type.get((cid, "CONSIGN_RETURN"), [])
+        if not customer:
+            continue
+        out_agg = agg_map.get((cid, "CONSIGN_OUT"), {})
+        settle_agg = agg_map.get((cid, "CONSIGN_SETTLE"), {})
+        return_agg = agg_map.get((cid, "CONSIGN_RETURN"), {})
 
-            total_out = sum(float(o.total_cost) for o in out_orders)
-            total_settle = sum(float(o.total_cost) for o in settle_orders)
-            total_return = sum(float(o.total_cost) for o in return_orders)
+        total_out = float(out_agg.get("total_cost", 0))
+        total_settle = float(settle_agg.get("total_cost", 0))
+        total_return = float(return_agg.get("total_cost", 0))
+        total_return += return_cost_map.get(cid, 0)
 
-            for log in return_logs_by_customer.get(cid, []):
-                if log.product:
-                    total_return += abs(log.quantity) * float(log.product.cost_price)
+        settle_unpaid = float(settle_agg.get("settle_unpaid", 0))
+        total_settle_unpaid += settle_unpaid
 
-            settle_unpaid = sum(float(o.total_amount - o.paid_amount) for o in settle_orders if not o.is_cleared)
-            total_settle_unpaid += settle_unpaid
+        customer_stats[cid] = {
+            "customer_id": cid,
+            "customer_name": customer.name,
+            "total_out_cost": total_out,
+            "total_settle_cost": total_settle,
+            "total_return_cost": total_return,
+            "remaining_cost": total_out - total_settle - total_return,
+            "settle_unpaid": settle_unpaid,
+            "balance": float(customer.balance)
+        }
 
-            customer_stats[cid] = {
-                "customer_id": cid,
-                "customer_name": customer.name,
-                "total_out_cost": total_out,
-                "total_settle_cost": total_settle,
-                "total_return_cost": total_return,
-                "remaining_cost": total_out - total_settle - total_return,
-                "settle_unpaid": settle_unpaid,
-                "balance": float(customer.balance)
-            }
-
-    # --- 库存明细：按 (product_id, unit_price) 分组，显示实际销售价 ---
-    # 实际剩余库存（ground truth）
+    # ---- 5. 虚拟仓库存明细（按 product_id 聚合，含商品信息）----
+    stock_rows = await conn.execute_query_dict("""
+        SELECT ws.product_id, SUM(ws.quantity) as quantity,
+               p.sku, p.name, p.cost_price, p.retail_price
+        FROM warehouse_stocks ws
+        JOIN warehouses w ON w.id = ws.warehouse_id
+        JOIN products p ON p.id = ws.product_id
+        WHERE w.is_virtual = true AND ws.quantity > 0
+        GROUP BY ws.product_id, p.sku, p.name, p.cost_price, p.retail_price
+    """)
     product_remaining = {}
-    for s in stocks:
-        pid = s.product_id
-        if pid not in product_remaining:
-            product_remaining[pid] = {"quantity": 0, "product": s.product}
-        product_remaining[pid]["quantity"] += s.quantity
+    total_stock_quantity = 0
+    for r in stock_rows:
+        product_remaining[r["product_id"]] = {
+            "quantity": r["quantity"],
+            "sku": r["sku"], "name": r["name"],
+            "cost_price": float(r["cost_price"]),
+            "retail_price": float(r["retail_price"]),
+        }
+        total_stock_quantity += r["quantity"]
 
-    # 获取所有 CONSIGN_OUT 订单明细，按订单时间排序（用于 FIFO 分配）
-    out_items = await OrderItem.filter(
-        order__order_type="CONSIGN_OUT"
-    ).select_related("product", "order").order_by("order__created_at")
-
-    # 按 (product_id, unit_price) 分组
-    price_batches = {}  # pid -> {unit_price: {out_qty, earliest_date, product}}
-    for item in out_items:
-        pid = item.product_id
-        up = float(item.unit_price)
+    # ---- 6. 预聚合价格批次（替代加载 37,510 OrderItem + select_related）----
+    batch_rows = await conn.execute_query_dict("""
+        SELECT oi.product_id, oi.unit_price, SUM(oi.quantity) as total_qty,
+               MIN(o.created_at) as earliest_date,
+               p.sku, p.name, p.cost_price, p.retail_price
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        JOIN products p ON p.id = oi.product_id
+        WHERE o.order_type = 'CONSIGN_OUT'
+        GROUP BY oi.product_id, oi.unit_price, p.sku, p.name, p.cost_price, p.retail_price
+    """)
+    price_batches = {}  # pid -> [{unit_price, total_qty, earliest_date, ...}]
+    for r in batch_rows:
+        pid = r["product_id"]
         if pid not in price_batches:
-            price_batches[pid] = {}
-        if up not in price_batches[pid]:
-            price_batches[pid][up] = {
-                "out_qty": 0,
-                "earliest_date": item.order.created_at,
-                "product": item.product,
-            }
-        price_batches[pid][up]["out_qty"] += item.quantity
-        if item.order.created_at < price_batches[pid][up]["earliest_date"]:
-            price_batches[pid][up]["earliest_date"] = item.order.created_at
+            price_batches[pid] = []
+        price_batches[pid].append({
+            "unit_price": float(r["unit_price"]),
+            "total_qty": r["total_qty"],
+            "earliest_date": r["earliest_date"],
+            "sku": r["sku"], "name": r["name"],
+            "cost_price": float(r["cost_price"]),
+            "retail_price": float(r["retail_price"]),
+        })
 
-    # FIFO 分配剩余库存到各价格批次
+    # ---- 7. FIFO 分配剩余库存到各价格批次 ----
     stock_details = []
     for pid, info in product_remaining.items():
         remaining_qty = info["quantity"]
-        product = info["product"]
 
         if pid not in price_batches:
             # 有库存但无调拨记录，用零售价兜底
             stock_details.append({
                 "product_id": pid,
-                "product_sku": product.sku,
-                "product_name": product.name,
+                "product_sku": info["sku"],
+                "product_name": info["name"],
                 "quantity": remaining_qty,
-                "cost_price": float(product.cost_price),
-                "unit_price": float(product.retail_price),
-                "total_cost": remaining_qty * float(product.cost_price),
-                "total_sales": remaining_qty * float(product.retail_price),
+                "cost_price": info["cost_price"],
+                "unit_price": info["retail_price"],
+                "total_cost": remaining_qty * info["cost_price"],
+                "total_sales": remaining_qty * info["retail_price"],
             })
             continue
 
-        batches = price_batches[pid]
-        sorted_batches = sorted(batches.items(), key=lambda x: x[1]["earliest_date"])
-        total_out = sum(b["out_qty"] for _, b in sorted_batches)
-        total_deducted = total_out - remaining_qty
-        # FIFO：从最早批次开始扣减已结算/退货量
-        deduction_left = max(0, total_deducted)
-        for up, batch in sorted_batches:
-            deduct = min(deduction_left, batch["out_qty"])
-            batch["remaining"] = batch["out_qty"] - deduct
+        batches = sorted(price_batches[pid], key=lambda b: b["earliest_date"])
+        total_out = sum(b["total_qty"] for b in batches)
+        deduction_left = max(0, total_out - remaining_qty)
+        for batch in batches:
+            deduct = min(deduction_left, batch["total_qty"])
+            batch["remaining"] = batch["total_qty"] - deduct
             deduction_left -= deduct
 
-        for up, batch in sorted_batches:
-            qty = batch.get("remaining", batch["out_qty"])
+        for batch in batches:
+            qty = batch.get("remaining", batch["total_qty"])
             if qty > 0:
-                p = batch["product"]
                 stock_details.append({
                     "product_id": pid,
-                    "product_sku": p.sku,
-                    "product_name": p.name,
+                    "product_sku": batch["sku"],
+                    "product_name": batch["name"],
                     "quantity": qty,
-                    "cost_price": float(p.cost_price),
-                    "unit_price": up,
-                    "total_cost": qty * float(p.cost_price),
-                    "total_sales": qty * up,
+                    "cost_price": batch["cost_price"],
+                    "unit_price": batch["unit_price"],
+                    "total_cost": qty * batch["cost_price"],
+                    "total_sales": qty * batch["unit_price"],
                 })
 
     total_cost_value = sum(item["total_cost"] for item in stock_details)
@@ -169,7 +190,7 @@ async def get_consignment_summary(user: User = Depends(require_permission("sales
         "total_sales_value": total_sales_value,
         "total_settle_unpaid": total_settle_unpaid,
         "total_items": len(stock_details),
-        "total_quantity": sum(s.quantity for s in stocks),
+        "total_quantity": total_stock_quantity,
         "customer_stats": list(customer_stats.values()),
         "stock_details": stock_details
     }
@@ -286,58 +307,73 @@ async def get_customer_consignment(customer_id: int, user: User = Depends(requir
 
 @router.get("/customers")
 async def get_consignment_customers(user: User = Depends(require_permission("sales"))):
-    """获取有寄售记录的客户列表"""
-    orders = await Order.filter(order_type="CONSIGN_OUT").select_related("customer")
-    customer_ids = list(set(o.customer_id for o in orders if o.customer_id))
+    """获取有寄售记录的客户列表（原生 SQL 聚合）"""
+    from tortoise import connections
+    conn = connections.get("default")
 
-    # 批量查询客户和订单（避免 N+1）
-    customers = await Customer.filter(id__in=customer_ids) if customer_ids else []
+    # 按 (客户, 类型) 聚合订单统计
+    order_agg = await conn.execute_query_dict("""
+        SELECT customer_id, order_type,
+               COUNT(*) as order_count,
+               COALESCE(SUM(total_cost), 0) as total_cost
+        FROM orders
+        WHERE order_type IN ('CONSIGN_OUT', 'CONSIGN_SETTLE', 'CONSIGN_RETURN')
+          AND customer_id IS NOT NULL
+        GROUP BY customer_id, order_type
+    """)
+    out_customer_ids = set()
+    agg_map = {}
+    for r in order_agg:
+        agg_map[(r["customer_id"], r["order_type"])] = r
+        if r["order_type"] == "CONSIGN_OUT":
+            out_customer_ids.add(r["customer_id"])
+
+    customer_ids = list(out_customer_ids)
+    if not customer_ids:
+        return []
+
+    customers = await Customer.filter(id__in=customer_ids)
     customer_map = {c.id: c for c in customers}
 
-    all_consign_orders = await Order.filter(
-        customer_id__in=customer_ids,
-        order_type__in=["CONSIGN_OUT", "CONSIGN_SETTLE", "CONSIGN_RETURN"]
-    ) if customer_ids else []
-    orders_by_cust_type = {}
-    for o in all_consign_orders:
-        orders_by_cust_type.setdefault((o.customer_id, o.order_type), []).append(o)
-
-    old_return_logs = await StockLog.filter(
-        change_type="CONSIGN_RETURN", reference_type="CONSIGN_RETURN",
-        reference_id__in=customer_ids, warehouse__is_virtual=True, quantity__lt=0
-    ).select_related("product") if customer_ids else []
-    logs_by_customer = {}
-    for log in old_return_logs:
-        logs_by_customer.setdefault(log.reference_id, []).append(log)
+    # 旧退货日志按客户聚合
+    return_cost_rows = await conn.execute_query_dict("""
+        SELECT sl.reference_id as customer_id,
+               COALESCE(SUM(ABS(sl.quantity) * p.cost_price), 0) as return_cost
+        FROM stock_logs sl
+        JOIN warehouses w ON w.id = sl.warehouse_id
+        JOIN products p ON p.id = sl.product_id
+        WHERE sl.change_type = 'CONSIGN_RETURN' AND sl.reference_type = 'CONSIGN_RETURN'
+          AND w.is_virtual = true AND sl.quantity < 0
+        GROUP BY sl.reference_id
+    """)
+    return_cost_map = {r["customer_id"]: float(r["return_cost"]) for r in return_cost_rows}
 
     result = []
     for cid in customer_ids:
         customer = customer_map.get(cid)
-        if customer:
-            out_orders = orders_by_cust_type.get((cid, "CONSIGN_OUT"), [])
-            settle_orders = orders_by_cust_type.get((cid, "CONSIGN_SETTLE"), [])
-            return_orders = orders_by_cust_type.get((cid, "CONSIGN_RETURN"), [])
+        if not customer:
+            continue
+        out_agg = agg_map.get((cid, "CONSIGN_OUT"), {})
+        settle_agg = agg_map.get((cid, "CONSIGN_SETTLE"), {})
+        return_agg = agg_map.get((cid, "CONSIGN_RETURN"), {})
 
-            total_out = sum(float(o.total_cost) for o in out_orders)
-            total_settle = sum(float(o.total_cost) for o in settle_orders)
-            total_return = sum(float(o.total_cost) for o in return_orders)
+        total_out = float(out_agg.get("total_cost", 0))
+        total_settle = float(settle_agg.get("total_cost", 0))
+        total_return = float(return_agg.get("total_cost", 0))
+        total_return += return_cost_map.get(cid, 0)
 
-            for log in logs_by_customer.get(cid, []):
-                if log.product:
-                    total_return += abs(log.quantity) * float(log.product.cost_price)
-
-            result.append({
-                "id": customer.id,
-                "name": customer.name,
-                "phone": customer.phone,
-                "balance": float(customer.balance),
-                "consign_out_count": len(out_orders),
-                "consign_settle_count": len(settle_orders),
-                "consign_out_cost": total_out,
-                "consign_settle_cost": total_settle,
-                "consign_return_cost": total_return,
-                "consign_remaining_cost": total_out - total_settle - total_return
-            })
+        result.append({
+            "id": customer.id,
+            "name": customer.name,
+            "phone": customer.phone,
+            "balance": float(customer.balance),
+            "consign_out_count": out_agg.get("order_count", 0),
+            "consign_settle_count": settle_agg.get("order_count", 0),
+            "consign_out_cost": total_out,
+            "consign_settle_cost": total_settle,
+            "consign_return_cost": total_return,
+            "consign_remaining_cost": total_out - total_settle - total_return
+        })
 
     return result
 
