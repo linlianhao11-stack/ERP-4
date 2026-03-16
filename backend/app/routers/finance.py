@@ -115,12 +115,19 @@ async def get_all_orders(
             if not po.payment.is_confirmed:
                 unconfirmed_order_ids.add(po.order_id)
 
-    # 批量查询品项数
+    # 批量查询品项数（使用数据库聚合代替逐行拉取）
     from app.models import AccountSet
+    from tortoise import connections
     item_counts = {}
     if order_ids:
-        for oi in await OrderItem.filter(order_id__in=order_ids).all():
-            item_counts[oi.order_id] = item_counts.get(oi.order_id, 0) + 1
+        conn = connections.get("default")
+        placeholders = ",".join(f"${i+1}" for i in range(len(order_ids)))
+        rows = await conn.execute_query_dict(
+            f"SELECT order_id, COUNT(*) as cnt FROM order_items WHERE order_id IN ({placeholders}) GROUP BY order_id",
+            order_ids
+        )
+        for r in rows:
+            item_counts[r["order_id"]] = r["cnt"]
 
     # 批量查询账套名称（account_set_id 直接可用，无需 select_related）
     as_ids = list(set(o.account_set_id for o in filtered_orders if o.account_set_id))
@@ -269,11 +276,12 @@ async def get_finance_stock_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     search: Optional[str] = None,
-    limit: int = 200,
+    offset: int = 0,
+    limit: int = 20,
     user: User = Depends(require_permission("finance"))
 ):
     """获取所有出入库日志（财务视角）"""
-    limit = min(limit, 1000)
+    limit = min(limit, 200)
     type_names = {
         "RESTOCK": "入库",
         "SALE": "销售出库",
@@ -303,9 +311,10 @@ async def get_finance_stock_logs(
             Q(product__name__icontains=search) | Q(product__sku__icontains=search) | Q(warehouse__name__icontains=search)
         )
 
-    logs = await query.order_by("-created_at").limit(limit).select_related("product", "warehouse", "creator")
+    total = await query.count()
+    logs = await query.order_by("-created_at").offset(offset).limit(limit).select_related("product", "warehouse", "creator")
 
-    return [{
+    return {"items": [{
         "id": l.id,
         "product_sku": l.product.sku,
         "product_name": l.product.name,
@@ -320,7 +329,7 @@ async def get_finance_stock_logs(
         "remark": l.remark,
         "creator_name": l.creator.display_name if l.creator else "-",
         "created_at": l.created_at.isoformat()
-    } for l in logs]
+    } for l in logs], "total": total}
 
 
 @router.get("/unpaid-orders")

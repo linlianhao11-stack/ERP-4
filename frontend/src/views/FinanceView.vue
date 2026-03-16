@@ -17,7 +17,7 @@
       ref="ordersPanel"
       @data-changed="onOrdersDataChanged"
     />
-    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
+    <Transition name="slide-fade" mode="out-in" :duration="{ enter: 120, leave: 60 }">
       <FinancePaymentsPanel
         v-if="financeTab === 'payments'"
         key="payments"

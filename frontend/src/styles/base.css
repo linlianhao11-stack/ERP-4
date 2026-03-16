@@ -181,11 +181,11 @@
   .fade-leave-active { transition: opacity .06s ease-out }
   .fade-enter-from, .fade-leave-to { opacity: 0 }
 
-  /* Slide-Fade Transition (tab content switching) */
-  .slide-fade-enter-active { transition: opacity .25s var(--ease-out-expo), transform .25s var(--ease-out-expo) }
-  .slide-fade-leave-active { transition: opacity .12s ease-out, transform .12s ease-out }
-  .slide-fade-enter-from { opacity: 0; transform: translateY(8px) }
-  .slide-fade-leave-to { opacity: 0; transform: translateY(-4px) }
+  /* Slide-Fade Transition (tab content switching) — 精简到 150ms 总延迟 */
+  .slide-fade-enter-active { transition: opacity .12s var(--ease-out-expo), transform .12s var(--ease-out-expo) }
+  .slide-fade-leave-active { transition: opacity .06s ease-out, transform .06s ease-out }
+  .slide-fade-enter-from { opacity: 0; transform: translateY(4px) }
+  .slide-fade-leave-to { opacity: 0; transform: translateY(-2px) }
 
   /* Spin Keyframe */
   @keyframes spin { to { transform: rotate(360deg) } }
@@ -211,6 +211,7 @@
     justify-content: center;
     padding: 20px;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .modal,
   .modal-content {
@@ -262,6 +263,7 @@
     padding: 20px 24px;
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     min-height: 0;
   }
   .modal-footer {
