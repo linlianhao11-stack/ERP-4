@@ -18,19 +18,19 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th v-if="rcIsColumnVisible('bill_no')" class="px-3 py-2">单号</th>
-              <th v-if="rcIsColumnVisible('receipt_date')" class="px-3 py-2">日期</th>
-              <th v-if="rcIsColumnVisible('customer')" class="px-3 py-2">客户</th>
-              <th v-if="rcIsColumnVisible('amount')" class="px-3 py-2 text-right">金额</th>
-              <th v-if="rcIsColumnVisible('payment_method')" class="px-3 py-2">收款方式</th>
-              <th v-if="rcIsColumnVisible('is_advance')" class="px-3 py-2">预收</th>
-              <th v-if="rcIsColumnVisible('status')" class="px-3 py-2">状态</th>
-              <th v-if="rcIsColumnVisible('remark')" class="px-3 py-2">备注</th>
-              <th v-if="rcIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
-              <th v-if="rcIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+              <th v-if="rcIsColumnVisible('bill_no')" class="px-2 py-2">单号</th>
+              <th v-if="rcIsColumnVisible('receipt_date')" class="px-2 py-2">日期</th>
+              <th v-if="rcIsColumnVisible('customer')" class="px-2 py-2">客户</th>
+              <th v-if="rcIsColumnVisible('amount')" class="px-2 py-2 text-right">金额</th>
+              <th v-if="rcIsColumnVisible('payment_method')" class="px-2 py-2">收款方式</th>
+              <th v-if="rcIsColumnVisible('is_advance')" class="px-2 py-2">预收</th>
+              <th v-if="rcIsColumnVisible('status')" class="px-2 py-2">状态</th>
+              <th v-if="rcIsColumnVisible('remark')" class="px-2 py-2">备注</th>
+              <th v-if="rcIsColumnVisible('voucher_no')" class="px-2 py-2">凭证号</th>
+              <th v-if="rcIsColumnVisible('actions')" class="px-2 py-2">操作</th>
               <th class="col-selector-th">
                 <ColumnMenu :labels="rcColumnLabels" :visible="rcVisibleColumns" pinned="bill_no"
                   @toggle="rcToggleColumn" @reset="rcResetColumns" />
@@ -48,19 +48,19 @@
               </td>
             </tr>
             <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
-              <td v-if="rcIsColumnVisible('bill_no')" class="px-3 py-2 font-mono text-[12px]">
+              <td v-if="rcIsColumnVisible('bill_no')" class="px-2 py-2 font-mono text-[12px]">
                 <span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
                 <span v-if="b.bill_type === 'return_refund'" class="ml-1 px-1.5 py-0.5 text-xs bg-error/10 text-error rounded">退款</span>
               </td>
-              <td v-if="rcIsColumnVisible('receipt_date')" class="px-3 py-2">{{ b.receipt_date }}</td>
-              <td v-if="rcIsColumnVisible('customer')" class="px-3 py-2">{{ b.customer_name }}</td>
-              <td v-if="rcIsColumnVisible('amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.amount) }}</td>
-              <td v-if="rcIsColumnVisible('payment_method')" class="px-3 py-2">{{ b.payment_method }}</td>
-              <td v-if="rcIsColumnVisible('is_advance')" class="px-3 py-2">{{ b.is_advance ? '是' : '否' }}</td>
-              <td v-if="rcIsColumnVisible('status')" class="px-3 py-2"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-              <td v-if="rcIsColumnVisible('remark')" class="px-3 py-2 text-xs text-muted max-w-48 truncate" :title="b.remark">{{ b.remark || '-' }}</td>
-              <td v-if="rcIsColumnVisible('voucher_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-              <td v-if="rcIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
+              <td v-if="rcIsColumnVisible('receipt_date')" class="px-2 py-2">{{ b.receipt_date }}</td>
+              <td v-if="rcIsColumnVisible('customer')" class="px-2 py-2">{{ b.customer_name }}</td>
+              <td v-if="rcIsColumnVisible('amount')" class="px-2 py-2 text-right">{{ fmtMoney(b.amount) }}</td>
+              <td v-if="rcIsColumnVisible('payment_method')" class="px-2 py-2">{{ b.payment_method }}</td>
+              <td v-if="rcIsColumnVisible('is_advance')" class="px-2 py-2">{{ b.is_advance ? '是' : '否' }}</td>
+              <td v-if="rcIsColumnVisible('status')" class="px-2 py-2"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
+              <td v-if="rcIsColumnVisible('remark')" class="px-2 py-2 text-xs text-muted max-w-48 truncate" :title="b.remark">{{ b.remark || '-' }}</td>
+              <td v-if="rcIsColumnVisible('voucher_no')" class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+              <td v-if="rcIsColumnVisible('actions')" class="px-2 py-2" @click.stop>
                 <button v-if="b.status === 'draft' && hasPermission('accounting_ar_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-success-subtle text-success-emphasis font-medium">确认</button>
               </td>
               <td></td>

@@ -44,7 +44,7 @@
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">
                 <tr>
-                  <th v-for="col in msg.table_data.columns" :key="col" class="px-3 py-2 text-left text-xs font-medium text-muted whitespace-nowrap">
+                  <th v-for="col in msg.table_data.columns" :key="col" class="px-2 py-2 text-left text-xs font-medium text-muted whitespace-nowrap">
                     {{ col }}
                   </th>
                 </tr>

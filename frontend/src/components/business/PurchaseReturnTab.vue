@@ -11,16 +11,16 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">退货单号</th>
-              <th class="px-3 py-2">退货日期</th>
-              <th class="px-3 py-2">供应商</th>
-              <th class="px-3 py-2">采购单号</th>
-              <th class="px-3 py-2 text-right">退货金额</th>
-              <th class="px-3 py-2">退款状态</th>
-              <th class="px-3 py-2">凭证号</th>
+              <th class="px-2 py-2">退货单号</th>
+              <th class="px-2 py-2">退货日期</th>
+              <th class="px-2 py-2">供应商</th>
+              <th class="px-2 py-2">采购单号</th>
+              <th class="px-2 py-2 text-right">退货金额</th>
+              <th class="px-2 py-2">退款状态</th>
+              <th class="px-2 py-2">凭证号</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -32,17 +32,17 @@
               </td>
             </tr>
             <tr v-for="pr in items" :key="pr.id" class="hover:bg-elevated">
-              <td class="px-3 py-2 font-mono text-[12px]">{{ pr.return_no }}</td>
-              <td class="px-3 py-2">{{ pr.return_date }}</td>
-              <td class="px-3 py-2">{{ pr.supplier_name }}</td>
-              <td class="px-3 py-2 font-mono text-[12px]">{{ pr.purchase_order_no || '-' }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(pr.total_amount) }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2 font-mono text-[12px]">{{ pr.return_no }}</td>
+              <td class="px-2 py-2">{{ pr.return_date }}</td>
+              <td class="px-2 py-2">{{ pr.supplier_name }}</td>
+              <td class="px-2 py-2 font-mono text-[12px]">{{ pr.purchase_order_no || '-' }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(pr.total_amount) }}</td>
+              <td class="px-2 py-2">
                 <span :class="pr.refund_status === 'completed' ? 'badge badge-green' : pr.refund_status === 'pending' ? 'badge badge-yellow' : 'badge badge-gray'">
                   {{ pr.refund_status === 'completed' ? '已退款' : pr.refund_status === 'pending' ? '待退款' : '无需退款' }}
                 </span>
               </td>
-              <td class="px-3 py-2 font-mono text-[12px]">
+              <td class="px-2 py-2 font-mono text-[12px]">
                 <span v-if="pr.voucher_no">{{ pr.voucher_no }}</span>
                 <span v-else class="text-muted">未生成</span>
               </td>

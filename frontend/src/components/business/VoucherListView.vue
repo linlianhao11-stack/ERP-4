@@ -1,18 +1,18 @@
 <template>
   <div>
     <div class="table-container">
-      <table class="w-full">
+      <table class="w-full text-sm">
         <thead class="bg-elevated">
           <tr>
-            <th v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2 w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
-            <th v-if="voucherIsColumnVisible('voucher_type_col')" class="px-3 py-2">凭证字</th>
-            <th v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
-            <th v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">日期</th>
-            <th v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">摘要</th>
-            <th v-if="voucherIsColumnVisible('total_debit')" class="px-3 py-2">借方合计</th>
-            <th v-if="voucherIsColumnVisible('total_credit')" class="px-3 py-2">贷方合计</th>
-            <th v-if="voucherIsColumnVisible('status')" class="px-3 py-2">状态</th>
-            <th v-if="voucherIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+            <th v-if="voucherIsColumnVisible('checkbox')" class="px-2 py-2 w-8"><input type="checkbox" @change="toggleSelectAll" :checked="selectedIds.length === vouchers.length && vouchers.length > 0" aria-label="全选"></th>
+            <th v-if="voucherIsColumnVisible('voucher_type_col')" class="px-2 py-2">凭证字</th>
+            <th v-if="voucherIsColumnVisible('voucher_no')" class="px-2 py-2">凭证号</th>
+            <th v-if="voucherIsColumnVisible('voucher_date')" class="px-2 py-2">日期</th>
+            <th v-if="voucherIsColumnVisible('summary')" class="px-2 py-2">摘要</th>
+            <th v-if="voucherIsColumnVisible('total_debit')" class="px-2 py-2">借方合计</th>
+            <th v-if="voucherIsColumnVisible('total_credit')" class="px-2 py-2">贷方合计</th>
+            <th v-if="voucherIsColumnVisible('status')" class="px-2 py-2">状态</th>
+            <th v-if="voucherIsColumnVisible('actions')" class="px-2 py-2">操作</th>
             <!-- 列选择器 -->
             <th class="col-selector-th">
               <ColumnMenu :labels="voucherColumnLabels" :visible="voucherVisibleColumns" pinned="voucher_no"
@@ -22,15 +22,15 @@
         </thead>
         <tbody class="divide-y">
           <tr v-for="v in vouchers" :key="v.id" @click="emit('view-voucher', v.id)" class="cursor-pointer hover:bg-elevated">
-            <td v-if="voucherIsColumnVisible('checkbox')" class="px-3 py-2" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
-            <td v-if="voucherIsColumnVisible('voucher_type_col')" class="px-3 py-2 font-medium">{{ v.voucher_type }}</td>
-            <td v-if="voucherIsColumnVisible('voucher_no')" class="px-3 py-2 font-medium">{{ v.sequence_no }}</td>
-            <td v-if="voucherIsColumnVisible('voucher_date')" class="px-3 py-2">{{ v.voucher_date }}</td>
-            <td v-if="voucherIsColumnVisible('summary')" class="px-3 py-2">{{ v.summary || '-' }}</td>
-            <td v-if="voucherIsColumnVisible('total_debit')" class="px-3 py-2 text-right">{{ formatAmount(v.total_debit) }}</td>
-            <td v-if="voucherIsColumnVisible('total_credit')" class="px-3 py-2 text-right">{{ formatAmount(v.total_credit) }}</td>
-            <td v-if="voucherIsColumnVisible('status')" class="px-3 py-2"><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
-            <td v-if="voucherIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
+            <td v-if="voucherIsColumnVisible('checkbox')" class="px-2 py-2" @click.stop><input type="checkbox" :value="v.id" v-model="selectedIds" aria-label="选择此行"></td>
+            <td v-if="voucherIsColumnVisible('voucher_type_col')" class="px-2 py-2 font-medium">{{ v.voucher_type }}</td>
+            <td v-if="voucherIsColumnVisible('voucher_no')" class="px-2 py-2 font-medium">{{ v.sequence_no }}</td>
+            <td v-if="voucherIsColumnVisible('voucher_date')" class="px-2 py-2">{{ v.voucher_date }}</td>
+            <td v-if="voucherIsColumnVisible('summary')" class="px-2 py-2">{{ v.summary || '-' }}</td>
+            <td v-if="voucherIsColumnVisible('total_debit')" class="px-2 py-2 text-right">{{ formatAmount(v.total_debit) }}</td>
+            <td v-if="voucherIsColumnVisible('total_credit')" class="px-2 py-2 text-right">{{ formatAmount(v.total_credit) }}</td>
+            <td v-if="voucherIsColumnVisible('status')" class="px-2 py-2"><span :class="statusBadge(v.status)">{{ statusName(v.status) }}</span></td>
+            <td v-if="voucherIsColumnVisible('actions')" class="px-2 py-2" @click.stop>
               <div class="flex items-center gap-1.5 justify-end">
                 <!-- 主操作按钮（外露） -->
                 <button v-if="v.status === 'draft' && hasPermission('accounting_edit')" @click="handleSubmit(v)" class="btn btn-primary btn-sm" style="padding:4px 12px;min-height:28px;font-size:12px">提交</button>
@@ -51,7 +51,7 @@
                 </div>
               </div>
             </td>
-            <td class="px-3 py-2"></td>
+            <td class="px-2 py-2"></td>
           </tr>
           <tr v-if="vouchers.length === 0">
             <td colspan="100">

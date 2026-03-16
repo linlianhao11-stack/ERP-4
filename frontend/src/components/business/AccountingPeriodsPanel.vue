@@ -13,27 +13,27 @@
       </PageToolbar>
 
       <div class="table-container">
-        <table class="w-full">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">期间</th>
-              <th class="px-3 py-2">年</th>
-              <th class="px-3 py-2">月</th>
-              <th class="px-3 py-2">状态</th>
-              <th class="px-3 py-2">结账时间</th>
+              <th class="px-2 py-2">期间</th>
+              <th class="px-2 py-2">年</th>
+              <th class="px-2 py-2">月</th>
+              <th class="px-2 py-2">状态</th>
+              <th class="px-2 py-2">结账时间</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="p in periods" :key="p.id" class="hover:bg-elevated">
-              <td class="px-3 py-2 font-medium">{{ p.period_name }}</td>
-              <td class="px-3 py-2">{{ p.year }}</td>
-              <td class="px-3 py-2">{{ p.month }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2 font-medium">{{ p.period_name }}</td>
+              <td class="px-2 py-2">{{ p.year }}</td>
+              <td class="px-2 py-2">{{ p.month }}</td>
+              <td class="px-2 py-2">
                 <span :class="p.is_closed ? 'badge badge-green' : 'badge badge-yellow'">
                   {{ p.is_closed ? '已结账' : '未结账' }}
                 </span>
               </td>
-              <td class="px-3 py-2">{{ p.closed_at ? new Date(p.closed_at).toLocaleString() : '-' }}</td>
+              <td class="px-2 py-2">{{ p.closed_at ? new Date(p.closed_at).toLocaleString() : '-' }}</td>
             </tr>
             <tr v-if="periods.length === 0">
               <td colspan="5" class="text-center text-muted py-8">

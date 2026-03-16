@@ -45,14 +45,14 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">退货单号</th>
-              <th class="px-3 py-2 text-left">关联采购单</th>
-              <th class="px-3 py-2 text-left">供应商</th>
-              <th class="px-3 py-2 text-right">退货金额</th>
-              <th class="px-3 py-2 text-left">退款方式</th>
-              <th class="px-3 py-2 text-center">退款状态</th>
-              <th class="px-3 py-2 text-left">退货时间</th>
-              <th class="px-3 py-2 text-center">操作</th>
+              <th class="px-2 py-2 text-left">退货单号</th>
+              <th class="px-2 py-2 text-left">关联采购单</th>
+              <th class="px-2 py-2 text-left">供应商</th>
+              <th class="px-2 py-2 text-right">退货金额</th>
+              <th class="px-2 py-2 text-left">退款方式</th>
+              <th class="px-2 py-2 text-center">退款状态</th>
+              <th class="px-2 py-2 text-left">退货时间</th>
+              <th class="px-2 py-2 text-center">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -65,16 +65,16 @@
               </td>
             </tr>
             <tr v-for="r in filteredItems" :key="r.id" class="hover:bg-elevated cursor-pointer" @click="viewDetail(r)">
-              <td class="px-3 py-2 font-mono text-sm max-w-48 truncate" :title="r.return_no">{{ r.return_no }}</td>
-              <td class="px-3 py-2 font-mono text-sm text-primary max-w-48 truncate" :title="r.po_no">{{ r.po_no }}</td>
-              <td class="px-3 py-2">{{ r.supplier_name }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-warning">{{ fmtMoney(r.total_amount) }}</td>
-              <td class="px-3 py-2">{{ r.is_refunded ? '供应商退款' : '转为在账资金' }}</td>
-              <td class="px-3 py-2 text-center">
+              <td class="px-2 py-2 font-mono text-sm max-w-48 truncate" :title="r.return_no">{{ r.return_no }}</td>
+              <td class="px-2 py-2 font-mono text-sm text-primary max-w-48 truncate" :title="r.po_no">{{ r.po_no }}</td>
+              <td class="px-2 py-2">{{ r.supplier_name }}</td>
+              <td class="px-2 py-2 text-right font-semibold text-warning">{{ fmtMoney(r.total_amount) }}</td>
+              <td class="px-2 py-2">{{ r.is_refunded ? '供应商退款' : '转为在账资金' }}</td>
+              <td class="px-2 py-2 text-center">
                 <span :class="refundStatusClass(r.refund_status)">{{ refundStatusLabel(r.refund_status) }}</span>
               </td>
-              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(r.created_at) }}</td>
-              <td class="px-3 py-2 text-center" @click.stop>
+              <td class="px-2 py-2 text-muted text-xs">{{ fmtDate(r.created_at) }}</td>
+              <td class="px-2 py-2 text-center" @click.stop>
                 <button @click="viewDetail(r)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
               </td>
             </tr>
@@ -130,7 +130,7 @@
               <div v-if="detail.items && detail.items.length">
                 <div class="text-[12px] font-semibold text-muted uppercase tracking-wider mb-2">退货商品明细</div>
                 <div class="table-container">
-                  <table class="w-full text-[13px]">
+                  <table class="w-full text-sm">
                     <thead>
                       <tr>
                         <th>SKU</th>

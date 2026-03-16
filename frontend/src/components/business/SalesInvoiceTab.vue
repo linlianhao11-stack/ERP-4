@@ -25,24 +25,24 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">发票号</th>
-              <th class="px-3 py-2">日期</th>
-              <th class="px-3 py-2">客户</th>
-              <th class="px-3 py-2">类型</th>
-              <th class="px-3 py-2 text-right">不含税金额</th>
-              <th class="px-3 py-2 text-right">税额</th>
-              <th class="px-3 py-2 text-right">价税合计</th>
-              <th class="px-3 py-2">状态</th>
-              <th class="px-3 py-2">凭证号</th>
-              <th class="px-3 py-2 text-center">操作</th>
+              <th class="px-2 py-2">发票号</th>
+              <th class="px-2 py-2">日期</th>
+              <th class="px-2 py-2">客户</th>
+              <th class="px-2 py-2">类型</th>
+              <th class="px-2 py-2 text-right">不含税金额</th>
+              <th class="px-2 py-2 text-right">税额</th>
+              <th class="px-2 py-2 text-right">价税合计</th>
+              <th class="px-2 py-2">状态</th>
+              <th class="px-2 py-2">凭证号</th>
+              <th class="px-2 py-2 text-center">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-if="!items.length">
-              <td colspan="10" class="px-3 py-2">
+              <td colspan="10" class="px-2 py-2">
                 <div class="text-center py-12 text-muted">
                   <div class="text-3xl mb-3">📋</div>
                   <p class="text-sm font-medium mb-1">暂无销项发票</p>
@@ -51,16 +51,16 @@
               </td>
             </tr>
             <tr v-for="inv in items" :key="inv.id" class="hover:bg-elevated">
-              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.invoice_no">{{ inv.invoice_no }}</td>
-              <td class="px-3 py-2">{{ inv.invoice_date }}</td>
-              <td class="px-3 py-2">{{ inv.customer_name || inv.counterparty_name }}</td>
-              <td class="px-3 py-2"><span :class="inv.invoice_type === 'special' ? 'badge badge-blue' : 'badge badge-gray'">{{ inv.invoice_type === 'special' ? '专票' : '普票' }}</span></td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.amount_without_tax) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.tax_amount) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(inv.total_amount) }}</td>
-              <td class="px-3 py-2"><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
-              <td class="px-3 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.voucher_no || ''">{{ inv.voucher_no || '-' }}</td>
-              <td class="px-3 py-2" @click.stop>
+              <td class="px-2 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.invoice_no">{{ inv.invoice_no }}</td>
+              <td class="px-2 py-2">{{ inv.invoice_date }}</td>
+              <td class="px-2 py-2">{{ inv.customer_name || inv.counterparty_name }}</td>
+              <td class="px-2 py-2"><span :class="inv.invoice_type === 'special' ? 'badge badge-blue' : 'badge badge-gray'">{{ inv.invoice_type === 'special' ? '专票' : '普票' }}</span></td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(inv.amount_without_tax) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(inv.tax_amount) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(inv.total_amount) }}</td>
+              <td class="px-2 py-2"><span :class="statusBadge(inv.status)">{{ statusName(inv.status) }}</span></td>
+              <td class="px-2 py-2 font-mono text-[12px] max-w-48 truncate" :title="inv.voucher_no || ''">{{ inv.voucher_no || '-' }}</td>
+              <td class="px-2 py-2" @click.stop>
                 <div class="flex items-center gap-1.5 justify-center">
                   <!-- 主操作按钮（外露） -->
                   <button v-if="inv.status === 'draft'" @click="handleConfirm(inv)" class="btn btn-sm si-action-btn" style="background:var(--success-subtle);color:var(--success-emphasis);border:none">确认</button>
@@ -149,7 +149,7 @@
                   </div>
                 </div>
                 <div v-if="detail.items && detail.items.length" class="table-container">
-                  <table class="w-full text-[13px]">
+                  <table class="w-full text-sm">
                     <thead>
                       <tr><th>品名</th><th class="text-right">数量</th><th class="text-right">单价</th><th class="text-right">税率(%)</th><th class="text-right">不含税金额</th><th class="text-right">税额</th><th class="text-right">金额</th></tr>
                     </thead>
@@ -175,7 +175,7 @@
                   <div class="col-span-2"><label for="si-edit-remark" class="label">备注</label><input id="si-edit-remark" v-model="editForm.remark" class="input text-sm" /></div>
                 </div>
                 <div class="table-container mb-3">
-                  <table class="w-full text-[13px]">
+                  <table class="w-full text-sm">
                     <thead><tr><th>品名</th><th>数量</th><th>单价</th><th>税率(%)</th><th class="text-right">金额</th><th class="text-right">税额</th><th></th></tr></thead>
                     <tbody>
                       <tr v-for="(row, idx) in editForm.items" :key="idx">

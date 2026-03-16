@@ -303,30 +303,30 @@
                 <span class="font-semibold text-secondary">{{ group.name }}</span>
                 <span class="text-primary font-mono font-semibold">&yen;{{ fmt(group.subtotal) }}</span>
               </div>
-              <table class="w-full text-[13px]">
+              <table class="w-full text-sm">
                 <thead class="bg-elevated" v-if="gIdx === 0 || detailItemsByAccountSet.length > 1">
                   <tr>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">仓库</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">数量</th>
-                    <th v-if="orderDetail.rebate_used > 0" class="px-3 py-2 text-right text-xs font-semibold text-secondary">返利</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">金额</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-secondary" v-if="hasPermission('finance')">毛利</th>
+                    <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                    <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">仓库</th>
+                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">数量</th>
+                    <th v-if="orderDetail.rebate_used > 0" class="px-2 py-2 text-right text-xs font-semibold text-secondary">返利</th>
+                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">金额</th>
+                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary" v-if="hasPermission('finance')">毛利</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-line">
                   <tr v-for="item in group.items" :key="item.id || item.product_id">
-                    <td class="px-3 py-2.5">
+                    <td class="px-2 py-2.5">
                       <div class="font-medium">{{ item.product_name }}</div>
                       <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
                     </td>
-                    <td class="px-3 py-2.5 text-muted">{{ item.warehouse_name || '-' }}</td>
-                    <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
-                    <td class="px-3 py-2.5 text-right">{{ item.quantity }}</td>
-                    <td v-if="orderDetail.rebate_used > 0" class="px-3 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
-                    <td class="px-3 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
-                    <td class="px-3 py-2.5 text-right" v-if="hasPermission('finance')" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
+                    <td class="px-2 py-2.5 text-muted">{{ item.warehouse_name || '-' }}</td>
+                    <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                    <td class="px-2 py-2.5 text-right">{{ item.quantity }}</td>
+                    <td v-if="orderDetail.rebate_used > 0" class="px-2 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
+                    <td class="px-2 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
+                    <td class="px-2 py-2.5 text-right" v-if="hasPermission('finance')" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -341,7 +341,7 @@
             <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.receivable_bills.length }} 笔</span>
           </div>
           <div class="space-y-2">
-            <div v-for="rb in orderDetail.receivable_bills" :key="rb.id" class="flex items-center justify-between px-3 py-2 bg-elevated rounded-lg border text-[13px]">
+            <div v-for="rb in orderDetail.receivable_bills" :key="rb.id" class="flex items-center justify-between px-2 py-2 bg-elevated rounded-lg border text-[13px]">
               <div class="flex items-center gap-2">
                 <span class="font-mono text-xs text-primary">{{ rb.bill_no }}</span>
                 <span v-if="rb.account_set_name" class="text-[11px] text-muted bg-surface px-1.5 py-0.5 rounded">{{ rb.account_set_name }}</span>
@@ -408,24 +408,24 @@
             <span class="text-[13px] font-semibold text-secondary">退货商品</span>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-[13px]">
+            <table class="w-full text-sm">
               <thead class="bg-elevated">
                 <tr>
-                  <th class="px-3 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">单价</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-secondary">可退</th>
-                  <th class="px-3 py-2 text-center text-xs font-semibold text-secondary" style="width:100px">退货数量</th>
+                  <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
+                  <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                  <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">可退</th>
+                  <th class="px-2 py-2 text-center text-xs font-semibold text-secondary" style="width:100px">退货数量</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-line">
                 <tr v-for="item in returnForm.items" :key="item.product_id">
-                  <td class="px-3 py-2.5">
+                  <td class="px-2 py-2.5">
                     <div class="font-medium">{{ item.product_name }}</div>
                     <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
                   </td>
-                  <td class="px-3 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
-                  <td class="px-3 py-2.5 text-right text-muted">{{ item.max_qty }}</td>
-                  <td class="px-3 py-2.5 text-center">
+                  <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                  <td class="px-2 py-2.5 text-right text-muted">{{ item.max_qty }}</td>
+                  <td class="px-2 py-2.5 text-center">
                     <input type="number" v-model.number="item.qty" :min="0" :max="item.max_qty" class="input text-center" style="width:80px" />
                   </td>
                 </tr>

@@ -13,7 +13,7 @@
               已选 {{ bills.length }} 张{{ mode === 'sales' ? '应收' : '应付' }}单
             </div>
             <div class="border border-line rounded-xl overflow-hidden">
-              <table class="w-full text-[13px]">
+              <table class="w-full text-sm">
                 <thead class="bg-elevated">
                   <tr>
                     <th class="px-3 py-1.5 text-left">单号</th>

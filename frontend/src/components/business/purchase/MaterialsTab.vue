@@ -59,16 +59,16 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left w-28">SKU</th>
-              <th class="px-3 py-2 text-left">商品名称</th>
-              <th class="px-3 py-2 text-left w-24">品牌</th>
-              <th class="px-3 py-2 text-left w-20">分类</th>
-              <th class="px-3 py-2 text-left w-16">单位</th>
-              <th class="px-3 py-2 text-right w-24">零售价</th>
-              <th v-if="hasPermission('finance')" class="px-3 py-2 text-right w-24">成本价</th>
-              <th class="px-3 py-2 text-right w-16">税率</th>
-              <th class="px-3 py-2 text-center w-16">状态</th>
-              <th class="px-3 py-2 text-center w-28">操作</th>
+              <th class="px-2 py-2 text-left w-28">SKU</th>
+              <th class="px-2 py-2 text-left">商品名称</th>
+              <th class="px-2 py-2 text-left w-24">品牌</th>
+              <th class="px-2 py-2 text-left w-20">分类</th>
+              <th class="px-2 py-2 text-left w-16">单位</th>
+              <th class="px-2 py-2 text-right w-24">零售价</th>
+              <th v-if="hasPermission('finance')" class="px-2 py-2 text-right w-24">成本价</th>
+              <th class="px-2 py-2 text-right w-16">税率</th>
+              <th class="px-2 py-2 text-center w-16">状态</th>
+              <th class="px-2 py-2 text-center w-28">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -81,20 +81,20 @@
               </td>
             </tr>
             <tr v-for="p in products" :key="p.id" class="hover:bg-elevated" :class="{ 'text-muted': !p.is_active }">
-              <td class="px-3 py-2 font-mono text-xs">{{ p.sku }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2 font-mono text-xs">{{ p.sku }}</td>
+              <td class="px-2 py-2">
                 <span :class="{ 'line-through': !p.is_active }">{{ p.name }}</span>
               </td>
-              <td class="px-3 py-2 text-secondary text-xs">{{ p.brand || '-' }}</td>
-              <td class="px-3 py-2 text-secondary text-xs">{{ p.category || '-' }}</td>
-              <td class="px-3 py-2 text-secondary text-xs">{{ p.unit }}</td>
-              <td class="px-3 py-2 text-right">{{ p.retail_price }}</td>
-              <td v-if="hasPermission('finance')" class="px-3 py-2 text-right">{{ p.cost_price }}</td>
-              <td class="px-3 py-2 text-right text-xs text-secondary">{{ p.tax_rate }}%</td>
-              <td class="px-3 py-2 text-center">
+              <td class="px-2 py-2 text-secondary text-xs">{{ p.brand || '-' }}</td>
+              <td class="px-2 py-2 text-secondary text-xs">{{ p.category || '-' }}</td>
+              <td class="px-2 py-2 text-secondary text-xs">{{ p.unit }}</td>
+              <td class="px-2 py-2 text-right">{{ p.retail_price }}</td>
+              <td v-if="hasPermission('finance')" class="px-2 py-2 text-right">{{ p.cost_price }}</td>
+              <td class="px-2 py-2 text-right text-xs text-secondary">{{ p.tax_rate }}%</td>
+              <td class="px-2 py-2 text-center">
                 <span :class="p.is_active ? 'badge badge-blue' : 'badge badge-muted'">{{ p.is_active ? '启用' : '停用' }}</span>
               </td>
-              <td class="px-3 py-2 text-center" @click.stop>
+              <td class="px-2 py-2 text-center" @click.stop>
                 <div class="flex gap-1 justify-center">
                   <button @click="openEdit(p)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis transition-colors">编辑</button>
                   <button v-if="hasPermission('stock_edit')" @click="toggleActive(p)" class="px-2 py-0.5 rounded-md text-[12px] font-medium transition-colors" :class="p.is_active ? 'bg-error-subtle text-error-emphasis' : 'bg-success-subtle text-success-emphasis'">

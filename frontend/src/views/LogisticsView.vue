@@ -48,42 +48,42 @@
       </PageToolbar>
       <div class="overflow-x-auto">
         <table class="w-full text-sm" style="min-width:900px">
-          <thead>
-            <tr class="bg-elevated text-left">
-              <th v-if="isColumnVisible('order_no')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('order_no')">
+          <thead class="bg-elevated">
+            <tr>
+              <th v-if="isColumnVisible('order_no')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('order_no')">
                 订单号
                 <span v-if="shipmentSort.key === 'order_no'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('order_type')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('order_type')">
+              <th v-if="isColumnVisible('order_type')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('order_type')">
                 类型
                 <span v-if="shipmentSort.key === 'order_type'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('customer')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('customer')">
+              <th v-if="isColumnVisible('customer')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('customer')">
                 客户
                 <span v-if="shipmentSort.key === 'customer'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('shipping_status')" class="p-3">发货状态</th>
-              <th v-if="isColumnVisible('carrier')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('carrier')">
+              <th v-if="isColumnVisible('shipping_status')" class="px-2 py-2 text-left">发货状态</th>
+              <th v-if="isColumnVisible('carrier')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('carrier')">
                 快递公司
                 <span v-if="shipmentSort.key === 'carrier'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('tracking_no')" class="p-3">快递单号</th>
-              <th v-if="isColumnVisible('sn')" class="p-3">SN码</th>
-              <th v-if="isColumnVisible('shipped_at')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('shipped_at')">
+              <th v-if="isColumnVisible('tracking_no')" class="px-2 py-2 text-left">快递单号</th>
+              <th v-if="isColumnVisible('sn')" class="px-2 py-2 text-left">SN码</th>
+              <th v-if="isColumnVisible('shipped_at')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('shipped_at')">
                 发货时间
                 <span v-if="shipmentSort.key === 'shipped_at'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('status')" class="p-3 cursor-pointer select-none hover:text-primary" @click="toggleSort('status')">
+              <th v-if="isColumnVisible('status')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('status')">
                 物流状态
                 <span v-if="shipmentSort.key === 'status'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('last_info')" class="p-3">物流信息</th>
+              <th v-if="isColumnVisible('last_info')" class="px-2 py-2 text-left">物流信息</th>
               <th v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('order_amount')">订单金额 <span v-if="shipmentSort.key === 'order_amount'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="isColumnVisible('remark')" class="px-2 py-2 text-left whitespace-nowrap">备注</th>
               <th v-if="isColumnVisible('employee')" class="px-2 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-primary" @click="toggleSort('employee')">业务员 <span v-if="shipmentSort.key === 'employee'" class="text-primary">{{ shipmentSort.order === 'asc' ? '↑' : '↓' }}</span></th>
               <th v-if="isColumnVisible('phone')" class="px-2 py-2 text-left whitespace-nowrap">收件电话</th>
               <th v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-left whitespace-nowrap">创建时间</th>
-              <th v-if="isColumnVisible('actions')" class="p-3">操作</th>
+              <th v-if="isColumnVisible('actions')" class="px-2 py-2 text-left">操作</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns"
@@ -91,25 +91,25 @@
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y">
             <tr
               v-for="s in sortedShipments"
               :key="s.order_id"
               @click="viewShipment(s.order_id)"
-              class="border-t hover:bg-elevated cursor-pointer"
+              class="hover:bg-elevated cursor-pointer"
             >
-              <td v-if="isColumnVisible('order_no')" class="p-3 font-mono text-xs">
+              <td v-if="isColumnVisible('order_no')" class="px-2 py-2 font-mono text-xs">
                 <span v-if="s.shipping_status === 'pending' || s.shipping_status === 'partial'" class="todo-dot mr-1.5"></span>{{ s.order_no }}
               </td>
-              <td v-if="isColumnVisible('order_type')" class="p-3">
+              <td v-if="isColumnVisible('order_type')" class="px-2 py-2">
                 <span :class="getOrderTypeBadge(s.order_type)">{{ getOrderTypeName(s.order_type) }}</span>
               </td>
-              <td v-if="isColumnVisible('customer')" class="p-3">{{ s.customer_name || '-' }}</td>
-              <td v-if="isColumnVisible('shipping_status')" class="p-3">
+              <td v-if="isColumnVisible('customer')" class="px-2 py-2">{{ s.customer_name || '-' }}</td>
+              <td v-if="isColumnVisible('shipping_status')" class="px-2 py-2">
                 <span :class="getShippingBadge(s.shipping_status)">{{ getShippingName(s.shipping_status) }}</span>
               </td>
-              <td v-if="isColumnVisible('carrier')" class="p-3">{{ s.carrier_name || '-' }}</td>
-              <td v-if="isColumnVisible('tracking_no')" class="p-3">
+              <td v-if="isColumnVisible('carrier')" class="px-2 py-2">{{ s.carrier_name || '-' }}</td>
+              <td v-if="isColumnVisible('tracking_no')" class="px-2 py-2">
                 <span v-if="s.tracking_no" class="font-mono text-xs">{{ s.tracking_no }}</span>
                 <span v-else class="text-muted">-</span>
                 <span
@@ -117,22 +117,22 @@
                   class="ml-1 text-xs text-warning bg-orange-subtle px-1.5 py-0.5 rounded"
                 >({{ s.shipment_count }}个单号)</span>
               </td>
-              <td v-if="isColumnVisible('sn')" class="p-3">
+              <td v-if="isColumnVisible('sn')" class="px-2 py-2">
                 <span :class="['text-xs px-2 py-0.5 rounded-full', s.sn_status === '已添加' ? 'bg-success-subtle text-success' : 'bg-elevated text-muted']">
                   {{ s.sn_status }}
                 </span>
               </td>
-              <td v-if="isColumnVisible('shipped_at')" class="p-3 text-xs text-secondary whitespace-nowrap">{{ s.created_at ? fmtDate(s.created_at) : '-' }}</td>
-              <td v-if="isColumnVisible('status')" class="p-3">
+              <td v-if="isColumnVisible('shipped_at')" class="px-2 py-2 text-xs text-secondary whitespace-nowrap">{{ s.created_at ? fmtDate(s.created_at) : '-' }}</td>
+              <td v-if="isColumnVisible('status')" class="px-2 py-2">
                 <span :class="['text-xs px-2 py-1 rounded-full', getShipmentStatusBadge(s.status)]">{{ getShipmentStatusName(s.status, s.status_text) }}</span>
               </td>
-              <td v-if="isColumnVisible('last_info')" class="p-3 text-xs text-secondary max-w-[200px] truncate" :title="s.last_info">{{ s.last_info || '-' }}</td>
+              <td v-if="isColumnVisible('last_info')" class="px-2 py-2 text-xs text-secondary max-w-[200px] truncate" :title="s.last_info">{{ s.last_info || '-' }}</td>
               <td v-if="isColumnVisible('order_amount')" class="px-2 py-2 text-right font-semibold whitespace-nowrap">¥{{ fmt(s.total_amount) }}</td>
               <td v-if="isColumnVisible('remark')" class="px-2 py-2 text-muted text-xs max-w-[150px] truncate">{{ s.remark || '-' }}</td>
               <td v-if="isColumnVisible('employee')" class="px-2 py-2 whitespace-nowrap">{{ s.employee_name || '-' }}</td>
               <td v-if="isColumnVisible('phone')" class="px-2 py-2 text-xs whitespace-nowrap">{{ s.phone || '-' }}</td>
               <td v-if="isColumnVisible('order_created_at')" class="px-2 py-2 text-muted text-xs whitespace-nowrap">{{ fmtDate(s.created_at) }}</td>
-              <td v-if="isColumnVisible('actions')" class="p-3" @click.stop>
+              <td v-if="isColumnVisible('actions')" class="px-2 py-2" @click.stop>
                 <button
                   v-if="s.all_tracking?.length"
                   @click="copyAllTracking(s.all_tracking)"

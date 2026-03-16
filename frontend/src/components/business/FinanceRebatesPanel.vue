@@ -15,18 +15,18 @@
       <table class="w-full text-sm">
         <thead class="bg-elevated">
           <tr>
-            <th class="px-3 py-2 text-left">{{ rebateTab === 'customer' ? '客户' : '供应商' }}名称</th>
-            <th class="px-3 py-2 text-right">返利余额</th>
-            <th v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right">在账资金</th>
-            <th class="px-3 py-2 text-center">操作</th>
+            <th class="px-2 py-2 text-left">{{ rebateTab === 'customer' ? '客户' : '供应商' }}名称</th>
+            <th class="px-2 py-2 text-right">返利余额</th>
+            <th v-if="rebateTab === 'supplier'" class="px-2 py-2 text-right">在账资金</th>
+            <th class="px-2 py-2 text-center">操作</th>
           </tr>
         </thead>
         <tbody class="divide-y">
           <tr v-for="item in rebateSummary" :key="item.id">
-            <td class="px-3 py-2 font-medium">{{ item.name }}</td>
-            <td class="px-3 py-2 text-right"><span :class="item.rebate_balance > 0 ? 'text-success font-semibold' : 'text-muted'">¥{{ fmt(item.rebate_balance) }}</span></td>
-            <td v-if="rebateTab === 'supplier'" class="px-3 py-2 text-right"><span :class="(item.credit_balance || 0) > 0 ? 'text-primary font-semibold' : 'text-muted'">¥{{ fmt(item.credit_balance || 0) }}</span></td>
-            <td class="px-3 py-2 text-center">
+            <td class="px-2 py-2 font-medium">{{ item.name }}</td>
+            <td class="px-2 py-2 text-right"><span :class="item.rebate_balance > 0 ? 'text-success font-semibold' : 'text-muted'">¥{{ fmt(item.rebate_balance) }}</span></td>
+            <td v-if="rebateTab === 'supplier'" class="px-2 py-2 text-right"><span :class="(item.credit_balance || 0) > 0 ? 'text-primary font-semibold' : 'text-muted'">¥{{ fmt(item.credit_balance || 0) }}</span></td>
+            <td class="px-2 py-2 text-center">
               <button v-if="hasPermission('finance_rebate')" @click="openRebateCharge(rebateTab, item.id, item.name)" class="text-xs text-primary hover:underline mr-3">充值</button>
               <button @click="viewRebateDetail(rebateTab, item.id, item.name)" class="text-xs text-primary hover:underline">明细</button>
             </td>

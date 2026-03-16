@@ -36,22 +36,22 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">订单号</th>
-              <th class="px-3 py-2 text-left">客户</th>
-              <th class="px-3 py-2 text-center">类型</th>
-              <th class="px-3 py-2 text-right">订单金额</th>
-              <th class="px-3 py-2 text-right">欠款金额</th>
-              <th class="px-3 py-2 text-left">创建时间</th>
+              <th class="px-2 py-2 text-left">订单号</th>
+              <th class="px-2 py-2 text-left">客户</th>
+              <th class="px-2 py-2 text-center">类型</th>
+              <th class="px-2 py-2 text-right">订单金额</th>
+              <th class="px-2 py-2 text-right">欠款金额</th>
+              <th class="px-2 py-2 text-left">创建时间</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="o in unpaidOrders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="handleViewOrder(o.id)">
-              <td class="px-3 py-2 font-mono text-sm text-primary"><span class="todo-dot mr-1.5"></span>{{ o.order_no }}</td>
-              <td class="px-3 py-2">{{ o.customer_name }}</td>
-              <td class="px-3 py-2 text-center"><StatusBadge type="orderType" :status="o.order_type" /></td>
-              <td class="px-3 py-2 text-right">¥{{ fmt(o.total_amount) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-error">¥{{ fmt(o.unpaid_amount) }}</td>
-              <td class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+              <td class="px-2 py-2 font-mono text-sm text-primary"><span class="todo-dot mr-1.5"></span>{{ o.order_no }}</td>
+              <td class="px-2 py-2">{{ o.customer_name }}</td>
+              <td class="px-2 py-2 text-center"><StatusBadge type="orderType" :status="o.order_type" /></td>
+              <td class="px-2 py-2 text-right">¥{{ fmt(o.total_amount) }}</td>
+              <td class="px-2 py-2 text-right font-semibold text-error">¥{{ fmt(o.unpaid_amount) }}</td>
+              <td class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
             </tr>
           </tbody>
         </table>

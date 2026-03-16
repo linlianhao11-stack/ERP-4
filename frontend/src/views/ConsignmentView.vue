@@ -24,48 +24,58 @@
 
     <!-- Customer List -->
     <div class="card mb-5">
-      <div class="p-3 border-b font-semibold text-sm">寄售客户</div>
-      <div class="divide-y">
-        <div
-          v-for="c in consignCustomers"
-          :key="c.id"
-          class="p-3 flex justify-between items-center hover:bg-elevated cursor-pointer"
-          @click="openConsignDetail(c)"
-        >
-          <div>
-            <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-muted">调拨{{ c.consign_out_count }}次 / 结算{{ c.consign_settle_count }}次</div>
-          </div>
-          <div class="text-right">
-            <div class="text-purple-emphasis font-semibold">库存¥{{ fmt(c.consign_remaining_cost) }}</div>
-            <div class="text-xs" :class="getBalanceClass(c.balance)">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
-          </div>
-        </div>
-        <div v-if="!consignCustomers.length" class="p-6 text-center text-muted text-sm">暂无寄售客户</div>
+      <div class="table-container">
+        <table class="w-full text-sm">
+          <thead class="bg-elevated">
+            <tr>
+              <th class="px-2 py-2 text-left">客户名称</th>
+              <th class="px-2 py-2 text-left">调拨/结算</th>
+              <th class="px-2 py-2 text-right">库存价值</th>
+              <th class="px-2 py-2 text-right">余额状态</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <tr
+              v-for="c in consignCustomers"
+              :key="c.id"
+              class="hover:bg-elevated cursor-pointer"
+              @click="openConsignDetail(c)"
+            >
+              <td class="px-2 py-2 font-medium">{{ c.name }}</td>
+              <td class="px-2 py-2 text-secondary text-xs">调拨{{ c.consign_out_count }}次 / 结算{{ c.consign_settle_count }}次</td>
+              <td class="px-2 py-2 text-right text-purple-emphasis font-semibold">¥{{ fmt(c.consign_remaining_cost) }}</td>
+              <td class="px-2 py-2 text-right">
+                <span :class="getBalanceClass(c.balance)">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</span>
+              </td>
+            </tr>
+            <tr v-if="!consignCustomers.length">
+              <td colspan="4" class="px-2 py-2 text-center text-muted">暂无寄售客户</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
     <!-- Stock Detail Table -->
     <div class="card">
-      <div class="p-3 border-b font-semibold text-sm">寄售库存明细</div>
-      <div class="overflow-x-auto table-container">
+      <div class="table-container">
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">SKU</th>
-              <th class="px-3 py-2 text-left">商品</th>
-              <th class="px-3 py-2 text-right">数量</th>
-              <th v-if="hasPermission('finance')" class="px-3 py-2 text-right">成本</th>
-              <th class="px-3 py-2 text-right">销售价</th>
+              <th class="px-2 py-2 text-left">SKU</th>
+              <th class="px-2 py-2 text-left">商品</th>
+              <th class="px-2 py-2 text-right">数量</th>
+              <th v-if="hasPermission('finance')" class="px-2 py-2 text-right">成本</th>
+              <th class="px-2 py-2 text-right">销售价</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="s in consignSummary.stock_details" :key="s.product_id + '-' + s.unit_price">
-              <td class="px-3 py-2 font-mono text-xs">{{ s.product_sku }}</td>
-              <td class="px-3 py-2">{{ s.product_name }}</td>
-              <td class="px-3 py-2 text-right font-semibold">{{ s.quantity }}</td>
-              <td v-if="hasPermission('finance')" class="px-3 py-2 text-right">{{ fmt(s.cost_price) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(s.unit_price) }}</td>
+              <td class="px-2 py-2 font-mono text-xs">{{ s.product_sku }}</td>
+              <td class="px-2 py-2">{{ s.product_name }}</td>
+              <td class="px-2 py-2 text-right font-semibold">{{ s.quantity }}</td>
+              <td v-if="hasPermission('finance')" class="px-2 py-2 text-right">{{ fmt(s.cost_price) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(s.unit_price) }}</td>
             </tr>
           </tbody>
         </table>

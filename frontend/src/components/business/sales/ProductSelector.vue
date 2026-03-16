@@ -46,7 +46,7 @@
       <!-- 退货订单提示 -->
       <div
         v-if="orderType === 'RETURN' && selectedReturnOrder"
-        class="w-full text-sm px-3 py-2 bg-info-subtle rounded border border-primary text-primary"
+        class="w-full text-sm px-2 py-2 bg-info-subtle rounded border border-primary text-primary"
       >
         <span class="font-medium">退货订单：</span>{{ selectedReturnOrder.order_no }} - {{ selectedReturnOrder.customer_name }}
       </div>
@@ -58,14 +58,14 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left w-24 md-hide">品牌</th>
-              <th class="px-3 py-2 text-left">商品名称</th>
-              <th class="px-3 py-2 text-left w-24 md-hide">仓位</th>
-              <th class="px-3 py-2 text-right w-24">零售价</th>
-              <th class="px-3 py-2 text-right w-24 md-hide" v-if="hasPermission('finance')">成本价</th>
-              <th class="px-3 py-2 text-center w-20">库存</th>
-              <th class="px-3 py-2 text-center w-20 md-hide">库龄</th>
-              <th class="px-3 py-2 text-center w-16">操作</th>
+              <th class="px-2 py-2 text-left w-24 md-hide">品牌</th>
+              <th class="px-2 py-2 text-left">商品名称</th>
+              <th class="px-2 py-2 text-left w-24 md-hide">仓位</th>
+              <th class="px-2 py-2 text-right w-24">零售价</th>
+              <th class="px-2 py-2 text-right w-24 md-hide" v-if="hasPermission('finance')">成本价</th>
+              <th class="px-2 py-2 text-center w-20">库存</th>
+              <th class="px-2 py-2 text-center w-20 md-hide">库龄</th>
+              <th class="px-2 py-2 text-center w-16">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -80,26 +80,26 @@
                 'cursor-pointer': !p.is_virtual_stock
               }"
             >
-              <td class="px-3 py-2 text-secondary text-xs md-hide">{{ p.brand || '-' }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2 text-secondary text-xs md-hide">{{ p.brand || '-' }}</td>
+              <td class="px-2 py-2">
                 <div class="font-medium">{{ p.name }}</div>
                 <div class="text-xs text-muted font-mono mt-0.5">{{ p.sku }}</div>
               </td>
-              <td class="px-3 py-2 md-hide">
+              <td class="px-2 py-2 md-hide">
                 <span v-if="p.is_virtual_stock" class="badge badge-purple text-xs">寄售</span>
                 <span v-else-if="p.location_code" class="badge badge-blue text-xs">{{ p.location_code }}</span>
                 <span v-else class="text-muted text-xs">-</span>
               </td>
-              <td class="px-3 py-2 text-right text-primary font-bold">&yen;{{ p.retail_price }}</td>
-              <td class="px-3 py-2 text-right text-secondary md-hide" v-if="hasPermission('finance')">&yen;{{ p.cost_price }}</td>
+              <td class="px-2 py-2 text-right text-primary font-bold">&yen;{{ p.retail_price }}</td>
+              <td class="px-2 py-2 text-right text-secondary md-hide" v-if="hasPermission('finance')">&yen;{{ p.cost_price }}</td>
               <td
-                class="px-3 py-2 text-center font-semibold"
+                class="px-2 py-2 text-center font-semibold"
                 :class="p.is_virtual_stock ? 'text-purple-emphasis' : getAgeClass(p.age_days)"
               >
                 {{ p.display_stock !== undefined ? p.display_stock : getStock(p) }}
               </td>
-              <td class="px-3 py-2 text-center text-xs md-hide" :class="getAgeClass(p.age_days)">{{ p.age_days }}天</td>
-              <td class="px-3 py-2 text-center">
+              <td class="px-2 py-2 text-center text-xs md-hide" :class="getAgeClass(p.age_days)">{{ p.age_days }}天</td>
+              <td class="px-2 py-2 text-center">
                 <button
                   v-if="!p.is_virtual_stock"
                   @click.stop="$emit('add-to-cart', p)"

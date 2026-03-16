@@ -68,13 +68,13 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left">采购单号</th>
-              <th v-if="isColumnVisible('supplier')" class="px-3 py-2 text-left">供应商</th>
-              <th v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right">总金额(含税)</th>
-              <th v-if="isColumnVisible('created_at')" class="px-3 py-2 text-left">创建时间</th>
-              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
-              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center">状态</th>
-              <th v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">操作</th>
+              <th v-if="isColumnVisible('po_no')" class="px-2 py-2 text-left">采购单号</th>
+              <th v-if="isColumnVisible('supplier')" class="px-2 py-2 text-left">供应商</th>
+              <th v-if="isColumnVisible('total_amount')" class="px-2 py-2 text-right">总金额(含税)</th>
+              <th v-if="isColumnVisible('created_at')" class="px-2 py-2 text-left">创建时间</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-2 py-2 text-left">付款方式</th>
+              <th v-if="isColumnVisible('status')" class="px-2 py-2 text-center">状态</th>
+              <th v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">操作</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="po_no"
@@ -84,13 +84,13 @@
           </thead>
           <tbody class="divide-y">
             <tr v-for="o in purchaseOrders" :key="'pay' + o.id" class="hover:bg-elevated cursor-pointer" @click="viewPurchaseOrder(o.id)">
-              <td v-if="isColumnVisible('po_no')" class="px-3 py-2 font-mono text-sm text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1.5 align-middle" title="待付款"></span>{{ o.po_no }}</td>
-              <td v-if="isColumnVisible('supplier')" class="px-3 py-2">{{ o.supplier_name }}</td>
-              <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
-              <td v-if="isColumnVisible('created_at')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
-              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ o.payment_method ? getDisbursementMethodName(o.payment_method) : '-' }}</td>
-              <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
-              <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('po_no')" class="px-2 py-2 font-mono text-sm text-primary"><span v-if="o.status === 'pending'" class="inline-block w-2 h-2 rounded-full bg-error mr-1.5 align-middle" title="待付款"></span>{{ o.po_no }}</td>
+              <td v-if="isColumnVisible('supplier')" class="px-2 py-2">{{ o.supplier_name }}</td>
+              <td v-if="isColumnVisible('total_amount')" class="px-2 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
+              <td v-if="isColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+              <td v-if="isColumnVisible('payment_method')" class="px-2 py-2">{{ o.payment_method ? getDisbursementMethodName(o.payment_method) : '-' }}</td>
+              <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
+              <td v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">
                 <div v-if="o.status === 'pending_review' && hasPermission('purchase_approve')" class="flex gap-1 justify-center">
                   <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm text-xs" style="background:#1677FF;color:#fff">通过</button>
                   <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">拒绝</button>

@@ -1,36 +1,36 @@
 <template>
   <div>
     <div class="table-container">
-      <table class="w-full">
+      <table class="w-full text-sm">
         <thead class="bg-elevated">
           <tr>
-            <th class="px-3 py-2">日期</th>
-            <th class="px-3 py-2">期间</th>
-            <th class="px-3 py-2">凭证字</th>
-            <th class="px-3 py-2">凭证号</th>
-            <th class="px-3 py-2">摘要</th>
-            <th class="px-3 py-2">科目编码</th>
-            <th class="px-3 py-2">科目名称</th>
-            <th class="px-3 py-2">核算维度</th>
-            <th class="px-3 py-2 text-right">借方金额</th>
-            <th class="px-3 py-2 text-right">贷方金额</th>
-            <th class="px-3 py-2">状态</th>
+            <th class="px-2 py-2">日期</th>
+            <th class="px-2 py-2">期间</th>
+            <th class="px-2 py-2">凭证字</th>
+            <th class="px-2 py-2">凭证号</th>
+            <th class="px-2 py-2">摘要</th>
+            <th class="px-2 py-2">科目编码</th>
+            <th class="px-2 py-2">科目名称</th>
+            <th class="px-2 py-2">核算维度</th>
+            <th class="px-2 py-2 text-right">借方金额</th>
+            <th class="px-2 py-2 text-right">贷方金额</th>
+            <th class="px-2 py-2">状态</th>
           </tr>
         </thead>
         <tbody class="divide-y">
           <tr v-for="(e, idx) in entries" :key="e.id"
             :class="['hover:bg-elevated', { 'border-t-2 border-border': isFirstOfVoucher(idx) && idx > 0 }]">
-            <td class="px-3 py-2">{{ isFirstOfVoucher(idx) ? e.voucher_date : '' }}</td>
-            <td class="px-3 py-2">{{ isFirstOfVoucher(idx) ? e.period_name : '' }}</td>
-            <td class="px-3 py-2">{{ isFirstOfVoucher(idx) ? e.voucher_type : '' }}</td>
-            <td class="px-3 py-2 font-medium">{{ isFirstOfVoucher(idx) ? e.sequence_no : '' }}</td>
-            <td class="px-3 py-2">{{ e.entry_summary }}</td>
-            <td class="px-3 py-2 font-mono text-xs">{{ e.account_code }}</td>
-            <td class="px-3 py-2">{{ e.account_name }}</td>
-            <td class="px-3 py-2 text-xs text-muted">{{ e.aux_info }}</td>
-            <td class="px-3 py-2 text-right">{{ formatAmount(e.debit_amount) }}</td>
-            <td class="px-3 py-2 text-right">{{ formatAmount(e.credit_amount) }}</td>
-            <td class="px-3 py-2">
+            <td class="px-2 py-2">{{ isFirstOfVoucher(idx) ? e.voucher_date : '' }}</td>
+            <td class="px-2 py-2">{{ isFirstOfVoucher(idx) ? e.period_name : '' }}</td>
+            <td class="px-2 py-2">{{ isFirstOfVoucher(idx) ? e.voucher_type : '' }}</td>
+            <td class="px-2 py-2 font-medium">{{ isFirstOfVoucher(idx) ? e.sequence_no : '' }}</td>
+            <td class="px-2 py-2">{{ e.entry_summary }}</td>
+            <td class="px-2 py-2 font-mono text-xs">{{ e.account_code }}</td>
+            <td class="px-2 py-2">{{ e.account_name }}</td>
+            <td class="px-2 py-2 text-xs text-muted">{{ e.aux_info }}</td>
+            <td class="px-2 py-2 text-right">{{ formatAmount(e.debit_amount) }}</td>
+            <td class="px-2 py-2 text-right">{{ formatAmount(e.credit_amount) }}</td>
+            <td class="px-2 py-2">
               <span v-if="isFirstOfVoucher(idx)" :class="statusBadge(e.status)">{{ statusName(e.status) }}</span>
             </td>
           </tr>

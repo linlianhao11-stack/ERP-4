@@ -19,23 +19,23 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" aria-label="全选" /></th>
-              <th class="px-3 py-2">单号</th>
-              <th class="px-3 py-2">日期</th>
-              <th class="px-3 py-2">客户</th>
-              <th class="px-3 py-2">仓库</th>
-              <th class="px-3 py-2 text-right">成本合计</th>
-              <th class="px-3 py-2 text-right">销售合计</th>
-              <th class="px-3 py-2">凭证号</th>
-              <th class="px-3 py-2">操作</th>
+              <th class="px-2 py-2 w-8"><input type="checkbox" @change="toggleAll" :checked="allSelected" aria-label="全选" /></th>
+              <th class="px-2 py-2">单号</th>
+              <th class="px-2 py-2">日期</th>
+              <th class="px-2 py-2">客户</th>
+              <th class="px-2 py-2">仓库</th>
+              <th class="px-2 py-2 text-right">成本合计</th>
+              <th class="px-2 py-2 text-right">销售合计</th>
+              <th class="px-2 py-2">凭证号</th>
+              <th class="px-2 py-2">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-if="!items.length">
-              <td colspan="9" class="px-3 py-2">
+              <td colspan="9" class="px-2 py-2">
                 <div class="text-center py-12 text-muted">
                   <div class="text-3xl mb-3">📋</div>
                   <p class="text-sm font-medium mb-1">暂无出库单数据</p>
@@ -44,15 +44,15 @@
               </td>
             </tr>
             <tr v-for="d in items" :key="d.id" class="hover:bg-elevated">
-              <td class="px-3 py-2"><input type="checkbox" :value="d.id" v-model="selectedIds" aria-label="选择此行" /></td>
-              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.delivery_no || d.bill_no">{{ d.delivery_no || d.bill_no }}</span></td>
-              <td class="px-3 py-2">{{ d.delivery_date || d.bill_date }}</td>
-              <td class="px-3 py-2">{{ d.customer_name }}</td>
-              <td class="px-3 py-2">{{ d.warehouse_name }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(d.cost_total) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(d.sales_total) }}</td>
-              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.voucher_no">{{ d.voucher_no || '-' }}</span></td>
-              <td class="px-3 py-2" @click.stop>
+              <td class="px-2 py-2"><input type="checkbox" :value="d.id" v-model="selectedIds" aria-label="选择此行" /></td>
+              <td class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.delivery_no || d.bill_no">{{ d.delivery_no || d.bill_no }}</span></td>
+              <td class="px-2 py-2">{{ d.delivery_date || d.bill_date }}</td>
+              <td class="px-2 py-2">{{ d.customer_name }}</td>
+              <td class="px-2 py-2">{{ d.warehouse_name }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(d.cost_total) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(d.sales_total) }}</td>
+              <td class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="d.voucher_no">{{ d.voucher_no || '-' }}</span></td>
+              <td class="px-2 py-2" @click.stop>
                 <div class="flex gap-1">
                   <button @click="viewDetail(d)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
                   <button @click="handleDownloadPdf(d)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">PDF</button>
@@ -94,7 +94,7 @@
               <div v-if="detail.items && detail.items.length">
                 <div class="text-[12px] font-semibold text-muted uppercase tracking-wider mb-2">商品明细</div>
                 <div class="table-container">
-                  <table class="w-full text-[13px]">
+                  <table class="w-full text-sm">
                     <thead>
                       <tr><th>商品</th><th class="text-right">数量</th><th class="text-right">成本价</th><th class="text-right">销售价</th></tr>
                     </thead>

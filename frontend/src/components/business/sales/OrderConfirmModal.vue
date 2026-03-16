@@ -48,22 +48,22 @@
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">
                 <tr>
-                  <th class="px-3 py-2 text-left">商品</th>
-                  <th class="px-3 py-2 text-left">出库仓位</th>
-                  <th class="px-3 py-2 text-right">单价</th>
-                  <th class="px-3 py-2 text-right">数量</th>
-                  <th class="px-3 py-2 text-right">小计</th>
+                  <th class="px-2 py-2 text-left">商品</th>
+                  <th class="px-2 py-2 text-left">出库仓位</th>
+                  <th class="px-2 py-2 text-right">单价</th>
+                  <th class="px-2 py-2 text-right">数量</th>
+                  <th class="px-2 py-2 text-right">小计</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
                 <tr v-for="(item, idx) in orderConfirm.items" :key="idx">
-                  <td class="px-3 py-2"><div class="font-medium">{{ item.name }}</div></td>
-                  <td class="px-3 py-2">
+                  <td class="px-2 py-2"><div class="font-medium">{{ item.name }}</div></td>
+                  <td class="px-2 py-2">
                     <span class="text-xs bg-info-subtle text-primary px-2 py-1 rounded">{{ item.warehouse_name }} - {{ item.location_code }}</span>
                   </td>
-                  <td class="px-3 py-2 text-right">&yen;{{ fmt(item.unit_price) }}</td>
-                  <td class="px-3 py-2 text-right font-medium">{{ item.quantity }}</td>
-                  <td class="px-3 py-2 text-right font-semibold text-primary">&yen;{{ fmt(Math.round(item.unit_price * item.quantity * 100) / 100) }}</td>
+                  <td class="px-2 py-2 text-right">&yen;{{ fmt(item.unit_price) }}</td>
+                  <td class="px-2 py-2 text-right font-medium">{{ item.quantity }}</td>
+                  <td class="px-2 py-2 text-right font-semibold text-primary">&yen;{{ fmt(Math.round(item.unit_price * item.quantity * 100) / 100) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -177,7 +177,7 @@
           <div v-if="accountSetInfo.count > 0" class="mb-4">
             <label class="label">财务账套</label>
             <!-- 单账套：显示名称 -->
-            <div v-if="accountSetInfo.count === 1" class="text-sm font-medium px-3 py-2 bg-elevated rounded-lg border">
+            <div v-if="accountSetInfo.count === 1" class="text-sm font-medium px-2 py-2 bg-elevated rounded-lg border">
               {{ accountSetInfo.name }}
             </div>
             <!-- 多账套：警告横幅 -->

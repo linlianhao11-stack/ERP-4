@@ -1,7 +1,7 @@
 <template>
   <Transition name="fade">
     <div v-if="visible" class="modal-backdrop" @click.self="close">
-      <div class="modal max-w-3xl">
+      <div class="modal max-w-5xl">
         <div class="modal-header">
           <h3>{{ isEditing ? '编辑凭证' : (isCreating ? '新增凭证' : '凭证详情') }}</h3>
           <button @click="close" class="modal-close" aria-label="关闭">&times;</button>
@@ -36,7 +36,7 @@
           </div>
 
           <div class="table-container">
-            <table class="w-full text-[13px]">
+            <table class="w-full text-sm">
               <thead>
                 <tr>
                   <th class="w-8">#</th>

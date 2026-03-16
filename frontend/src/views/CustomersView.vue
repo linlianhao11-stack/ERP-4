@@ -10,44 +10,79 @@
     <Transition name="slide-fade" mode="out-in" :duration="{ enter: 250, leave: 120 }">
     <!-- Transactions Tab -->
     <div v-if="customerTab === 'transactions'" key="transactions">
-      <input v-model="customersStore.customerSearch" class="input mb-3 text-sm" placeholder="搜索客户...">
-      <div class="card divide-y">
-        <div
-          v-for="c in filteredCustomers"
-          :key="c.id"
-          class="p-3 flex justify-between items-center cursor-pointer hover:bg-elevated"
-          @click="openCustomerTrans(c)"
-        >
-          <div>
-            <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-muted">{{ c.phone }}</div>
-          </div>
-          <div class="text-right">
-            <div :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
-            <div class="text-xs text-muted">点击查看交易明细 →</div>
+      <div class="card" style="overflow: visible">
+        <div class="px-2 py-2">
+          <div class="toolbar-search-wrapper" style="max-width:320px">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="customersStore.customerSearch" class="toolbar-search" placeholder="搜索客户...">
           </div>
         </div>
-        <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
+        <div class="table-container">
+          <table class="w-full text-sm">
+            <thead class="bg-elevated">
+              <tr>
+                <th class="px-2 py-2 text-left w-80">客户名称</th>
+                <th class="px-2 py-2 text-left w-36">电话</th>
+                <th class="px-2 py-2 text-right">余额状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr
+                v-for="c in filteredCustomers"
+                :key="c.id"
+                class="hover:bg-elevated cursor-pointer"
+                @click="openCustomerTrans(c)"
+              >
+                <td class="px-2 py-2 font-medium">{{ c.name }}</td>
+                <td class="px-2 py-2 text-secondary">{{ c.phone || '-' }}</td>
+                <td class="px-2 py-2 text-right">
+                  <span :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
+        </div>
       </div>
     </div>
 
     <!-- Manage Tab -->
     <div v-else-if="customerTab === 'manage'" key="manage">
-      <input v-model="customersStore.customerSearch" class="input mb-3 text-sm" placeholder="搜索客户...">
-      <div class="card divide-y">
-        <div
-          v-for="c in filteredCustomers"
-          :key="c.id"
-          class="p-3 flex justify-between items-center cursor-pointer hover:bg-elevated"
-          @click="editCustomer(c)"
-        >
-          <div>
-            <div class="font-medium">{{ c.name }}</div>
-            <div class="text-xs text-muted">{{ c.contact_person }} · {{ c.phone }}</div>
+      <div class="card" style="overflow: visible">
+        <div class="px-2 py-2">
+          <div class="toolbar-search-wrapper" style="max-width:320px">
+            <Search :size="14" class="toolbar-search-icon" />
+            <input v-model="customersStore.customerSearch" class="toolbar-search" placeholder="搜索客户...">
           </div>
-          <div :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</div>
         </div>
-        <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
+        <div class="table-container">
+          <table class="w-full text-sm">
+            <thead class="bg-elevated">
+              <tr>
+                <th class="px-2 py-2 text-left w-80">客户名称</th>
+                <th class="px-2 py-2 text-left w-28">联系人</th>
+                <th class="px-2 py-2 text-left w-36">电话</th>
+                <th class="px-2 py-2 text-right">余额状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr
+                v-for="c in filteredCustomers"
+                :key="c.id"
+                class="hover:bg-elevated cursor-pointer"
+                @click="editCustomer(c)"
+              >
+                <td class="px-2 py-2 font-medium">{{ c.name }}</td>
+                <td class="px-2 py-2 text-secondary">{{ c.contact_person || '-' }}</td>
+                <td class="px-2 py-2 text-secondary">{{ c.phone || '-' }}</td>
+                <td class="px-2 py-2 text-right">
+                  <span :class="getBalanceClass(c.balance)" class="font-semibold">{{ getBalanceLabel(c.balance) }} ¥{{ formatBalance(c.balance) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!filteredCustomers.length" class="p-6 text-center text-muted text-sm">暂无客户</div>
+        </div>
       </div>
     </div>
     </Transition>
@@ -196,11 +231,11 @@
             <table class="w-full text-sm">
               <thead class="bg-elevated sticky top-0">
                 <tr>
-                  <th class="px-2 py-1 text-left">订单号</th>
-                  <th class="px-2 py-1 text-left">类型</th>
-                  <th class="px-2 py-1 text-right">金额</th>
-                  <th class="px-2 py-1 text-center">状态</th>
-                  <th class="px-2 py-1 text-left">时间</th>
+                  <th class="px-2 py-2 text-left">订单号</th>
+                  <th class="px-2 py-2 text-left">类型</th>
+                  <th class="px-2 py-2 text-right">金额</th>
+                  <th class="px-2 py-2 text-center">状态</th>
+                  <th class="px-2 py-2 text-left">时间</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
@@ -210,15 +245,15 @@
                   class="clickable-row"
                   @click="viewOrderFromTrans(t.id)"
                 >
-                  <td class="px-2 py-1 font-mono text-xs text-primary">{{ t.order_no }}</td>
-                  <td class="px-2 py-1">
+                  <td class="px-2 py-2 font-mono text-xs text-primary">{{ t.order_no }}</td>
+                  <td class="px-2 py-2">
                     <span :class="orderTypeBadges[t.order_type] || 'badge badge-gray'">{{ orderTypeNames[t.order_type] || t.order_type }}</span>
                   </td>
-                  <td class="px-2 py-1 text-right font-semibold">¥{{ fmt(t.total_amount) }}</td>
-                  <td class="px-2 py-1 text-center">
+                  <td class="px-2 py-2 text-right font-semibold">¥{{ fmt(t.total_amount) }}</td>
+                  <td class="px-2 py-2 text-center">
                     <span :class="t.is_cleared ? 'badge badge-green' : 'badge badge-red'">{{ t.is_cleared ? '已结' : '未结' }}</span>
                   </td>
-                  <td class="px-2 py-1 text-muted text-xs">{{ fmtDate(t.created_at) }}</td>
+                  <td class="px-2 py-2 text-muted text-xs">{{ fmtDate(t.created_at) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -331,27 +366,27 @@
             <table class="w-full text-sm">
               <thead class="bg-elevated">
                 <tr>
-                  <th class="px-2 py-1 text-left">商品</th>
-                  <th class="px-2 py-1 text-left">仓库</th>
-                  <th class="px-2 py-1 text-right">单价</th>
-                  <th class="px-2 py-1 text-right">数量</th>
-                  <th v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right">返利</th>
-                  <th class="px-2 py-1 text-right">金额</th>
-                  <th v-if="hasPermission('finance')" class="px-2 py-1 text-right">毛利</th>
+                  <th class="px-2 py-2 text-left">商品</th>
+                  <th class="px-2 py-2 text-left">仓库</th>
+                  <th class="px-2 py-2 text-right">单价</th>
+                  <th class="px-2 py-2 text-right">数量</th>
+                  <th v-if="orderDetail.rebate_used > 0" class="px-2 py-2 text-right">返利</th>
+                  <th class="px-2 py-2 text-right">金额</th>
+                  <th v-if="hasPermission('finance')" class="px-2 py-2 text-right">毛利</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
                 <tr v-for="item in orderDetail.items" :key="item.product_id">
-                  <td class="px-2 py-1">
+                  <td class="px-2 py-2">
                     <div>{{ item.product_name }}</div>
                     <div class="text-xs text-muted">{{ item.product_sku }}</div>
                   </td>
-                  <td class="px-2 py-1 text-muted">{{ item.warehouse_name || '-' }}</td>
-                  <td class="px-2 py-1 text-right">{{ fmt(item.unit_price) }}</td>
-                  <td class="px-2 py-1 text-right">{{ item.quantity }}</td>
-                  <td v-if="orderDetail.rebate_used > 0" class="px-2 py-1 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
-                  <td class="px-2 py-1 text-right font-semibold">{{ fmt(item.amount) }}</td>
-                  <td v-if="hasPermission('finance')" class="px-2 py-1 text-right" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
+                  <td class="px-2 py-2 text-muted">{{ item.warehouse_name || '-' }}</td>
+                  <td class="px-2 py-2 text-right">{{ fmt(item.unit_price) }}</td>
+                  <td class="px-2 py-2 text-right">{{ item.quantity }}</td>
+                  <td v-if="orderDetail.rebate_used > 0" class="px-2 py-2 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
+                  <td class="px-2 py-2 text-right font-semibold">{{ fmt(item.amount) }}</td>
+                  <td v-if="hasPermission('finance')" class="px-2 py-2 text-right" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -368,7 +403,7 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Search } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
 import { useCustomersStore } from '../stores/customers'

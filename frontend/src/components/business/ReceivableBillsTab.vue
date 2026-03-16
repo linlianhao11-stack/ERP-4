@@ -23,22 +23,22 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 w-8">
+              <th class="px-2 py-2 w-8">
                 <input type="checkbox" :checked="allChecked" :indeterminate="someChecked" @change="toggleAll" />
               </th>
-              <th v-if="arIsColumnVisible('bill_no')" class="px-3 py-2">单号</th>
-              <th v-if="arIsColumnVisible('bill_date')" class="px-3 py-2">日期</th>
-              <th v-if="arIsColumnVisible('customer')" class="px-3 py-2">客户</th>
-              <th v-if="arIsColumnVisible('total_amount')" class="px-3 py-2 text-right">应收金额</th>
-              <th v-if="arIsColumnVisible('received_amount')" class="px-3 py-2 text-right">已收金额</th>
-              <th v-if="arIsColumnVisible('unreceived_amount')" class="px-3 py-2 text-right">未收金额</th>
-              <th v-if="arIsColumnVisible('status')" class="px-3 py-2">状态</th>
-              <th v-if="arIsColumnVisible('voucher_no')" class="px-3 py-2">凭证号</th>
-              <th v-if="arIsColumnVisible('order_no')" class="px-3 py-2">来源订单</th>
-              <th v-if="arIsColumnVisible('actions')" class="px-3 py-2">操作</th>
+              <th v-if="arIsColumnVisible('bill_no')" class="px-2 py-2">单号</th>
+              <th v-if="arIsColumnVisible('bill_date')" class="px-2 py-2">日期</th>
+              <th v-if="arIsColumnVisible('customer')" class="px-2 py-2">客户</th>
+              <th v-if="arIsColumnVisible('total_amount')" class="px-2 py-2 text-right">应收金额</th>
+              <th v-if="arIsColumnVisible('received_amount')" class="px-2 py-2 text-right">已收金额</th>
+              <th v-if="arIsColumnVisible('unreceived_amount')" class="px-2 py-2 text-right">未收金额</th>
+              <th v-if="arIsColumnVisible('status')" class="px-2 py-2">状态</th>
+              <th v-if="arIsColumnVisible('voucher_no')" class="px-2 py-2">凭证号</th>
+              <th v-if="arIsColumnVisible('order_no')" class="px-2 py-2">来源订单</th>
+              <th v-if="arIsColumnVisible('actions')" class="px-2 py-2">操作</th>
               <th class="col-selector-th">
                 <ColumnMenu :labels="arColumnLabels" :visible="arVisibleColumns" pinned="bill_no"
                   @toggle="arToggleColumn" @reset="arResetColumns" />
@@ -56,21 +56,21 @@
               </td>
             </tr>
             <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
-              <td class="px-3 py-2 w-8">
+              <td class="px-2 py-2 w-8">
                 <input type="checkbox" :checked="selectedIds.includes(b.id)" @change="toggleRow(b.id)" />
               </td>
-              <td v-if="arIsColumnVisible('bill_no')" class="px-3 py-2 font-mono text-[12px]">
+              <td v-if="arIsColumnVisible('bill_no')" class="px-2 py-2 font-mono text-[12px]">
                 <span v-if="b.status === 'pending' || b.status === 'partial'" class="todo-dot mr-1"></span><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
               </td>
-              <td v-if="arIsColumnVisible('bill_date')" class="px-3 py-2">{{ b.bill_date }}</td>
-              <td v-if="arIsColumnVisible('customer')" class="px-3 py-2">{{ b.customer_name }}</td>
-              <td v-if="arIsColumnVisible('total_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.total_amount) }}</td>
-              <td v-if="arIsColumnVisible('received_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.received_amount) }}</td>
-              <td v-if="arIsColumnVisible('unreceived_amount')" class="px-3 py-2 text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
-              <td v-if="arIsColumnVisible('status')" class="px-3 py-2"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
-              <td v-if="arIsColumnVisible('voucher_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-              <td v-if="arIsColumnVisible('order_no')" class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
-              <td v-if="arIsColumnVisible('actions')" class="px-3 py-2" @click.stop>
+              <td v-if="arIsColumnVisible('bill_date')" class="px-2 py-2">{{ b.bill_date }}</td>
+              <td v-if="arIsColumnVisible('customer')" class="px-2 py-2">{{ b.customer_name }}</td>
+              <td v-if="arIsColumnVisible('total_amount')" class="px-2 py-2 text-right">{{ fmtMoney(b.total_amount) }}</td>
+              <td v-if="arIsColumnVisible('received_amount')" class="px-2 py-2 text-right">{{ fmtMoney(b.received_amount) }}</td>
+              <td v-if="arIsColumnVisible('unreceived_amount')" class="px-2 py-2 text-right">{{ fmtMoney(b.unreceived_amount) }}</td>
+              <td v-if="arIsColumnVisible('status')" class="px-2 py-2"><span :class="statusBadge(b.status)">{{ statusName(b.status) }}</span></td>
+              <td v-if="arIsColumnVisible('voucher_no')" class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+              <td v-if="arIsColumnVisible('order_no')" class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.order_no">{{ b.order_no || '-' }}</span></td>
+              <td v-if="arIsColumnVisible('actions')" class="px-2 py-2" @click.stop>
                 <div class="flex gap-1">
                   <button @click="viewDetail(b)" class="text-xs px-2.5 py-1 rounded-md bg-info-subtle text-info-emphasis font-medium">查看</button>
                   <button v-if="b.status === 'pending' || b.status === 'partial'" @click="cancelBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-error-subtle text-error-emphasis font-medium">取消</button>

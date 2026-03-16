@@ -53,15 +53,15 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th v-if="isColumnVisible('payment_no')" class="px-3 py-2 text-left">收款单号</th>
-              <th v-if="isColumnVisible('customer')" class="px-3 py-2 text-left">客户</th>
-              <th v-if="isColumnVisible('source')" class="px-3 py-2 text-center">类型</th>
-              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
-              <th v-if="isColumnVisible('amount')" class="px-3 py-2 text-right">金额</th>
-              <th v-if="isColumnVisible('order_nos')" class="px-3 py-2 text-left">关联订单</th>
-              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center">状态</th>
-              <th v-if="isColumnVisible('created_at')" class="px-3 py-2 text-left">时间</th>
-              <th v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">操作</th>
+              <th v-if="isColumnVisible('payment_no')" class="px-2 py-2 text-left">收款单号</th>
+              <th v-if="isColumnVisible('customer')" class="px-2 py-2 text-left">客户</th>
+              <th v-if="isColumnVisible('source')" class="px-2 py-2 text-center">类型</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-2 py-2 text-left">付款方式</th>
+              <th v-if="isColumnVisible('amount')" class="px-2 py-2 text-right">金额</th>
+              <th v-if="isColumnVisible('order_nos')" class="px-2 py-2 text-left">关联订单</th>
+              <th v-if="isColumnVisible('status')" class="px-2 py-2 text-center">状态</th>
+              <th v-if="isColumnVisible('created_at')" class="px-2 py-2 text-left">时间</th>
+              <th v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">操作</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="payment_no"
@@ -71,23 +71,23 @@
           </thead>
           <tbody class="divide-y">
             <tr v-for="p in payments" :key="p.id" class="hover:bg-elevated cursor-pointer" @click="p.order_nos && p.order_nos.length ? $emit('view-order', p.order_nos[0].id) : null">
-              <td v-if="isColumnVisible('payment_no')" class="px-3 py-2 font-mono text-sm">{{ p.payment_no }}</td>
-              <td v-if="isColumnVisible('customer')" class="px-3 py-2">{{ p.customer_name }}</td>
-              <td v-if="isColumnVisible('source')" class="px-3 py-2 text-center"><span :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></td>
-              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ getPaymentMethodName(p.payment_method) }}</td>
-              <td v-if="isColumnVisible('amount')" class="px-3 py-2 text-right font-semibold text-success">+¥{{ fmt(p.amount) }}</td>
-              <td v-if="isColumnVisible('order_nos')" class="px-3 py-2">
+              <td v-if="isColumnVisible('payment_no')" class="px-2 py-2 font-mono text-sm">{{ p.payment_no }}</td>
+              <td v-if="isColumnVisible('customer')" class="px-2 py-2">{{ p.customer_name }}</td>
+              <td v-if="isColumnVisible('source')" class="px-2 py-2 text-center"><span :class="p.source === 'CASH' ? 'badge badge-blue' : 'badge badge-purple'" style="font-size:11px">{{ p.source === 'CASH' ? '现款' : '账期' }}</span></td>
+              <td v-if="isColumnVisible('payment_method')" class="px-2 py-2">{{ getPaymentMethodName(p.payment_method) }}</td>
+              <td v-if="isColumnVisible('amount')" class="px-2 py-2 text-right font-semibold text-success">+¥{{ fmt(p.amount) }}</td>
+              <td v-if="isColumnVisible('order_nos')" class="px-2 py-2">
                 <span v-if="p.order_nos && p.order_nos.length">
                   <span v-for="(on, idx) in p.order_nos" :key="on.id"><span class="text-primary font-mono text-xs">{{ on.order_no }}</span><span v-if="idx < p.order_nos.length - 1">、</span></span>
                 </span>
                 <span v-else class="text-muted text-xs">-</span>
               </td>
-              <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center">
                 <span v-if="p.is_confirmed" class="text-xs text-success">已确认</span>
                 <span v-else class="text-xs text-warning">待确认</span>
               </td>
-              <td v-if="isColumnVisible('created_at')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(p.created_at) }}</td>
-              <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(p.created_at) }}</td>
+              <td v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">
                 <span v-if="p.is_confirmed" class="text-xs text-muted">{{ p.confirmed_by_name }}</span>
                 <button v-else-if="hasPermission('finance_confirm')" @click.stop="confirmPaymentRecord(p.id, p.amount)" class="btn btn-warning btn-sm text-xs">确认到账</button>
               </td>

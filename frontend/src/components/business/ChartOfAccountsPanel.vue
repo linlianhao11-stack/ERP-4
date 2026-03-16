@@ -8,26 +8,26 @@
       </PageToolbar>
 
       <div class="table-container">
-        <table class="w-full">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">科目编码</th>
-              <th class="px-3 py-2">科目名称</th>
-              <th class="px-3 py-2">类别</th>
-              <th class="px-3 py-2">方向</th>
-              <th class="px-3 py-2">末级</th>
-              <th class="px-3 py-2">辅助核算</th>
-              <th v-if="hasPermission('accounting_edit')" class="px-3 py-2">操作</th>
+              <th class="px-2 py-2">科目编码</th>
+              <th class="px-2 py-2">科目名称</th>
+              <th class="px-2 py-2">类别</th>
+              <th class="px-2 py-2">方向</th>
+              <th class="px-2 py-2">末级</th>
+              <th class="px-2 py-2">辅助核算</th>
+              <th v-if="hasPermission('accounting_edit')" class="px-2 py-2">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="a in accounts" :key="a.id" class="hover:bg-elevated">
-              <td class="px-3 py-2">{{ a.code }}</td>
-              <td class="px-3 py-2">{{ a.name }}</td>
-              <td class="px-3 py-2"><span :class="categoryBadge(a.category)">{{ categoryName(a.category) }}</span></td>
-              <td class="px-3 py-2">{{ a.direction === 'debit' ? '借' : '贷' }}</td>
-              <td class="px-3 py-2">{{ a.is_leaf ? '是' : '否' }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2">{{ a.code }}</td>
+              <td class="px-2 py-2">{{ a.name }}</td>
+              <td class="px-2 py-2"><span :class="categoryBadge(a.category)">{{ categoryName(a.category) }}</span></td>
+              <td class="px-2 py-2">{{ a.direction === 'debit' ? '借' : '贷' }}</td>
+              <td class="px-2 py-2">{{ a.is_leaf ? '是' : '否' }}</td>
+              <td class="px-2 py-2">
                 <span v-if="a.aux_customer" class="badge badge-blue">客户</span>
                 <span v-if="a.aux_supplier" class="badge badge-orange">供应商</span>
                 <span v-if="a.aux_employee" class="badge badge-green">员工</span>
@@ -35,7 +35,7 @@
                 <span v-if="a.aux_product" class="badge badge-red">商品</span>
                 <span v-if="a.aux_bank" class="badge" style="background: oklch(0.55 0.15 195 / 0.1); color: oklch(0.45 0.15 195)">银行</span>
               </td>
-              <td v-if="hasPermission('accounting_edit')" class="px-3 py-2">
+              <td v-if="hasPermission('accounting_edit')" class="px-2 py-2">
                 <div class="flex gap-1">
                   <button @click="openEditAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis hover:bg-info-subtle transition-colors">编辑</button>
                   <button v-if="a.is_leaf" @click="deactivateAccount(a)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis hover:bg-error-subtle transition-colors">停用</button>

@@ -43,28 +43,28 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 text-left">供应商名称</th>
-              <th class="px-3 py-2 text-left">联系人</th>
-              <th class="px-3 py-2 text-left">电话</th>
-              <th class="px-3 py-2 text-right">返利余额</th>
-              <th class="px-3 py-2 text-right">在账资金</th>
-              <th class="px-3 py-2 text-center">操作</th>
+              <th class="px-2 py-2 text-left">供应商名称</th>
+              <th class="px-2 py-2 text-left">联系人</th>
+              <th class="px-2 py-2 text-left">电话</th>
+              <th class="px-2 py-2 text-right">返利余额</th>
+              <th class="px-2 py-2 text-right">在账资金</th>
+              <th class="px-2 py-2 text-center">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="s in filteredSuppliers" :key="s.id" class="hover:bg-elevated cursor-pointer" @click="openSupplierDetail(s)">
-              <td class="px-3 py-2 font-medium">{{ s.name }}</td>
-              <td class="px-3 py-2 text-secondary">{{ s.contact_person || '-' }}</td>
-              <td class="px-3 py-2 text-secondary">{{ s.phone || '-' }}</td>
-              <td class="px-3 py-2 text-right">
+              <td class="px-2 py-2 font-medium">{{ s.name }}</td>
+              <td class="px-2 py-2 text-secondary">{{ s.contact_person || '-' }}</td>
+              <td class="px-2 py-2 text-secondary">{{ s.phone || '-' }}</td>
+              <td class="px-2 py-2 text-right">
                 <span v-if="s.rebate_balance > 0" class="text-success font-semibold">¥{{ fmt(s.rebate_balance) }}</span>
                 <span v-else class="text-muted">-</span>
               </td>
-              <td class="px-3 py-2 text-right">
+              <td class="px-2 py-2 text-right">
                 <span v-if="s.credit_balance > 0" class="text-primary font-semibold">¥{{ fmt(s.credit_balance) }}</span>
                 <span v-else class="text-muted">-</span>
               </td>
-              <td class="px-3 py-2 text-center" @click.stop>
+              <td class="px-2 py-2 text-center" @click.stop>
                 <div class="flex gap-1 justify-center">
                   <button @click="openSupplierForm(s)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis transition-colors">编辑</button>
                   <button @click="handleDeleteSupplier(s.id)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis transition-colors">停用</button>

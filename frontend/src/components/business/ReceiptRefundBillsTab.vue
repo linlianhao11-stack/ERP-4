@@ -18,18 +18,18 @@
         </template>
       </PageToolbar>
       <div class="table-container">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">单号</th>
-              <th class="px-3 py-2">日期</th>
-              <th class="px-3 py-2">客户</th>
-              <th class="px-3 py-2 text-right">退款金额</th>
-              <th class="px-3 py-2">原收款单</th>
-              <th class="px-3 py-2">退款原因</th>
-              <th class="px-3 py-2">状态</th>
-              <th class="px-3 py-2">凭证号</th>
-              <th class="px-3 py-2">操作</th>
+              <th class="px-2 py-2">单号</th>
+              <th class="px-2 py-2">日期</th>
+              <th class="px-2 py-2">客户</th>
+              <th class="px-2 py-2 text-right">退款金额</th>
+              <th class="px-2 py-2">原收款单</th>
+              <th class="px-2 py-2">退款原因</th>
+              <th class="px-2 py-2">状态</th>
+              <th class="px-2 py-2">凭证号</th>
+              <th class="px-2 py-2">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -43,15 +43,15 @@
               </td>
             </tr>
             <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
-              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span></td>
-              <td class="px-3 py-2">{{ b.refund_date }}</td>
-              <td class="px-3 py-2">{{ b.customer_name }}</td>
-              <td class="px-3 py-2 text-right">{{ fmtMoney(b.amount) }}</td>
-              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.original_receipt_no">{{ b.original_receipt_no || '-' }}</span></td>
-              <td class="px-3 py-2 max-w-[120px] truncate">{{ b.reason || '-' }}</td>
-              <td class="px-3 py-2"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
-              <td class="px-3 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
-              <td class="px-3 py-2" @click.stop>
+              <td class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span></td>
+              <td class="px-2 py-2">{{ b.refund_date }}</td>
+              <td class="px-2 py-2">{{ b.customer_name }}</td>
+              <td class="px-2 py-2 text-right">{{ fmtMoney(b.amount) }}</td>
+              <td class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.original_receipt_no">{{ b.original_receipt_no || '-' }}</span></td>
+              <td class="px-2 py-2 max-w-[120px] truncate">{{ b.reason || '-' }}</td>
+              <td class="px-2 py-2"><span :class="b.status === 'confirmed' ? 'badge badge-green' : 'badge badge-gray'">{{ b.status === 'confirmed' ? '已确认' : '草稿' }}</span></td>
+              <td class="px-2 py-2 font-mono text-[12px]"><span class="max-w-48 truncate inline-block align-bottom" :title="b.voucher_no">{{ b.voucher_no || '-' }}</span></td>
+              <td class="px-2 py-2" @click.stop>
                 <button v-if="b.status === 'draft' && hasPermission('accounting_ar_confirm')" @click="confirmBill(b)" class="text-xs px-2.5 py-1 rounded-md bg-purple-subtle text-purple-emphasis font-medium">确认</button>
               </td>
             </tr>

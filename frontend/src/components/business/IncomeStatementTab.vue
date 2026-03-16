@@ -4,23 +4,23 @@
     <template v-else>
       <div class="card" style="overflow: visible">
         <div class="table-container">
-          <table class="w-full text-[13px]">
-            <thead>
+          <table class="w-full text-sm">
+            <thead class="bg-elevated">
               <tr>
-                <th class="text-left">项目</th>
-                <th class="text-right w-40">本期金额</th>
-                <th class="text-right w-40">本年累计</th>
+                <th class="px-2 py-2 text-left">项目</th>
+                <th class="px-2 py-2 text-right w-40">本期金额</th>
+                <th class="px-2 py-2 text-right w-40">本年累计</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <tr v-for="(row, idx) in data.rows" :key="idx" :class="isHeader(row.name) ? 'bg-elevated' : ''">
-                <td :class="[isHeader(row.name) ? 'font-semibold text-foreground' : 'text-secondary', isSubItem(row.name) ? 'pl-6' : '']">
+                <td class="px-2 py-2" :class="[isHeader(row.name) ? 'font-semibold text-foreground' : 'text-secondary', isSubItem(row.name) ? 'pl-6' : '']">
                   {{ row.name }}
                 </td>
-                <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
+                <td class="px-2 py-2 text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
                   {{ fmt(row.current) }}
                 </td>
-                <td class="text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
+                <td class="px-2 py-2 text-right font-mono" :class="isHeader(row.name) ? 'font-semibold' : ''">
                   {{ fmt(row.ytd) }}
                 </td>
               </tr>

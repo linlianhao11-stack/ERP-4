@@ -63,7 +63,7 @@
 
         <!-- 预览表格 -->
         <div v-if="previewData && previewData.entries && previewData.entries.length > 0 && !previewData.already_exists" class="table-container mt-3">
-          <table class="w-full text-[13px]">
+          <table class="w-full text-sm">
             <thead>
               <tr>
                 <th>科目编码</th>
@@ -200,32 +200,32 @@
         </div>
       </div>
       <div class="card" style="overflow: visible">
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2">期间</th>
-              <th class="px-3 py-2">年</th>
-              <th class="px-3 py-2">月</th>
-              <th class="px-3 py-2">状态</th>
-              <th class="px-3 py-2">结账时间</th>
-              <th class="px-3 py-2">结账人</th>
+              <th class="px-2 py-2">期间</th>
+              <th class="px-2 py-2">年</th>
+              <th class="px-2 py-2">月</th>
+              <th class="px-2 py-2">状态</th>
+              <th class="px-2 py-2">结账时间</th>
+              <th class="px-2 py-2">结账人</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr v-for="p in periodList" :key="p.period_name">
-              <td class="px-3 py-2 font-medium">{{ p.period_name }}</td>
-              <td class="px-3 py-2">{{ p.year }}</td>
-              <td class="px-3 py-2">{{ p.month }}</td>
-              <td class="px-3 py-2">
+              <td class="px-2 py-2 font-medium">{{ p.period_name }}</td>
+              <td class="px-2 py-2">{{ p.year }}</td>
+              <td class="px-2 py-2">{{ p.month }}</td>
+              <td class="px-2 py-2">
                 <span :class="p.is_closed ? 'badge badge-red' : 'badge badge-green'">
                   {{ p.is_closed ? '已结账' : '未结账' }}
                 </span>
               </td>
-              <td class="px-3 py-2">{{ p.closed_at ? formatDate(p.closed_at) : '-' }}</td>
-              <td class="px-3 py-2">{{ p.closed_by || '-' }}</td>
+              <td class="px-2 py-2">{{ p.closed_at ? formatDate(p.closed_at) : '-' }}</td>
+              <td class="px-2 py-2">{{ p.closed_by || '-' }}</td>
             </tr>
             <tr v-if="periodList.length === 0">
-              <td colspan="6" class="px-3 py-2 text-center text-muted py-8">暂无期间数据</td>
+              <td colspan="6" class="px-2 py-2 text-center text-muted py-8">暂无期间数据</td>
             </tr>
           </tbody>
         </table>

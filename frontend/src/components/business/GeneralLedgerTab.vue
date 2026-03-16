@@ -23,48 +23,48 @@
         <div class="text-center text-[15px] font-semibold mb-2 mt-2">
           总分类账 — {{ data.account_code }} {{ data.account_name }}
         </div>
-        <table class="w-full text-[13px]">
+        <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th class="px-3 py-2 w-24">日期</th>
-              <th class="px-3 py-2 w-48">凭证号</th>
-              <th class="px-3 py-2">摘要</th>
-              <th class="px-3 py-2 w-28 text-right">借方</th>
-              <th class="px-3 py-2 w-28 text-right">贷方</th>
-              <th class="px-3 py-2 w-12 text-center">方向</th>
-              <th class="px-3 py-2 w-28 text-right">余额</th>
+              <th class="px-2 py-2 w-24">日期</th>
+              <th class="px-2 py-2 w-48">凭证号</th>
+              <th class="px-2 py-2">摘要</th>
+              <th class="px-2 py-2 w-28 text-right">借方</th>
+              <th class="px-2 py-2 w-28 text-right">贷方</th>
+              <th class="px-2 py-2 w-12 text-center">方向</th>
+              <th class="px-2 py-2 w-28 text-right">余额</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <tr class="bg-canvas">
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
-              <td class="px-3 py-2 font-medium">期初余额</td>
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
-              <td class="px-3 py-2 text-center">{{ data.opening_direction }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(data.opening_balance) }}</td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
+              <td class="px-2 py-2 font-medium">期初余额</td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
+              <td class="px-2 py-2 text-center">{{ data.opening_direction }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(data.opening_balance) }}</td>
             </tr>
             <tr v-for="(e, idx) in data.entries" :key="idx" class="hover:bg-elevated">
-              <td class="px-3 py-2">{{ e.date }}</td>
-              <td class="px-3 py-2 text-blue-600 cursor-pointer hover:underline" @click="$emit('viewVoucher', e.voucher_id)">{{ e.voucher_no }}</td>
-              <td class="px-3 py-2">{{ e.summary }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(e.debit) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(e.credit) }}</td>
-              <td class="px-3 py-2 text-center">{{ e.direction }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(e.balance) }}</td>
+              <td class="px-2 py-2">{{ e.date }}</td>
+              <td class="px-2 py-2 text-blue-600 cursor-pointer hover:underline" @click="$emit('viewVoucher', e.voucher_id)">{{ e.voucher_no }}</td>
+              <td class="px-2 py-2">{{ e.summary }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(e.debit) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(e.credit) }}</td>
+              <td class="px-2 py-2 text-center">{{ e.direction }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(e.balance) }}</td>
             </tr>
             <tr class="bg-canvas font-semibold">
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
-              <td class="px-3 py-2">本期合计</td>
-              <td class="px-3 py-2 text-right">{{ fmt(data.period_debit_total) }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(data.period_credit_total) }}</td>
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
+              <td class="px-2 py-2">本期合计</td>
+              <td class="px-2 py-2 text-right">{{ fmt(data.period_debit_total) }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(data.period_credit_total) }}</td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
             </tr>
             <tr class="bg-canvas font-semibold">
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
-              <td class="px-3 py-2">期末余额</td>
-              <td class="px-3 py-2"></td><td class="px-3 py-2"></td>
-              <td class="px-3 py-2 text-center">{{ data.closing_direction }}</td>
-              <td class="px-3 py-2 text-right">{{ fmt(data.closing_balance) }}</td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
+              <td class="px-2 py-2">期末余额</td>
+              <td class="px-2 py-2"></td><td class="px-2 py-2"></td>
+              <td class="px-2 py-2 text-center">{{ data.closing_direction }}</td>
+              <td class="px-2 py-2 text-right">{{ fmt(data.closing_balance) }}</td>
             </tr>
           </tbody>
         </table>

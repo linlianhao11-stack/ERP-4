@@ -22,26 +22,26 @@
             <table class="w-full text-sm">
               <thead class="bg-elevated">
                 <tr>
-                  <th class="px-3 py-2 text-left w-10">
+                  <th class="px-2 py-2 text-left w-10">
                     <input type="checkbox" v-model="allChecked" class="rounded" />
                   </th>
-                  <th class="px-3 py-2 text-left">单据号</th>
-                  <th class="px-3 py-2 text-left">类型</th>
-                  <th class="px-3 py-2 text-left">{{ mode === 'ar' ? '客户' : '供应商' }}</th>
-                  <th class="px-3 py-2 text-right">金额</th>
-                  <th class="px-3 py-2 text-left">日期</th>
+                  <th class="px-2 py-2 text-left">单据号</th>
+                  <th class="px-2 py-2 text-left">类型</th>
+                  <th class="px-2 py-2 text-left">{{ mode === 'ar' ? '客户' : '供应商' }}</th>
+                  <th class="px-2 py-2 text-right">金额</th>
+                  <th class="px-2 py-2 text-left">日期</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="bill in bills" :key="bill.type + '-' + bill.id" class="border-t border-border-light">
-                  <td class="px-3 py-2">
+                  <td class="px-2 py-2">
                     <input type="checkbox" v-model="checkedBills" :value="bill" class="rounded" />
                   </td>
-                  <td class="px-3 py-2 font-mono text-xs">{{ bill.bill_no }}</td>
-                  <td class="px-3 py-2">{{ bill.type_label }}</td>
-                  <td class="px-3 py-2">{{ bill.partner_name }}</td>
-                  <td class="px-3 py-2 text-right font-mono">{{ formatMoney(bill.amount) }}</td>
-                  <td class="px-3 py-2 text-secondary">{{ bill.date }}</td>
+                  <td class="px-2 py-2 font-mono text-xs">{{ bill.bill_no }}</td>
+                  <td class="px-2 py-2">{{ bill.type_label }}</td>
+                  <td class="px-2 py-2">{{ bill.partner_name }}</td>
+                  <td class="px-2 py-2 text-right font-mono">{{ formatMoney(bill.amount) }}</td>
+                  <td class="px-2 py-2 text-secondary">{{ bill.date }}</td>
                 </tr>
               </tbody>
             </table>

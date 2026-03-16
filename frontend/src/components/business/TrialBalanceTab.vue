@@ -12,49 +12,49 @@
     </PageToolbar>
 
     <div v-if="data" class="table-container">
-      <table class="w-full text-[13px]">
-        <thead>
+      <table class="w-full text-sm">
+        <thead class="bg-elevated">
           <tr>
-            <th rowspan="2" class="w-24">科目编码</th>
-            <th rowspan="2">科目名称</th>
-            <th colspan="2" class="text-center border-b-0">期初余额</th>
-            <th colspan="2" class="text-center border-b-0">本期发生额</th>
-            <th colspan="2" class="text-center border-b-0">期末余额</th>
+            <th rowspan="2" class="px-2 py-2 w-24">科目编码</th>
+            <th rowspan="2" class="px-2 py-2">科目名称</th>
+            <th colspan="2" class="px-2 py-2 text-center border-b-0">期初余额</th>
+            <th colspan="2" class="px-2 py-2 text-center border-b-0">本期发生额</th>
+            <th colspan="2" class="px-2 py-2 text-center border-b-0">期末余额</th>
           </tr>
           <tr>
-            <th class="w-28 text-right">借方</th>
-            <th class="w-28 text-right">贷方</th>
-            <th class="w-28 text-right">借方</th>
-            <th class="w-28 text-right">贷方</th>
-            <th class="w-28 text-right">借方</th>
-            <th class="w-28 text-right">贷方</th>
+            <th class="px-2 py-2 w-28 text-right">借方</th>
+            <th class="px-2 py-2 w-28 text-right">贷方</th>
+            <th class="px-2 py-2 w-28 text-right">借方</th>
+            <th class="px-2 py-2 w-28 text-right">贷方</th>
+            <th class="px-2 py-2 w-28 text-right">借方</th>
+            <th class="px-2 py-2 w-28 text-right">贷方</th>
           </tr>
         </thead>
         <tbody class="divide-y">
           <tr v-for="a in data.accounts" :key="a.code" :class="{ 'font-semibold bg-canvas': !a.is_leaf }">
-            <td>{{ a.code }}</td>
-            <td :style="{ paddingLeft: (a.level - 1) * 16 + 8 + 'px' }">{{ a.name }}</td>
-            <td class="text-right">{{ fmt(a.opening_debit) }}</td>
-            <td class="text-right">{{ fmt(a.opening_credit) }}</td>
-            <td class="text-right">{{ fmt(a.period_debit) }}</td>
-            <td class="text-right">{{ fmt(a.period_credit) }}</td>
-            <td class="text-right">{{ fmt(a.closing_debit) }}</td>
-            <td class="text-right">{{ fmt(a.closing_credit) }}</td>
+            <td class="px-2 py-2">{{ a.code }}</td>
+            <td class="px-2 py-2" :style="{ paddingLeft: (a.level - 1) * 16 + 8 + 'px' }">{{ a.name }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.opening_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.opening_credit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.period_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.period_credit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.closing_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(a.closing_credit) }}</td>
           </tr>
           <tr v-if="data.accounts.length === 0">
-            <td colspan="8" class="text-center text-muted py-8">暂无数据</td>
+            <td colspan="8" class="px-2 py-2 text-center text-muted py-8">暂无数据</td>
           </tr>
         </tbody>
         <tfoot v-if="data.accounts.length > 0">
           <tr class="font-bold bg-elevated">
-            <td></td>
-            <td>合  计</td>
-            <td class="text-right">{{ fmt(data.totals.opening_debit) }}</td>
-            <td class="text-right">{{ fmt(data.totals.opening_credit) }}</td>
-            <td class="text-right">{{ fmt(data.totals.period_debit) }}</td>
-            <td class="text-right">{{ fmt(data.totals.period_credit) }}</td>
-            <td class="text-right">{{ fmt(data.totals.closing_debit) }}</td>
-            <td class="text-right">{{ fmt(data.totals.closing_credit) }}</td>
+            <td class="px-2 py-2"></td>
+            <td class="px-2 py-2">合  计</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.opening_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.opening_credit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.period_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.period_credit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.closing_debit) }}</td>
+            <td class="px-2 py-2 text-right">{{ fmt(data.totals.closing_credit) }}</td>
           </tr>
         </tfoot>
       </table>

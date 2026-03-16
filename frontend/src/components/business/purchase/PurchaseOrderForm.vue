@@ -21,7 +21,7 @@
               autocomplete="off"
             >
             <div v-if="poSupplierDropdown && filteredPoSuppliers.length" class="absolute z-50 left-0 right-0 bg-surface border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
-              <div v-for="s in filteredPoSuppliers" :key="s.id" @mousedown.prevent="selectPoSupplier(s)" class="px-3 py-2 hover:bg-info-subtle cursor-pointer text-sm">
+              <div v-for="s in filteredPoSuppliers" :key="s.id" @mousedown.prevent="selectPoSupplier(s)" class="px-2 py-2 hover:bg-info-subtle cursor-pointer text-sm">
                 {{ s.name }}
                 <span v-if="s.contact_person" class="text-muted text-xs ml-1">({{ s.contact_person }})</span>
               </div>
@@ -79,7 +79,7 @@
                 autocomplete="off"
               >
               <div v-if="item._dropdownOpen && poFilteredProducts(item._search).length" class="absolute z-50 left-0 right-0 bg-surface border rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
-                <div v-for="p in poFilteredProducts(item._search)" :key="p.id" @mousedown.prevent="poPickProduct(item, p)" class="px-3 py-2 hover:bg-info-subtle cursor-pointer text-sm">
+                <div v-for="p in poFilteredProducts(item._search)" :key="p.id" @mousedown.prevent="poPickProduct(item, p)" class="px-2 py-2 hover:bg-info-subtle cursor-pointer text-sm">
                   <span class="font-mono text-muted">{{ p.sku }}</span> <span>{{ p.name }}</span>
                   <span v-if="p.brand" class="text-muted text-xs ml-1">[{{ p.brand }}]</span>
                 </div>

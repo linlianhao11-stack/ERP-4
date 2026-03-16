@@ -72,25 +72,25 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th v-if="viewMode === 'summary'" class="px-3 py-2 w-6"></th>
-              <th v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('po_no')">采购单号 <span v-if="purchaseSort.key === 'po_no'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('supplier')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('supplier')">供应商 <span v-if="purchaseSort.key === 'supplier'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('date')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('date')">采购日期 <span v-if="purchaseSort.key === 'date'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('total_amount')">总金额 <span v-if="purchaseSort.key === 'total_amount'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">含税金额</th>
-              <th v-if="isColumnVisible('item_count')" class="px-3 py-2 text-center">品项数</th>
-              <th v-if="isColumnVisible('status')" class="px-3 py-2 text-center cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('status')">状态 <span v-if="purchaseSort.key === 'status'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('remark')" class="px-3 py-2 text-left">备注</th>
-              <th v-if="isColumnVisible('creator')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('creator')">创建人 <span v-if="purchaseSort.key === 'creator'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
-              <th v-if="isColumnVisible('account_set')" class="px-3 py-2 text-left">账套</th>
-              <th v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">退货金额</th>
-              <th v-if="isColumnVisible('target_warehouse')" class="px-3 py-2 text-left">目标仓库</th>
-              <th v-if="isColumnVisible('target_location')" class="px-3 py-2 text-left">目标仓位</th>
-              <th v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">返利已用</th>
-              <th v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">在账资金</th>
-              <th v-if="isColumnVisible('reviewer')" class="px-3 py-2 text-left">审核人</th>
-              <th v-if="isColumnVisible('reviewed_at')" class="px-3 py-2 text-left">审核时间</th>
-              <th v-if="isColumnVisible('payment_method')" class="px-3 py-2 text-left">付款方式</th>
+              <th v-if="viewMode === 'summary'" class="px-2 py-2 w-6"></th>
+              <th v-if="isColumnVisible('po_no')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('po_no')">采购单号 <span v-if="purchaseSort.key === 'po_no'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('supplier')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('supplier')">供应商 <span v-if="purchaseSort.key === 'supplier'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('date')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('date')">采购日期 <span v-if="purchaseSort.key === 'date'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('total_amount')" class="px-2 py-2 text-right cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('total_amount')">总金额 <span v-if="purchaseSort.key === 'total_amount'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('tax_amount')" class="px-2 py-2 text-right">含税金额</th>
+              <th v-if="isColumnVisible('item_count')" class="px-2 py-2 text-center">品项数</th>
+              <th v-if="isColumnVisible('status')" class="px-2 py-2 text-center cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('status')">状态 <span v-if="purchaseSort.key === 'status'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('remark')" class="px-2 py-2 text-left">备注</th>
+              <th v-if="isColumnVisible('creator')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="togglePurchaseSort('creator')">创建人 <span v-if="purchaseSort.key === 'creator'" class="text-primary">{{ purchaseSort.order === 'asc' ? '↑' : '↓' }}</span></th>
+              <th v-if="isColumnVisible('account_set')" class="px-2 py-2 text-left">账套</th>
+              <th v-if="isColumnVisible('return_amount')" class="px-2 py-2 text-right">退货金额</th>
+              <th v-if="isColumnVisible('target_warehouse')" class="px-2 py-2 text-left">目标仓库</th>
+              <th v-if="isColumnVisible('target_location')" class="px-2 py-2 text-left">目标仓位</th>
+              <th v-if="isColumnVisible('rebate_used')" class="px-2 py-2 text-right">返利已用</th>
+              <th v-if="isColumnVisible('credit_used')" class="px-2 py-2 text-right">在账资金</th>
+              <th v-if="isColumnVisible('reviewer')" class="px-2 py-2 text-left">审核人</th>
+              <th v-if="isColumnVisible('reviewed_at')" class="px-2 py-2 text-left">审核时间</th>
+              <th v-if="isColumnVisible('payment_method')" class="px-2 py-2 text-left">付款方式</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="po_no"
@@ -104,26 +104,26 @@
                 <td v-if="viewMode === 'summary'" class="px-1 py-2 text-center text-muted" @click="toggleExpand(o.id, $event)">
                   <span class="cursor-pointer">{{ expandedRows[o.id] ? '▼' : '▶' }}</span>
                 </td>
-                <td v-if="isColumnVisible('po_no')" class="px-3 py-2 font-mono text-sm">
+                <td v-if="isColumnVisible('po_no')" class="px-2 py-2 font-mono text-sm">
                   <span v-if="['pending_review','paid','partial'].includes(o.status)" class="todo-dot mr-1.5"></span>{{ o.po_no }}
                 </td>
-                <td v-if="isColumnVisible('supplier')" class="px-3 py-2">{{ o.supplier_name }}</td>
-                <td v-if="isColumnVisible('date')" class="px-3 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
-                <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
-                <td v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">¥{{ fmt(o.tax_amount) }}</td>
-                <td v-if="isColumnVisible('item_count')" class="px-3 py-2 text-center">{{ o.item_count }}</td>
-                <td v-if="isColumnVisible('status')" class="px-3 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
-                <td v-if="isColumnVisible('remark')" class="px-3 py-2 text-muted text-xs max-w-[150px] truncate">{{ o.remark || '-' }}</td>
-                <td v-if="isColumnVisible('creator')" class="px-3 py-2 text-secondary">{{ o.creator_name }}</td>
-                <td v-if="isColumnVisible('account_set')" class="px-3 py-2">{{ o.account_set_name || '-' }}</td>
-                <td v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">{{ o.return_amount ? '¥' + fmt(o.return_amount) : '-' }}</td>
-                <td v-if="isColumnVisible('target_warehouse')" class="px-3 py-2">{{ o.target_warehouse_name || '-' }}</td>
-                <td v-if="isColumnVisible('target_location')" class="px-3 py-2">{{ o.target_location_code || '-' }}</td>
-                <td v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">{{ o.rebate_used ? '¥' + fmt(o.rebate_used) : '-' }}</td>
-                <td v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">{{ o.credit_used ? '¥' + fmt(o.credit_used) : '-' }}</td>
-                <td v-if="isColumnVisible('reviewer')" class="px-3 py-2">{{ o.reviewed_by_name || '-' }}</td>
-                <td v-if="isColumnVisible('reviewed_at')" class="px-3 py-2 text-xs text-muted">{{ o.reviewed_at ? fmtDate(o.reviewed_at) : '-' }}</td>
-                <td v-if="isColumnVisible('payment_method')" class="px-3 py-2">{{ o.payment_method || '-' }}</td>
+                <td v-if="isColumnVisible('supplier')" class="px-2 py-2">{{ o.supplier_name }}</td>
+                <td v-if="isColumnVisible('date')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+                <td v-if="isColumnVisible('total_amount')" class="px-2 py-2 text-right font-semibold">¥{{ fmt(o.total_amount) }}</td>
+                <td v-if="isColumnVisible('tax_amount')" class="px-2 py-2 text-right">¥{{ fmt(o.tax_amount) }}</td>
+                <td v-if="isColumnVisible('item_count')" class="px-2 py-2 text-center">{{ o.item_count }}</td>
+                <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
+                <td v-if="isColumnVisible('remark')" class="px-2 py-2 text-muted text-xs max-w-[150px] truncate">{{ o.remark || '-' }}</td>
+                <td v-if="isColumnVisible('creator')" class="px-2 py-2 text-secondary">{{ o.creator_name }}</td>
+                <td v-if="isColumnVisible('account_set')" class="px-2 py-2">{{ o.account_set_name || '-' }}</td>
+                <td v-if="isColumnVisible('return_amount')" class="px-2 py-2 text-right">{{ o.return_amount ? '¥' + fmt(o.return_amount) : '-' }}</td>
+                <td v-if="isColumnVisible('target_warehouse')" class="px-2 py-2">{{ o.target_warehouse_name || '-' }}</td>
+                <td v-if="isColumnVisible('target_location')" class="px-2 py-2">{{ o.target_location_code || '-' }}</td>
+                <td v-if="isColumnVisible('rebate_used')" class="px-2 py-2 text-right">{{ o.rebate_used ? '¥' + fmt(o.rebate_used) : '-' }}</td>
+                <td v-if="isColumnVisible('credit_used')" class="px-2 py-2 text-right">{{ o.credit_used ? '¥' + fmt(o.credit_used) : '-' }}</td>
+                <td v-if="isColumnVisible('reviewer')" class="px-2 py-2">{{ o.reviewed_by_name || '-' }}</td>
+                <td v-if="isColumnVisible('reviewed_at')" class="px-2 py-2 text-xs text-muted">{{ o.reviewed_at ? fmtDate(o.reviewed_at) : '-' }}</td>
+                <td v-if="isColumnVisible('payment_method')" class="px-2 py-2">{{ o.payment_method || '-' }}</td>
                 <td></td>
               </tr>
               <!-- 展开行：物料明细子表 -->
@@ -165,25 +165,25 @@
           </tbody>
           <tfoot v-if="sortedPurchaseOrders.length > 0" class="bg-elevated font-semibold text-sm">
             <tr>
-              <td v-if="viewMode === 'summary'" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('po_no')" class="px-3 py-2 text-left">本页合计</td>
-              <td v-if="isColumnVisible('supplier')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('date')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('total_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.total_amount) }}</td>
-              <td v-if="isColumnVisible('tax_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.tax_amount) }}</td>
-              <td v-if="isColumnVisible('item_count')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('status')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('remark')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('creator')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('account_set')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('return_amount')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.return_amount) }}</td>
-              <td v-if="isColumnVisible('target_warehouse')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('target_location')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('rebate_used')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.rebate_used) }}</td>
-              <td v-if="isColumnVisible('credit_used')" class="px-3 py-2 text-right">¥{{ fmt(pageSummary.credit_used) }}</td>
-              <td v-if="isColumnVisible('reviewer')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('reviewed_at')" class="px-3 py-2"></td>
-              <td v-if="isColumnVisible('payment_method')" class="px-3 py-2"></td>
+              <td v-if="viewMode === 'summary'" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('po_no')" class="px-2 py-2 text-left">本页合计</td>
+              <td v-if="isColumnVisible('supplier')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('date')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('total_amount')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.total_amount) }}</td>
+              <td v-if="isColumnVisible('tax_amount')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.tax_amount) }}</td>
+              <td v-if="isColumnVisible('item_count')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('status')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('remark')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('creator')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('account_set')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('return_amount')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.return_amount) }}</td>
+              <td v-if="isColumnVisible('target_warehouse')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('target_location')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('rebate_used')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.rebate_used) }}</td>
+              <td v-if="isColumnVisible('credit_used')" class="px-2 py-2 text-right">¥{{ fmt(pageSummary.credit_used) }}</td>
+              <td v-if="isColumnVisible('reviewer')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('reviewed_at')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('payment_method')" class="px-2 py-2"></td>
               <td></td>
             </tr>
             <tr v-if="hasPagination" class="font-normal">

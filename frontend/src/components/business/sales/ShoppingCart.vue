@@ -128,7 +128,7 @@
               v-for="o in filteredReturnOrders"
               :key="o.id"
               @click="$emit('select-return-order', o)"
-              class="px-3 py-2 hover:bg-elevated cursor-pointer border-b"
+              class="px-2 py-2 hover:bg-elevated cursor-pointer border-b"
             >
               <div class="font-medium text-sm">{{ o.order_no }}</div>
               <div class="text-xs text-muted">{{ o.customer_name }} &middot; {{ o.created_at.split('T')[0] }} &middot; &yen;{{ o.total_amount }}</div>

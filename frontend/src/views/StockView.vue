@@ -81,30 +81,30 @@
         <table class="w-full text-sm">
           <thead class="bg-elevated">
             <tr>
-              <th v-if="isColumnVisible('brand')" class="px-3 py-2 text-left w-24 cursor-pointer select-none hover:text-primary" @click="toggleStockSort('brand')">
+              <th v-if="isColumnVisible('brand')" class="px-2 py-2 text-left w-24 cursor-pointer select-none hover:text-primary" @click="toggleStockSort('brand')">
                 品牌 <span v-if="stockSort.key === 'brand'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('name')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('name')">
+              <th v-if="isColumnVisible('name')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('name')">
                 商品名称 <span v-if="stockSort.key === 'name'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('warehouse')" class="px-3 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('warehouse')">
+              <th v-if="isColumnVisible('warehouse')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleStockSort('warehouse')">
                 仓位 <span v-if="stockSort.key === 'warehouse'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('retail_price')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('retail_price')">
+              <th v-if="isColumnVisible('retail_price')" class="px-2 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('retail_price')">
                 零售价 <span v-if="stockSort.key === 'retail_price'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="hasPermission('finance') && isColumnVisible('cost_price')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('cost_price')">
+              <th v-if="hasPermission('finance') && isColumnVisible('cost_price')" class="px-2 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('cost_price')">
                 成本 <span v-if="stockSort.key === 'cost_price'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('quantity')" class="px-3 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('quantity')">
+              <th v-if="isColumnVisible('quantity')" class="px-2 py-2 text-right cursor-pointer select-none hover:text-primary" @click="toggleStockSort('quantity')">
                 库存 <span v-if="stockSort.key === 'quantity'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('reserved_qty')" class="px-3 py-2 text-right">预留</th>
-              <th v-if="isColumnVisible('available_qty')" class="px-3 py-2 text-right">可用</th>
-              <th v-if="isColumnVisible('age_days')" class="px-3 py-2 text-center cursor-pointer select-none hover:text-primary" @click="toggleStockSort('age')">
+              <th v-if="isColumnVisible('reserved_qty')" class="px-2 py-2 text-right">预留</th>
+              <th v-if="isColumnVisible('available_qty')" class="px-2 py-2 text-right">可用</th>
+              <th v-if="isColumnVisible('age_days')" class="px-2 py-2 text-center cursor-pointer select-none hover:text-primary" @click="toggleStockSort('age')">
                 库龄 <span v-if="stockSort.key === 'age'" class="text-primary">{{ stockSort.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
-              <th v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">操作</th>
+              <th v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">操作</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="name"
@@ -119,26 +119,26 @@
               class="hover:bg-elevated"
               :class="{ 'bg-purple-subtle': row.s.is_virtual, 'text-muted': row.s.quantity === 0 }"
             >
-              <td v-if="isColumnVisible('brand')" class="px-3 py-2 text-secondary text-xs">{{ row.p.brand || '-' }}</td>
-              <td v-if="isColumnVisible('name')" class="px-3 py-2">
+              <td v-if="isColumnVisible('brand')" class="px-2 py-2 text-secondary text-xs">{{ row.p.brand || '-' }}</td>
+              <td v-if="isColumnVisible('name')" class="px-2 py-2">
                 <div class="font-medium">
                   <span v-if="!row.s.is_virtual && row.s.quantity < 10" class="todo-dot mr-1.5"></span>{{ row.p.name }}
                 </div>
                 <div class="text-xs text-muted font-mono mt-0.5">{{ row.p.sku }}</div>
               </td>
-              <td v-if="isColumnVisible('warehouse')" class="px-3 py-2">
+              <td v-if="isColumnVisible('warehouse')" class="px-2 py-2">
                 <span :class="row.s.is_virtual ? 'badge badge-purple' : 'badge badge-blue'">{{ row.s.is_virtual ? '寄售' : (row.s.location_code || '-') }}</span>
                 <div class="text-xs text-muted">{{ row.s.warehouse_name }}</div>
               </td>
-              <td v-if="isColumnVisible('retail_price')" class="px-3 py-2 text-right">{{ row.p.retail_price }}</td>
-              <td v-if="hasPermission('finance') && isColumnVisible('cost_price')" class="px-3 py-2 text-right">{{ row.p.cost_price }}</td>
-              <td v-if="isColumnVisible('quantity')" class="px-3 py-2 text-right font-semibold" :class="{ 'text-purple-emphasis': row.s.is_virtual }">{{ row.s.quantity }}</td>
-              <td v-if="isColumnVisible('reserved_qty')" class="px-3 py-2 text-right" :class="(row.s.reserved_qty || 0) > 0 ? 'text-warning font-semibold' : 'text-muted'">{{ row.s.reserved_qty || 0 }}</td>
-              <td v-if="isColumnVisible('available_qty')" class="px-3 py-2 text-right" :class="(row.s.available_qty ?? row.s.quantity) < (row.s.reserved_qty || 0) ? 'text-error font-semibold' : 'text-success font-semibold'">{{ row.s.available_qty ?? row.s.quantity }}</td>
-              <td v-if="isColumnVisible('age_days')" class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('retail_price')" class="px-2 py-2 text-right">{{ row.p.retail_price }}</td>
+              <td v-if="hasPermission('finance') && isColumnVisible('cost_price')" class="px-2 py-2 text-right">{{ row.p.cost_price }}</td>
+              <td v-if="isColumnVisible('quantity')" class="px-2 py-2 text-right font-semibold" :class="{ 'text-purple-emphasis': row.s.is_virtual }">{{ row.s.quantity }}</td>
+              <td v-if="isColumnVisible('reserved_qty')" class="px-2 py-2 text-right" :class="(row.s.reserved_qty || 0) > 0 ? 'text-warning font-semibold' : 'text-muted'">{{ row.s.reserved_qty || 0 }}</td>
+              <td v-if="isColumnVisible('available_qty')" class="px-2 py-2 text-right" :class="(row.s.available_qty ?? row.s.quantity) < (row.s.reserved_qty || 0) ? 'text-error font-semibold' : 'text-success font-semibold'">{{ row.s.available_qty ?? row.s.quantity }}</td>
+              <td v-if="isColumnVisible('age_days')" class="px-2 py-2 text-center">
                 <span :class="getAgeClass(row.p.age_days)">{{ row.p.age_days }}天</span>
               </td>
-              <td v-if="isColumnVisible('actions')" class="px-3 py-2 text-center">
+              <td v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">
                 <template v-if="!row.s.is_virtual">
                   <button v-if="hasPermission('stock_edit')" @click="openTransferModal(row.p, row.s)" class="text-success text-xs">调拨</button>
                 </template>
