@@ -95,10 +95,12 @@
                 <span :class="p.is_active ? 'badge badge-blue' : 'badge badge-muted'">{{ p.is_active ? '启用' : '停用' }}</span>
               </td>
               <td class="px-3 py-2 text-center" @click.stop>
-                <button @click="openEdit(p)" class="text-primary text-xs mr-2">编辑</button>
-                <button v-if="hasPermission('stock_edit')" @click="toggleActive(p)" :class="p.is_active ? 'text-error' : 'text-success'" class="text-xs">
-                  {{ p.is_active ? '停用' : '启用' }}
-                </button>
+                <div class="flex gap-1 justify-center">
+                  <button @click="openEdit(p)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis transition-colors">编辑</button>
+                  <button v-if="hasPermission('stock_edit')" @click="toggleActive(p)" class="px-2 py-0.5 rounded-md text-[12px] font-medium transition-colors" :class="p.is_active ? 'bg-error-subtle text-error-emphasis' : 'bg-success-subtle text-success-emphasis'">
+                    {{ p.is_active ? '停用' : '启用' }}
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>

@@ -63,7 +63,7 @@
           <span class="text-[14px] font-semibold text-foreground">待办事项</span>
           <span v-if="todoItems.length" class="badge badge-gray text-[11px]">{{ todoItems.length }} 项</span>
         </div>
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto max-h-[270px]">
           <router-link
             v-for="item in todoItems"
             :key="item.key"

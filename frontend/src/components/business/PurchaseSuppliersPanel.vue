@@ -13,8 +13,8 @@
         <div class="flex justify-between items-start mb-1">
           <div class="font-medium text-sm">{{ s.name }}</div>
           <div class="flex gap-2 text-xs" @click.stop>
-            <button @click="openSupplierForm(s)" class="text-primary">编辑</button>
-            <button @click="handleDeleteSupplier(s.id)" class="text-error">停用</button>
+            <button @click="openSupplierForm(s)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis transition-colors">编辑</button>
+            <button @click="handleDeleteSupplier(s.id)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis transition-colors">停用</button>
           </div>
         </div>
         <div class="text-xs text-muted">{{ s.contact_person || '-' }} · {{ s.phone || '-' }}</div>
@@ -65,8 +65,10 @@
                 <span v-else class="text-muted">-</span>
               </td>
               <td class="px-3 py-2 text-center" @click.stop>
-                <button @click="openSupplierForm(s)" class="text-primary text-xs mr-2">编辑</button>
-                <button @click="handleDeleteSupplier(s.id)" class="text-error text-xs">停用</button>
+                <div class="flex gap-1 justify-center">
+                  <button @click="openSupplierForm(s)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-info-subtle text-info-emphasis transition-colors">编辑</button>
+                  <button @click="handleDeleteSupplier(s.id)" class="px-2 py-0.5 rounded-md text-[12px] font-medium bg-error-subtle text-error-emphasis transition-colors">停用</button>
+                </div>
               </td>
             </tr>
           </tbody>
