@@ -1,6 +1,7 @@
 """代采代发路由"""
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -12,8 +13,8 @@ from tortoise.queryset import Q
 
 from app.auth.dependencies import require_permission
 from app.logger import get_logger
-from app.models import User, Supplier, Product, Customer, AccountSet
-from app.models.ar_ap import ReceivableBill
+from app.models import User, Supplier, Product, Customer
+from app.models.ar_ap import PayableBill, ReceivableBill
 from app.models.dropship import DropshipOrder
 from app.schemas.dropship import (
     DropshipOrderCreate, DropshipOrderUpdate,
@@ -28,6 +29,27 @@ from app.utils.errors import parse_date
 
 logger = get_logger("dropship")
 
+
+def _parse_tracking_status(last_tracking_info, order_status):
+    """从 last_tracking_info JSON 解析最新物流状态文本"""
+    if not last_tracking_info:
+        if order_status == "shipped":
+            return "待查询"
+        return None
+    try:
+        data = json.loads(last_tracking_info)
+        if isinstance(data, dict):
+            if str(data.get("ischeck")) == "1":
+                return "已签收"
+            state = str(data.get("state", ""))
+            from app.config import KD100_STATE_MAP
+            if state in KD100_STATE_MAP:
+                return KD100_STATE_MAP[state][1]
+        return "运输中"
+    except (json.JSONDecodeError, TypeError, KeyError):
+        return None
+
+
 router = APIRouter(prefix="/api/dropship", tags=["代采代发"])
 
 
@@ -36,7 +58,7 @@ router = APIRouter(prefix="/api/dropship", tags=["代采代发"])
 
 @router.get("/reports/summary")
 async def report_summary(
-    account_set_id: int,
+    account_set_id: Optional[int] = None,
     month: Optional[str] = None,
     user: User = Depends(require_permission("dropship")),
 ):
@@ -59,14 +81,12 @@ async def report_summary(
     else:
         month_end = date(month_start.year, month_start.month + 1, 1)
 
-    # 查询指定月份+账套的所有非取消订单
+    # 查询指定月份的所有非取消订单
+    q = Q(status__not="cancelled", created_at__gte=month_start, created_at__lt=month_end)
+    if account_set_id:
+        q &= Q(account_set_id=account_set_id)
     orders = await (
-        DropshipOrder.filter(
-            account_set_id=account_set_id,
-            status__not="cancelled",
-            created_at__gte=month_start,
-            created_at__lt=month_end,
-        )
+        DropshipOrder.filter(q)
         .select_related("supplier", "customer")
     )
 
@@ -150,20 +170,21 @@ async def report_summary(
 
 @router.get("/reports/profit")
 async def report_profit(
-    account_set_id: int,
+    account_set_id: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     user: User = Depends(require_permission("dropship")),
 ):
     """报表：毛利分析 — 已发货/已完成订单的逐单毛利明细与汇总"""
     query = DropshipOrder.filter(
-        account_set_id=account_set_id,
         status__in=["shipped", "completed"],
     )
+    if account_set_id:
+        query = query.filter(account_set_id=account_set_id)
     if start_date:
         query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
     if end_date:
-        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+        query = query.filter(created_at__lt=parse_date(end_date, "end_date") + timedelta(days=1))
 
     orders = await query.select_related("supplier", "customer").order_by("-created_at")
 
@@ -205,17 +226,16 @@ async def report_profit(
 
 @router.get("/reports/receivable")
 async def report_receivable(
-    account_set_id: int,
+    account_set_id: Optional[int] = None,
     user: User = Depends(require_permission("dropship")),
 ):
     """报表：应收未收 — 已发货但客户未回款的订单"""
     # 查询关联了代采代发订单且未完成的应收单
+    q = Q(dropship_order__isnull=False, status__in=["pending", "partial"])
+    if account_set_id:
+        q &= Q(dropship_order__account_set_id=account_set_id)
     receivables = await (
-        ReceivableBill.filter(
-            dropship_order__isnull=False,
-            dropship_order__account_set_id=account_set_id,
-            status__in=["pending", "partial"],
-        )
+        ReceivableBill.filter(q)
         .select_related("dropship_order", "customer")
     )
 
@@ -228,8 +248,10 @@ async def report_receivable(
         if not order:
             continue
 
-        # 发货天数：从订单更新时间（发货时会更新）到今天
-        if order.updated_at:
+        # 发货天数：优先使用 shipped_at，兼容历史数据回退 updated_at
+        if order.shipped_at:
+            shipped_days = (today - order.shipped_at.date()).days
+        elif order.updated_at:
             shipped_days = (today - order.updated_at.date()).days
         else:
             shipped_days = (today - order.created_at.date()).days
@@ -259,12 +281,12 @@ async def report_receivable(
 
 @router.get("/payment-workbench")
 async def payment_workbench(
-    account_set_id: int,
+    account_set_id: Optional[int] = None,
     user: User = Depends(require_permission("dropship")),
 ):
     """付款工作台：按供应商分组显示待付款订单"""
     orders = await (
-        DropshipOrder.filter(status="pending_payment", account_set_id=account_set_id)
+        DropshipOrder.filter(status="pending_payment", **({'account_set_id': account_set_id} if account_set_id else {}))
         .select_related("supplier", "customer")
         .order_by("-created_at")
     )
@@ -280,6 +302,7 @@ async def payment_workbench(
         group["orders"].append({
             "id": o.id,
             "ds_no": o.ds_no,
+            "account_set_id": o.account_set_id,
             "product_name": f"{o.product_name} \u00d7{o.quantity}",
             "purchase_total": float(o.purchase_total),
             "sale_total": float(o.sale_total),
@@ -336,7 +359,7 @@ async def list_dropship_orders(
     if start_date:
         query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
     if end_date:
-        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+        query = query.filter(created_at__lt=parse_date(end_date, "end_date") + timedelta(days=1))
     if search:
         query = query.filter(
             Q(ds_no__icontains=search)
@@ -357,13 +380,6 @@ async def list_dropship_orders(
         .select_related("supplier", "customer", "creator", "account_set")
     )
 
-    # 批量查询账套名称
-    as_ids = list(set(o.account_set_id for o in orders if o.account_set_id))
-    as_map = {}
-    if as_ids:
-        for a in await AccountSet.filter(id__in=as_ids):
-            as_map[a.id] = a.name
-
     return {
         "items": [
             {
@@ -371,7 +387,7 @@ async def list_dropship_orders(
                 "ds_no": o.ds_no,
                 "status": o.status,
                 "account_set_id": o.account_set_id,
-                "account_set_name": as_map.get(o.account_set_id),
+                "account_set_name": o.account_set.name if o.account_set else None,
                 "supplier_id": o.supplier_id,
                 "supplier_name": o.supplier.name if o.supplier else "",
                 "product_name": o.product_name,
@@ -388,6 +404,8 @@ async def list_dropship_orders(
                 "gross_margin": float(o.gross_margin),
                 "shipping_mode": o.shipping_mode,
                 "tracking_no": o.tracking_no,
+                "carrier_name": o.carrier_name,
+                "tracking_status": _parse_tracking_status(o.last_tracking_info, o.status),
                 "settlement_type": o.settlement_type,
                 "creator_name": o.creator.display_name if o.creator else None,
                 "created_at": o.created_at.isoformat(),
@@ -410,11 +428,16 @@ async def get_dropship_order(
     """代采代发订单详情"""
     order = await DropshipOrder.filter(id=order_id).select_related(
         "supplier", "customer", "creator", "account_set",
-        "product", "payable_bill", "disbursement_bill", "receivable_bill",
-        "payment_employee", "advance_receipt",
+        "product", "payment_employee",
     ).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
+
+    # 单独查询关联的应付单（payable_bill_id 是 IntField 非外键）
+    payable_bill_no = None
+    if order.payable_bill_id:
+        pb = await PayableBill.filter(id=order.payable_bill_id).first()
+        payable_bill_no = pb.bill_no if pb else None
 
     return {
         "id": order.id,
@@ -450,13 +473,15 @@ async def get_dropship_order(
         "carrier_name": order.carrier_name,
         "tracking_no": order.tracking_no,
         "last_tracking_info": order.last_tracking_info,
+        "phone": order.phone,
         # 状态管理
+        "shipped_at": order.shipped_at.isoformat() if order.shipped_at else None,
         "urged_at": order.urged_at.isoformat() if order.urged_at else None,
         "cancel_reason": order.cancel_reason,
         "note": order.note,
         # 财务单据
         "payable_bill_id": order.payable_bill_id,
-        "payable_bill_no": order.payable_bill.bill_no if order.payable_bill else None,
+        "payable_bill_no": payable_bill_no,
         "disbursement_bill_id": order.disbursement_bill_id,
         "receivable_bill_id": order.receivable_bill_id,
         # 付款
@@ -518,17 +543,16 @@ async def update_order(
         if not product:
             raise HTTPException(status_code=400, detail="商品不存在")
 
-    # 应用更新
+    # 应用更新（exclude_unset 已确保只有用户显式传入的字段）
     for field, value in update_data.items():
-        if value is not None:
-            setattr(order, field, value)
+        setattr(order, field, value)
 
     # 重新计算金额和毛利
     price_fields = {"purchase_price", "quantity", "sale_price", "purchase_tax_rate", "sale_tax_rate", "invoice_type"}
     if price_fields & set(update_data.keys()):
         order.purchase_total = order.purchase_price * order.quantity
         order.sale_total = order.sale_price * order.quantity
-        order.gross_profit, order.gross_margin = await calculate_gross_profit(
+        order.gross_profit, order.gross_margin = calculate_gross_profit(
             order.purchase_total, order.sale_total,
             order.purchase_tax_rate, order.sale_tax_rate,
             order.invoice_type,
@@ -598,7 +622,7 @@ async def urge_payment(
 @router.post("/batch-pay")
 async def batch_pay(
     data: DropshipPaymentRequest,
-    user: User = Depends(require_permission("dropship", "dropship_pay")),
+    user: User = Depends(require_permission("dropship_pay")),
 ):
     """批量付款：创建付款单 + 更新应付单 + 生成凭证A"""
     result = await batch_pay_dropship(
@@ -625,6 +649,7 @@ async def ship_order(
         carrier_code=data.carrier_code,
         carrier_name=data.carrier_name,
         tracking_no=data.tracking_no,
+        phone=data.phone,
         user=user,
     )
     return {
@@ -634,6 +659,52 @@ async def ship_order(
         "receivable_bill_id": order.receivable_bill_id,
         "tracking_no": order.tracking_no,
     }
+
+
+# ── 物流刷新 ──
+
+
+@router.post("/{order_id}/refresh-tracking")
+async def refresh_tracking(
+    order_id: int,
+    user: User = Depends(require_permission("dropship")),
+):
+    """刷新代采代发订单的物流信息（查询快递100）"""
+    order = await DropshipOrder.filter(id=order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if not order.tracking_no or not order.carrier_code:
+        raise HTTPException(status_code=400, detail="该订单没有物流信息")
+
+    try:
+        from app.services.logistics_service import query_kd100
+        resp = await query_kd100(order.carrier_code, order.tracking_no, phone=order.phone)
+
+        if resp.get("message") == "ok" and resp.get("data"):
+            order.last_tracking_info = json.dumps(resp, ensure_ascii=False)
+
+            # 检查是否已签收
+            if str(resp.get("ischeck")) == "1":
+                if order.status == "shipped":
+                    order.status = "completed"
+                    logger.info(f"快递已签收，自动完成: {order.ds_no}")
+            await order.save()
+
+            return {
+                "id": order.id,
+                "ds_no": order.ds_no,
+                "status": order.status,
+                "last_tracking_info": order.last_tracking_info,
+                "tracking_status": _parse_tracking_status(order.last_tracking_info, order.status),
+            }
+        else:
+            return {
+                "id": order.id,
+                "message": resp.get("message", "查询无结果"),
+            }
+    except Exception as e:
+        logger.warning(f"物流刷新失败: {order.ds_no}, 错误: {e}")
+        raise HTTPException(status_code=500, detail=f"物流查询失败: {str(e)}")
 
 
 # ── 手动完成 ──

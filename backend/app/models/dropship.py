@@ -29,7 +29,7 @@ class DropshipOrder(models.Model):
     sale_total = fields.DecimalField(max_digits=12, decimal_places=2)
     sale_tax_rate = fields.DecimalField(max_digits=5, decimal_places=2, default=13)
     settlement_type = fields.CharField(max_length=10, default="credit")  # prepaid | credit
-    advance_receipt = fields.ForeignKeyField("models.ReceiptBill", related_name="dropship_orders", null=True, on_delete=fields.SET_NULL)
+    advance_receipt_id = fields.IntField(null=True)  # ReceiptBill.id, IntField 避免循环 FK
 
     # 毛利
     gross_profit = fields.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -42,16 +42,18 @@ class DropshipOrder(models.Model):
     tracking_no = fields.CharField(max_length=100, null=True)
     kd100_subscribed = fields.BooleanField(default=False)
     last_tracking_info = fields.TextField(null=True)
+    phone = fields.CharField(max_length=11, null=True)  # 收/寄件人手机号（顺丰/中通查询需要）
 
     # 状态管理
+    shipped_at = fields.DatetimeField(null=True)
     urged_at = fields.DatetimeField(null=True)
     cancel_reason = fields.CharField(max_length=200, null=True)
     note = fields.TextField(null=True)
 
-    # 关联财务单据
-    payable_bill = fields.ForeignKeyField("models.PayableBill", related_name="dropship_orders", null=True, on_delete=fields.SET_NULL)
-    disbursement_bill = fields.ForeignKeyField("models.DisbursementBill", related_name="dropship_orders", null=True, on_delete=fields.SET_NULL)
-    receivable_bill = fields.ForeignKeyField("models.ReceivableBill", related_name="dropship_orders", null=True, on_delete=fields.SET_NULL)
+    # 关联财务单据（用 IntField 避免与 ReceivableBill.dropship_order 形成循环 FK）
+    payable_bill_id = fields.IntField(null=True)
+    disbursement_bill_id = fields.IntField(null=True)
+    receivable_bill_id = fields.IntField(null=True)
 
     # 付款信息
     payment_method = fields.CharField(max_length=50, null=True)

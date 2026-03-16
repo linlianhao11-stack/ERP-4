@@ -26,7 +26,7 @@ from app.utils.voucher_no import next_voucher_no
 logger = get_logger("dropship_service")
 
 
-async def calculate_gross_profit(
+def calculate_gross_profit(
     purchase_total: Decimal,
     sale_total: Decimal,
     purchase_tax_rate: Decimal,
@@ -60,12 +60,13 @@ async def calculate_gross_profit(
     return gross_profit, gross_margin
 
 
+@transactions.atomic()
 async def create_dropship_order(
     data: DropshipOrderCreate,
     user: User,
     submit: bool = False,
 ) -> DropshipOrder:
-    """创建代采代发订单，可选自动提交"""
+    """创建代采代发订单，可选自动提交（事务保护）"""
 
     # 1. 处理供应商
     if data.supplier_id:
@@ -106,7 +107,7 @@ async def create_dropship_order(
     sale_total = data.sale_price * data.quantity
 
     # 4. 计算毛利
-    gross_profit, gross_margin = await calculate_gross_profit(
+    gross_profit, gross_margin = calculate_gross_profit(
         purchase_total, sale_total,
         data.purchase_tax_rate, data.sale_tax_rate,
         data.invoice_type,
@@ -144,46 +145,51 @@ async def create_dropship_order(
 
     logger.info(f"创建代采代发订单: {ds_no}, 采购={purchase_total}, 销售={sale_total}, 毛利={gross_profit}")
 
-    # 7. 可选自动提交
+    # 7. 可选自动提交（复用内部方法，避免嵌套事务）
     if submit:
-        order = await submit_dropship_order(order.id, user)
+        order = await _do_submit(order, user)
 
     return order
 
 
+async def _do_submit(order: DropshipOrder, user: User) -> DropshipOrder:
+    """提交核心逻辑（调用方需确保已在事务内）：创建应付单，更新状态为 pending_payment"""
+    if order.status != "draft":
+        raise HTTPException(status_code=400, detail=f"只有草稿状态可以提交，当前状态: {order.status}")
+
+    # 创建应付单
+    bill_no = generate_order_no("YFDS")
+    payable = await PayableBill.create(
+        bill_no=bill_no,
+        account_set_id=order.account_set_id,
+        supplier_id=order.supplier_id,
+        bill_date=date.today(),
+        total_amount=order.purchase_total,
+        paid_amount=Decimal("0"),
+        unpaid_amount=order.purchase_total,
+        status="pending",
+        remark=f"代采代发订单 {order.ds_no}",
+        creator=user,
+    )
+    logger.info(f"创建应付单: {bill_no}, 金额: {order.purchase_total}")
+
+    # 更新订单状态
+    order.payable_bill_id = payable.id
+    order.status = "pending_payment"
+    await order.save()
+
+    logger.info(f"代采代发订单提交: {order.ds_no} → pending_payment")
+    return order
+
+
 async def submit_dropship_order(order_id: int, user: User) -> DropshipOrder:
-    """提交代采代发订单：draft → pending_payment，并创建应付单"""
+    """提交代采代发订单：draft → pending_payment，并创建应付单（独立调用入口，自带事务）"""
 
     async with transactions.in_transaction():
         order = await DropshipOrder.filter(id=order_id).select_for_update().first()
         if not order:
             raise HTTPException(status_code=404, detail="订单不存在")
-        if order.status != "draft":
-            raise HTTPException(status_code=400, detail=f"只有草稿状态可以提交，当前状态: {order.status}")
-
-        # 创建应付单
-        bill_no = generate_order_no("YF-DS")
-        payable = await PayableBill.create(
-            bill_no=bill_no,
-            account_set_id=order.account_set_id,
-            supplier_id=order.supplier_id,
-            bill_date=date.today(),
-            total_amount=order.purchase_total,
-            paid_amount=Decimal("0"),
-            unpaid_amount=order.purchase_total,
-            status="pending",
-            remark=f"代采代发订单 {order.ds_no}",
-            creator=user,
-        )
-        logger.info(f"创建应付单: {bill_no}, 金额: {order.purchase_total}")
-
-        # 更新订单状态
-        order.payable_bill_id = payable.id
-        order.status = "pending_payment"
-        await order.save()
-
-    logger.info(f"代采代发订单提交: {order.ds_no} → pending_payment")
-    return order
+        return await _do_submit(order, user)
 
 
 async def batch_pay_dropship(
@@ -220,13 +226,18 @@ async def batch_pay_dropship(
                     detail=f"订单 {order.ds_no} 不是待付款状态，当前状态: {order.status}",
                 )
 
+        # 校验所有订单属于同一账套
+        account_set_ids = {o.account_set_id for o in orders}
+        if len(account_set_ids) > 1:
+            raise HTTPException(status_code=400, detail="批量付款的订单必须属于同一账套")
+
         # 2. 按供应商分组（用于后续合并凭证）
         supplier_groups: dict[int, list] = defaultdict(list)
         disbursement_bills = []
 
         for order in orders:
             # 2a. 创建付款单
-            bill_no = generate_order_no("FK-DS")
+            bill_no = generate_order_no("FKDS")
             disb = await DisbursementBill.create(
                 bill_no=bill_no,
                 account_set_id=order.account_set_id,
@@ -264,41 +275,38 @@ async def batch_pay_dropship(
 
         logger.info(f"批量付款: {len(orders)} 笔订单, 方式={payment_method}")
 
-        # 3. 按供应商合并生成凭证A
+        # 3. 预查询供应商和科目（避免 N+1）
+        supplier_ids = list(supplier_groups.keys())
+        supplier_map = {s.id: s.name for s in await Supplier.filter(id__in=supplier_ids)}
+
+        account_set_id = orders[0].account_set_id
+        account_codes = ["1123", "1002", "1221"]
+        accounts = await ChartOfAccount.filter(
+            account_set_id=account_set_id, code__in=account_codes, is_active=True
+        )
+        account_map = {a.code: a for a in accounts}
+        prepaid_account = account_map.get("1123")
+        bank_account = account_map.get("1002")
+        other_receivable_account = account_map.get("1221")
+
+        if not prepaid_account:
+            raise HTTPException(status_code=400, detail="缺少必要科目：预付账款(1123)")
+        if payment_method == "employee_advance" and not other_receivable_account:
+            raise HTTPException(status_code=400, detail="缺少必要科目：其他应收款(1221)")
+        if payment_method != "employee_advance" and not bank_account:
+            raise HTTPException(status_code=400, detail="缺少必要科目：银行存款(1002)")
+
+        # 按供应商合并生成凭证A
         vouchers_created = []
 
         for supplier_id, group in supplier_groups.items():
             group_orders = [item[0] for item in group]
             group_disbs = [item[1] for item in group]
-
-            # 获取供应商名称
-            supplier = await Supplier.filter(id=supplier_id).first()
-            supplier_name = supplier.name if supplier else f"供应商{supplier_id}"
+            supplier_name = supplier_map.get(supplier_id, f"供应商{supplier_id}")
 
             # 计算合计金额
             total_amount = sum(o.purchase_total for o in group_orders)
             ds_nos = "/".join(o.ds_no for o in group_orders)
-            account_set_id = group_orders[0].account_set_id
-
-            # 查找科目
-            prepaid_account = await ChartOfAccount.filter(
-                account_set_id=account_set_id, code="1123", is_active=True
-            ).first()
-            bank_account = await ChartOfAccount.filter(
-                account_set_id=account_set_id, code="1002", is_active=True
-            ).first()
-            other_receivable_account = await ChartOfAccount.filter(
-                account_set_id=account_set_id, code="1221", is_active=True
-            ).first()
-
-            if not prepaid_account:
-                raise HTTPException(status_code=400, detail="缺少必要科目：预付账款(1123)")
-
-            if payment_method == "employee_advance" and not other_receivable_account:
-                raise HTTPException(status_code=400, detail="缺少必要科目：其他应收款(1221)")
-
-            if payment_method != "employee_advance" and not bank_account:
-                raise HTTPException(status_code=400, detail="缺少必要科目：银行存款(1002)")
 
             # 生成凭证
             today = date.today()
@@ -382,6 +390,7 @@ async def ship_dropship_order(
     carrier_name: str,
     tracking_no: str,
     user: User,
+    phone: str = None,
 ) -> DropshipOrder:
     """
     确认发货：更新物流信息、创建应收单、处理过手转发出入库、订阅快递100。
@@ -410,9 +419,10 @@ async def ship_dropship_order(
         order.carrier_code = carrier_code
         order.carrier_name = carrier_name
         order.tracking_no = tracking_no
+        order.phone = phone
 
         # 3. 创建应收单
-        bill_no = generate_order_no("YS-DS")
+        bill_no = generate_order_no("YSDS")
         receivable = await ReceivableBill.create(
             bill_no=bill_no,
             account_set_id=order.account_set_id,
@@ -431,6 +441,8 @@ async def ship_dropship_order(
 
         # 4. 过手转发：通过虚拟中转仓记录出入库
         if order.shipping_mode == "transit":
+            if not order.product_id:
+                raise HTTPException(status_code=400, detail="过手转发模式需要关联商品")
             # 查找或创建虚拟中转仓
             transit_wh, _ = await Warehouse.get_or_create(
                 name="代采代发中转仓",
@@ -480,13 +492,14 @@ async def ship_dropship_order(
 
         # 5. 关联应收单并更新状态
         order.receivable_bill_id = receivable.id
+        order.shipped_at = now()
         order.status = "shipped"
         await order.save()
 
     # 6. 订阅快递100（事务外，失败不阻断）
     try:
         from app.services.logistics_service import subscribe_kd100
-        await subscribe_kd100(carrier_code, tracking_no, order.id)
+        await subscribe_kd100(carrier_code, tracking_no, order.id, phone=phone)
         order.kd100_subscribed = True
         await order.save()
         logger.info(f"快递100订阅成功: {order.ds_no}, 快递={carrier_code}, 单号={tracking_no}")
@@ -590,10 +603,12 @@ async def cancel_dropship_order(order_id: int, reason: str, user: User) -> Drops
 
         # 3. 已付待发 → 冲销应付单 + 付款单 + 红冲凭证
         if order.status == "paid_pending_ship":
-            # 冲销应付单
+            # 冲销应付单并回滚金额
             if order.payable_bill_id:
                 pb = await PayableBill.filter(id=order.payable_bill_id).select_for_update().first()
                 if pb:
+                    pb.paid_amount = Decimal("0")
+                    pb.unpaid_amount = pb.total_amount
                     pb.status = "cancelled"
                     await pb.save()
                     logger.info(f"冲销应付单: {pb.bill_no}")

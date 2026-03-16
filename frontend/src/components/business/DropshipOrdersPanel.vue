@@ -21,11 +21,11 @@
       <!-- 移动端卡片 -->
       <div v-for="o in sortedItems" :key="o.id" class="card p-3">
         <div class="flex justify-between items-start mb-1">
-          <div class="font-medium text-sm font-mono">
+          <button type="button" class="font-medium text-sm font-mono text-primary hover:underline" @click="openDetail(o)">
             <span v-if="['pending_payment','paid_pending_ship'].includes(o.status)" class="todo-dot mr-1"></span>
             {{ o.ds_no }}
             <span v-if="o.urged_at" class="badge badge-orange text-[10px] ml-1">催</span>
-          </div>
+          </button>
           <div class="text-lg font-bold text-primary">¥{{ fmt(o.sale_total) }}</div>
         </div>
         <div class="text-xs text-muted mb-1">
@@ -78,7 +78,7 @@
           <button v-if="hasPermission('dropship')" @click="showImportModal = true" class="btn btn-secondary btn-sm">
             <Upload :size="14" /> 导入供应商
           </button>
-          <button v-if="hasPermission('dropship')" @click="showCreateModal = true" class="btn btn-primary btn-sm">
+          <button v-if="hasPermission('dropship')" @click="editingOrder = null; showCreateModal = true" class="btn btn-primary btn-sm">
             <Plus :size="14" /> 新建
           </button>
         </template>
@@ -115,6 +115,7 @@
               <th v-if="isColumnVisible('gross_margin')" class="px-2 py-2 text-right">毛利率</th>
               <th v-if="isColumnVisible('platform_order_no')" class="px-2 py-2 text-left">平台单号</th>
               <th v-if="isColumnVisible('tracking_no')" class="px-2 py-2 text-left">快递单号</th>
+              <th v-if="isColumnVisible('tracking_status')" class="px-2 py-2 text-center">物流状态</th>
               <th v-if="isColumnVisible('settlement_type')" class="px-2 py-2 text-left">结算方式</th>
               <th v-if="isColumnVisible('creator_name')" class="px-2 py-2 text-left">创建人</th>
               <th v-if="isColumnVisible('created_at')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('created_at')">
@@ -132,7 +133,9 @@
             <tr v-for="o in sortedItems" :key="o.id" class="hover:bg-elevated">
               <td v-if="isColumnVisible('ds_no')" class="px-2 py-2 font-mono text-sm">
                 <span v-if="['pending_payment','paid_pending_ship'].includes(o.status)" class="todo-dot mr-1.5"></span>
-                {{ o.ds_no }}
+                <button type="button" class="text-primary hover:underline cursor-pointer" @click="openDetail(o)">
+                  {{ o.ds_no }}
+                </button>
                 <span v-if="o.urged_at" class="badge badge-orange text-[10px] ml-1">催</span>
               </td>
               <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center">
@@ -154,7 +157,19 @@
               </td>
               <td v-if="isColumnVisible('platform_order_no')" class="px-2 py-2 font-mono text-xs text-muted">{{ o.platform_order_no || '-' }}</td>
               <td v-if="isColumnVisible('tracking_no')" class="px-2 py-2 font-mono text-xs text-muted">{{ o.tracking_no || '-' }}</td>
-              <td v-if="isColumnVisible('settlement_type')" class="px-2 py-2">{{ o.settlement_type === 'prepay' ? '先款后货' : o.settlement_type === 'credit' ? '赊销' : o.settlement_type || '-' }}</td>
+              <td v-if="isColumnVisible('tracking_status')" class="px-2 py-2 text-center">
+                <span v-if="o.tracking_status" class="text-xs px-1.5 py-0.5 rounded-md"
+                  :class="{
+                    'bg-success/10 text-success': o.tracking_status === '已签收',
+                    'bg-primary/10 text-primary': o.tracking_status === '运输中' || o.tracking_status === '待查询',
+                    'bg-warning/10 text-warning': o.tracking_status === '待揽收',
+                    'bg-elevated text-secondary': !['已签收','运输中','待查询','待揽收'].includes(o.tracking_status),
+                  }">
+                  {{ o.tracking_status }}
+                </span>
+                <span v-else class="text-muted">-</span>
+              </td>
+              <td v-if="isColumnVisible('settlement_type')" class="px-2 py-2">{{ o.settlement_type === 'prepaid' ? '先款后货' : o.settlement_type === 'credit' ? '赊销' : o.settlement_type || '-' }}</td>
               <td v-if="isColumnVisible('creator_name')" class="px-2 py-2 text-secondary">{{ o.creator_name || '-' }}</td>
               <td v-if="isColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
               <!-- 操作列 -->
@@ -186,6 +201,7 @@
               <td v-if="isColumnVisible('gross_margin')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('platform_order_no')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('tracking_no')" class="px-2 py-2"></td>
+              <td v-if="isColumnVisible('tracking_status')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('settlement_type')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('creator_name')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('created_at')" class="px-2 py-2"></td>
@@ -218,88 +234,34 @@
     <DropshipOrderForm
       ref="formRef"
       :visible="showCreateModal"
-      @update:visible="showCreateModal = $event"
+      :editData="editingOrder"
+      @update:visible="val => { showCreateModal = val; if (!val) editingOrder = null }"
       @saved="onFormSaved"
     />
 
+    <!-- 订单详情弹窗 -->
+    <DropshipOrderDetail
+      :visible="showDetailModal"
+      :orderId="detailOrderId"
+      @update:visible="showDetailModal = $event"
+      @status-changed="loadData"
+    />
+
     <!-- 发货弹窗 -->
-    <div v-if="showShipModal" class="modal-overlay" @click.self="showShipModal = false">
-      <div class="modal-content" style="max-width:520px">
-        <div class="modal-header">
-          <h3 class="modal-title">确认发货</h3>
-          <button @click="showShipModal = false" class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="space-y-4">
-            <!-- 订单摘要 -->
-            <div class="bg-elevated rounded-lg p-3 text-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-mono font-semibold">{{ shipOrder?.ds_no }}</span>
-              </div>
-              <div class="text-muted">{{ shipOrder?.product_name }}</div>
-              <div class="text-muted text-xs mt-1">
-                {{ shipOrder?.supplier_name }} → {{ shipOrder?.customer_name }}
-              </div>
-            </div>
-            <!-- 快递公司 -->
-            <div>
-              <label class="label" for="ship-carrier">快递公司 *</label>
-              <select id="ship-carrier" v-model="shipForm.carrier" class="input">
-                <option value="" disabled>请选择快递公司</option>
-                <option v-for="c in carriers" :key="c.code" :value="c.code">{{ c.name }}</option>
-              </select>
-            </div>
-            <!-- 快递单号 -->
-            <div>
-              <label class="label" for="ship-tracking">快递单号 *</label>
-              <input id="ship-tracking" v-model="shipForm.tracking_no" class="input" placeholder="输入快递单号">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" @click="showShipModal = false" class="btn btn-sm btn-secondary">取消</button>
-          <button type="button" @click="handleShip" class="btn btn-sm btn-primary" :disabled="appStore.submitting || !shipForm.carrier || !shipForm.tracking_no.trim()">
-            {{ appStore.submitting ? '发货中...' : '确认发货' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <DropshipShipModal
+      :visible="showShipModal"
+      :order="shipOrder"
+      @update:visible="showShipModal = $event"
+      @shipped="loadData"
+    />
 
     <!-- 取消弹窗 -->
-    <div v-if="showCancelModal" class="modal-overlay" @click.self="showCancelModal = false">
-      <div class="modal-content" style="max-width:480px">
-        <div class="modal-header">
-          <h3 class="modal-title">取消订单</h3>
-          <button @click="showCancelModal = false" class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="space-y-4">
-            <!-- 订单摘要 -->
-            <div class="bg-elevated rounded-lg p-3 text-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-mono font-semibold">{{ cancelOrder?.ds_no }}</span>
-                <StatusBadge type="dropshipStatus" :status="cancelOrder?.status" />
-              </div>
-              <div class="text-muted">{{ cancelOrder?.product_name }}</div>
-              <div class="text-muted text-xs mt-1">
-                {{ cancelOrder?.supplier_name }} → {{ cancelOrder?.customer_name }}
-              </div>
-            </div>
-            <!-- 取消原因 -->
-            <div>
-              <label class="label" for="cancel-reason">取消原因（可选）</label>
-              <textarea id="cancel-reason" v-model="cancelReason" class="input" rows="3" placeholder="请输入取消原因..."></textarea>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" @click="showCancelModal = false" class="btn btn-sm btn-secondary">返回</button>
-          <button type="button" @click="handleCancel" class="btn btn-sm btn-danger" :disabled="appStore.submitting">
-            {{ appStore.submitting ? '取消中...' : '确认取消' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <DropshipCancelModal
+      :visible="showCancelModal"
+      :order="cancelOrder"
+      @update:visible="showCancelModal = $event"
+      @cancelled="loadData"
+    />
 
     <!-- 供应商导入弹窗 -->
     <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
@@ -361,20 +323,22 @@
  * 负责筛选栏、列表展示、操作按钮（发货/取消/催付款/提交/编辑/完成）
  * 包含发货弹窗、取消弹窗、供应商导入弹窗
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Search, Plus, Upload, Download } from 'lucide-vue-next'
 import ColumnMenu from '../common/ColumnMenu.vue'
 import StatusBadge from '../common/StatusBadge.vue'
 import PageToolbar from '../common/PageToolbar.vue'
 import DateRangePicker from '../common/DateRangePicker.vue'
 import DropshipOrderForm from './dropship/DropshipOrderForm.vue'
+import DropshipOrderDetail from './dropship/DropshipOrderDetail.vue'
+import DropshipShipModal from './dropship/DropshipShipModal.vue'
+import DropshipCancelModal from './dropship/DropshipCancelModal.vue'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
 import { useDropshipOrder } from '../../composables/useDropshipOrder'
 import { useAppStore } from '../../stores/app'
 import {
-  submitDropshipOrder, urgeDropshipOrder,
-  shipDropshipOrder, completeDropshipOrder, cancelDropshipOrder,
+  submitDropshipOrder, urgeDropshipOrder, completeDropshipOrder,
   importSuppliers, downloadSupplierTemplate
 } from '../../api/dropship'
 
@@ -408,26 +372,15 @@ const pageSummary = computed(() => {
   return sum
 })
 
-// 新建弹窗可见性
+// 新建/编辑弹窗
 const showCreateModal = ref(false)
+const editingOrder = ref(null)
 const formRef = ref(null)
 
 /** 表单保存后刷新列表 */
 const onFormSaved = () => {
   loadData()
 }
-
-// ---- 快递公司列表 ----
-const carriers = [
-  { code: 'shunfeng', name: '顺丰速运' },
-  { code: 'zhongtong', name: '中通快递' },
-  { code: 'yuantong', name: '圆通速递' },
-  { code: 'shentong', name: '申通快递' },
-  { code: 'yunda', name: '韵达快递' },
-  { code: 'jd', name: '京东物流' },
-  { code: 'debangkuaidi', name: '德邦快递' },
-  { code: 'ems', name: 'EMS' },
-]
 
 // ---- 操作按钮逻辑 ----
 
@@ -459,9 +412,8 @@ const getActions = (order) => {
 const handleAction = (key, order) => {
   switch (key) {
     case 'edit':
-      // 打开编辑弹窗（传入订单数据）
+      editingOrder.value = order
       showCreateModal.value = true
-      // 通过 nextTick 或 watch 让 form 识别
       break
     case 'submit':
       handleSubmit(order)
@@ -521,60 +473,25 @@ const handleComplete = async (order) => {
 // ---- 发货弹窗 ----
 const showShipModal = ref(false)
 const shipOrder = ref(null)
-const shipForm = reactive({ carrier: '', tracking_no: '' })
-
 const openShipModal = (order) => {
   shipOrder.value = order
-  shipForm.carrier = ''
-  shipForm.tracking_no = ''
   showShipModal.value = true
-}
-
-const handleShip = async () => {
-  if (!shipForm.carrier || !shipForm.tracking_no.trim()) return
-  if (appStore.submitting) return
-  appStore.submitting = true
-  try {
-    await shipDropshipOrder(shipOrder.value.id, {
-      carrier: shipForm.carrier,
-      tracking_no: shipForm.tracking_no.trim(),
-    })
-    appStore.showToast('发货成功')
-    showShipModal.value = false
-    loadData()
-  } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '发货失败', 'error')
-  } finally {
-    appStore.submitting = false
-  }
 }
 
 // ---- 取消弹窗 ----
 const showCancelModal = ref(false)
 const cancelOrder = ref(null)
-const cancelReason = ref('')
-
 const openCancelModal = (order) => {
   cancelOrder.value = order
-  cancelReason.value = ''
   showCancelModal.value = true
 }
 
-const handleCancel = async () => {
-  if (appStore.submitting) return
-  appStore.submitting = true
-  try {
-    await cancelDropshipOrder(cancelOrder.value.id, {
-      reason: cancelReason.value.trim() || null,
-    })
-    appStore.showToast('订单已取消')
-    showCancelModal.value = false
-    loadData()
-  } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '取消失败', 'error')
-  } finally {
-    appStore.submitting = false
-  }
+// ---- 详情弹窗 ----
+const showDetailModal = ref(false)
+const detailOrderId = ref(null)
+const openDetail = (order) => {
+  detailOrderId.value = order.id
+  showDetailModal.value = true
 }
 
 // ---- 供应商导入弹窗 ----

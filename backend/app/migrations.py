@@ -110,6 +110,7 @@ async def _run_migrations_inner():
 
     # 代采代发模块
     await migrate_dropship_module()
+    await migrate_dropship_phone()
 
     logger.info("数据库初始化完成")
 
@@ -1028,7 +1029,15 @@ async def migrate_dropship_module():
         END $$
     """)
 
-    # 4. 插入 "冲减借支" 付款方式（code='employee_advance'）
+    # 4. dropship_orders 表添加 shipped_at 列
+    await conn.execute_query("""
+        DO $$ BEGIN
+            ALTER TABLE dropship_orders ADD COLUMN shipped_at TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$
+    """)
+
+    # 5. 插入 "冲减借支" 付款方式（code='employee_advance'）
     await conn.execute_query("""
         INSERT INTO disbursement_methods (code, name, sort_order, is_active)
         SELECT 'employee_advance', '冲减借支', 10, TRUE
@@ -1038,3 +1047,15 @@ async def migrate_dropship_module():
     """)
 
     logger.info("代采代发模块迁移完成")
+
+
+async def migrate_dropship_phone():
+    """代采代发订单新增 phone 字段（收/寄件人手机号，顺丰/中通查询需要）"""
+    conn = connections.get("default")
+    await conn.execute_query("""
+        DO $$ BEGIN
+            ALTER TABLE dropship_orders ADD COLUMN phone VARCHAR(11);
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$
+    """)
+    logger.info("代采代发: phone 字段已添加")

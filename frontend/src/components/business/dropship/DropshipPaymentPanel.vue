@@ -72,7 +72,7 @@
                 </td>
                 <td class="px-2 py-2">{{ o.customer_name }}</td>
                 <td class="px-2 py-2 text-center">
-                  <span v-if="o.settlement_type === 'prepay'" class="badge badge-blue text-[10px]">先款</span>
+                  <span v-if="o.settlement_type === 'prepaid'" class="badge badge-blue text-[10px]">先款</span>
                   <span v-else-if="o.settlement_type === 'credit'" class="badge badge-yellow text-[10px]">赊销</span>
                   <span v-else class="text-muted">-</span>
                 </td>
@@ -95,17 +95,17 @@
         <div class="flex items-center gap-3">
           <select v-model="payMethod" class="toolbar-select">
             <option value="bank_transfer">银行转账</option>
-            <option value="offset_advance">冲减借支</option>
+            <option value="employee_advance">冲减借支</option>
           </select>
           <!-- 冲减借支时选择员工 -->
-          <select v-if="payMethod === 'offset_advance'" v-model="selectedEmployee" class="toolbar-select">
+          <select v-if="payMethod === 'employee_advance'" v-model="selectedEmployee" class="toolbar-select">
             <option :value="null" disabled>选择员工</option>
             <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
           </select>
           <button
             type="button"
             class="btn btn-primary btn-sm"
-            :disabled="!selectedIds.size || appStore.submitting || (payMethod === 'offset_advance' && !selectedEmployee)"
+            :disabled="!selectedIds.size || appStore.submitting || (payMethod === 'employee_advance' && !selectedEmployee)"
             @click="handleBatchPay"
           >
             {{ appStore.submitting ? '付款中...' : '确认付款' }}
@@ -126,11 +126,13 @@ import { ChevronRight } from 'lucide-vue-next'
 import { useFormat } from '../../../composables/useFormat'
 import { useAppStore } from '../../../stores/app'
 import { useSettingsStore } from '../../../stores/settings'
+import { useAccountingStore } from '../../../stores/accounting'
 import { getPaymentWorkbench, batchPayDropship } from '../../../api/dropship'
 
 const { fmtMoney } = useFormat()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
+const accountingStore = useAccountingStore()
 
 // 工作台数据
 const loading = ref(false)
@@ -164,7 +166,9 @@ const selectedTotal = computed(() => {
 const loadData = async () => {
   loading.value = true
   try {
-    const { data } = await getPaymentWorkbench()
+    const params = {}
+    if (accountingStore.currentAccountSetId) params.account_set_id = accountingStore.currentAccountSetId
+    const { data } = await getPaymentWorkbench(params)
     groups.value = data.groups || []
     workbench.total_count = data.total_count ?? 0
     workbench.total_amount = data.total_amount ?? 0
@@ -237,13 +241,23 @@ const handleBatchPay = async () => {
   )
   if (!ok) return
 
+  // 校验所选订单属于同一账套
+  const accountSetIds = new Set()
+  for (const o of selectedOrderMap.value.values()) {
+    if (o.account_set_id) accountSetIds.add(o.account_set_id)
+  }
+  if (accountSetIds.size > 1) {
+    appStore.showToast('所选订单属于不同账套，请只选择同一账套的订单', 'error')
+    return
+  }
+
   appStore.submitting = true
   try {
     const payload = {
       order_ids: [...selectedIds.value],
-      pay_method: payMethod.value,
+      payment_method: payMethod.value,
     }
-    if (payMethod.value === 'offset_advance' && selectedEmployee.value) {
+    if (payMethod.value === 'employee_advance' && selectedEmployee.value) {
       payload.employee_id = selectedEmployee.value
     }
     await batchPayDropship(payload)

@@ -28,7 +28,7 @@
                 v-model="supplierSearch"
                 @input="supplierDropdown = true"
                 @focus="supplierDropdown = true"
-                @blur="setTimeout(() => supplierDropdown = false, 200)"
+                @blur="hideSupplierDropdown"
                 class="input"
                 placeholder="输入供应商名称搜索..."
                 autocomplete="off"
@@ -54,7 +54,7 @@
                   <input type="radio" v-model="form.invoice_type" value="special" class="w-4 h-4"> 专票
                 </label>
                 <label class="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <input type="radio" v-model="form.invoice_type" value="ordinary" class="w-4 h-4"> 普票
+                  <input type="radio" v-model="form.invoice_type" value="normal" class="w-4 h-4"> 普票
                 </label>
               </div>
             </div>
@@ -100,7 +100,7 @@
                 v-model="customerSearch"
                 @input="customerDropdown = true"
                 @focus="customerDropdown = true"
-                @blur="setTimeout(() => customerDropdown = false, 200)"
+                @blur="hideCustomerDropdown"
                 class="input"
                 placeholder="输入客户名称搜索..."
                 autocomplete="off"
@@ -169,7 +169,7 @@
               <label class="label">结算方式</label>
               <div class="flex items-center gap-4 mt-1.5">
                 <label class="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <input type="radio" v-model="form.settlement_type" value="prepay" class="w-4 h-4"> 先款后货
+                  <input type="radio" v-model="form.settlement_type" value="prepaid" class="w-4 h-4"> 先款后货
                 </label>
                 <label class="flex items-center gap-1.5 cursor-pointer text-sm">
                   <input type="radio" v-model="form.settlement_type" value="credit" class="w-4 h-4"> 赊销
@@ -180,11 +180,11 @@
             <div>
               <label class="label">发货方式</label>
               <div class="flex items-center gap-4 mt-1.5">
-                <label class="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <input type="radio" v-model="form.shipping_method" value="direct" class="w-4 h-4"> 供应商直发
+                <label class="flex items-center gap-1.5 cursor-pointer text-sm" title="供应商直接发货给客户，货物不经过我方仓库">
+                  <input type="radio" v-model="form.shipping_mode" value="direct" class="w-4 h-4"> 供应商直发
                 </label>
-                <label class="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <input type="radio" v-model="form.shipping_method" value="transit" class="w-4 h-4"> 过手转发
+                <label class="flex items-center gap-1.5 cursor-pointer text-sm" title="货物先到我方仓库，再由我方转发给客户，会产生虚拟入库和出库记录">
+                  <input type="radio" v-model="form.shipping_mode" value="transit" class="w-4 h-4"> 过手转发
                 </label>
               </div>
             </div>
@@ -194,7 +194,7 @@
         <!-- 备注 -->
         <div>
           <label class="label">备注</label>
-          <textarea v-model="form.remark" class="input" rows="2" placeholder="可选"></textarea>
+          <textarea v-model="form.note" class="input" rows="2" placeholder="可选"></textarea>
         </div>
 
       </div></div>
@@ -218,7 +218,7 @@
  * 代采代发订单新建/编辑表单弹窗
  * 包含供应商/客户搜索、采购销售信息录入、毛利实时计算
  */
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { useFormat } from '../../../composables/useFormat'
 import { createDropshipOrder, updateDropshipOrder } from '../../../api/dropship'
@@ -254,6 +254,18 @@ const customers = ref([])
 const customerSearch = ref('')
 const customerDropdown = ref(false)
 
+// 下拉菜单延时隐藏（每个下拉单独封装，避免模板 ref 自动展开问题）
+let _blurTimer = null
+const hideSupplierDropdown = () => {
+  clearTimeout(_blurTimer)
+  _blurTimer = setTimeout(() => { supplierDropdown.value = false }, 200)
+}
+const hideCustomerDropdown = () => {
+  clearTimeout(_blurTimer)
+  _blurTimer = setTimeout(() => { customerDropdown.value = false }, 200)
+}
+onUnmounted(() => clearTimeout(_blurTimer))
+
 // 表单数据
 const form = reactive({
   account_set_id: null,
@@ -267,9 +279,9 @@ const form = reactive({
   platform_order_no: '',
   sale_price: null,
   sale_tax_rate: 13,
-  settlement_type: 'prepay',
-  shipping_method: 'direct',
-  remark: '',
+  settlement_type: 'prepaid',
+  shipping_mode: 'direct',
+  note: '',
 })
 
 /** 关闭弹窗 */
@@ -293,38 +305,26 @@ const saleTotal = computed(() => {
   return Math.round(price * qty * 100) / 100
 })
 
-/** 毛利计算（不含税比较） */
-const grossProfit = computed(() => {
-  const pt = purchaseTotal.value
-  const st = saleTotal.value
+/** 不含税金额（提取公共计算逻辑） */
+const exclTaxAmounts = computed(() => {
   const saleTaxRate = Number(form.sale_tax_rate) || 0
   const purchaseTaxRate = Number(form.purchase_tax_rate) || 0
+  const saleExclTax = saleTotal.value / (1 + saleTaxRate / 100)
+  const costExclTax = form.invoice_type === 'special'
+    ? purchaseTotal.value / (1 + purchaseTaxRate / 100)
+    : purchaseTotal.value // 普票不可抵扣，含税价即成本
+  return { saleExclTax, costExclTax }
+})
 
-  const saleExclTax = st / (1 + saleTaxRate / 100)
-  let costExclTax
-  if (form.invoice_type === 'special') {
-    costExclTax = pt / (1 + purchaseTaxRate / 100)
-  } else {
-    // 普票不可抵扣，含税价即成本
-    costExclTax = pt
-  }
+/** 毛利计算（不含税比较） */
+const grossProfit = computed(() => {
+  const { saleExclTax, costExclTax } = exclTaxAmounts.value
   return (saleExclTax - costExclTax).toFixed(2)
 })
 
 /** 毛利率 */
 const grossMargin = computed(() => {
-  const pt = purchaseTotal.value
-  const st = saleTotal.value
-  const saleTaxRate = Number(form.sale_tax_rate) || 0
-  const purchaseTaxRate = Number(form.purchase_tax_rate) || 0
-
-  const saleExclTax = st / (1 + saleTaxRate / 100)
-  let costExclTax
-  if (form.invoice_type === 'special') {
-    costExclTax = pt / (1 + purchaseTaxRate / 100)
-  } else {
-    costExclTax = pt
-  }
+  const { saleExclTax, costExclTax } = exclTaxAmounts.value
   if (saleExclTax <= 0) return '0.00'
   return ((saleExclTax - costExclTax) / saleExclTax * 100).toFixed(2)
 })
@@ -391,7 +391,7 @@ const loadSuppliers = async () => {
 const loadCustomers = async () => {
   try {
     const { data } = await getCustomers()
-    customers.value = data
+    customers.value = Array.isArray(data) ? data : (data.items || [])
   } catch (e) {
     console.error('加载客户失败:', e)
   }
@@ -423,9 +423,9 @@ const resetForm = () => {
     platform_order_no: '',
     sale_price: null,
     sale_tax_rate: 13,
-    settlement_type: 'prepay',
-    shipping_method: 'direct',
-    remark: '',
+    settlement_type: 'prepaid',
+    shipping_mode: 'direct',
+    note: '',
   })
   form._new_supplier_name = ''
   supplierSearch.value = ''
@@ -446,9 +446,9 @@ const fillEditData = (data) => {
     platform_order_no: data.platform_order_no || '',
     sale_price: data.sale_price ?? null,
     sale_tax_rate: data.sale_tax_rate ?? 13,
-    settlement_type: data.settlement_type || 'prepay',
-    shipping_method: data.shipping_method || 'direct',
-    remark: data.remark || '',
+    settlement_type: data.settlement_type || 'prepaid',
+    shipping_mode: data.shipping_mode || 'direct',
+    note: data.note || '',
   })
   supplierSearch.value = data.supplier_name || ''
   customerSearch.value = data.customer_name || ''
@@ -516,7 +516,7 @@ const handleSave = async (submit) => {
   try {
     const payload = {
       supplier_id: form.supplier_id ? parseInt(form.supplier_id) : null,
-      new_supplier_name: form._new_supplier_name || null,
+      supplier_name: form._new_supplier_name || null,
       product_name: form.product_name.trim(),
       invoice_type: form.invoice_type,
       purchase_price: form.purchase_price,
@@ -527,8 +527,8 @@ const handleSave = async (submit) => {
       sale_price: form.sale_price,
       sale_tax_rate: form.sale_tax_rate,
       settlement_type: form.settlement_type,
-      shipping_method: form.shipping_method,
-      remark: form.remark?.trim() || null,
+      shipping_mode: form.shipping_mode,
+      note: form.note?.trim() || null,
       account_set_id: form.account_set_id || null,
     }
 

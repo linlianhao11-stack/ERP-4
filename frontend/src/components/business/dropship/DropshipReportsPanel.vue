@@ -182,6 +182,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import SegmentedControl from '../../common/SegmentedControl.vue'
 import { useFormat } from '../../../composables/useFormat'
+import { useAccountingStore } from '../../../stores/accounting'
 import {
   getDropshipReportSummary,
   getDropshipReportProfit,
@@ -189,6 +190,7 @@ import {
 } from '../../../api/dropship'
 
 const { fmtMoney, getAgeClass } = useFormat()
+const accountingStore = useAccountingStore()
 
 // 子 Tab
 const subTabs = [
@@ -218,11 +220,19 @@ const summaryTotals = computed(() => {
 const loadSummary = async () => {
   summaryLoading.value = true
   try {
-    const { data } = await getDropshipReportSummary({
-      month: summaryMonth.value,
-      dimension: summaryDimension.value,
-    })
-    summaryData.value = data.items || data || []
+    const p = { month: summaryMonth.value }
+    if (accountingStore.currentAccountSetId) p.account_set_id = accountingStore.currentAccountSetId
+    const { data } = await getDropshipReportSummary(p)
+    // 后端返回 by_customer / by_supplier，前端根据维度选择并做字段映射
+    const dim = summaryDimension.value
+    const raw = dim === 'customer' ? (data.by_customer || []) : (data.by_supplier || [])
+    summaryData.value = raw.map(r => ({
+      name: dim === 'customer' ? r.customer_name : r.supplier_name,
+      order_count: r.count,
+      purchase_total: r.purchase_total,
+      sale_total: r.sale_total,
+      gross_profit: r.profit,
+    }))
   } catch (e) {
     console.error('加载月度汇总失败:', e)
     summaryData.value = []
@@ -237,17 +247,28 @@ const profitEnd = ref('')
 const profitData = ref([])
 const profitLoading = ref(false)
 
+// 后端返回的汇总数据（含加权平均毛利率）
+const profitSummary = ref(null)
+
 const profitTotals = computed(() => {
+  // 优先使用后端汇总
+  if (profitSummary.value) {
+    return {
+      purchase_total: profitSummary.value.total_purchase ?? 0,
+      sale_total: profitSummary.value.total_sale ?? 0,
+      gross_profit: profitSummary.value.total_profit ?? 0,
+      avg_margin: (profitSummary.value.avg_margin ?? 0).toFixed(1),
+    }
+  }
+  // 兜底前端计算
   const t = { purchase_total: 0, sale_total: 0, gross_profit: 0 }
   for (const r of profitData.value) {
     t.purchase_total += Number(r.purchase_total) || 0
     t.sale_total += Number(r.sale_total) || 0
     t.gross_profit += Number(r.gross_profit) || 0
   }
-  // 平均毛利率
-  const totalSale = t.sale_total
-  t.avg_margin = totalSale > 0
-    ? ((t.gross_profit / totalSale) * 100).toFixed(1)
+  t.avg_margin = t.sale_total > 0
+    ? (t.gross_profit / t.sale_total * 100).toFixed(1)
     : '0.0'
   return t
 })
@@ -256,10 +277,12 @@ const loadProfit = async () => {
   profitLoading.value = true
   try {
     const params = {}
+    if (accountingStore.currentAccountSetId) params.account_set_id = accountingStore.currentAccountSetId
     if (profitStart.value) params.start_date = profitStart.value
     if (profitEnd.value) params.end_date = profitEnd.value
     const { data } = await getDropshipReportProfit(params)
     profitData.value = data.items || data || []
+    profitSummary.value = data.summary || null
   } catch (e) {
     console.error('加载毛利分析失败:', e)
     profitData.value = []
@@ -285,11 +308,16 @@ const receivableTotals = computed(() => {
 const loadReceivable = async () => {
   receivableLoading.value = true
   try {
-    const { data } = await getDropshipReportReceivable()
-    // 按发货天数降序排列
+    const rp = {}
+    if (accountingStore.currentAccountSetId) rp.account_set_id = accountingStore.currentAccountSetId
+    const { data } = await getDropshipReportReceivable(rp)
+    // 后端已按发货天数降序排列，做字段映射
     const items = data.items || data || []
-    items.sort((a, b) => (b.shipped_days || 0) - (a.shipped_days || 0))
-    receivableData.value = items
+    receivableData.value = items.map(r => ({
+      ...r,
+      received: r.received_amount ?? r.received ?? 0,
+      unreceived: r.unreceived_amount ?? r.unreceived ?? 0,
+    }))
   } catch (e) {
     console.error('加载应收未收失败:', e)
     receivableData.value = []

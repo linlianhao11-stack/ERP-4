@@ -22,6 +22,7 @@ const dropshipColumnDefs = {
   customer_name: { label: '客户', defaultVisible: true },
   platform_order_no: { label: '平台单号', defaultVisible: false },
   tracking_no: { label: '快递单号', defaultVisible: false },
+  tracking_status: { label: '物流状态', defaultVisible: true },
   settlement_type: { label: '结算方式', defaultVisible: false },
   creator_name: { label: '创建人', defaultVisible: false },
   created_at: { label: '创建时间', defaultVisible: true },
@@ -29,7 +30,7 @@ const dropshipColumnDefs = {
 
 export function useDropshipOrder() {
   const { page, pageSize, total, totalPages, hasPagination, paginationParams,
-    visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage, saveNextCursor }
+    visiblePages, pageItemCount, resetPage, prevPage, nextPage, goToPage }
     = usePagination(20)
 
   // 排序
@@ -71,7 +72,6 @@ export function useDropshipOrder() {
       const { data } = await getDropshipOrders(params)
       items.value = data.items || data
       total.value = data.total ?? 0
-      saveNextCursor(data.next_cursor)
     } catch (e) {
       console.error('加载代采代发列表失败:', e)
     }

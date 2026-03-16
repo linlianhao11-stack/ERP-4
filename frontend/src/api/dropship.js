@@ -31,3 +31,6 @@ export const importSuppliers = (formData) =>
   api.post('/suppliers/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const downloadSupplierTemplate = () =>
   api.get('/suppliers/import-template', { responseType: 'blob' })
+
+// 物流
+export const refreshDropshipTracking = (id) => api.post('/dropship/' + id + '/refresh-tracking')
