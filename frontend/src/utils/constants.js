@@ -115,6 +115,7 @@ export const permissionGroups = [
     { key: 'ai_customer', name: '客户数据' },
     { key: 'ai_finance', name: '财务数据' },
     { key: 'ai_accounting', name: '会计数据' },
+    { key: 'ai_dropship', name: '代采代发数据' },
   ]},
   { label: '系统设置', icon: 'settings', main: 'settings', children: [
     { key: 'logs', name: '操作日志' },
@@ -124,13 +125,15 @@ export const permissionGroups = [
 export const orderTypeNames = {
   CASH: '现款', CREDIT: '账期',
   CONSIGN_OUT: '寄售调拨', CONSIGN_SETTLE: '寄售结算',
-  CONSIGN_RETURN: '寄售退货', RETURN: '退货'
+  CONSIGN_RETURN: '寄售退货', RETURN: '退货',
+  DROPSHIP: '代发',
 }
 
 export const orderTypeBadges = {
   CASH: 'badge badge-green', CREDIT: 'badge badge-yellow',
   CONSIGN_OUT: 'badge badge-purple', CONSIGN_SETTLE: 'badge badge-blue',
-  CONSIGN_RETURN: 'badge badge-orange', RETURN: 'badge badge-red'
+  CONSIGN_RETURN: 'badge badge-orange', RETURN: 'badge badge-red',
+  DROPSHIP: 'badge badge-cyan',
 }
 
 export const logTypeNames = {

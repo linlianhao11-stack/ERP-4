@@ -226,3 +226,54 @@ GRANT SELECT ON products TO erp_ai_readonly;
 GRANT SELECT ON customers TO erp_ai_readonly;
 GRANT SELECT ON suppliers TO erp_ai_readonly;
 GRANT SELECT ON account_sets TO erp_ai_readonly;
+
+-- ============================================================
+-- 10. 代采代发订单明细
+-- ============================================================
+CREATE OR REPLACE VIEW vw_dropship_detail AS
+SELECT
+    d.ds_no,
+    d.created_at::date AS order_date,
+    d.status,
+    sup.name AS supplier_name,
+    d.customer_name,
+    d.product_name,
+    d.quantity,
+    ROUND(d.purchase_price::numeric, 2) AS purchase_price,
+    ROUND(d.purchase_total::numeric, 2) AS purchase_total,
+    ROUND(d.sale_price::numeric, 2) AS sale_price,
+    ROUND(d.sale_total::numeric, 2) AS sale_total,
+    ROUND(d.gross_profit::numeric, 2) AS gross_profit,
+    ROUND(d.gross_margin::numeric, 2) AS gross_margin,
+    d.carrier_name,
+    d.tracking_no,
+    d.settlement_type,
+    d.note,
+    u.name AS creator_name
+FROM dropship_orders d
+LEFT JOIN suppliers sup ON sup.id = d.supplier_id
+LEFT JOIN users u ON u.id = d.creator_id;
+
+-- 11. 代采代发按月汇总
+CREATE OR REPLACE VIEW vw_dropship_summary AS
+SELECT
+    TO_CHAR(d.created_at, 'YYYY-MM') AS year_month,
+    COUNT(*) AS order_count,
+    ROUND(SUM(d.purchase_total)::numeric, 2) AS total_purchase,
+    ROUND(SUM(d.sale_total)::numeric, 2) AS total_sales,
+    ROUND(SUM(d.gross_profit)::numeric, 2) AS total_profit,
+    ROUND(
+        CASE WHEN SUM(d.sale_total) > 0
+             THEN (SUM(d.gross_profit) / NULLIF(SUM(d.sale_total), 0) * 100)::numeric
+             ELSE 0 END,
+        2
+    ) AS profit_rate,
+    COUNT(DISTINCT d.customer_name) AS customer_count,
+    COUNT(DISTINCT d.supplier_id) AS supplier_count
+FROM dropship_orders d
+WHERE d.status NOT IN ('draft', 'cancelled')
+GROUP BY TO_CHAR(d.created_at, 'YYYY-MM');
+
+-- 授权只读用户 — 代采代发视图
+GRANT SELECT ON vw_dropship_detail TO erp_ai_readonly;
+GRANT SELECT ON vw_dropship_summary TO erp_ai_readonly;

@@ -96,7 +96,7 @@
       </div>
       <!-- 移动端卡片 -->
       <div class="md:hidden divide-y divide-line">
-        <div v-for="o in recentOrders" :key="o.id" class="px-4 py-3 cursor-pointer active:bg-elevated" @click="goToOrder(o.id)">
+        <div v-for="o in recentOrders" :key="o.order_no" class="px-4 py-3 cursor-pointer active:bg-elevated" @click="goToOrder(o)">
           <div class="flex justify-between items-start mb-1">
             <span class="text-[12px] font-mono font-semibold text-primary">{{ o.order_no }}</span>
             <span class="text-[13px] font-mono font-semibold">¥{{ fmt(o.total_amount) }}</span>
@@ -123,12 +123,15 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in recentOrders" :key="o.id" class="hover:bg-elevated cursor-pointer" @click="goToOrder(o.id)">
+            <tr v-for="o in recentOrders" :key="o.order_no" class="hover:bg-elevated cursor-pointer" @click="goToOrder(o)">
               <td class="px-4 py-2.5 font-mono text-[12px] font-semibold text-primary">{{ o.order_no }}</td>
               <td class="px-4 py-2.5">{{ o.customer_name }}</td>
               <td class="px-4 py-2.5 text-right font-mono">¥{{ fmt(o.total_amount) }}</td>
               <td class="px-4 py-2.5 text-center"><StatusBadge type="orderType" :status="o.order_type" /></td>
-              <td class="px-4 py-2.5 text-center"><StatusBadge type="shippingStatus" :status="o.shipping_status" /></td>
+              <td class="px-4 py-2.5 text-center">
+                <StatusBadge v-if="o.order_type === 'DROPSHIP'" type="dropshipStatus" :status="o.shipping_status" />
+                <StatusBadge v-else type="shippingStatus" :status="o.shipping_status" />
+              </td>
               <td class="px-4 py-2.5 text-muted text-xs">{{ o.created_at }}</td>
             </tr>
           </tbody>
@@ -416,12 +419,18 @@ const lockScroll = (lock) => {
   if (el) el.style.overflow = lock ? 'hidden' : ''
 }
 
-const goToOrder = async (id) => {
+const goToOrder = async (order) => {
+  // 代采代发订单：跳转到代采代发页面
+  if (order.source === 'dropship') {
+    router.push({ path: '/dropship', query: { orderId: order.id } })
+    return
+  }
+  // 常规订单：打开详情弹窗
   orderDetailLoading.value = true
   showOrderDetail.value = true
   lockScroll(true)
   try {
-    const { data } = await getOrder(id)
+    const { data } = await getOrder(order.id)
     Object.keys(orderDetail).forEach(k => delete orderDetail[k])
     Object.assign(orderDetail, data)
   } catch (e) {

@@ -74,4 +74,22 @@ DEFAULT_PRESET_QUERIES = [
         "permission": "ai_stock",
         "sql": "SELECT product_name AS 产品, brand AS 品牌, current_stock AS 库存, sold_30d AS 近30天出库, ROUND(turnover_rate,2) AS 周转率 FROM vw_inventory_turnover WHERE current_stock > 0 ORDER BY turnover_rate DESC LIMIT 20",
     },
+    {
+        "display": "本月代采代发概况",
+        "keywords": ["代采代发", "代发"],
+        "permission": "ai_dropship",
+        "sql": "SELECT COUNT(*) AS 订单数, ROUND(SUM(sale_total),2) AS 销售额, ROUND(SUM(purchase_total),2) AS 采购额, ROUND(SUM(gross_profit),2) AS 毛利, ROUND(SUM(gross_profit)/NULLIF(SUM(sale_total),0)*100,2) AS 毛利率 FROM vw_dropship_detail WHERE order_date >= date_trunc('month', CURRENT_DATE) AND status NOT IN ('draft', 'cancelled')",
+    },
+    {
+        "display": "代采代发客户排名",
+        "keywords": ["代采代发", "客户", "排名"],
+        "permission": "ai_dropship",
+        "sql": "SELECT customer_name AS 客户, COUNT(*) AS 订单数, ROUND(SUM(sale_total),2) AS 销售额, ROUND(SUM(gross_profit),2) AS 毛利 FROM vw_dropship_detail WHERE order_date >= date_trunc('month', CURRENT_DATE) AND status NOT IN ('draft', 'cancelled') GROUP BY customer_name ORDER BY SUM(sale_total) DESC LIMIT 20",
+    },
+    {
+        "display": "代采代发毛利分析",
+        "keywords": ["代采代发", "毛利"],
+        "permission": "ai_dropship",
+        "sql": "SELECT supplier_name AS 供应商, COUNT(*) AS 订单数, ROUND(SUM(purchase_total),2) AS 采购额, ROUND(SUM(sale_total),2) AS 销售额, ROUND(SUM(gross_profit),2) AS 毛利, ROUND(SUM(gross_profit)/NULLIF(SUM(sale_total),0)*100,2) AS 毛利率 FROM vw_dropship_detail WHERE order_date >= date_trunc('month', CURRENT_DATE) AND status NOT IN ('draft', 'cancelled') GROUP BY supplier_name ORDER BY SUM(gross_profit) DESC",
+    },
 ]

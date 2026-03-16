@@ -21,12 +21,19 @@ async def get_dashboard(user: User = Depends(require_permission("dashboard"))):
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
     conn = connections.get("default")
 
-    # 今日销售额（DB 聚合）
+    # 今日销售额 + 毛利（常规订单 + 代采代发 UNION 聚合）
     sales_agg = await conn.execute_query_dict("""
-        SELECT COALESCE(SUM(total_amount), 0) as total_sales,
+        SELECT COALESCE(SUM(total_sales), 0) as total_sales,
                COALESCE(SUM(total_profit), 0) as total_profit
-        FROM orders WHERE created_at >= $1
-          AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
+        FROM (
+            SELECT SUM(total_amount) as total_sales, SUM(total_profit) as total_profit
+            FROM orders WHERE created_at >= $1
+              AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
+            UNION ALL
+            SELECT SUM(sale_total), SUM(gross_profit)
+            FROM dropship_orders WHERE created_at >= $1
+              AND status NOT IN ('draft', 'cancelled')
+        ) combined
     """, [today])
     today_sales = float(sales_agg[0]["total_sales"]) if sales_agg else 0
 
@@ -70,17 +77,23 @@ async def get_dashboard(user: User = Depends(require_permission("dashboard"))):
     )
     total_receivable = float(recv_agg[0]["total"]) if recv_agg else 0
 
-    # Top 10 畅销商品（DB 聚合 + GROUP BY）
+    # Top 10 畅销商品（常规订单 + 代采代发 UNION 聚合）
     top_products = await conn.execute_query_dict("""
-        SELECT p.name, p.sku,
-               SUM(oi.quantity) as quantity,
-               SUM(oi.amount) as amount
-        FROM order_items oi
-        JOIN orders o ON oi.order_id = o.id
-        JOIN products p ON oi.product_id = p.id
-        WHERE o.created_at >= $1
-          AND o.order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
-        GROUP BY p.id, p.name, p.sku
+        SELECT name, sku, SUM(quantity) as quantity, SUM(amount) as amount
+        FROM (
+            SELECT p.name, p.sku, oi.quantity, oi.amount
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE o.created_at >= $1
+              AND o.order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
+            UNION ALL
+            SELECT d.product_name as name, '' as sku, d.quantity, d.sale_total as amount
+            FROM dropship_orders d
+            WHERE d.created_at >= $1
+              AND d.status NOT IN ('draft', 'cancelled')
+        ) combined
+        GROUP BY name, sku
         ORDER BY quantity DESC
         LIMIT 10
     """, [thirty_days_ago])
@@ -190,12 +203,19 @@ async def get_sales_trend(
     start_date = now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)
     conn = connections.get("default")
     rows = await conn.execute_query_dict("""
-        SELECT DATE(created_at) as date,
-               COALESCE(SUM(total_amount), 0) as amount
-        FROM orders
-        WHERE created_at >= $1
-          AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
-        GROUP BY DATE(created_at)
+        SELECT date, COALESCE(SUM(amount), 0) as amount
+        FROM (
+            SELECT DATE(created_at) as date, total_amount as amount
+            FROM orders
+            WHERE created_at >= $1
+              AND order_type IN ('CASH', 'CREDIT', 'CONSIGN_SETTLE')
+            UNION ALL
+            SELECT DATE(created_at) as date, sale_total as amount
+            FROM dropship_orders
+            WHERE created_at >= $1
+              AND status NOT IN ('draft', 'cancelled')
+        ) combined
+        GROUP BY date
         ORDER BY date
     """, [start_date])
 
@@ -220,12 +240,22 @@ async def get_recent_orders(
     """返回最近的销售订单"""
     conn = connections.get("default")
     rows = await conn.execute_query_dict("""
-        SELECT o.id, o.order_no, o.order_type, o.total_amount,
-               o.shipping_status, o.is_cleared, o.created_at,
-               c.name as customer_name
-        FROM orders o
-        LEFT JOIN customers c ON o.customer_id = c.id
-        ORDER BY o.created_at DESC
+        SELECT * FROM (
+            SELECT o.id, o.order_no, o.order_type, o.total_amount,
+                   o.shipping_status, o.is_cleared, o.created_at,
+                   c.name as customer_name,
+                   'order' as source
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            UNION ALL
+            SELECT d.id, d.ds_no as order_no, 'DROPSHIP' as order_type, d.sale_total as total_amount,
+                   d.status as shipping_status, false as is_cleared, d.created_at,
+                   d.customer_name,
+                   'dropship' as source
+            FROM dropship_orders d
+            WHERE d.status NOT IN ('draft', 'cancelled')
+        ) combined
+        ORDER BY created_at DESC
         LIMIT $1
     """, [limit])
 
@@ -239,6 +269,7 @@ async def get_recent_orders(
             "is_cleared": r["is_cleared"],
             "customer_name": r["customer_name"] or "-",
             "created_at": str(r["created_at"])[:19].replace("T", " ") if r["created_at"] else "",
+            "source": r["source"],
         }
         for r in rows
     ]

@@ -20,6 +20,9 @@ DEFAULT_BUSINESS_DICT = [
     {"term": "启领/002", "meaning": "账套名称，用来区分不同公司或业务线的数据"},
     {"term": "SKU", "meaning": "产品的唯一编码，每个产品都有一个独立的 SKU 编号"},
     {"term": "排名/Top", "meaning": "按某个指标从高到低排序，取前几名"},
+    {"term": "代采代发/代发/直发", "meaning": "从供应商直接发货给客户，不经过自己仓库的业务模式", "field_hint": "vw_dropship_detail, vw_dropship_summary"},
+    {"term": "代采代发毛利", "meaning": "销售额 - 采购额，代采代发的利润", "field_hint": "gross_profit, gross_margin"},
+    {"term": "代采代发状态", "meaning": "草稿→待付款→已付待发→已发货→已完成/已取消", "field_hint": "status: draft/pending_payment/paid_pending_ship/shipped/completed/cancelled"},
 ]
 
 

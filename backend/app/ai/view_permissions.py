@@ -12,6 +12,9 @@ AI_VIEW_PERMISSIONS: dict[str, str] = {
     "vw_payables": "ai_finance",
     "vw_accounting_ledger": "ai_accounting",
     "vw_accounting_voucher_summary": "ai_accounting",
+    # 代采代发
+    "vw_dropship_detail": "ai_dropship",
+    "vw_dropship_summary": "ai_dropship",
     # 基础参考表 — 主开关即可
     "customers": "ai_chat",
     "products": "ai_chat",
@@ -22,7 +25,7 @@ AI_VIEW_PERMISSIONS: dict[str, str] = {
 
 AI_PERMISSION_KEYS = [
     "ai_chat", "ai_sales", "ai_purchase", "ai_stock",
-    "ai_customer", "ai_finance", "ai_accounting",
+    "ai_customer", "ai_finance", "ai_accounting", "ai_dropship",
 ]
 
 

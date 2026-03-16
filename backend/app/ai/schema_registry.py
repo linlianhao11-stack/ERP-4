@@ -154,6 +154,42 @@ VIEW_SCHEMAS = {
             ("posted_count", "INT", "已过账数"),
         ],
     },
+    "vw_dropship_detail": {
+        "description": "代采代发订单明细 — 每行一个代采代发订单",
+        "columns": [
+            ("ds_no", "VARCHAR", "代采代发单号"),
+            ("order_date", "DATE", "订单日期"),
+            ("status", "VARCHAR", "状态: draft/pending_payment/paid_pending_ship/shipped/completed/cancelled"),
+            ("supplier_name", "VARCHAR", "供应商名称"),
+            ("customer_name", "VARCHAR", "客户名称"),
+            ("product_name", "VARCHAR", "商品名称"),
+            ("quantity", "INT", "数量"),
+            ("purchase_price", "DECIMAL", "采购单价"),
+            ("purchase_total", "DECIMAL", "采购总额"),
+            ("sale_price", "DECIMAL", "销售单价"),
+            ("sale_total", "DECIMAL", "销售总额"),
+            ("gross_profit", "DECIMAL", "毛利"),
+            ("gross_margin", "DECIMAL", "毛利率(%)"),
+            ("carrier_name", "VARCHAR", "快递公司"),
+            ("tracking_no", "VARCHAR", "快递单号"),
+            ("settlement_type", "VARCHAR", "结算方式: prepaid/postpaid"),
+            ("note", "VARCHAR", "备注"),
+            ("creator_name", "VARCHAR", "创建人"),
+        ],
+    },
+    "vw_dropship_summary": {
+        "description": "代采代发按月汇总",
+        "columns": [
+            ("year_month", "VARCHAR", "年月 如 2024-03"),
+            ("order_count", "INT", "订单数"),
+            ("total_purchase", "DECIMAL", "采购总额"),
+            ("total_sales", "DECIMAL", "销售总额"),
+            ("total_profit", "DECIMAL", "毛利"),
+            ("profit_rate", "DECIMAL", "毛利率(%)"),
+            ("customer_count", "INT", "客户数"),
+            ("supplier_count", "INT", "供应商数"),
+        ],
+    },
 }
 
 # 基础参考表 schema — 用于查询仓库/客户/供应商/产品等基础信息
