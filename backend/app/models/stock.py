@@ -16,6 +16,7 @@ class WarehouseStock(models.Model):
     class Meta:
         table = "warehouse_stocks"
         unique_together = (("warehouse", "product", "location"),)
+        indexes = (("warehouse_id", "product_id"),)
 
 
 class StockLog(models.Model):

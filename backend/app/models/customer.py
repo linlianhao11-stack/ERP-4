@@ -20,3 +20,4 @@ class Customer(models.Model):
 
     class Meta:
         table = "customers"
+        indexes = (("is_active",),)

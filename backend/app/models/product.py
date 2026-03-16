@@ -18,3 +18,4 @@ class Product(models.Model):
 
     class Meta:
         table = "products"
+        indexes = (("is_active",),)

@@ -18,3 +18,4 @@ class Supplier(models.Model):
 
     class Meta:
         table = "suppliers"
+        indexes = (("is_active",),)

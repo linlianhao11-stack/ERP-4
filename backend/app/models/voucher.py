@@ -27,6 +27,7 @@ class Voucher(models.Model):
 
     class Meta:
         table = "vouchers"
+        indexes = (("status",),)
 
 
 class VoucherEntry(models.Model):
@@ -48,3 +49,4 @@ class VoucherEntry(models.Model):
     class Meta:
         table = "voucher_entries"
         ordering = ["line_no"]
+        indexes = (("voucher_id",), ("account_id",),)
