@@ -31,6 +31,7 @@ from app.routers import (
     ai_chat, api_keys,
     departments, employees,
     bank_accounts,
+    dropship,
 )
 
 
@@ -179,6 +180,7 @@ app.include_router(api_keys.router)
 app.include_router(departments.router)
 app.include_router(employees.router)
 app.include_router(bank_accounts.router)
+app.include_router(dropship.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
