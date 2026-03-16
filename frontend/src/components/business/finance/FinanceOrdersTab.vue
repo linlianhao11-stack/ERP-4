@@ -217,392 +217,22 @@
     </div>
   </div>
 
-  <!-- ============ 弹窗：订单详情 ============ -->
-  <div v-if="showOrderDetailModal" class="modal-overlay" @click.self="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false">
-    <div class="modal-content" :class="{ 'modal-expanded': isDetailExpanded }" style="max-width:920px">
-      <div class="modal-header">
-        <h3 class="font-semibold">订单详情</h3>
-        <div class="flex items-center gap-1">
-          <button @click="isDetailExpanded = !isDetailExpanded" class="modal-expand-btn hidden md:inline-flex" :aria-label="isDetailExpanded ? '收起弹窗' : '展开弹窗'">
-            <Minimize2 v-if="isDetailExpanded" :size="16" />
-            <Maximize2 v-else :size="16" />
-          </button>
-          <button @click="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false" class="modal-close">&times;</button>
-        </div>
-      </div>
-      <div class="modal-body" v-if="orderDetail.order_no">
-        <!-- 订单基本信息 -->
-        <div class="mb-5 p-4 bg-elevated rounded-xl">
-          <div class="flex justify-between items-start mb-2">
-            <div>
-              <div class="text-[15px] font-bold font-mono">{{ orderDetail.order_no }}</div>
-              <div class="text-xs text-muted mt-0.5">
-                <span v-if="orderDetail.employee_name">销售员: {{ orderDetail.employee_name }} · </span>
-                {{ orderDetail.creator_name }} · {{ fmtDate(orderDetail.created_at) }}
-              </div>
-            </div>
-            <StatusBadge type="orderType" :status="orderDetail.order_type" />
-          </div>
-          <div class="grid detail-grid grid-cols-2 gap-1.5 gap-x-4 text-[13px]">
-            <div><span class="text-muted">客户:</span> {{ orderDetail.customer?.name || '-' }}</div>
-            <div><span class="text-muted">仓库:</span> {{ orderDetail.warehouse?.name || '-' }}</div>
-            <div v-if="orderDetail.related_order" class="col-span-2">
-              <span class="text-muted">关联原订单:</span>
-              <span @click="viewOrder(orderDetail.related_order.id)" class="text-primary hover:underline cursor-pointer font-mono">{{ orderDetail.related_order.order_no }}</span>
-            </div>
-            <div v-if="orderDetail.related_children?.length" class="col-span-2">
-              <span class="text-muted">拆分订单:</span>
-              <span v-for="child in orderDetail.related_children" :key="child.id" @click="viewOrder(child.id)" class="text-primary hover:underline cursor-pointer font-mono ml-1">{{ child.order_no }}</span>
-            </div>
-            <div><span class="text-muted">金额:</span> <span class="font-semibold">¥{{ fmt(orderDetail.total_amount) }}</span></div>
-            <div v-if="hasPermission('finance')"><span class="text-muted">毛利:</span> <span :class="orderDetail.total_profit >= 0 ? 'text-success' : 'text-error'">¥{{ fmt(orderDetail.total_profit) }}</span></div>
-            <div v-if="orderDetail.rebate_used > 0" class="col-span-2">
-              <span class="text-muted">已使用返利:</span> <span class="text-success font-semibold">¥{{ fmt(orderDetail.rebate_used) }}</span>
-            </div>
-            <div v-if="orderDetail.credit_used > 0" class="col-span-2">
-              <span class="text-muted">已使用在账资金:</span> <span class="text-primary font-semibold">¥{{ fmt(orderDetail.credit_used) }}</span>
-            </div>
-            <!-- 收款记录 -->
-            <div v-if="orderDetail.payment_records && orderDetail.payment_records.length" class="col-span-2">
-              <div v-for="pr in orderDetail.payment_records" :key="pr.id" class="flex items-center gap-2 text-[13px] mb-1">
-                <span class="text-muted">{{ pr.source === 'CASH' ? '销售收款' : pr.source === 'REFUND' ? '退款' : pr.source === 'CREDIT' ? '账期回款' : pr.source === 'CONSIGN_SETTLE' ? '寄售结算' : pr.source || '回款' }}:</span>
-                <span :class="pr.source === 'REFUND' ? 'font-semibold text-warning' : 'font-semibold text-success'">{{ pr.source === 'REFUND' ? '-' : '' }}¥{{ fmt(Math.abs(pr.amount)) }}</span>
-                <span class="badge badge-blue" style="font-size:11px">{{ getPaymentMethodName(pr.payment_method) }}</span>
-                <span v-if="pr.source !== 'REFUND'" :class="pr.is_confirmed ? 'text-success' : 'text-warning'" style="font-size:11px">{{ pr.is_confirmed ? '已确认' : '待确认' }}</span>
-              </div>
-            </div>
-            <div v-else-if="!orderDetail.credit_used"><span class="text-muted">已付:</span> ¥{{ fmt(orderDetail.paid_amount) }}</div>
-            <div><span class="text-muted">状态:</span> <span :class="orderDetail.is_cleared ? 'text-success' : 'text-error'">{{ orderDetail.is_cleared ? '已结清' : '未结清' }}</span></div>
-            <div v-if="orderDetail.shipping_status"><span class="text-muted">发货:</span> <StatusBadge type="shippingStatus" :status="orderDetail.shipping_status" /></div>
-            <div v-if="orderDetail.order_type === 'RETURN'" class="col-span-2">
-              <span class="text-muted">退款状态:</span>
-              <span :class="orderDetail.refunded ? 'text-warning' : 'text-error-emphasis'">{{ orderDetail.refunded ? '已退款给客户' : '形成在账资金' }}</span>
-            </div>
-            <div v-if="orderDetail.rebate_refund_records?.length" class="col-span-2">
-              <div v-for="rr in orderDetail.rebate_refund_records" :key="rr.id" class="flex items-center gap-2 text-[13px] mb-1">
-                <span class="text-muted">退回返利:</span>
-                <span class="font-semibold text-warning">¥{{ fmt(rr.amount) }}</span>
-                <span v-if="rr.remark" class="text-xs text-muted">{{ rr.remark }}</span>
-              </div>
-            </div>
-            <div v-if="orderDetail.remark" class="col-span-2 pt-2 border-t border-line"><span class="text-muted">备注:</span> <span class="text-secondary">{{ orderDetail.remark }}</span></div>
-          </div>
-        </div>
+  <!-- 订单详情弹窗 -->
+  <FinanceOrderDetailModal
+    :order-id="selectedOrderId"
+    v-model:visible="showDetail"
+    @cancel-order="handleCancelOrder"
+    @data-changed="loadOrders(); emit('data-changed')"
+    @open-payment="emit('open-payment', $event)"
+  />
 
-        <!-- 商品明细（按账套分组） -->
-        <div class="mb-5">
-          <div class="flex items-center gap-2 mb-2.5">
-            <span class="text-[13px] font-semibold text-secondary">商品明细</span>
-            <span v-if="orderDetail.items?.length" class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.items.length }} 件商品</span>
-            <span v-if="detailItemsByAccountSet.length > 1" class="text-[11px] text-warning bg-warning-subtle px-2 py-0.5 rounded-full">{{ detailItemsByAccountSet.length }} 个账套</span>
-          </div>
-          <div class="overflow-x-auto">
-            <template v-for="(group, gIdx) in detailItemsByAccountSet" :key="group.key">
-              <!-- 分组标题（仅多账套时显示） -->
-              <div v-if="detailItemsByAccountSet.length > 1" class="flex justify-between items-center px-3 py-1.5 bg-elevated border-b text-xs" :class="gIdx > 0 ? 'mt-3' : ''">
-                <span class="font-semibold text-secondary">{{ group.name }}</span>
-                <span class="text-primary font-mono font-semibold">&yen;{{ fmt(group.subtotal) }}</span>
-              </div>
-              <table class="w-full text-sm">
-                <thead class="bg-elevated" v-if="gIdx === 0 || detailItemsByAccountSet.length > 1">
-                  <tr>
-                    <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                    <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">仓库</th>
-                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
-                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">数量</th>
-                    <th v-if="orderDetail.rebate_used > 0" class="px-2 py-2 text-right text-xs font-semibold text-secondary">返利</th>
-                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">金额</th>
-                    <th class="px-2 py-2 text-right text-xs font-semibold text-secondary" v-if="hasPermission('finance')">毛利</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-line">
-                  <tr v-for="item in group.items" :key="item.id || item.product_id">
-                    <td class="px-2 py-2.5">
-                      <div class="font-medium">{{ item.product_name }}</div>
-                      <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
-                    </td>
-                    <td class="px-2 py-2.5 text-muted">{{ item.warehouse_name || '-' }}</td>
-                    <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
-                    <td class="px-2 py-2.5 text-right">{{ item.quantity }}</td>
-                    <td v-if="orderDetail.rebate_used > 0" class="px-2 py-2.5 text-right text-success">{{ item.rebate_amount > 0 ? '-¥' + fmt(item.rebate_amount) : '' }}</td>
-                    <td class="px-2 py-2.5 text-right font-semibold">{{ fmt(item.amount) }}</td>
-                    <td class="px-2 py-2.5 text-right" v-if="hasPermission('finance')" :class="item.profit >= 0 ? 'text-success' : 'text-error'">{{ fmt(item.profit) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </template>
-          </div>
-        </div>
-
-        <!-- 关联应收单（按账套分组） -->
-        <div v-if="orderDetail.receivable_bills?.length" class="mb-5">
-          <div class="flex items-center gap-2 mb-2.5">
-            <span class="text-[13px] font-semibold text-secondary">关联应收单</span>
-            <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.receivable_bills.length }} 笔</span>
-          </div>
-          <div class="space-y-2">
-            <div v-for="rb in orderDetail.receivable_bills" :key="rb.id" class="flex items-center justify-between px-2 py-2 bg-elevated rounded-lg border text-[13px]">
-              <div class="flex items-center gap-2">
-                <span class="font-mono text-xs text-primary">{{ rb.bill_no }}</span>
-                <span v-if="rb.account_set_name" class="text-[11px] text-muted bg-surface px-1.5 py-0.5 rounded">{{ rb.account_set_name }}</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="font-semibold">&yen;{{ fmt(rb.total_amount) }}</span>
-                <span :class="rb.status === 'completed' ? 'badge badge-green' : rb.status === 'partial' ? 'badge badge-orange' : 'badge badge-gray'" class="text-[11px]">
-                  {{ rb.status === 'completed' ? '已收' : rb.status === 'partial' ? '部分收' : rb.status === 'cancelled' ? '已取消' : '待收' }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 物流信息（卡片式） -->
-        <div v-if="orderDetail.shipments?.length" class="mb-2">
-          <div class="flex items-center gap-2 mb-2.5">
-            <span class="text-[13px] font-semibold text-secondary">物流信息</span>
-            <span class="text-[11px] text-muted bg-elevated px-2 py-0.5 rounded-full">{{ orderDetail.shipments.length }} 个物流单</span>
-          </div>
-          <div v-for="(sh, shIdx) in orderDetail.shipments" :key="sh.id" class="border border-line rounded-[10px] overflow-hidden mb-2.5 last:mb-0">
-            <!-- 物流单头部 -->
-            <div class="flex justify-between items-center px-3.5 py-2.5 bg-elevated">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[13px] font-semibold text-secondary">物流单 {{ shIdx + 1 }}</span>
-                <span class="text-xs text-muted">{{ sh.carrier_name || '未填写承运商' }}</span>
-              </div>
-              <StatusBadge type="shipmentStatus" :status="sh.status" />
-            </div>
-            <!-- 运单号 -->
-            <div v-if="sh.tracking_no" class="flex items-center gap-1.5 px-3.5 py-2 border-b border-line">
-              <span class="text-[11px] text-muted">运单号:</span>
-              <span class="text-xs font-mono font-medium text-primary">{{ sh.tracking_no }}</span>
-            </div>
-            <!-- 发货商品明细 -->
-            <div v-if="sh.items?.length" class="px-3.5 py-2">
-              <div v-for="(si, idx) in sh.items" :key="idx" class="flex items-start gap-2.5 py-1.5" :class="idx < sh.items.length - 1 ? 'border-b border-line' : ''">
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs font-medium">{{ si.product_name }}</div>
-                  <div class="text-[11px] text-muted font-mono">{{ si.product_sku }}</div>
-                  <div v-if="si.sn_codes" class="mt-1 p-1.5 bg-success-subtle rounded-md">
-                    <span class="text-[11px] text-muted font-semibold">SN:</span>
-                    <span v-for="sn in parseSN(si.sn_codes)" :key="sn" class="text-[11px] text-success font-mono ml-1">{{ sn }}</span>
-                  </div>
-                </div>
-                <span class="text-xs font-semibold text-secondary flex-shrink-0">× {{ si.quantity }}</span>
-              </div>
-            </div>
-            <!-- 兜底：无明细时显示聚合SN码 -->
-            <div v-else-if="sh.sn_code" class="px-3.5 py-2">
-              <div class="p-1.5 bg-success-subtle rounded-md">
-                <span class="text-[11px] text-muted font-semibold">SN:</span>
-                <span class="text-[11px] text-success font-mono ml-1">{{ sh.sn_code }}</span>
-              </div>
-            </div>
-            <!-- 最新物流动态 -->
-            <div v-if="sh.last_info" class="px-3.5 py-2 border-t border-line text-[11px] text-muted">{{ sh.last_info }}</div>
-          </div>
-        </div>
-
-        <!-- 退货表单 -->
-        <div v-if="showReturnForm" class="mb-2">
-          <div class="flex items-center gap-2 mb-2.5">
-            <span class="text-[13px] font-semibold text-secondary">退货商品</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-elevated">
-                <tr>
-                  <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                  <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
-                  <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">可退</th>
-                  <th class="px-2 py-2 text-center text-xs font-semibold text-secondary" style="width:100px">退货数量</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-line">
-                <tr v-for="item in returnForm.items" :key="item.product_id">
-                  <td class="px-2 py-2.5">
-                    <div class="font-medium">{{ item.product_name }}</div>
-                    <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
-                  </td>
-                  <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
-                  <td class="px-2 py-2.5 text-right text-muted">{{ item.max_qty }}</td>
-                  <td class="px-2 py-2.5 text-center">
-                    <input type="number" v-model.number="item.qty" :min="0" :max="item.max_qty" class="input text-center" style="width:80px" />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="mt-3 px-1">
-            <label class="flex items-center gap-2 cursor-pointer text-[13px]">
-              <input type="checkbox" v-model="returnForm.refunded" class="rounded" />
-              <span>已退款给客户</span>
-              <span class="text-[11px] text-muted">（不勾选则形成在账资金）</span>
-            </label>
-          </div>
-          <div class="flex gap-3 pt-4 mt-4 border-t border-line">
-            <button type="button" @click="cancelReturnForm" class="btn btn-secondary flex-1">取消</button>
-            <button type="button" @click="submitReturn" :disabled="!canSubmitReturn || returnSubmitting" class="btn btn-primary flex-1">
-              {{ returnSubmitting ? '提交中...' : '确认退货' }}
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- 底部操作按钮（独立于滚动区域） -->
-      <div v-if="!showReturnForm" class="modal-footer">
-        <button type="button" @click="showOrderDetailModal = false; showReturnForm = false; isDetailExpanded = false" class="btn btn-secondary btn-sm">关闭</button>
-        <button v-if="canReturn" type="button" @click="openReturnForm" class="btn btn-primary btn-sm">销售退货</button>
-        <button v-if="orderDetail.shipping_status && ['pending', 'partial'].includes(orderDetail.shipping_status)" type="button" @click="handleCancelOrder(orderDetail.id)" class="btn btn-sm" style="background:var(--error);color:#fff">取消订单</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ 弹窗：取消订单向导（3步） ============ -->
-  <teleport to="body">
-    <div v-if="showCancelModal && cancelPreviewData" class="modal-overlay" @click.self="showCancelModal = false">
-      <div class="modal-content" style="max-width:640px">
-        <div class="modal-header">
-          <h3 class="font-semibold">取消订单 {{ cancelPreviewData.order_no }}</h3>
-          <button @click="showCancelModal = false" class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <!-- 步骤指示器 -->
-          <div v-if="cancelStepCount > 1" class="flex items-center justify-center gap-2 mb-4">
-            <template v-for="s in cancelStepCount" :key="s">
-              <div :class="['w-2.5 h-2.5 rounded-full transition-all', cancelStep === s ? 'bg-primary scale-125' : (cancelStep > s ? 'bg-success' : 'bg-line-strong')]"></div>
-              <div v-if="s < cancelStepCount" class="w-6 h-0.5" :class="cancelStep > s ? 'bg-success' : 'bg-line-strong'"></div>
-            </template>
-          </div>
-
-          <!-- 第1步：确认商品 -->
-          <div v-show="cancelStep === 1 && cancelPreviewData?.is_partial" class="space-y-4">
-            <!-- 已发货商品（部分取消时显示） -->
-            <div v-if="cancelPreviewData.is_partial">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="w-5 h-5 rounded-full bg-success text-white text-xs flex items-center justify-center font-bold">✓</span>
-                <span class="text-sm font-semibold text-foreground">已发货商品（将生成新订单）</span>
-              </div>
-              <div class="p-3 bg-success-subtle rounded-lg border border-success">
-                <div v-for="item in cancelPreviewData.shipped_items" :key="'s-'+item.product_sku" class="flex justify-between text-sm py-1">
-                  <span class="text-foreground">{{ item.product_name }} <span class="text-muted">x{{ item.shipped_qty }}</span></span>
-                  <span class="font-semibold">¥{{ fmt(item.amount) }}</span>
-                </div>
-                <div class="border-t border-success mt-2 pt-2 flex justify-between text-sm font-bold">
-                  <span>新订单金额</span>
-                  <span class="text-success">¥{{ fmt(cancelPreviewData.new_order_amount) }}</span>
-                </div>
-              </div>
-            </div>
-            <!-- 取消商品 -->
-            <div>
-              <div class="flex items-center gap-2 mb-2">
-                <span class="w-5 h-5 rounded-full bg-error text-white text-xs flex items-center justify-center font-bold">✕</span>
-                <span class="text-sm font-semibold text-foreground">取消商品（释放库存预留）</span>
-              </div>
-              <div class="p-3 bg-error-subtle rounded-lg border border-error">
-                <div v-for="item in cancelPreviewData.cancel_items" :key="'c-'+item.product_sku" class="flex justify-between text-sm py-1">
-                  <span class="text-foreground">{{ item.product_name }} <span class="text-muted">x{{ item.cancel_qty }}</span></span>
-                  <span>¥{{ fmt(item.amount) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 第2步：逐商品财务分配（部分取消时） -->
-          <div v-show="cancelStep === 2" class="space-y-4">
-            <div class="text-center mb-2">
-              <div class="text-sm font-semibold text-foreground">新订单逐商品财务分配</div>
-              <div class="text-xs text-muted mt-1">每个商品的现金+返利必须等于商品金额，影响开票单价</div>
-            </div>
-            <div class="text-xs text-muted p-2 bg-elevated rounded">
-              原订单：付款 <span class="font-semibold text-foreground">¥{{ fmt(cancelPreviewData.paid_amount) }}</span>
-              + 返利 <span class="font-semibold text-success">¥{{ fmt(cancelPreviewData.rebate_used) }}</span>
-              = ¥{{ fmt(cancelPreviewData.total_amount) }}
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-elevated">
-                  <tr>
-                    <th class="px-2 py-1.5 text-left text-xs">商品</th>
-                    <th class="px-2 py-1.5 text-right text-xs">数量</th>
-                    <th class="px-2 py-1.5 text-right text-xs">金额</th>
-                    <th class="px-2 py-1.5 text-center text-xs" style="min-width:100px">使用现金</th>
-                    <th class="px-2 py-1.5 text-center text-xs" style="min-width:100px">使用返利</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <tr v-for="(alloc, idx) in cancelForm.item_allocations" :key="alloc.order_item_id">
-                    <td class="px-2 py-1.5">
-                      <div class="text-xs">{{ alloc.product_name }}</div>
-                      <div class="text-[10px] text-muted">{{ alloc.product_sku }}</div>
-                    </td>
-                    <td class="px-2 py-1.5 text-right text-xs">{{ alloc.shipped_qty }}</td>
-                    <td class="px-2 py-1.5 text-right text-xs font-semibold">¥{{ fmt(alloc.amount) }}</td>
-                    <td class="px-2 py-1 text-center" style="min-width:100px">
-                      <input v-model.number="alloc.paid" @input="onItemPaidChange(idx)" type="number" step="0.01" min="0" :max="alloc.amount" class="input text-xs py-1 text-center w-full">
-                    </td>
-                    <td class="px-2 py-1 text-center" style="min-width:100px">
-                      <input v-model.number="alloc.rebate" @input="onItemRebateChange(idx)" type="number" step="0.01" min="0" :max="alloc.amount" class="input text-xs py-1 text-center w-full">
-                    </td>
-                  </tr>
-                </tbody>
-                <tfoot class="border-t-2 border-line-strong">
-                  <tr class="font-semibold text-xs">
-                    <td class="px-2 py-2" colspan="2">合计</td>
-                    <td class="px-2 py-2 text-right">¥{{ fmt(cancelPreviewData.new_order_amount) }}</td>
-                    <td class="px-2 py-2 text-center">¥{{ cancelForm.new_order_paid_amount.toFixed(2) }}</td>
-                    <td class="px-2 py-2 text-center text-success">¥{{ cancelForm.new_order_rebate_used.toFixed(2) }}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <!-- 分配平衡提示 -->
-            <div class="p-2 rounded text-center text-xs font-semibold" :class="Math.abs(cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used - cancelPreviewData.new_order_amount) < 0.01 ? 'bg-success-subtle text-success' : 'bg-error-subtle text-error'">
-              {{ Math.abs(cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used - cancelPreviewData.new_order_amount) < 0.01 ? '分配正确' : '分配不平衡：合计 ¥' + (cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used).toFixed(2) + ' / 需要 ¥' + cancelPreviewData.new_order_amount.toFixed(2) }}
-            </div>
-          </div>
-
-          <!-- 第3步：退款方式 -->
-          <div v-show="(cancelStepCount === 3 && cancelStep === 3) || (cancelStepCount === 1 && !cancelPreviewData?.is_partial)" class="space-y-4">
-            <div class="text-center mb-2">
-              <div class="text-sm font-semibold text-foreground">退还金额确认</div>
-              <div class="text-xs text-muted mt-1">确认退款金额和退款方式</div>
-            </div>
-            <div class="p-4 bg-orange-subtle rounded-lg">
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label class="label text-xs font-semibold">退款金额</label>
-                  <input v-model.number="cancelForm.refund_amount" type="number" step="0.01" min="0" :max="cancelPreviewData.paid_amount" class="input text-sm py-1.5">
-                </div>
-                <div>
-                  <label class="label text-xs font-semibold">退返利金额</label>
-                  <input v-model.number="cancelForm.refund_rebate" type="number" step="0.01" min="0" :max="cancelPreviewData.rebate_used" class="input text-sm py-1.5">
-                </div>
-              </div>
-              <div v-if="cancelForm.refund_amount > 0" class="pt-3 border-t border-warning">
-                <label class="label text-xs font-semibold mb-2">退款方式</label>
-                <div class="flex gap-4">
-                  <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded-lg border transition-all" :class="cancelForm.refund_method === 'balance' ? 'border-primary bg-info-subtle' : 'border-line-strong'">
-                    <input type="radio" v-model="cancelForm.refund_method" value="balance" class="accent-primary"> 转入客户余额
-                  </label>
-                  <label class="flex items-center gap-2 text-sm cursor-pointer p-2 rounded-lg border transition-all" :class="cancelForm.refund_method === 'cash' ? 'border-primary bg-info-subtle' : 'border-line-strong'">
-                    <input type="radio" v-model="cancelForm.refund_method" value="cash" class="accent-primary"> 现金退款
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 导航按钮 -->
-          <div class="flex gap-3 pt-4 mt-4 border-t">
-            <button v-if="cancelStep > 1" @click="prevCancelStep" class="btn btn-secondary flex-1">&larr; 上一步</button>
-            <button v-else @click="showCancelModal = false" class="btn btn-secondary flex-1">取消</button>
-            <button v-if="cancelStep < cancelStepCount" @click="nextCancelStep" class="btn btn-primary flex-1">下一步 &rarr;</button>
-            <button v-else @click="confirmCancel" class="btn flex-1" style="background:#ff3b30;color:#fff">确认取消订单</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </teleport>
+  <!-- 取消订单向导 -->
+  <FinanceOrderCancelWizard
+    :preview-data="cancelPreviewData"
+    v-model:visible="showCancel"
+    @cancelled="onCancelDone"
+    @data-changed="emit('data-changed')"
+  />
   </div>
 </template>
 
@@ -613,7 +243,6 @@
  */
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../../stores/app'
-import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import { useSort } from '../../../composables/useSort'
@@ -621,15 +250,17 @@ import { usePagination } from '../../../composables/usePagination'
 import { useColumnConfig } from '../../../composables/useColumnConfig'
 import { getAllOrders, exportOrders, getOrderItems } from '../../../api/finance'
 import { getAccountSets } from '../../../api/accounting'
-import { getOrder, cancelOrder, cancelPreview, createOrder } from '../../../api/orders'
-import { getLocations } from '../../../api/warehouses'
+import { cancelOrder, cancelPreview } from '../../../api/orders'
 import { orderTypeNames, orderTypeBadges, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import StatusBadge from '../../common/StatusBadge.vue'
-import { RotateCcw, Search, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { RotateCcw, Search } from 'lucide-vue-next'
 import ColumnMenu from '../../common/ColumnMenu.vue'
 import PageToolbar from '../../common/PageToolbar.vue'
 import DateRangePicker from '../../common/DateRangePicker.vue'
 import SegmentedControl from '../../common/SegmentedControl.vue'
+import FinanceOrderDetailModal from './FinanceOrderDetailModal.vue'
+import FinanceOrderCancelWizard from './FinanceOrderCancelWizard.vue'
+import { downloadBlob } from '../../../composables/useDownload'
 
 // --- Props & Emits ---
 const props = defineProps({
@@ -645,8 +276,6 @@ const emit = defineEmits([
 
 // --- Stores ---
 const appStore = useAppStore()
-const settingsStore = useSettingsStore()
-
 // --- Composables ---
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
@@ -723,15 +352,6 @@ watch(financeViewMode, (mode) => {
   if (mode === 'detail') loadAllItems()
 })
 
-/** 解析 SN 码 JSON 字符串为数组 */
-const parseSN = (raw) => {
-  if (!raw) return []
-  try { return JSON.parse(raw) } catch { return raw.split(',').map(s => s.trim()).filter(Boolean) }
-}
-
-// --- 收款方式列表（用于详情弹窗内显示名称） ---
-const paymentMethods = computed(() => settingsStore.paymentMethods)
-
 // ===== 本地状态 =====
 /** 移动端日期预设选中值 */
 const orderDatePreset = ref('')
@@ -744,41 +364,11 @@ const accountSets = ref([])
 /** 全部订单数据 */
 const allOrders = ref([])
 
-/** 订单详情弹窗可见性 */
-const showOrderDetailModal = ref(false)
-/** 订单详情弹窗展开状态 */
-const isDetailExpanded = ref(false)
-/** 订单详情数据 */
-const orderDetail = reactive({})
-
-// --- 退货相关状态 ---
-/** 是否显示退货表单 */
-const showReturnForm = ref(false)
-/** 退货表单数据 */
-const returnForm = reactive({
-  items: [],
-  refunded: false,
-})
-/** 退货提交中 */
-const returnSubmitting = ref(false)
-
-// --- 取消订单相关状态 ---
-/** 取消弹窗可见性 */
-const showCancelModal = ref(false)
-/** 取消向导当前步骤 */
-const cancelStep = ref(1)
-/** 取消预览数据 */
+// --- 弹窗控制 ---
+const selectedOrderId = ref(null)
+const showDetail = ref(false)
 const cancelPreviewData = ref(null)
-/** 取消表单数据 */
-const cancelForm = reactive({
-  new_order_paid_amount: 0,
-  new_order_rebate_used: 0,
-  item_allocations: [],
-  refund_amount: 0,
-  refund_rebate: 0,
-  refund_method: 'balance',
-  refund_payment_method: 'cash'
-})
+const showCancel = ref(false)
 
 // ===== 计算属性 =====
 /** 按排序条件排列的订单列表 */
@@ -811,49 +401,6 @@ const pageSummary = computed(() => {
   return sum
 })
 
-/** 订单详情商品按账套分组 */
-const detailItemsByAccountSet = computed(() => {
-  const items = orderDetail.items || []
-  if (!items.length) return []
-  const groups = new Map()
-  for (const item of items) {
-    const asId = item.account_set_id || 0
-    const asName = item.account_set_name || '未关联账套'
-    if (!groups.has(asId)) {
-      groups.set(asId, { key: asId, name: asName, items: [], subtotal: 0 })
-    }
-    const group = groups.get(asId)
-    group.items.push(item)
-    group.subtotal += Number(item.amount) || 0
-  }
-  return [...groups.values()]
-})
-
-/** 取消向导总步数 */
-const cancelStepCount = computed(() => {
-  const preview = cancelPreviewData.value
-  if (!preview) return 1
-  if (preview.order_type === 'CONSIGN_OUT') return 0
-  const hasPaid = preview.paid_amount > 0 || preview.rebate_used > 0
-  if (!preview.is_partial && !hasPaid) return 0
-  if (!preview.is_partial && hasPaid) return 1
-  if (preview.is_partial && !hasPaid) return 1
-  return 3
-})
-
-/** 当前订单是否可发起退货 */
-const canReturn = computed(() => {
-  if (!orderDetail.order_type) return false
-  if (!['CASH', 'CREDIT'].includes(orderDetail.order_type)) return false
-  if (orderDetail.shipping_status === 'cancelled') return false
-  return orderDetail.items?.some(i => i.available_return_quantity > 0)
-})
-
-/** 退货表单是否可提交 */
-const canSubmitReturn = computed(() => {
-  return returnForm.items.some(i => i.qty > 0)
-})
-
 // ===== 辅助函数 =====
 /** 获取订单付款状态徽标 */
 const getOrderPayStatus = (o) => {
@@ -861,13 +408,6 @@ const getOrderPayStatus = (o) => {
   if (!o.is_cleared) return { text: '未结清', badge: 'badge badge-red' }
   if (o.has_unconfirmed_payment) return { text: '待确认', badge: 'badge badge-orange' }
   return { text: '已结清', badge: 'badge badge-green' }
-}
-
-/** 根据 code 获取收款方式名称 */
-const getPaymentMethodName = (m) => {
-  const found = paymentMethods.value.find(p => p.code === m)
-  if (found) return found.name
-  return { cash: '现金', bank: '银行转账', bank_public: '对公转账', bank_private: '对私转账', wechat: '微信', alipay: '支付宝' }[m] || m
 }
 
 // ===== 日期预设 =====
@@ -949,94 +489,9 @@ onUnmounted(() => clearTimeout(_searchTimer))
 
 // ===== 订单详情 =====
 /** 查看订单详情 */
-const viewOrder = async (id) => {
-  try {
-    const { data } = await getOrder(id)
-    Object.keys(orderDetail).forEach(k => delete orderDetail[k])
-    Object.assign(orderDetail, data)
-    showOrderDetailModal.value = true
-  } catch (e) {
-    appStore.showToast('加载订单详情失败', 'error')
-  }
-}
-
-// ===== 销售退货 =====
-/** 打开退货表单 */
-const openReturnForm = () => {
-  returnForm.items = orderDetail.items
-    .filter(i => i.available_return_quantity > 0)
-    .map(i => ({
-      product_id: i.product_id,
-      product_name: i.product_name,
-      product_sku: i.product_sku,
-      unit_price: i.unit_price,
-      cost_price: i.cost_price,
-      max_qty: i.available_return_quantity,
-      qty: 0
-    }))
-  returnForm.refunded = false
-  showReturnForm.value = true
-}
-
-/** 提交退货 */
-const submitReturn = async () => {
-  const items = returnForm.items.filter(i => i.qty > 0)
-  if (!items.length) {
-    appStore.showToast('请至少选择一件退货商品', 'error')
-    return
-  }
-  for (const item of items) {
-    if (item.qty > item.max_qty) {
-      appStore.showToast(`${item.product_name} 最多可退 ${item.max_qty} 件`, 'error')
-      return
-    }
-  }
-
-  returnSubmitting.value = true
-  try {
-    const warehouseId = orderDetail.warehouse?.id
-    if (!warehouseId) {
-      appStore.showToast('原订单无仓库信息，无法退货', 'error')
-      returnSubmitting.value = false
-      return
-    }
-    let locationId = null
-    try {
-      const { data: locs } = await getLocations({ warehouse_id: warehouseId })
-      if (locs.length) locationId = locs[0].id
-    } catch (e) {
-      console.warn('获取仓位失败:', e)
-    }
-
-    await createOrder({
-      order_type: 'RETURN',
-      customer_id: orderDetail.customer?.id,
-      warehouse_id: warehouseId,
-      related_order_id: orderDetail.id,
-      refunded: returnForm.refunded,
-      items: items.map(i => ({
-        product_id: i.product_id,
-        quantity: i.qty,
-        unit_price: i.unit_price,
-        warehouse_id: warehouseId,
-        location_id: locationId,
-      }))
-    })
-
-    appStore.showToast('退货单创建成功')
-    showReturnForm.value = false
-    showOrderDetailModal.value = false
-    loadOrders()
-  } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '退货失败', 'error')
-  } finally {
-    returnSubmitting.value = false
-  }
-}
-
-/** 取消退货表单 */
-const cancelReturnForm = () => {
-  showReturnForm.value = false
+const viewOrder = (id) => {
+  selectedOrderId.value = id
+  showDetail.value = true
 }
 
 // ===== 取消订单 =====
@@ -1051,143 +506,37 @@ const handleCancelOrder = async (orderId) => {
     if (data.order_type === 'CONSIGN_OUT' || (!data.is_partial && (!hasPaid || !data.has_confirmed_payment))) {
       const confirmed = await appStore.customConfirm('确认取消', `确认取消订单 ${data.order_no}？`)
       if (!confirmed) return
-      cancelForm.refund_amount = 0
-      cancelForm.refund_rebate = 0
-      cancelForm.refund_method = 'balance'
-      cancelForm.refund_payment_method = 'cash'
-      cancelForm.new_order_paid_amount = 0
-      cancelForm.new_order_rebate_used = 0
-      cancelForm.item_allocations = []
-      await confirmCancel()
+      appStore.submitting = true
+      try {
+        const { data: result } = await cancelOrder(data.order_id, {
+          refund_amount: 0, refund_rebate: 0,
+          refund_method: 'balance', refund_payment_method: 'cash'
+        })
+        appStore.showToast(result.message)
+        showDetail.value = false
+        loadOrders()
+        emit('data-changed')
+      } catch (e) {
+        appStore.showToast(e.response?.data?.detail || '取消失败', 'error')
+      } finally {
+        appStore.submitting = false
+      }
       return
     }
 
-    cancelForm.new_order_paid_amount = data.default_new_paid
-    cancelForm.new_order_rebate_used = data.default_new_rebate
-    cancelForm.item_allocations = (data.shipped_items || []).map(si => ({
-      order_item_id: si.order_item_id,
-      product_name: si.product_name,
-      product_sku: si.product_sku,
-      shipped_qty: si.shipped_qty,
-      amount: si.amount,
-      paid: si.default_paid || si.amount,
-      rebate: si.default_rebate || 0
-    }))
-    cancelForm.refund_amount = data.default_refund
-    cancelForm.refund_rebate = data.default_refund_rebate
-    cancelForm.refund_method = 'balance'
-    cancelForm.refund_payment_method = 'cash'
-    cancelStep.value = 1
-    showCancelModal.value = true
+    // 复杂路径：打开取消向导
+    showDetail.value = false
+    showCancel.value = true
   } catch (e) {
     appStore.showToast(e.response?.data?.detail || '获取取消预览失败', 'error')
   }
 }
 
-/** 逐商品现金分配变更回调 */
-const onItemPaidChange = (index) => {
-  const item = cancelForm.item_allocations[index]
-  let paid = Math.max(0, Math.min(item.paid, item.amount))
-  item.paid = paid
-  item.rebate = +(item.amount - paid).toFixed(2)
-  recalcCancelTotals()
-}
-
-/** 逐商品返利分配变更回调 */
-const onItemRebateChange = (index) => {
-  const item = cancelForm.item_allocations[index]
-  let rebate = Math.max(0, Math.min(item.rebate, item.amount))
-  item.rebate = rebate
-  item.paid = +(item.amount - rebate).toFixed(2)
-  recalcCancelTotals()
-}
-
-/** 重新计算取消合计金额 */
-const recalcCancelTotals = () => {
-  const preview = cancelPreviewData.value
-  if (!preview) return
-  const totalPaid = Math.round(cancelForm.item_allocations.reduce((s, i) => s + i.paid, 0) * 100) / 100
-  const totalRebate = Math.round(cancelForm.item_allocations.reduce((s, i) => s + i.rebate, 0) * 100) / 100
-  cancelForm.new_order_paid_amount = +totalPaid.toFixed(2)
-  cancelForm.new_order_rebate_used = +totalRebate.toFixed(2)
-  cancelForm.refund_amount = +(preview.paid_amount - cancelForm.new_order_paid_amount).toFixed(2)
-  cancelForm.refund_rebate = +(preview.rebate_used - cancelForm.new_order_rebate_used).toFixed(2)
-}
-
-/** 取消向导下一步 */
-const nextCancelStep = () => {
-  const preview = cancelPreviewData.value
-  if (!preview) return
-  const steps = cancelStepCount.value
-
-  if (steps === 1) {
-    confirmCancel()
-    return
-  }
-
-  if (cancelStep.value === 1) {
-    cancelStep.value = 2
-  } else if (cancelStep.value === 2) {
-    const sum = cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used
-    if (Math.abs(sum - preview.new_order_amount) > 0.01) {
-      appStore.showToast('付款 + 返利必须等于新订单金额 ¥' + preview.new_order_amount.toFixed(2), 'error')
-      return
-    }
-    cancelStep.value = 3
-  }
-}
-
-/** 取消向导上一步 */
-const prevCancelStep = () => {
-  if (cancelStep.value === 3) {
-    cancelStep.value = 2
-  } else if (cancelStep.value === 2) {
-    cancelStep.value = 1
-  }
-}
-
-/** 确认取消订单——提交到后端 */
-const confirmCancel = async () => {
-  if (appStore.submitting) return
-  const preview = cancelPreviewData.value
-  if (!preview) return
-
-  // 部分取消时校验分配平衡
-  if (preview.is_partial) {
-    const sum = cancelForm.new_order_paid_amount + cancelForm.new_order_rebate_used
-    if (Math.abs(sum - preview.new_order_amount) > 0.01) {
-      appStore.showToast('付款 + 返利必须等于新订单金额 ¥' + preview.new_order_amount.toFixed(2), 'error')
-      return
-    }
-  }
-
-  appStore.submitting = true
-  try {
-    const payload = {
-      refund_amount: cancelForm.refund_amount,
-      refund_rebate: cancelForm.refund_rebate,
-      refund_method: cancelForm.refund_method,
-      refund_payment_method: cancelForm.refund_payment_method
-    }
-    if (preview.is_partial) {
-      payload.new_order_paid_amount = cancelForm.new_order_paid_amount
-      payload.new_order_rebate_used = cancelForm.new_order_rebate_used
-      payload.item_allocations = cancelForm.item_allocations.map(a => ({
-        order_item_id: a.order_item_id,
-        paid_amount: a.paid,
-        rebate_amount: a.rebate
-      }))
-    }
-    const { data } = await cancelOrder(preview.order_id, payload)
-    appStore.showToast(data.message)
-    showCancelModal.value = false
-    showOrderDetailModal.value = false
-    loadOrders()
-  } catch (e) {
-    appStore.showToast(e.response?.data?.detail || '取消失败', 'error')
-  } finally {
-    appStore.submitting = false
-  }
+/** 取消订单完成回调 */
+const onCancelDone = () => {
+  showCancel.value = false
+  showDetail.value = false
+  loadOrders()
 }
 
 // ===== 导出订单 =====
@@ -1199,14 +548,7 @@ const handleExportOrders = async () => {
     if (orderFilter.start) params.start_date = orderFilter.start
     if (orderFilter.end) params.end_date = orderFilter.end
     const response = await exportOrders(params)
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', '订单明细_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    downloadBlob(response.data, '订单明细_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
     appStore.showToast('导出成功')
   } catch (e) {
     appStore.showToast('导出失败', 'error')
