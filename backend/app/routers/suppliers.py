@@ -1,9 +1,14 @@
 """供应商路由"""
+from __future__ import annotations
+
 from decimal import Decimal
 from datetime import datetime
+from io import BytesIO
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import openpyxl
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from tortoise import transactions
 from tortoise.expressions import F
 
@@ -14,6 +19,107 @@ from app.schemas.supplier import SupplierRequest, CreditRefundRequest
 from app.services.operation_log_service import log_operation
 
 router = APIRouter(prefix="/api/suppliers", tags=["供应商管理"])
+
+
+# ── 批量导入相关端点（放在 /{id} 路径之前，避免被拦截） ──────────────
+
+
+@router.post("/import")
+async def import_suppliers(
+    file: UploadFile = File(...),
+    user: User = Depends(require_permission("dropship")),
+):
+    """供应商批量导入(Excel)"""
+    # 1. 校验文件后缀
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式的文件")
+
+    # 2. 读取 Excel
+    try:
+        contents = await file.read()
+        wb = openpyxl.load_workbook(BytesIO(contents), read_only=True)
+        ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请确认格式正确")
+
+    # 3. 列映射（按顺序）：名称, 联系人, 电话, 地址, 税号, 银行名称, 银行账号
+    field_mapping = [
+        "name", "contact_person", "phone", "address",
+        "tax_id", "bank_name", "bank_account",
+    ]
+
+    created = 0
+    skipped = 0
+    errors: list[dict] = []
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        # 跳过全空行
+        if not row or all(cell is None or str(cell).strip() == "" for cell in row):
+            continue
+
+        # 解析行数据
+        row_data: dict = {}
+        for col_idx, field in enumerate(field_mapping):
+            value = row[col_idx] if col_idx < len(row) else None
+            if value is not None:
+                row_data[field] = str(value).strip()
+
+        # 4. 名称必填校验
+        name = row_data.get("name", "")
+        if not name:
+            errors.append({"row": row_idx, "reason": "名称为空"})
+            continue
+
+        # 5. 去重：按名称匹配，已存在则跳过
+        exists = await Supplier.filter(name=name).exists()
+        if exists:
+            skipped += 1
+            continue
+
+        # 6. 创建供应商
+        try:
+            await Supplier.create(**row_data)
+            created += 1
+        except Exception as e:
+            errors.append({"row": row_idx, "reason": str(e)})
+
+    wb.close()
+
+    return {"created": created, "skipped": skipped, "errors": errors}
+
+
+@router.get("/import-template")
+async def import_template(
+    user: User = Depends(require_permission("dropship")),
+):
+    """下载供应商导入模板"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "供应商导入模板"
+
+    # 表头行
+    ws.append(["名称", "联系人", "电话", "地址", "税号", "银行名称", "银行账号"])
+    # 示例数据
+    ws.append([
+        "示例供应商", "张三", "13800138000",
+        "上海市浦东新区", "91310000XXXXXXXX", "中国银行", "6217001234567890",
+    ])
+
+    # 设置列宽
+    for col in range(1, 8):
+        ws.column_dimensions[chr(64 + col)].width = 20
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=supplier_import_template.xlsx"
+        },
+    )
 
 
 @router.get("")
