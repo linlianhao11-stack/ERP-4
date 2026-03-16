@@ -57,7 +57,7 @@ async def list_payable_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier", "purchase_order")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("supplier", "purchase_order")
 
     items = []
     for b in bills:
@@ -88,7 +88,7 @@ async def get_payable_bill(
     q = {"id": bill_id}
     if account_set_id:
         q["account_set_id"] = account_set_id
-    b = await PayableBill.filter(**q).prefetch_related("supplier", "purchase_order").first()
+    b = await PayableBill.filter(**q).select_related("supplier", "purchase_order").first()
     if not b:
         raise HTTPException(status_code=404, detail="应付单不存在")
     return {
@@ -174,7 +174,7 @@ async def list_disbursement_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("supplier")
 
     items = []
     for b in bills:
@@ -263,7 +263,7 @@ async def list_disbursement_refund_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("supplier")
 
     items = []
     for b in bills:
@@ -347,7 +347,7 @@ async def list_purchase_returns_for_ap(
         )
 
     total = await query.count()
-    returns = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("supplier", "purchase_order")
+    returns = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("supplier", "purchase_order")
 
     items = []
     for pr in returns:

@@ -57,7 +57,7 @@ async def list_receivable_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer", "order")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("customer", "order")
 
     items = []
     for b in bills:
@@ -88,7 +88,7 @@ async def get_receivable_bill(
     q = {"id": bill_id}
     if account_set_id:
         q["account_set_id"] = account_set_id
-    b = await ReceivableBill.filter(**q).prefetch_related("customer", "order").first()
+    b = await ReceivableBill.filter(**q).select_related("customer", "order").first()
     if not b:
         raise HTTPException(status_code=404, detail="应收单不存在")
     return {
@@ -174,7 +174,7 @@ async def list_receipt_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("customer")
 
     items = []
     for b in bills:
@@ -265,7 +265,7 @@ async def list_receipt_refund_bills(
         )
 
     total = await query.count()
-    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
+    bills = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("customer")
 
     items = []
     for b in bills:
@@ -350,7 +350,7 @@ async def list_write_offs(
         )
 
     total = await query.count()
-    items_raw = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
+    items_raw = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("customer")
 
     items = []
     for wo in items_raw:
@@ -442,7 +442,7 @@ async def list_sales_returns(
         )
 
     total = await query.count()
-    orders = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).prefetch_related("customer")
+    orders = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related("customer")
 
     items = []
     for o in orders:
