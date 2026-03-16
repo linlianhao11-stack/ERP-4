@@ -1,7 +1,8 @@
 """代采代发路由"""
 from __future__ import annotations
 
-from datetime import timedelta
+from collections import defaultdict
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -12,6 +13,7 @@ from tortoise.queryset import Q
 from app.auth.dependencies import require_permission
 from app.logger import get_logger
 from app.models import User, Supplier, Product, Customer, AccountSet
+from app.models.ar_ap import ReceivableBill
 from app.models.dropship import DropshipOrder
 from app.schemas.dropship import (
     DropshipOrderCreate, DropshipOrderUpdate,
@@ -34,29 +36,225 @@ router = APIRouter(prefix="/api/dropship", tags=["代采代发"])
 
 @router.get("/reports/summary")
 async def report_summary(
+    account_set_id: int,
+    month: Optional[str] = None,
     user: User = Depends(require_permission("dropship")),
 ):
-    """报表：汇总统计 (TODO)"""
-    # Task 8 skeleton
-    return {"message": "TODO"}
+    """报表：月度汇总 — 按客户/供应商维度聚合订单数、采购额、销售额、毛利"""
+    # 默认当月
+    if month:
+        try:
+            year, mon = month.split("-")
+            month_start = date(int(year), int(mon), 1)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="month 格式错误，请使用 YYYY-MM 格式")
+    else:
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+        month = month_start.strftime("%Y-%m")
+
+    # 下个月第一天，用于 < 比较
+    if month_start.month == 12:
+        month_end = date(month_start.year + 1, 1, 1)
+    else:
+        month_end = date(month_start.year, month_start.month + 1, 1)
+
+    # 查询指定月份+账套的所有非取消订单
+    orders = await (
+        DropshipOrder.filter(
+            account_set_id=account_set_id,
+            status__not="cancelled",
+            created_at__gte=month_start,
+            created_at__lt=month_end,
+        )
+        .select_related("supplier", "customer")
+    )
+
+    # 按客户维度汇总
+    customer_map: dict = defaultdict(lambda: {
+        "count": 0, "purchase_total": Decimal("0"),
+        "sale_total": Decimal("0"), "profit": Decimal("0"),
+    })
+    # 按供应商维度汇总
+    supplier_map: dict = defaultdict(lambda: {
+        "count": 0, "purchase_total": Decimal("0"),
+        "sale_total": Decimal("0"), "profit": Decimal("0"),
+    })
+
+    total_count = 0
+    total_purchase = Decimal("0")
+    total_sale = Decimal("0")
+    total_profit = Decimal("0")
+
+    for o in orders:
+        total_count += 1
+        total_purchase += o.purchase_total
+        total_sale += o.sale_total
+        total_profit += o.gross_profit
+
+        # 客户维度
+        cg = customer_map[o.customer_id]
+        cg["customer_id"] = o.customer_id
+        cg["customer_name"] = o.customer.name if o.customer else ""
+        cg["count"] += 1
+        cg["purchase_total"] += o.purchase_total
+        cg["sale_total"] += o.sale_total
+        cg["profit"] += o.gross_profit
+
+        # 供应商维度
+        sg = supplier_map[o.supplier_id]
+        sg["supplier_id"] = o.supplier_id
+        sg["supplier_name"] = o.supplier.name if o.supplier else ""
+        sg["count"] += 1
+        sg["purchase_total"] += o.purchase_total
+        sg["sale_total"] += o.sale_total
+        sg["profit"] += o.gross_profit
+
+    by_customer = [
+        {
+            "customer_id": v["customer_id"],
+            "customer_name": v["customer_name"],
+            "count": v["count"],
+            "purchase_total": float(v["purchase_total"]),
+            "sale_total": float(v["sale_total"]),
+            "profit": float(v["profit"]),
+        }
+        for v in customer_map.values()
+    ]
+    by_supplier = [
+        {
+            "supplier_id": v["supplier_id"],
+            "supplier_name": v["supplier_name"],
+            "count": v["count"],
+            "purchase_total": float(v["purchase_total"]),
+            "sale_total": float(v["sale_total"]),
+            "profit": float(v["profit"]),
+        }
+        for v in supplier_map.values()
+    ]
+
+    # 按订单数降序
+    by_customer.sort(key=lambda x: x["count"], reverse=True)
+    by_supplier.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "month": month,
+        "total_count": total_count,
+        "total_purchase": float(total_purchase),
+        "total_sale": float(total_sale),
+        "total_profit": float(total_profit),
+        "by_customer": by_customer,
+        "by_supplier": by_supplier,
+    }
 
 
 @router.get("/reports/profit")
 async def report_profit(
+    account_set_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     user: User = Depends(require_permission("dropship")),
 ):
-    """报表：利润分析 (TODO)"""
-    # Task 8 skeleton
-    return {"message": "TODO"}
+    """报表：毛利分析 — 已发货/已完成订单的逐单毛利明细与汇总"""
+    query = DropshipOrder.filter(
+        account_set_id=account_set_id,
+        status__in=["shipped", "completed"],
+    )
+    if start_date:
+        query = query.filter(created_at__gte=parse_date(start_date, "start_date"))
+    if end_date:
+        query = query.filter(created_at__lte=parse_date(end_date, "end_date") + timedelta(days=1))
+
+    orders = await query.select_related("supplier", "customer").order_by("-created_at")
+
+    items = []
+    sum_purchase = Decimal("0")
+    sum_sale = Decimal("0")
+    sum_profit = Decimal("0")
+
+    for o in orders:
+        items.append({
+            "ds_no": o.ds_no,
+            "product_name": o.product_name,
+            "supplier_name": o.supplier.name if o.supplier else "",
+            "customer_name": o.customer.name if o.customer else "",
+            "purchase_total": float(o.purchase_total),
+            "sale_total": float(o.sale_total),
+            "gross_profit": float(o.gross_profit),
+            "gross_margin": float(o.gross_margin),
+            "created_at": o.created_at.isoformat(),
+        })
+        sum_purchase += o.purchase_total
+        sum_sale += o.sale_total
+        sum_profit += o.gross_profit
+
+    count = len(items)
+    avg_margin = float(sum_profit / sum_sale * 100) if sum_sale else 0.0
+
+    return {
+        "items": items,
+        "summary": {
+            "count": count,
+            "total_purchase": float(sum_purchase),
+            "total_sale": float(sum_sale),
+            "total_profit": float(sum_profit),
+            "avg_margin": round(avg_margin, 2),
+        },
+    }
 
 
 @router.get("/reports/receivable")
 async def report_receivable(
+    account_set_id: int,
     user: User = Depends(require_permission("dropship")),
 ):
-    """报表：应收统计 (TODO)"""
-    # Task 8 skeleton
-    return {"message": "TODO"}
+    """报表：应收未收 — 已发货但客户未回款的订单"""
+    # 查询关联了代采代发订单且未完成的应收单
+    receivables = await (
+        ReceivableBill.filter(
+            dropship_order__isnull=False,
+            dropship_order__account_set_id=account_set_id,
+            status__in=["pending", "partial"],
+        )
+        .select_related("dropship_order", "customer")
+    )
+
+    today = date.today()
+    items = []
+    total_unreceived = Decimal("0")
+
+    for rb in receivables:
+        order = rb.dropship_order
+        if not order:
+            continue
+
+        # 发货天数：从订单更新时间（发货时会更新）到今天
+        if order.updated_at:
+            shipped_days = (today - order.updated_at.date()).days
+        else:
+            shipped_days = (today - order.created_at.date()).days
+
+        items.append({
+            "ds_no": order.ds_no,
+            "customer_name": rb.customer.name if rb.customer else "",
+            "platform_order_no": order.platform_order_no,
+            "sale_total": float(order.sale_total),
+            "receivable_bill_no": rb.bill_no,
+            "received_amount": float(rb.received_amount),
+            "unreceived_amount": float(rb.unreceived_amount),
+            "created_at": order.created_at.isoformat(),
+            "shipped_days": shipped_days,
+        })
+        total_unreceived += rb.unreceived_amount
+
+    # 按发货天数降序（欠款最久的排前面）
+    items.sort(key=lambda x: x["shipped_days"], reverse=True)
+
+    return {
+        "items": items,
+        "total_unreceived": float(total_unreceived),
+        "total_count": len(items),
+    }
 
 
 @router.get("/payment-workbench")
@@ -72,7 +270,6 @@ async def payment_workbench(
     )
 
     # 按供应商分组
-    from collections import defaultdict
     supplier_map: dict = defaultdict(lambda: {"orders": [], "subtotal": Decimal("0")})
 
     for o in orders:
