@@ -43,6 +43,14 @@
             毛利 ¥{{ fmt(o.gross_profit) }}
           </span>
         </div>
+        <!-- 移动端操作按钮 -->
+        <div v-if="getActions(o).length" class="flex items-center gap-2 mt-2 pt-2 border-t">
+          <button v-for="act in getActions(o)" :key="act.key" type="button"
+            :class="act.class" class="text-xs px-2 py-1 rounded-md"
+            @click="handleAction(act.key, o)">
+            {{ act.label }}
+          </button>
+        </div>
       </div>
       <div v-if="!items.length" class="p-8 text-center text-muted text-sm">暂无代采代发订单</div>
     </div>
@@ -67,6 +75,9 @@
           </div>
         </template>
         <template #actions>
+          <button v-if="hasPermission('dropship')" @click="showImportModal = true" class="btn btn-secondary btn-sm">
+            <Upload :size="14" /> 导入供应商
+          </button>
           <button v-if="hasPermission('dropship')" @click="showCreateModal = true" class="btn btn-primary btn-sm">
             <Plus :size="14" /> 新建
           </button>
@@ -109,6 +120,7 @@
               <th v-if="isColumnVisible('created_at')" class="px-2 py-2 text-left cursor-pointer select-none hover:text-primary" @click="toggleSort('created_at')">
                 创建时间 <span v-if="sortState.key === 'created_at'" class="text-primary">{{ sortState.order === 'asc' ? '↑' : '↓' }}</span>
               </th>
+              <th class="px-2 py-2 text-center">操作</th>
               <!-- 列选择器 -->
               <th class="col-selector-th">
                 <ColumnMenu :labels="columnLabels" :visible="visibleColumns" pinned="ds_no"
@@ -117,7 +129,7 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <tr v-for="o in sortedItems" :key="o.id" class="hover:bg-elevated cursor-pointer">
+            <tr v-for="o in sortedItems" :key="o.id" class="hover:bg-elevated">
               <td v-if="isColumnVisible('ds_no')" class="px-2 py-2 font-mono text-sm">
                 <span v-if="['pending_payment','paid_pending_ship'].includes(o.status)" class="todo-dot mr-1.5"></span>
                 {{ o.ds_no }}
@@ -145,6 +157,16 @@
               <td v-if="isColumnVisible('settlement_type')" class="px-2 py-2">{{ o.settlement_type === 'prepay' ? '先款后货' : o.settlement_type === 'credit' ? '赊销' : o.settlement_type || '-' }}</td>
               <td v-if="isColumnVisible('creator_name')" class="px-2 py-2 text-secondary">{{ o.creator_name || '-' }}</td>
               <td v-if="isColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
+              <!-- 操作列 -->
+              <td class="px-2 py-2 text-center whitespace-nowrap">
+                <div class="flex items-center justify-center gap-1">
+                  <button v-for="act in getActions(o)" :key="act.key" type="button"
+                    :class="act.class" class="text-xs px-2 py-1 rounded-md"
+                    @click="handleAction(act.key, o)">
+                    {{ act.label }}
+                  </button>
+                </div>
+              </td>
               <td></td>
             </tr>
           </tbody>
@@ -167,6 +189,7 @@
               <td v-if="isColumnVisible('settlement_type')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('creator_name')" class="px-2 py-2"></td>
               <td v-if="isColumnVisible('created_at')" class="px-2 py-2"></td>
+              <td class="px-2 py-2"></td>
               <td></td>
             </tr>
             <tr v-if="hasPagination" class="font-normal">
@@ -198,16 +221,148 @@
       @update:visible="showCreateModal = $event"
       @saved="onFormSaved"
     />
+
+    <!-- 发货弹窗 -->
+    <div v-if="showShipModal" class="modal-overlay" @click.self="showShipModal = false">
+      <div class="modal-content" style="max-width:520px">
+        <div class="modal-header">
+          <h3 class="modal-title">确认发货</h3>
+          <button @click="showShipModal = false" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="space-y-4">
+            <!-- 订单摘要 -->
+            <div class="bg-elevated rounded-lg p-3 text-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-mono font-semibold">{{ shipOrder?.ds_no }}</span>
+              </div>
+              <div class="text-muted">{{ shipOrder?.product_name }}</div>
+              <div class="text-muted text-xs mt-1">
+                {{ shipOrder?.supplier_name }} → {{ shipOrder?.customer_name }}
+              </div>
+            </div>
+            <!-- 快递公司 -->
+            <div>
+              <label class="label" for="ship-carrier">快递公司 *</label>
+              <select id="ship-carrier" v-model="shipForm.carrier" class="input">
+                <option value="" disabled>请选择快递公司</option>
+                <option v-for="c in carriers" :key="c.code" :value="c.code">{{ c.name }}</option>
+              </select>
+            </div>
+            <!-- 快递单号 -->
+            <div>
+              <label class="label" for="ship-tracking">快递单号 *</label>
+              <input id="ship-tracking" v-model="shipForm.tracking_no" class="input" placeholder="输入快递单号">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="showShipModal = false" class="btn btn-sm btn-secondary">取消</button>
+          <button type="button" @click="handleShip" class="btn btn-sm btn-primary" :disabled="appStore.submitting || !shipForm.carrier || !shipForm.tracking_no.trim()">
+            {{ appStore.submitting ? '发货中...' : '确认发货' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 取消弹窗 -->
+    <div v-if="showCancelModal" class="modal-overlay" @click.self="showCancelModal = false">
+      <div class="modal-content" style="max-width:480px">
+        <div class="modal-header">
+          <h3 class="modal-title">取消订单</h3>
+          <button @click="showCancelModal = false" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="space-y-4">
+            <!-- 订单摘要 -->
+            <div class="bg-elevated rounded-lg p-3 text-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-mono font-semibold">{{ cancelOrder?.ds_no }}</span>
+                <StatusBadge type="dropshipStatus" :status="cancelOrder?.status" />
+              </div>
+              <div class="text-muted">{{ cancelOrder?.product_name }}</div>
+              <div class="text-muted text-xs mt-1">
+                {{ cancelOrder?.supplier_name }} → {{ cancelOrder?.customer_name }}
+              </div>
+            </div>
+            <!-- 取消原因 -->
+            <div>
+              <label class="label" for="cancel-reason">取消原因（可选）</label>
+              <textarea id="cancel-reason" v-model="cancelReason" class="input" rows="3" placeholder="请输入取消原因..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="showCancelModal = false" class="btn btn-sm btn-secondary">返回</button>
+          <button type="button" @click="handleCancel" class="btn btn-sm btn-danger" :disabled="appStore.submitting">
+            {{ appStore.submitting ? '取消中...' : '确认取消' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 供应商导入弹窗 -->
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal-content" style="max-width:520px">
+        <div class="modal-header">
+          <h3 class="modal-title">导入供应商</h3>
+          <button @click="showImportModal = false" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="space-y-4">
+            <!-- 下载模板 -->
+            <div class="flex items-center justify-between bg-elevated rounded-lg p-3">
+              <span class="text-sm">下载导入模板</span>
+              <button type="button" @click="handleDownloadTemplate" class="btn btn-sm btn-secondary">
+                <Download :size="14" /> 下载模板
+              </button>
+            </div>
+            <!-- 上传区 -->
+            <div
+              class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+              :class="isDragging ? 'border-primary bg-primary/5' : 'border-border-strong'"
+              @dragover.prevent="isDragging = true"
+              @dragleave.prevent="isDragging = false"
+              @drop.prevent="handleFileDrop"
+              @click="triggerFileInput"
+            >
+              <Upload :size="24" class="mx-auto mb-2 text-muted" />
+              <div class="text-sm text-muted">拖拽 .xlsx 文件到此处，或点击选择文件</div>
+              <div v-if="importFile" class="text-sm text-primary mt-2 font-medium">{{ importFile.name }}</div>
+              <input ref="fileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleFileSelect">
+            </div>
+            <!-- 上传按钮 -->
+            <button type="button" @click="handleImport" class="btn btn-primary btn-sm w-full"
+              :disabled="!importFile || appStore.submitting">
+              {{ appStore.submitting ? '导入中...' : '开始导入' }}
+            </button>
+            <!-- 导入结果 -->
+            <div v-if="importResult" class="bg-elevated rounded-lg p-3 text-sm space-y-1">
+              <div v-if="importResult.success" class="text-success">成功导入 {{ importResult.success }} 条</div>
+              <div v-if="importResult.skipped" class="text-warning">跳过 {{ importResult.skipped }} 条</div>
+              <div v-if="importResult.errors?.length" class="text-error">
+                <div>失败 {{ importResult.errors.length }} 条：</div>
+                <ul class="list-disc pl-4 mt-1 text-xs">
+                  <li v-for="(err, i) in importResult.errors.slice(0, 10)" :key="i">{{ err }}</li>
+                  <li v-if="importResult.errors.length > 10">...等 {{ importResult.errors.length - 10 }} 条</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 /**
- * 代采代发订单面板（瘦容器）
- * 负责筛选栏、列表展示，将表单逻辑委托给子组件
+ * 代采代发订单面板
+ * 负责筛选栏、列表展示、操作按钮（发货/取消/催付款/提交/编辑/完成）
+ * 包含发货弹窗、取消弹窗、供应商导入弹窗
  */
-import { ref, computed, onMounted } from 'vue'
-import { Search, Plus } from 'lucide-vue-next'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Search, Plus, Upload, Download } from 'lucide-vue-next'
 import ColumnMenu from '../common/ColumnMenu.vue'
 import StatusBadge from '../common/StatusBadge.vue'
 import PageToolbar from '../common/PageToolbar.vue'
@@ -216,9 +371,16 @@ import DropshipOrderForm from './dropship/DropshipOrderForm.vue'
 import { useFormat } from '../../composables/useFormat'
 import { usePermission } from '../../composables/usePermission'
 import { useDropshipOrder } from '../../composables/useDropshipOrder'
+import { useAppStore } from '../../stores/app'
+import {
+  submitDropshipOrder, urgeDropshipOrder,
+  shipDropshipOrder, completeDropshipOrder, cancelDropshipOrder,
+  importSuppliers, downloadSupplierTemplate
+} from '../../api/dropship'
 
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
+const appStore = useAppStore()
 
 // 使用 composable 管理列表逻辑
 const {
@@ -253,6 +415,230 @@ const formRef = ref(null)
 /** 表单保存后刷新列表 */
 const onFormSaved = () => {
   loadData()
+}
+
+// ---- 快递公司列表 ----
+const carriers = [
+  { code: 'shunfeng', name: '顺丰速运' },
+  { code: 'zhongtong', name: '中通快递' },
+  { code: 'yuantong', name: '圆通速递' },
+  { code: 'shentong', name: '申通快递' },
+  { code: 'yunda', name: '韵达快递' },
+  { code: 'jd', name: '京东物流' },
+  { code: 'debangkuaidi', name: '德邦快递' },
+  { code: 'ems', name: 'EMS' },
+]
+
+// ---- 操作按钮逻辑 ----
+
+/** 根据订单状态返回可用操作列表 */
+const getActions = (order) => {
+  const actions = []
+  switch (order.status) {
+    case 'draft':
+      actions.push({ key: 'edit', label: '编辑', class: 'bg-elevated text-text hover:bg-surface-hover' })
+      actions.push({ key: 'submit', label: '提交', class: 'bg-primary/10 text-primary hover:bg-primary/20' })
+      actions.push({ key: 'cancel', label: '取消', class: 'bg-error/10 text-error hover:bg-error/20' })
+      break
+    case 'pending_payment':
+      actions.push({ key: 'urge', label: '催付款', class: 'bg-warning/10 text-warning hover:bg-warning/20' })
+      actions.push({ key: 'cancel', label: '取消', class: 'bg-error/10 text-error hover:bg-error/20' })
+      break
+    case 'paid_pending_ship':
+      actions.push({ key: 'ship', label: '发货', class: 'bg-primary/10 text-primary hover:bg-primary/20' })
+      actions.push({ key: 'cancel', label: '取消', class: 'bg-error/10 text-error hover:bg-error/20' })
+      break
+    case 'shipped':
+      actions.push({ key: 'complete', label: '完成', class: 'bg-success/10 text-success hover:bg-success/20' })
+      break
+  }
+  return actions
+}
+
+/** 处理操作按钮点击 */
+const handleAction = (key, order) => {
+  switch (key) {
+    case 'edit':
+      // 打开编辑弹窗（传入订单数据）
+      showCreateModal.value = true
+      // 通过 nextTick 或 watch 让 form 识别
+      break
+    case 'submit':
+      handleSubmit(order)
+      break
+    case 'urge':
+      handleUrge(order)
+      break
+    case 'ship':
+      openShipModal(order)
+      break
+    case 'complete':
+      handleComplete(order)
+      break
+    case 'cancel':
+      openCancelModal(order)
+      break
+  }
+}
+
+/** 提交草稿 */
+const handleSubmit = async (order) => {
+  const ok = await appStore.customConfirm('确认提交该订单？', `单号: ${order.ds_no}`)
+  if (!ok) return
+  try {
+    await submitDropshipOrder(order.id)
+    appStore.showToast('订单已提交')
+    loadData()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '提交失败', 'error')
+  }
+}
+
+/** 催付款 */
+const handleUrge = async (order) => {
+  try {
+    await urgeDropshipOrder(order.id)
+    appStore.showToast('已标记催付款')
+    loadData()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
+  }
+}
+
+/** 手动完成 */
+const handleComplete = async (order) => {
+  const ok = await appStore.customConfirm('确认手动完成该订单？', `单号: ${order.ds_no}`)
+  if (!ok) return
+  try {
+    await completeDropshipOrder(order.id)
+    appStore.showToast('订单已完成')
+    loadData()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '操作失败', 'error')
+  }
+}
+
+// ---- 发货弹窗 ----
+const showShipModal = ref(false)
+const shipOrder = ref(null)
+const shipForm = reactive({ carrier: '', tracking_no: '' })
+
+const openShipModal = (order) => {
+  shipOrder.value = order
+  shipForm.carrier = ''
+  shipForm.tracking_no = ''
+  showShipModal.value = true
+}
+
+const handleShip = async () => {
+  if (!shipForm.carrier || !shipForm.tracking_no.trim()) return
+  if (appStore.submitting) return
+  appStore.submitting = true
+  try {
+    await shipDropshipOrder(shipOrder.value.id, {
+      carrier: shipForm.carrier,
+      tracking_no: shipForm.tracking_no.trim(),
+    })
+    appStore.showToast('发货成功')
+    showShipModal.value = false
+    loadData()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '发货失败', 'error')
+  } finally {
+    appStore.submitting = false
+  }
+}
+
+// ---- 取消弹窗 ----
+const showCancelModal = ref(false)
+const cancelOrder = ref(null)
+const cancelReason = ref('')
+
+const openCancelModal = (order) => {
+  cancelOrder.value = order
+  cancelReason.value = ''
+  showCancelModal.value = true
+}
+
+const handleCancel = async () => {
+  if (appStore.submitting) return
+  appStore.submitting = true
+  try {
+    await cancelDropshipOrder(cancelOrder.value.id, {
+      reason: cancelReason.value.trim() || null,
+    })
+    appStore.showToast('订单已取消')
+    showCancelModal.value = false
+    loadData()
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '取消失败', 'error')
+  } finally {
+    appStore.submitting = false
+  }
+}
+
+// ---- 供应商导入弹窗 ----
+const showImportModal = ref(false)
+const importFile = ref(null)
+const importResult = ref(null)
+const isDragging = ref(false)
+const fileInput = ref(null)
+
+const triggerFileInput = () => {
+  fileInput.value?.click()
+}
+
+const handleFileSelect = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    importFile.value = file
+    importResult.value = null
+  }
+}
+
+const handleFileDrop = (e) => {
+  isDragging.value = false
+  const file = e.dataTransfer.files[0]
+  if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+    importFile.value = file
+    importResult.value = null
+  } else {
+    appStore.showToast('请上传 .xlsx 格式文件', 'error')
+  }
+}
+
+const handleDownloadTemplate = async () => {
+  try {
+    const { data } = await downloadSupplierTemplate()
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '供应商导入模板.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    appStore.showToast('下载模板失败', 'error')
+  }
+}
+
+const handleImport = async () => {
+  if (!importFile.value || appStore.submitting) return
+  appStore.submitting = true
+  try {
+    const formData = new FormData()
+    formData.append('file', importFile.value)
+    const { data } = await importSuppliers(formData)
+    importResult.value = data
+    appStore.showToast('导入完成')
+    // 导入成功后刷新表单的供应商列表
+    if (formRef.value?.loadSuppliers) {
+      formRef.value.loadSuppliers()
+    }
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '导入失败', 'error')
+  } finally {
+    appStore.submitting = false
+  }
 }
 
 // 暴露给父组件
