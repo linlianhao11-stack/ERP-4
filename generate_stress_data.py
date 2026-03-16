@@ -236,7 +236,7 @@ def main():
     copy_batch(cur, "warehouse_stocks", (
         "id", "warehouse_id", "product_id", "location_id",
         "quantity", "reserved_qty", "weighted_cost",
-        "weighted_entry_date", "last_activity_at", "created_at",
+        "weighted_entry_date", "last_activity_at", "updated_at",
     ), rows)
     set_sequence(cur, "warehouse_stocks")
     conn.commit()
