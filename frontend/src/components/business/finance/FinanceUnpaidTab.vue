@@ -97,7 +97,7 @@
                 <div>
                   <label class="label">方式</label>
                   <select v-model="paymentForm.payment_method" class="input">
-                    <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+                    <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">{{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}</option>
                   </select>
                 </div>
               </div>
