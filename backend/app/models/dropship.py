@@ -1,4 +1,6 @@
 """代采代发模型"""
+from __future__ import annotations
+
 from tortoise import fields, models
 
 

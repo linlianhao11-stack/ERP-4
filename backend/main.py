@@ -63,12 +63,39 @@ async def _migrate_ai_permissions():
     await SystemSetting.get_or_create(key="ai.permissions_migrated", defaults={"value": "1"})
 
 
+async def _migrate_dropship_permissions():
+    """一次性：为所有活跃非 admin 用户追加代采代发权限（仅首次运行）"""
+    from app.models import User, SystemSetting
+    from app.logger import get_logger
+    logger = get_logger("migration")
+
+    flag = await SystemSetting.filter(key="dropship.permissions_migrated").first()
+    if flag:
+        return
+
+    dropship_perms = ["dropship", "dropship_pay"]
+    users = await User.filter(is_active=True).exclude(role="admin").all()
+    migrated = 0
+    for user in users:
+        perms = user.permissions or []
+        if "dropship" not in perms:
+            perms.extend(dropship_perms)
+            user.permissions = list(set(perms))
+            await user.save()
+            migrated += 1
+    if migrated:
+        logger.info(f"代采代发权限迁移完成，已为 {migrated} 个用户添加权限")
+
+    await SystemSetting.get_or_create(key="dropship.permissions_migrated", defaults={"value": "1"})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动
     await init_db()
     await run_migrations()
     await _migrate_ai_permissions()
+    await _migrate_dropship_permissions()
     # 启动自动备份任务
     backup_task = asyncio.create_task(auto_backup_loop())
     yield
