@@ -127,12 +127,9 @@ async def export_purchase_orders(
         "rejected": "已拒绝", "returned": "已退货"
     }
 
-    output = io.StringIO()
-    output.write('\ufeff')
     headers = ["采购单号", "供应商", "状态", "总金额", "目标仓库", "备注", "创建人", "审核人", "审核时间", "付款人", "付款时间", "创建时间",
                "商品SKU", "商品名称", "数量", "含税单价", "税率", "不含税单价", "小计金额", "已收货数量",
                "退货数量", "退货金额", "退款状态"]
-    output.write(','.join(headers) + '\n')
 
     # 批量查询所有采购明细（避免 N+1）
     po_ids = [o.id for o in orders]
@@ -141,55 +138,73 @@ async def export_purchase_orders(
     for item in all_po_items:
         po_items_by_order.setdefault(item.purchase_order_id, []).append(item)
 
-    for o in orders:
-        order_base = [
-            o.po_no,
-            o.supplier.name if o.supplier else "-",
-            status_names.get(o.status, o.status),
-            f"{float(o.total_amount):.2f}",
-            o.target_warehouse.name if o.target_warehouse else "-",
-            (o.remark or "").replace('\n', ' '),
-            o.creator.display_name if o.creator else "-",
-            o.reviewed_by.display_name if o.reviewed_by else "-",
-            o.reviewed_at.strftime("%Y-%m-%d %H:%M") if o.reviewed_at else "-",
-            o.paid_by.display_name if o.paid_by else "-",
-            o.paid_at.strftime("%Y-%m-%d %H:%M") if o.paid_at else "-",
-            o.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ]
-        items = po_items_by_order.get(o.id, [])
-        # Derive refund status at PO level
-        po_return_amount = float(o.return_amount) if o.return_amount else 0
-        if po_return_amount > 0 and o.is_refunded:
-            refund_status = "已退款"
-        elif po_return_amount > 0 and not o.is_refunded:
-            refund_status = "转为在账资金"
-        else:
-            refund_status = ""
+    def generate_csv():
+        buf = io.StringIO()
+        buf.write('\ufeff')
+        buf.write(','.join(headers) + '\n')
+        yield buf.getvalue()
+        buf.seek(0)
+        buf.truncate(0)
+        line_count = 0
 
-        if items:
-            for it in items:
-                row = order_base + [
-                    it.product.sku if it.product else "-",
-                    it.product.name if it.product else "-",
-                    str(it.quantity),
-                    f"{float(it.tax_inclusive_price):.2f}",
-                    f"{float(it.tax_rate * 100):.0f}%",
-                    f"{float(it.tax_exclusive_price):.2f}",
-                    f"{float(it.amount):.2f}",
-                    str(it.received_quantity),
-                    str(it.returned_quantity),
-                    f"{po_return_amount:.2f}",
-                    refund_status,
-                ]
-                output.write(','.join(csv_safe(item) for item in row) + '\n')
-        else:
-            row = order_base + ["-"] * 11
-            output.write(','.join(csv_safe(item) for item in row) + '\n')
+        for o in orders:
+            order_base = [
+                o.po_no,
+                o.supplier.name if o.supplier else "-",
+                status_names.get(o.status, o.status),
+                f"{float(o.total_amount):.2f}",
+                o.target_warehouse.name if o.target_warehouse else "-",
+                (o.remark or "").replace('\n', ' '),
+                o.creator.display_name if o.creator else "-",
+                o.reviewed_by.display_name if o.reviewed_by else "-",
+                o.reviewed_at.strftime("%Y-%m-%d %H:%M") if o.reviewed_at else "-",
+                o.paid_by.display_name if o.paid_by else "-",
+                o.paid_at.strftime("%Y-%m-%d %H:%M") if o.paid_at else "-",
+                o.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+            items = po_items_by_order.get(o.id, [])
+            po_return_amount = float(o.return_amount) if o.return_amount else 0
+            if po_return_amount > 0 and o.is_refunded:
+                refund_status = "已退款"
+            elif po_return_amount > 0 and not o.is_refunded:
+                refund_status = "转为在账资金"
+            else:
+                refund_status = ""
 
-    output.seek(0)
+            if items:
+                for it in items:
+                    row = order_base + [
+                        it.product.sku if it.product else "-",
+                        it.product.name if it.product else "-",
+                        str(it.quantity),
+                        f"{float(it.tax_inclusive_price):.2f}",
+                        f"{float(it.tax_rate * 100):.0f}%",
+                        f"{float(it.tax_exclusive_price):.2f}",
+                        f"{float(it.amount):.2f}",
+                        str(it.received_quantity),
+                        str(it.returned_quantity),
+                        f"{po_return_amount:.2f}",
+                        refund_status,
+                    ]
+                    buf.write(','.join(csv_safe(item) for item in row) + '\n')
+                    line_count += 1
+            else:
+                row = order_base + ["-"] * 11
+                buf.write(','.join(csv_safe(item) for item in row) + '\n')
+                line_count += 1
+
+            if line_count % 100 == 0:
+                yield buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+
+        remaining = buf.getvalue()
+        if remaining:
+            yield remaining
+
     filename = f"采购订单_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
-        iter([output.getvalue().encode('utf-8')]),
+        generate_csv(),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
     )
