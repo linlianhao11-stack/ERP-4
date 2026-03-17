@@ -8,6 +8,7 @@ class Warehouse(models.Model):
     is_virtual = fields.BooleanField(default=False)
     customer = fields.ForeignKeyField("models.Customer", related_name="warehouses", null=True, on_delete=fields.SET_NULL)
     is_active = fields.BooleanField(default=True)
+    color = fields.CharField(max_length=20, default="blue")
     account_set = fields.ForeignKeyField("models.AccountSet", related_name="warehouses", null=True, on_delete=fields.SET_NULL)
     created_at = fields.DatetimeField(auto_now_add=True)
 

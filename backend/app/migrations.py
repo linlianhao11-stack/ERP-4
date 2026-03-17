@@ -43,6 +43,7 @@ async def _run_migrations_inner():
     await migrate_ai_readonly_user()
     await migrate_stock_last_activity()
     await migrate_tracking_refresh_fields()
+    await migrate_warehouse_color()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -1078,3 +1079,16 @@ async def migrate_tracking_refresh_fields():
         END $$
     """)
     logger.info("迁移: last_tracking_refresh 字段已添加")
+
+
+async def migrate_warehouse_color():
+    """v4.17: 仓库颜色标记字段"""
+    conn = connections.get("default")
+    cols = [r["column_name"] for r in (await conn.execute_query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='warehouses'"
+    ))[1]]
+    if "color" not in cols:
+        await conn.execute_query(
+            "ALTER TABLE warehouses ADD COLUMN color VARCHAR(20) DEFAULT 'blue'"
+        )
+        logger.info("迁移完成: warehouses.color")
