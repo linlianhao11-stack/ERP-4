@@ -92,6 +92,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
                 stock_details.append({
                     "warehouse_id": s.warehouse_id,
                     "warehouse_name": s.warehouse.name,
+                    "warehouse_color": s.warehouse.color or "blue",
                     "location_id": s.location_id,
                     "location_code": s.location.code if s.location else None,
                     "quantity": s.quantity,
@@ -514,7 +515,7 @@ async def get_product(product_id: int, user: User = Depends(get_current_user)):
     result = {
         "id": p.id, "sku": p.sku, "name": p.name, "brand": p.brand, "category": p.category,
         "retail_price": float(p.retail_price), "unit": p.unit,
-        "stocks": [{"warehouse_id": s.warehouse_id, "warehouse_name": s.warehouse.name, "quantity": s.quantity} for s in stocks]
+        "stocks": [{"warehouse_id": s.warehouse_id, "warehouse_name": s.warehouse.name, "warehouse_color": s.warehouse.color or "blue", "quantity": s.quantity} for s in stocks]
     }
     if has_finance:
         result["cost_price"] = float(p.cost_price)

@@ -35,6 +35,7 @@ async def list_warehouses(include_virtual: bool = False, user: User = Depends(ge
             "is_virtual": w.is_virtual, "customer_id": w.customer_id,
             "account_set_id": w.account_set_id,
             "account_set_name": as_map.get(w.account_set_id) if w.account_set_id else None,
+            "color": w.color or "blue",
             "locations": [{"id": loc.id, "code": loc.code, "name": loc.name} for loc in locs]
         })
     return result
@@ -48,7 +49,7 @@ async def create_warehouse(data: WarehouseCreate, user: User = Depends(require_p
     async with transactions.in_transaction():
         if data.is_default:
             await Warehouse.filter(is_default=True).update(is_default=False)
-        create_kwargs = dict(name=data.name, is_default=data.is_default)
+        create_kwargs = dict(name=data.name, is_default=data.is_default, color=data.color)
         if data.account_set_id is not None:
             create_kwargs["account_set_id"] = data.account_set_id
         wh = await Warehouse.create(**create_kwargs)
