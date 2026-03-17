@@ -1084,8 +1084,8 @@ async def migrate_tracking_refresh_fields():
 async def migrate_warehouse_color():
     """v4.17: 仓库颜色标记字段"""
     conn = connections.get("default")
-    cols = [r["column_name"] for r in (await conn.execute_query(
-        "SELECT column_name FROM information_schema.columns WHERE table_name='warehouses'"
+    cols = [r["name"] for r in (await conn.execute_query(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name='warehouses'"
     ))[1]]
     if "color" not in cols:
         await conn.execute_query(

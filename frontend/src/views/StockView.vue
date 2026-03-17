@@ -59,7 +59,7 @@
           </div>
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-1.5 text-xs">
-              <span :class="s.is_virtual ? 'badge badge-purple' : `badge badge-${s.warehouse_color || 'blue'}`">{{ s.is_virtual ? '寄售' : (s.location_code || '-') }}</span>
+              <span :class="s.is_virtual ? 'badge badge-purple' : `badge badge-${s.warehouse_color || DEFAULT_WAREHOUSE_COLOR}`">{{ s.is_virtual ? '寄售' : (s.location_code || '-') }}</span>
               <span class="text-muted">{{ s.warehouse_name }}</span>
               <span v-if="!s.is_virtual" :class="getAgeClass(p.age_days)" class="ml-1">{{ p.age_days }}天</span>
             </div>
@@ -127,7 +127,7 @@
                 <div class="text-xs text-muted font-mono mt-0.5">{{ row.p.sku }}</div>
               </td>
               <td v-if="isColumnVisible('warehouse')" class="px-2 py-2">
-                <span :class="row.s.is_virtual ? 'badge badge-purple' : `badge badge-${row.s.warehouse_color || 'blue'}`">{{ row.s.is_virtual ? '寄售' : (row.s.location_code || '-') }}</span>
+                <span :class="row.s.is_virtual ? 'badge badge-purple' : `badge badge-${row.s.warehouse_color || DEFAULT_WAREHOUSE_COLOR}`">{{ row.s.is_virtual ? '寄售' : (row.s.location_code || '-') }}</span>
                 <div class="text-xs text-muted">{{ row.s.warehouse_name }}</div>
               </td>
               <td v-if="isColumnVisible('retail_price')" class="px-2 py-2 text-right">{{ row.p.retail_price }}</td>
@@ -214,6 +214,7 @@ import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
 import { useStock } from '../composables/useStock'
 import ColumnMenu from '../components/common/ColumnMenu.vue'
+import { DEFAULT_WAREHOUSE_COLOR } from '../utils/constants'
 
 // 弹窗子组件
 import RestockModal from '../components/business/stock/RestockModal.vue'

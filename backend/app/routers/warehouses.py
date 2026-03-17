@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Warehouse, Location, WarehouseStock, AccountSet
-from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
+from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate, DEFAULT_WAREHOUSE_COLOR
 
 router = APIRouter(prefix="/api/warehouses", tags=["仓库管理"])
 
@@ -35,7 +35,7 @@ async def list_warehouses(include_virtual: bool = False, user: User = Depends(ge
             "is_virtual": w.is_virtual, "customer_id": w.customer_id,
             "account_set_id": w.account_set_id,
             "account_set_name": as_map.get(w.account_set_id) if w.account_set_id else None,
-            "color": w.color or "blue",
+            "color": w.color or DEFAULT_WAREHOUSE_COLOR,
             "locations": [{"id": loc.id, "code": loc.code, "name": loc.name} for loc in locs]
         })
     return result
