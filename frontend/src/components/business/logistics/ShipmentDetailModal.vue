@@ -277,7 +277,7 @@ import {
 } from '../../../api/logistics'
 import { orderTypeNames, orderTypeBadges, shipmentStatusNames, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import { parseSnCodes } from '../../../utils/helpers'
-import { PHONE_REQUIRED_CARRIERS, NO_LOGISTICS_CODES } from '../../../constants/carriers'
+import { PHONE_REQUIRED_CARRIERS, isNoLogisticsCode, noLogisticsHint as getNoLogisticsHint, shipActionText } from '../../../constants/carriers'
 import SearchableSelect from '../../common/SearchableSelect.vue'
 
 const props = defineProps({
@@ -342,24 +342,13 @@ const carrierOptions = computed(() =>
   (props.carriers || []).map(c => ({ id: c.code, label: c.name }))
 )
 
-/** 判断是否为无物流配送方式 */
-const isNoLogistics = (code) => NO_LOGISTICS_CODES.has(code)
-
-/** 无物流配送的提示文案 */
-const noLogisticsHint = (code) =>
-  code === 'self_delivery' ? '自配送（无需快递单号）' : '客户上门自提'
-
-/** 发货按钮文案 */
-const shipBtnText = (code) => {
-  if (code === 'self_pickup') return '确认自提'
-  if (code === 'self_delivery') return '确认送达'
-  return '确认发货'
-}
+const isNoLogistics = isNoLogisticsCode
+const noLogisticsHint = getNoLogisticsHint
+const shipBtnText = shipActionText
 
 /** legacy 表单保存按钮文案 */
 const legacySaveBtnText = (code, isEditing) => {
-  if (code === 'self_pickup') return '确认自提'
-  if (code === 'self_delivery') return '确认送达'
+  if (isNoLogisticsCode(code)) return shipActionText(code)
   return isEditing ? '保存修改' : '添加'
 }
 

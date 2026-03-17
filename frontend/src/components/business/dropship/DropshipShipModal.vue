@@ -1,6 +1,6 @@
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="$emit('update:visible', false)">
-    <div class="modal-content" style="max-width:520px">
+    <div class="modal-content" style="max-width:640px">
       <div class="modal-header">
         <h3 class="modal-title">确认发货</h3>
         <button @click="$emit('update:visible', false)" class="modal-close">&times;</button>
@@ -59,7 +59,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { PHONE_REQUIRED_CARRIERS, NO_LOGISTICS_CODES } from '../../../constants/carriers'
+import { PHONE_REQUIRED_CARRIERS, isNoLogisticsCode, noLogisticsHint as getNoLogisticsHint, shipActionText } from '../../../constants/carriers'
 import { getCarriers } from '../../../api/logistics'
 import { shipDropshipOrder } from '../../../api/dropship'
 import { useAppStore } from '../../../stores/app'
@@ -86,19 +86,11 @@ const carrierOptions = computed(() =>
   carriers.value.map(c => ({ id: c.code, label: c.name }))
 )
 
-const isNoLogistics = computed(() => NO_LOGISTICS_CODES.has(form.carrier_code))
+const isNoLogistics = computed(() => isNoLogisticsCode(form.carrier_code))
 const needPhone = computed(() => PHONE_REQUIRED_CARRIERS.has(form.carrier_code))
 const carrierName = computed(() => carriers.value.find(c => c.code === form.carrier_code)?.name || '')
-
-const noLogisticsHint = computed(() =>
-  form.carrier_code === 'self_delivery' ? '自配送（无需快递单号）' : '客户上门自提'
-)
-
-const shipBtnText = computed(() => {
-  if (form.carrier_code === 'self_pickup') return '确认自提'
-  if (form.carrier_code === 'self_delivery') return '确认送达'
-  return '确认发货'
-})
+const noLogisticsHint = computed(() => getNoLogisticsHint(form.carrier_code))
+const shipBtnText = computed(() => shipActionText(form.carrier_code))
 
 /** 加载快递公司列表 */
 const loadCarriers = async () => {
