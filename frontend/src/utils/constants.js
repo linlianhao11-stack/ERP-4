@@ -185,12 +185,12 @@ export const shipmentStatusBadges = {
 
 export const shippingStatusNames = {
   pending: '待发货', partial: '部分发货',
-  completed: '已完成', cancelled: '已取消'
+  completed: '已完成', delivered: '已签收', cancelled: '已取消'
 }
 
 export const shippingStatusBadges = {
   pending: 'badge badge-yellow', partial: 'badge badge-orange',
-  completed: 'badge badge-green', cancelled: 'badge badge-gray'
+  completed: 'badge badge-green', delivered: 'badge badge-blue', cancelled: 'badge badge-gray'
 }
 
 export const dropshipStatusNames = {

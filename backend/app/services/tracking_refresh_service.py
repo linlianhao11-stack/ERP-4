@@ -100,7 +100,6 @@ async def _refresh_dropship_orders() -> dict:
 async def _refresh_shipments() -> dict:
     """刷新普通物流 Shipment 状态，联动更新 Order，返回统计"""
     from app.models.shipment import Shipment
-    from app.models.order import Order
 
     stats = {"total": 0, "success": 0, "signed": 0, "delivered": 0, "failed": 0}
 
