@@ -6,7 +6,7 @@
 
   <!-- 聊天窗口 -->
   <Transition name="slide-up">
-    <div v-if="open" class="ai-window" :class="{ 'ai-window-mobile': isMobile, 'ai-window-expanded': expanded && !isMobile }">
+    <div v-show="open" class="ai-window" :class="{ 'ai-window-mobile': isMobile, 'ai-window-expanded': expanded && !isMobile }">
       <!-- 标题栏 -->
       <div class="ai-header">
         <div class="flex items-center gap-2">
