@@ -1,7 +1,7 @@
 """数据库迁移逻辑 - 初始化默认数据"""
 from app.auth.password import hash_password
 from tortoise import connections
-from app.models import User, Warehouse, Location, PaymentMethod, DisbursementMethod
+from app.models import User, Warehouse, Location, PaymentMethod, DisbursementMethod, SystemSetting
 from app.logger import get_logger
 
 logger = get_logger("migrations")
@@ -9,19 +9,21 @@ logger = get_logger("migrations")
 
 async def run_migrations():
     """初始化默认数据（幂等操作）"""
-    # 使用 advisory lock 防止多 worker 同时执行迁移
-    conn = connections.get("default")
-    lock_acquired = (await conn.execute_query(
-        "SELECT pg_try_advisory_lock(20260315)"
-    ))[1][0]["pg_try_advisory_lock"]
-    if not lock_acquired:
-        logger.info("另一个 worker 正在执行迁移，跳过")
-        return
-
+    # 使用 pg_advisory_lock 防止多 worker 同时执行迁移
+    # pg_try_advisory_lock 是会话级锁，在连接池环境中 lock/unlock
+    # 可能分配到不同连接导致锁失效。改用原始连接 + 阻塞式锁：
+    # 第一个 worker 获取锁并执行迁移，第二个 worker 阻塞等待，
+    # 等锁释放后所有迁移已完成，幂等检查会让它直接跳过。
+    pool = connections.get("default")
+    raw_conn = await pool._pool.acquire()
     try:
-        await _run_migrations_inner()
+        await raw_conn.execute("SELECT pg_advisory_lock(20260315)")
+        try:
+            await _run_migrations_inner()
+        finally:
+            await raw_conn.execute("SELECT pg_advisory_unlock(20260315)")
     finally:
-        await conn.execute_query("SELECT pg_advisory_unlock(20260315)")
+        await pool._pool.release(raw_conn)
 
 
 async def _run_migrations_inner():
@@ -113,6 +115,10 @@ async def _run_migrations_inner():
     # 代采代发模块
     await migrate_dropship_module()
     await migrate_dropship_phone()
+
+    # 一次性权限迁移（从 main.py 移入，统一在 advisory lock 保护下）
+    await _migrate_ai_permissions()
+    await _migrate_dropship_permissions()
 
     logger.info("数据库初始化完成")
 
@@ -1092,3 +1098,46 @@ async def migrate_warehouse_color():
             "ALTER TABLE warehouses ADD COLUMN color VARCHAR(20) DEFAULT 'blue'"
         )
         logger.info("迁移完成: warehouses.color")
+
+
+async def _migrate_ai_permissions():
+    """一次性：为所有活跃非 admin 用户追加 AI 权限"""
+    from app.ai.view_permissions import AI_PERMISSION_KEYS
+
+    flag = await SystemSetting.filter(key="ai.permissions_migrated").first()
+    if flag:
+        return
+
+    users = await User.filter(is_active=True).exclude(role="admin").all()
+    migrated = 0
+    for user in users:
+        perms = user.permissions or []
+        if "ai_chat" not in perms:
+            perms.extend(AI_PERMISSION_KEYS)
+            user.permissions = list(set(perms))
+            await user.save()
+            migrated += 1
+    if migrated:
+        logger.info(f"AI 权限迁移完成，已为 {migrated} 个用户添加 AI 权限")
+    await SystemSetting.get_or_create(key="ai.permissions_migrated", defaults={"value": "1"})
+
+
+async def _migrate_dropship_permissions():
+    """一次性：为所有活跃非 admin 用户追加代采代发权限"""
+    flag = await SystemSetting.filter(key="dropship.permissions_migrated").first()
+    if flag:
+        return
+
+    dropship_perms = ["dropship", "dropship_pay"]
+    users = await User.filter(is_active=True).exclude(role="admin").all()
+    migrated = 0
+    for user in users:
+        perms = user.permissions or []
+        if "dropship" not in perms:
+            perms.extend(dropship_perms)
+            user.permissions = list(set(perms))
+            await user.save()
+            migrated += 1
+    if migrated:
+        logger.info(f"代采代发权限迁移完成，已为 {migrated} 个用户添加权限")
+    await SystemSetting.get_or_create(key="dropship.permissions_migrated", defaults={"value": "1"})
