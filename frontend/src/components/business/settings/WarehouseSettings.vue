@@ -16,6 +16,7 @@
           <div class="flex justify-between items-center p-3 bg-elevated cursor-pointer" @click="toggleExpandWarehouse(w.id)">
             <div class="flex items-center gap-2">
               <span class="text-xs text-muted">{{ expandedWarehouse === w.id ? '▼' : '▶' }}</span>
+              <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" :style="`background-color: var(--${colorCssVarMap[w.color || 'blue'] || 'info-emphasis'})`"></span>
               <span class="font-medium text-sm">{{ w.name }}</span>
               <span v-if="w.is_default" class="text-xs text-primary bg-info-subtle px-1.5 py-0.5 rounded">(默认)</span>
               <span v-if="w.account_set_name" class="text-xs text-white bg-primary px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
@@ -86,6 +87,23 @@
         </div>
         <div class="modal-body"><div class="space-y-3">
           <div><label class="label">仓库名称 *</label><input v-model="warehouseForm.name" class="input" required placeholder="请输入新名称"></div>
+          <div>
+            <label class="label">标记颜色</label>
+            <div class="flex gap-2 mt-1">
+              <button
+                v-for="c in colorOptions"
+                :key="c.value"
+                type="button"
+                @click="warehouseForm.color = c.value"
+                class="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center"
+                :class="warehouseForm.color === c.value ? 'border-foreground scale-110' : 'border-transparent opacity-60 hover:opacity-100'"
+                :style="`background-color: var(--${c.cssVar})`"
+                :title="c.label"
+              >
+                <svg v-if="warehouseForm.color === c.value" class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </button>
+            </div>
+          </div>
           <div><label class="flex items-center"><input type="checkbox" v-model="warehouseForm.is_default" class="mr-2">设为默认仓库</label></div>
           <div v-if="accountSets.length">
             <label class="label">关联账套</label>
@@ -138,6 +156,19 @@ import {
 import { createSnConfig, deleteSnConfig as deleteSnConfigApi } from '../../../api/sn'
 import { getAccountSets } from '../../../api/accounting'
 
+// 预设颜色选项
+const colorOptions = [
+  { value: 'blue', label: '蓝色', cssVar: 'info-emphasis' },
+  { value: 'green', label: '绿色', cssVar: 'success-emphasis' },
+  { value: 'red', label: '红色', cssVar: 'error-emphasis' },
+  { value: 'yellow', label: '黄色', cssVar: 'warning-emphasis' },
+  { value: 'purple', label: '紫色', cssVar: 'purple-emphasis' },
+  { value: 'gray', label: '灰色', cssVar: 'gray-emphasis' },
+  { value: 'orange', label: '橙色', cssVar: 'orange-emphasis' },
+]
+
+const colorCssVarMap = Object.fromEntries(colorOptions.map(c => [c.value, c.cssVar]))
+
 const emit = defineEmits(['data-changed'])
 
 const appStore = useAppStore()
@@ -152,7 +183,7 @@ const accountSets = ref([])
 
 // 仓库相关状态
 const showWarehouseModal = ref(false)
-const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null })
+const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null, color: 'blue' })
 const expandedWarehouse = ref(null)
 
 // 仓位相关状态
@@ -177,12 +208,12 @@ const toggleExpandWarehouse = (id) => {
 
 // === 仓库操作 ===
 const openCreateWarehouse = () => {
-  Object.assign(warehouseForm, { id: null, name: '', is_default: false, account_set_id: null })
+  Object.assign(warehouseForm, { id: null, name: '', is_default: false, account_set_id: null, color: 'blue' })
   showWarehouseModal.value = true
 }
 
 const editWarehouse = (w) => {
-  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null })
+  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null, color: w.color || 'blue' })
   showWarehouseModal.value = true
 }
 
@@ -195,9 +226,9 @@ const saveWarehouse = async () => {
   appStore.submitting = true
   try {
     if (warehouseForm.id) {
-      await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
+      await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null, color: warehouseForm.color })
     } else {
-      await createWarehouse({ name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
+      await createWarehouse({ name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null, color: warehouseForm.color })
     }
     appStore.showToast(warehouseForm.id ? '保存成功' : '创建成功')
     showWarehouseModal.value = false
