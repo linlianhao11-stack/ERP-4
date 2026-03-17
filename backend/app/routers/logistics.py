@@ -9,7 +9,7 @@ from tortoise import transactions
 from tortoise.expressions import F
 
 from app.auth.dependencies import get_current_user, require_permission
-from app.config import CARRIER_LIST, KD100_KEY, KD100_CUSTOMER
+from app.config import CARRIER_LIST, NO_LOGISTICS_CARRIERS, KD100_KEY, KD100_CUSTOMER
 from app.models import (
     User, Order, OrderItem, Shipment, ShipmentItem, SnCode, SnConfig, WarehouseStock, StockLog
 )
@@ -53,6 +53,15 @@ def _shipment_to_dict(s, tracking_info=None):
         "tracking_info": ti,
         "updated_at": s.updated_at.isoformat()
     }
+
+
+def _no_logistics_status_text(carrier_code: str) -> str:
+    """无物流配送方式的状态文本"""
+    return "已送达" if carrier_code == "self_delivery" else "已自提"
+
+def _no_logistics_message(carrier_code: str) -> str:
+    """无物流配送方式的返回消息"""
+    return "已标记送达" if carrier_code == "self_delivery" else "已标记自提完成"
 
 
 @router.get("/carriers")
@@ -297,8 +306,8 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
     if not data.items:
         raise HTTPException(status_code=400, detail="请选择要发货的商品")
 
-    is_self_pickup = data.is_self_pickup or data.carrier_code == "self_pickup"
-    if not is_self_pickup and not data.tracking_no:
+    is_no_logistics = data.carrier_code in NO_LOGISTICS_CARRIERS
+    if not is_no_logistics and not data.tracking_no:
         raise HTTPException(status_code=400, detail="请填写快递单号")
 
     async with transactions.in_transaction():
@@ -310,8 +319,8 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
             carrier_name=data.carrier_name,
             tracking_no=data.tracking_no or None,
             phone=data.phone or None,
-            status="signed" if is_self_pickup else "shipped",
-            status_text="已自提" if is_self_pickup else "已发货"
+            status="signed" if is_no_logistics else "shipped",
+            status_text=_no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
         )
 
         consignment_wh = None
@@ -484,7 +493,7 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
         except Exception as e:
             logger.warning(f"自动生成出库单失败: {e}")
 
-    if not is_self_pickup and data.tracking_no:
+    if not is_no_logistics and data.tracking_no:
         try:
             await refresh_shipment_tracking(shipment)
         except Exception as e:
@@ -498,7 +507,7 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
             logger.warning("订阅快递100失败", extra={"data": {"shipment_id": shipment.id, "error": str(e)}})
 
     return {
-        "message": "已标记自提完成" if is_self_pickup else "发货成功",
+        "message": _no_logistics_message(data.carrier_code) if is_no_logistics else "发货成功",
         "shipment": _shipment_to_dict(shipment),
         "shipping_status": order.shipping_status
     }
@@ -513,7 +522,7 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
     if order.order_type not in ("CASH", "CREDIT", "CONSIGN_OUT"):
         raise HTTPException(status_code=400, detail="该订单类型不支持添加物流单")
 
-    is_self_pickup = data.carrier_code == "self_pickup"
+    is_no_logistics = data.carrier_code in NO_LOGISTICS_CARRIERS
     sh_no = await generate_sequential_no("SH", "shipments", "shipment_no")
     shipment = await Shipment.create(
         shipment_no=sh_no,
@@ -523,15 +532,15 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
         tracking_no=data.tracking_no or None,
         phone=data.phone or None,
         sn_code=data.sn_code or None,
-        status="signed" if is_self_pickup else "shipped",
-        status_text="已自提" if is_self_pickup else "已发货"
+        status="signed" if is_no_logistics else "shipped",
+        status_text=_no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
     )
 
     if data.sn_codes:
         await validate_and_consume_sn_codes(data.sn_codes, shipment, user, strict=False)
 
     tracking_info = []
-    if not is_self_pickup and data.tracking_no:
+    if not is_no_logistics and data.tracking_no:
         result = await refresh_shipment_tracking(shipment)
         if result:
             tracking_info = result.get("tracking_info", [])
@@ -544,7 +553,7 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
         except Exception:
             pass
 
-    return {"message": "已标记自提完成" if is_self_pickup else "物流单已添加", "shipment": _shipment_to_dict(shipment, tracking_info)}
+    return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "物流单已添加", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
 
 @router.put("/shipment/{shipment_id}/ship")
@@ -553,7 +562,7 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
     if not shipment:
         raise HTTPException(status_code=404, detail="物流记录不存在")
 
-    is_self_pickup = data.carrier_code == "self_pickup"
+    is_no_logistics = data.carrier_code in NO_LOGISTICS_CARRIERS
     tracking_changed = (shipment.tracking_no != data.tracking_no) or (shipment.carrier_code != data.carrier_code)
 
     shipment.carrier_code = data.carrier_code
@@ -561,8 +570,8 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
     shipment.tracking_no = data.tracking_no or None
     shipment.phone = data.phone or shipment.phone
     shipment.sn_code = data.sn_code if data.sn_code is not None else shipment.sn_code
-    shipment.status = "signed" if is_self_pickup else "shipped"
-    shipment.status_text = "已自提" if is_self_pickup else "已发货"
+    shipment.status = "signed" if is_no_logistics else "shipped"
+    shipment.status_text = _no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
 
     if tracking_changed:
         shipment.last_tracking_info = None
@@ -571,7 +580,7 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
     await shipment.save()
 
     tracking_info = []
-    if not is_self_pickup and data.tracking_no and tracking_changed:
+    if not is_no_logistics and data.tracking_no and tracking_changed:
         result = await refresh_shipment_tracking(shipment)
         if result:
             tracking_info = result.get("tracking_info", [])
@@ -584,7 +593,7 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
         except Exception:
             pass
 
-    return {"message": "已标记自提完成" if is_self_pickup else "发货信息已保存", "shipment": _shipment_to_dict(shipment, tracking_info)}
+    return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "发货信息已保存", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
 
 @router.post("/shipment/{shipment_id}/update-sn")

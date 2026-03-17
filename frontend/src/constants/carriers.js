@@ -14,3 +14,6 @@ export const CARRIERS = [
 
 /** 需要手机号后四位才能查询物流的快递公司 */
 export const PHONE_REQUIRED_CARRIERS = new Set(['shunfeng', 'shunfengkuaiyun', 'zhongtong'])
+
+/** 无需物流跟踪的配送方式（自提/自配送） */
+export const NO_LOGISTICS_CODES = new Set(['self_pickup', 'self_delivery'])

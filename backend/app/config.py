@@ -46,18 +46,37 @@ CORS_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()] if _cors_r
 # 快递公司列表
 CARRIER_LIST = [
     {"code": "self_pickup", "name": "上门自提"},
+    {"code": "self_delivery", "name": "自配送"},
     {"code": "shunfeng", "name": "顺丰速运"},
+    {"code": "shunfengkuaiyun", "name": "顺丰快运"},
     {"code": "yuantong", "name": "圆通速递"},
     {"code": "zhongtong", "name": "中通快递"},
+    {"code": "zhongtongkuaiyun", "name": "中通快运"},
     {"code": "yunda", "name": "韵达快递"},
+    {"code": "yundakuaiyun", "name": "韵达快运"},
     {"code": "shentong", "name": "申通快递"},
     {"code": "ems", "name": "EMS"},
     {"code": "jd", "name": "京东物流"},
     {"code": "jtexpress", "name": "极兔速递"},
     {"code": "debangkuaidi", "name": "德邦快递"},
-    {"code": "kuayue", "name": "跨越速运"},
+    {"code": "huitongkuaidi", "name": "百世快递"},
+    {"code": "tiantian", "name": "天天快递"},
     {"code": "youzhengguonei", "name": "中国邮政"},
+    {"code": "youzhengbk", "name": "邮政标准快递"},
+    {"code": "kuayue", "name": "跨越速运"},
+    {"code": "fengwang", "name": "丰网速运"},
+    {"code": "annengwuliu", "name": "安能快运"},
+    {"code": "yimidida", "name": "壹米滴答"},
+    {"code": "ztky", "name": "中铁快运"},
+    {"code": "zhaijisong", "name": "宅急送"},
+    {"code": "guotongkuaidi", "name": "国通快递"},
+    {"code": "jiayunmeiwuliu", "name": "加运美"},
+    {"code": "xinfengwuliu", "name": "信丰物流"},
+    {"code": "jinguangsudikuaijian", "name": "京广速递"},
 ]
+
+# 无需物流跟踪的配送方式（自提/自配送）
+NO_LOGISTICS_CARRIERS = {"self_pickup", "self_delivery"}
 
 # 需要手机号才能查询的快递公司
 PHONE_REQUIRED_CARRIERS = {"shunfeng", "shunfengkuaiyun", "zhongtong"}

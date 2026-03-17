@@ -169,20 +169,22 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="label text-xs">快递公司</label>
-                <select v-model="shipForm.carrier_code" @change="onShipCarrierChange" class="input text-sm py-1">
-                  <option value="">请选择</option>
-                  <option v-for="c in carriers" :key="c.code" :value="c.code">{{ c.name }}</option>
-                </select>
+                <SearchableSelect
+                  v-model="shipForm.carrier_code"
+                  :options="carrierOptions"
+                  placeholder="请选择快递公司"
+                  search-placeholder="搜索快递公司..."
+                />
               </div>
-              <div v-if="shipForm.carrier_code === 'self_pickup'" class="flex items-end pb-1">
-                <span class="text-sm text-success font-semibold">客户上门自提</span>
+              <div v-if="isNoLogistics(shipForm.carrier_code)" class="flex items-end pb-1">
+                <span class="text-sm text-success font-semibold">{{ noLogisticsHint(shipForm.carrier_code) }}</span>
               </div>
               <div v-else>
                 <label class="label text-xs">快递单号</label>
                 <input v-model="shipForm.tracking_no" class="input text-sm py-1" placeholder="输入快递单号">
               </div>
               <div
-                v-if="shipForm.carrier_code !== 'self_pickup' && ['shunfeng', 'shunfengkuaiyun', 'zhongtong'].includes(shipForm.carrier_code)"
+                v-if="!isNoLogistics(shipForm.carrier_code) && PHONE_REQUIRED_CARRIERS.has(shipForm.carrier_code)"
                 class="col-span-2"
               >
                 <label class="label text-xs">
@@ -196,7 +198,7 @@
             </div>
             <div class="flex gap-2 pt-2">
               <button @click="submitShip" class="btn btn-primary btn-sm flex-1">
-                {{ shipForm.carrier_code === 'self_pickup' ? '确认自提' : '确认发货' }}
+                {{ shipBtnText(shipForm.carrier_code) }}
               </button>
               <button @click="showShipForm = false" class="btn btn-secondary btn-sm flex-1">取消</button>
             </div>
@@ -208,20 +210,22 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="label text-xs">快递公司</label>
-                <select v-model="shipmentForm.carrier_code" @change="onCarrierChange" class="input text-sm py-1">
-                  <option value="">请选择</option>
-                  <option v-for="c in carriers" :key="c.code" :value="c.code">{{ c.name }}</option>
-                </select>
+                <SearchableSelect
+                  v-model="shipmentForm.carrier_code"
+                  :options="carrierOptions"
+                  placeholder="请选择快递公司"
+                  search-placeholder="搜索快递公司..."
+                />
               </div>
-              <div v-if="shipmentForm.carrier_code === 'self_pickup'" class="flex items-end pb-1">
-                <span class="text-sm text-success font-semibold">客户上门自提，无需快递单号</span>
+              <div v-if="isNoLogistics(shipmentForm.carrier_code)" class="flex items-end pb-1">
+                <span class="text-sm text-success font-semibold">{{ noLogisticsHint(shipmentForm.carrier_code) }}</span>
               </div>
               <div v-else>
                 <label class="label text-xs">快递单号</label>
                 <input v-model="shipmentForm.tracking_no" class="input text-sm py-1" placeholder="输入快递单号">
               </div>
               <div
-                v-if="shipmentForm.carrier_code !== 'self_pickup' && ['shunfeng', 'shunfengkuaiyun', 'zhongtong'].includes(shipmentForm.carrier_code)"
+                v-if="!isNoLogistics(shipmentForm.carrier_code) && PHONE_REQUIRED_CARRIERS.has(shipmentForm.carrier_code)"
                 class="col-span-2"
               >
                 <label class="label text-xs">
@@ -239,7 +243,7 @@
             </div>
             <div class="flex gap-2 pt-2">
               <button @click="saveShipment(shipmentDetail.order.id)" class="btn btn-primary btn-sm flex-1">
-                {{ shipmentForm.carrier_code === 'self_pickup' ? '确认自提' : (editingShipmentId ? '保存修改' : '添加') }}
+                {{ legacySaveBtnText(shipmentForm.carrier_code, editingShipmentId) }}
               </button>
               <button @click="resetShipmentForm" class="btn btn-secondary btn-sm flex-1">取消</button>
             </div>
@@ -273,6 +277,8 @@ import {
 } from '../../../api/logistics'
 import { orderTypeNames, orderTypeBadges, shipmentStatusNames, shipmentStatusBadges, shippingStatusNames, shippingStatusBadges } from '../../../utils/constants'
 import { parseSnCodes } from '../../../utils/helpers'
+import { PHONE_REQUIRED_CARRIERS, NO_LOGISTICS_CODES } from '../../../constants/carriers'
+import SearchableSelect from '../../common/SearchableSelect.vue'
 
 const props = defineProps({
   /** 弹窗是否显示 */
@@ -330,6 +336,32 @@ const getShipmentStatusBadge = (status) => shipmentStatusBadges[status] || 'bg-e
 const getShipmentStatusName = (status, fallback) => shipmentStatusNames[status] || fallback || status || '-'
 const getShippingName = (status) => shippingStatusNames[status] || status || '-'
 const getShippingBadge = (status) => shippingStatusBadges[status] || 'badge badge-gray'
+
+/** 快递公司列表转 SearchableSelect 格式 */
+const carrierOptions = computed(() =>
+  (props.carriers || []).map(c => ({ id: c.code, label: c.name }))
+)
+
+/** 判断是否为无物流配送方式 */
+const isNoLogistics = (code) => NO_LOGISTICS_CODES.has(code)
+
+/** 无物流配送的提示文案 */
+const noLogisticsHint = (code) =>
+  code === 'self_delivery' ? '自配送（无需快递单号）' : '客户上门自提'
+
+/** 发货按钮文案 */
+const shipBtnText = (code) => {
+  if (code === 'self_pickup') return '确认自提'
+  if (code === 'self_delivery') return '确认送达'
+  return '确认发货'
+}
+
+/** legacy 表单保存按钮文案 */
+const legacySaveBtnText = (code, isEditing) => {
+  if (code === 'self_pickup') return '确认自提'
+  if (code === 'self_delivery') return '确认送达'
+  return isEditing ? '保存修改' : '添加'
+}
 
 /** 解析 SN 码文本为数组 */
 const formatSN = (snText) => {
@@ -408,11 +440,11 @@ const openShipForm = () => {
   }))
 }
 
-/** 发货表单快递公司选择变化 */
-const onShipCarrierChange = () => {
-  const c = props.carriers.find(x => x.code === shipForm.carrier_code)
+/** 发货表单快递公司选择变化 — 自动同步 carrier_name */
+watch(() => shipForm.carrier_code, (code) => {
+  const c = props.carriers?.find(x => x.code === code)
   if (c) shipForm.carrier_name = c.name
-}
+})
 
 /** 提交发货 */
 const submitShip = async () => {
@@ -421,8 +453,8 @@ const submitShip = async () => {
     appStore.showToast('请选择快递公司', 'error')
     return
   }
-  const isSelfPickup = shipForm.carrier_code === 'self_pickup'
-  if (!isSelfPickup && !shipForm.tracking_no) {
+  const noLogistics = isNoLogistics(shipForm.carrier_code)
+  if (!noLogistics && !shipForm.tracking_no) {
     appStore.showToast('请填写快递单号', 'error')
     return
   }
@@ -446,7 +478,7 @@ const submitShip = async () => {
     carrier_name: shipForm.carrier_name,
     tracking_no: shipForm.tracking_no || null,
     phone: shipForm.phone || null,
-    is_self_pickup: isSelfPickup,
+    is_self_pickup: noLogistics,
     items: itemsToShip.map(i => {
       const snList = i.sn_input ? parseSnCodes(i.sn_input) : []
       return {
@@ -511,11 +543,11 @@ const editShipmentItem = (s) => {
   showShipForm.value = false
 }
 
-/** 编辑表单快递公司选择变化 */
-const onCarrierChange = () => {
-  const c = props.carriers.find(x => x.code === shipmentForm.carrier_code)
+/** 编辑表单快递公司选择变化 — 自动同步 carrier_name */
+watch(() => shipmentForm.carrier_code, (code) => {
+  const c = props.carriers?.find(x => x.code === code)
   if (c) shipmentForm.carrier_name = c.name
-}
+})
 
 /** 保存物流单（新增或更新）*/
 const saveShipment = async (orderId) => {
@@ -523,7 +555,7 @@ const saveShipment = async (orderId) => {
     appStore.showToast('请选择快递公司', 'error')
     return
   }
-  if (shipmentForm.carrier_code !== 'self_pickup' && !shipmentForm.tracking_no) {
+  if (!isNoLogistics(shipmentForm.carrier_code) && !shipmentForm.tracking_no) {
     appStore.showToast('请填写快递单号', 'error')
     return
   }
