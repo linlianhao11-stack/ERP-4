@@ -11,7 +11,7 @@ import { usePermission } from '../../../composables/usePermission'
 import { getOrder, createOrder } from '../../../api/orders'
 import { getLocations } from '../../../api/warehouses'
 import StatusBadge from '../../common/StatusBadge.vue'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Copy } from 'lucide-vue-next'
 
 const props = defineProps({
   orderId: { type: Number, default: null },
@@ -73,10 +73,36 @@ const canSubmitReturn = computed(() => {
   return returnForm.items.some(i => i.qty > 0)
 })
 
-/** 解析 SN 码 */
+/** 解析 SN 码（兼容 JSON 数组和逗号分隔字符串） */
 const parseSN = (raw) => {
   if (!raw) return []
-  try { return JSON.parse(raw) } catch { return raw.split(',').map(s => s.trim()).filter(Boolean) }
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed.map(String)
+  } catch {}
+  return String(raw).split(',').map(s => s.trim()).filter(Boolean)
+}
+
+/** 获取物流单的 SN 码列表（合并 ShipmentItem + Shipment 两个数据源，去重） */
+const getShipmentSNCodes = (sh) => {
+  const codes = []
+  for (const si of (sh.items || [])) {
+    codes.push(...parseSN(si.sn_codes))
+  }
+  if (!codes.length && sh.sn_code) {
+    codes.push(...parseSN(sh.sn_code))
+  }
+  return [...new Set(codes)]
+}
+
+/** 复制文本到剪贴板 */
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    appStore.showToast('已复制', 'success')
+  } catch {
+    appStore.showToast('复制失败', 'error')
+  }
 }
 
 // --- 数据加载 ---
@@ -346,10 +372,15 @@ const cancelReturnForm = () => {
               </div>
               <StatusBadge type="shipmentStatus" :status="sh.status" />
             </div>
-            <!-- 运单号 -->
-            <div v-if="sh.tracking_no" class="flex items-center gap-1.5 px-3.5 py-2 border-b border-line">
-              <span class="text-[11px] text-muted">运单号:</span>
-              <span class="text-xs font-mono font-medium text-primary">{{ sh.tracking_no }}</span>
+            <!-- 运单号（带复制） -->
+            <div v-if="sh.tracking_no" class="flex items-center justify-between px-3.5 py-2 border-b border-line">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] text-muted">运单号:</span>
+                <span class="text-xs font-mono font-medium text-primary">{{ sh.tracking_no }}</span>
+              </div>
+              <button @click="copyToClipboard(sh.tracking_no)" class="text-muted hover:text-primary transition-colors" title="复制运单号">
+                <Copy :size="14" />
+              </button>
             </div>
             <!-- 发货商品明细 -->
             <div v-if="sh.items?.length" class="px-3.5 py-2">
@@ -357,19 +388,25 @@ const cancelReturnForm = () => {
                 <div class="flex-1 min-w-0">
                   <div class="text-xs font-medium">{{ si.product_name }}</div>
                   <div class="text-[11px] text-muted font-mono">{{ si.product_sku }}</div>
-                  <div v-if="si.sn_codes" class="mt-1 p-1.5 bg-success-subtle rounded-md">
-                    <span class="text-[11px] text-muted font-semibold">SN:</span>
-                    <span v-for="sn in parseSN(si.sn_codes)" :key="sn" class="text-[11px] text-success font-mono ml-1">{{ sn }}</span>
-                  </div>
                 </div>
                 <span class="text-xs font-semibold text-secondary flex-shrink-0">× {{ si.quantity }}</span>
               </div>
             </div>
-            <!-- 兜底：无明细时显示聚合SN码 -->
-            <div v-else-if="sh.sn_code" class="px-3.5 py-2">
-              <div class="p-1.5 bg-success-subtle rounded-md">
-                <span class="text-[11px] text-muted font-semibold">SN:</span>
-                <span class="text-[11px] text-success font-mono ml-1">{{ sh.sn_code }}</span>
+            <!-- SN 码面板 -->
+            <div v-if="getShipmentSNCodes(sh).length" class="px-3.5 py-2 border-t border-line">
+              <div class="text-[11px] font-semibold text-muted mb-1.5">SN码</div>
+              <div class="space-y-1">
+                <div v-for="sn in getShipmentSNCodes(sh)" :key="sn" class="flex items-center justify-between px-2.5 py-1.5 bg-elevated border border-line rounded-lg group">
+                  <span class="text-[12px] font-mono text-text">{{ sn }}</span>
+                  <button @click="copyToClipboard(sn)" class="text-muted opacity-0 group-hover:opacity-100 hover:text-primary transition-all" title="复制SN码">
+                    <Copy :size="14" />
+                  </button>
+                </div>
+              </div>
+              <div v-if="getShipmentSNCodes(sh).length > 1" class="mt-2 flex justify-end">
+                <button @click="copyToClipboard(getShipmentSNCodes(sh).join('\n'))" class="text-[11px] text-primary hover:text-primary-hover font-medium">
+                  复制全部SN码
+                </button>
               </div>
             </div>
             <!-- 最新物流动态 -->
