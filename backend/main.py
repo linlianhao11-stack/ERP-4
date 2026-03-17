@@ -14,6 +14,7 @@ from app.database import init_db, close_db
 from app.exceptions import http_exception_handler, unhandled_exception_handler
 from app.migrations import run_migrations
 from app.services.backup_service import auto_backup_loop
+from app.services.tracking_refresh_service import tracking_refresh_loop
 
 # 导入所有路由
 from app.routers import (
@@ -96,13 +97,19 @@ async def lifespan(app: FastAPI):
     await run_migrations()
     await _migrate_ai_permissions()
     await _migrate_dropship_permissions()
-    # 启动自动备份任务
+    # 启动后台任务
     backup_task = asyncio.create_task(auto_backup_loop())
+    tracking_task = asyncio.create_task(tracking_refresh_loop())
     yield
     # 关闭
     backup_task.cancel()
+    tracking_task.cancel()
     try:
         await backup_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await tracking_task
     except asyncio.CancelledError:
         pass
     # 关闭 AI 资源
