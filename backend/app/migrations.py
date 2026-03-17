@@ -42,6 +42,7 @@ async def _run_migrations_inner():
     await migrate_invoice_pdf_files()
     await migrate_ai_readonly_user()
     await migrate_stock_last_activity()
+    await migrate_tracking_refresh_fields()
 
     # 初始化默认收款方式
     if not await PaymentMethod.exists():
@@ -1059,3 +1060,21 @@ async def migrate_dropship_phone():
         END $$
     """)
     logger.info("代采代发: phone 字段已添加")
+
+
+async def migrate_tracking_refresh_fields():
+    """为 dropship_orders 和 shipments 添加 last_tracking_refresh 字段（幂等）"""
+    conn = connections.get("default")
+    await conn.execute_query("""
+        DO $$ BEGIN
+            ALTER TABLE dropship_orders ADD COLUMN last_tracking_refresh TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$
+    """)
+    await conn.execute_query("""
+        DO $$ BEGIN
+            ALTER TABLE shipments ADD COLUMN last_tracking_refresh TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$
+    """)
+    logger.info("迁移: last_tracking_refresh 字段已添加")

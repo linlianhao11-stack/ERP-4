@@ -46,6 +46,7 @@ class DropshipOrder(models.Model):
 
     # 状态管理
     shipped_at = fields.DatetimeField(null=True)
+    last_tracking_refresh = fields.DatetimeField(null=True)
     urged_at = fields.DatetimeField(null=True)
     cancel_reason = fields.CharField(max_length=200, null=True)
     note = fields.TextField(null=True)

@@ -13,6 +13,7 @@ class Shipment(models.Model):
     last_tracking_info = fields.TextField(null=True)
     phone = fields.CharField(max_length=20, null=True)
     kd100_subscribed = fields.BooleanField(default=False)
+    last_tracking_refresh = fields.DatetimeField(null=True)
     sn_code = fields.TextField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
