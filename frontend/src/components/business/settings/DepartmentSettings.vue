@@ -74,7 +74,7 @@ const deptForm = reactive({ id: null, code: '', name: '' })
 const loadDepartments = async () => {
   try {
     const { data } = await getDepartments()
-    departments.value = data
+    departments.value = data.items || data
   } catch (e) {
     console.error('加载部门列表失败:', e)
   }

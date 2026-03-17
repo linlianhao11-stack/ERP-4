@@ -389,7 +389,7 @@ const openReceive = () => {
 const loadReceivablePOs = async () => {
   try {
     const { data } = await getReceivablePOs()
-    receivablePOs.value = data
+    receivablePOs.value = data.items || data
   } catch (e) {
     console.error(e)
   }

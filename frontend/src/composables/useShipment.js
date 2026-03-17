@@ -1,3 +1,4 @@
+// TODO: 此 composable 职责过多（数据+分页+排序+列配置），建议拆分为 useShipmentData + useShipmentUI
 /**
  * useShipment — 物流列表数据加载、筛选、排序 composable
  * 从 LogisticsView 提取，提供物流列表页所需的核心数据和操作
@@ -48,7 +49,7 @@ export function useShipment() {
   const loadCarriers = async () => {
     try {
       const { data } = await getCarriers()
-      carriers.value = data
+      carriers.value = data.items || data
     } catch (e) {
       console.error(e)
     }

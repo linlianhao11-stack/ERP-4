@@ -1,3 +1,4 @@
+<!-- TODO: 此组件 600+ 行，建议拆分为 SalesInvoiceList + SalesInvoiceDetail + SalesInvoiceActions -->
 <template>
   <div>
     <div class="card" style="overflow: visible">

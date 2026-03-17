@@ -12,86 +12,6 @@ export function useSalesCart() {
   let _cartIdCounter = 0
 
   /**
-   * 添加商品到购物车
-   * @param {Object} p - 商品对象
-   * @param {string} orderType - 订单类型（CASH/CREDIT/RETURN 等）
-   * @param {Function} getStock - 获取库存的函数
-   * @param {import('vue').Ref<Array>} products - 全部商品列表 ref
-   * @param {Object} appStore - 全局应用 store（用于 toast 提示）
-   */
-  const addToCart = (p, orderType, getStock, products, appStore) => {
-    const stock = getStock(p)
-    // 非退货模式下库存不足不能添加
-    if (stock <= 0 && orderType !== 'RETURN') {
-      appStore.showToast('库存不足', 'error')
-      return
-    }
-
-    if (orderType === 'RETURN') {
-      // 退货模式：检查退货上限
-      const e = cart.value.find(c => c.product_id === p.id)
-      const maxQty = p.max_return_qty || p.original_quantity || 0
-      if (e) {
-        if (e.quantity >= maxQty) {
-          appStore.showToast(`最多只能退${maxQty}件`, 'error')
-          return
-        }
-        e.quantity++
-      } else {
-        cart.value.push({
-          _id: ++_cartIdCounter,
-          product_id: p.id,
-          name: p.name,
-          unit_price: p.retail_price,
-          quantity: 1,
-          max_return_qty: maxQty,
-          warehouse_id: p.warehouse_id || '',
-          location_id: p.location_id || '',
-          stocks: p.stocks || []
-        })
-      }
-    } else {
-      // 普通模式：先找无仓库行，再找同商品最后一行
-      const e = cart.value.find(c => c.product_id === p.id && (!c.warehouse_id || c.warehouse_id === ''))
-      if (e) {
-        e.quantity++
-      } else {
-        const hasLine = cart.value.some(c => c.product_id === p.id)
-        if (hasLine) {
-          const last = cart.value.filter(c => c.product_id === p.id).pop()
-          last.quantity++
-        } else {
-          const fullProduct = products.value.find(prod => prod.id === p.id)
-          cart.value.push({
-            _id: ++_cartIdCounter,
-            product_id: p.id,
-            name: p.name,
-            unit_price: p.retail_price,
-            quantity: 1,
-            warehouse_id: '',
-            location_id: '',
-            stocks: fullProduct?.stocks || []
-          })
-        }
-      }
-    }
-  }
-
-  /**
-   * 增加数量（含退货上限检查）
-   * @param {Object} item - 购物车行
-   * @param {string} orderType - 订单类型
-   * @param {Object} appStore - 全局应用 store
-   */
-  const incrementQuantity = (item, orderType, appStore) => {
-    if (orderType === 'RETURN' && item.max_return_qty && item.quantity >= item.max_return_qty) {
-      appStore.showToast('最多只能退' + item.max_return_qty + '件', 'error')
-    } else {
-      item.quantity++
-    }
-  }
-
-  /**
    * 复制购物车行（从其他仓库再出一行）
    * @param {number} idx - 行索引
    * @param {import('vue').Ref<Array>} products - 全部商品列表 ref
@@ -111,40 +31,85 @@ export function useSalesCart() {
     })
   }
 
-  /**
-   * 更新购物车商品仓库（同时清空仓位）
-   * @param {number} idx - 行索引
-   */
-  const updateCartWarehouse = (idx) => {
-    cart.value[idx].location_id = ''
-  }
-
-  /**
-   * 更新购物车商品仓位
-   * @param {number} idx - 行索引
-   * @param {string|number} locationId - 仓位 ID
-   */
-  const updateCartLocation = (idx, locationId) => {
-    cart.value[idx].location_id = locationId
-  }
-
-  /**
-   * 获取购物车商品在指定仓库/仓位的可用库存
-   * @param {Object} item - 购物车行
-   * @returns {number} 可用库存数量
-   */
-  const getCartStock = (item) => {
-    if (!item.warehouse_id || !item.location_id) return 0
-    const stock = item.stocks?.find(
-      s => s.warehouse_id === parseInt(item.warehouse_id) && s.location_id === parseInt(item.location_id)
-    )
-    return stock ? (stock.available_qty ?? stock.quantity) : 0
-  }
-
   /** 购物车合计金额 */
   const cartTotal = computed(() =>
     cart.value.reduce((s, i) => s + Math.round(i.quantity * i.unit_price * 100) / 100, 0)
   )
+
+  /**
+   * 从搜索下拉添加商品到购物车（工作台模式）
+   * @param {Object} product - 商品对象（含 id/name/sku/retail_price/cost_price/stocks）
+   * @param {Object} stockRow - 搜索下拉中选中的仓库/仓位行
+   * @param {string} orderType - 订单类型
+   * @param {Object} appStore - 全局应用 store
+   */
+  const addFromSearch = (product, stockRow, orderType, appStore) => {
+    if (orderType !== 'CREDIT' && stockRow.available_qty <= 0) {
+      appStore.showToast('库存不足', 'error')
+      return
+    }
+    const existing = cart.value.find(
+      c => c.product_id === product.id &&
+           c.warehouse_id == stockRow.warehouse_id &&
+           c.location_id == stockRow.location_id
+    )
+    if (existing) {
+      existing.quantity++
+      return existing
+    }
+    const item = {
+      _id: ++_cartIdCounter,
+      product_id: product.id,
+      name: product.name,
+      sku: product.sku || '',
+      unit_price: product.retail_price,
+      cost_price: product.cost_price || 0,
+      quantity: 1,
+      warehouse_id: stockRow.warehouse_id,
+      warehouse_name: stockRow.warehouse_name || '',
+      location_id: stockRow.location_id,
+      location_code: stockRow.location_code || '',
+      location_color: stockRow.location_color || 'blue',
+      is_virtual_stock: !!stockRow.is_virtual,
+      stocks: product.stocks || []
+    }
+    cart.value.push(item)
+    return item
+  }
+
+  /**
+   * 退货模式：从原始订单填充可退商品到购物车
+   * @param {Object} orderData - 原始订单详情（含 items）
+   * @param {import('vue').Ref<Array>} products - 全部商品列表 ref
+   */
+  const populateReturnItems = (orderData, products) => {
+    cart.value = []
+    if (!orderData?.items) return
+    orderData.items.forEach(item => {
+      const availableQty = item.available_return_quantity || 0
+      if (availableQty <= 0) return
+      const product = products.value.find(p => p.id === item.product_id)
+      if (!product) return
+      cart.value.push({
+        _id: ++_cartIdCounter,
+        product_id: item.product_id,
+        name: product.name,
+        sku: product.sku || '',
+        unit_price: Math.abs(item.unit_price),
+        cost_price: product.cost_price || 0,
+        quantity: 0,
+        max_return_qty: availableQty,
+        original_quantity: Math.abs(item.quantity),
+        returned_quantity: item.returned_quantity || 0,
+        warehouse_id: '',
+        warehouse_name: '',
+        location_id: '',
+        location_code: '',
+        location_color: 'blue',
+        stocks: product.stocks || []
+      })
+    })
+  }
 
   /** 清空购物车 */
   const clearCart = () => {
@@ -153,12 +118,9 @@ export function useSalesCart() {
 
   return {
     cart,
-    addToCart,
-    incrementQuantity,
+    addFromSearch,
+    populateReturnItems,
     duplicateCartLine,
-    updateCartWarehouse,
-    updateCartLocation,
-    getCartStock,
     cartTotal,
     clearCart
   }

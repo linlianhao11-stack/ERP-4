@@ -4,6 +4,7 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.models.accounting import AccountSet, AccountingPeriod
 from app.services.accounting_init import init_accounting_periods
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/accounting-periods", tags=["会计期间"])
 
@@ -18,11 +19,11 @@ async def list_periods(
     if year:
         query = query.filter(year=year)
     periods = await query.order_by("year", "month")
-    return [{
+    return paginated_response([{
         "id": p.id, "period_name": p.period_name,
         "year": p.year, "month": p.month,
         "is_closed": p.is_closed, "closed_at": p.closed_at,
-    } for p in periods]
+    } for p in periods])
 
 
 @router.post("/init-year")

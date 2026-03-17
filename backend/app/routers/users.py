@@ -5,6 +5,7 @@ from app.auth.dependencies import require_permission
 from app.models import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.services.operation_log_service import log_operation
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/users", tags=["用户管理"])
 
@@ -12,8 +13,8 @@ router = APIRouter(prefix="/api/users", tags=["用户管理"])
 @router.get("")
 async def list_users(user: User = Depends(require_permission("admin"))):
     users = await User.all().order_by("id").limit(500)
-    return [{"id": u.id, "username": u.username, "display_name": u.display_name,
-             "role": u.role, "permissions": u.permissions, "is_active": u.is_active} for u in users]
+    return paginated_response([{"id": u.id, "username": u.username, "display_name": u.display_name,
+             "role": u.role, "permissions": u.permissions, "is_active": u.is_active} for u in users])
 
 
 @router.post("")
@@ -40,6 +41,8 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         raise HTTPException(status_code=404, detail="用户不存在")
     if data.role is not None and user.id == admin.id and admin.role == "admin" and data.role != "admin":
         raise HTTPException(status_code=400, detail="不能降级自己的管理员角色")
+    old_role = user.role
+    old_permissions = user.permissions
     if data.display_name is not None:
         user.display_name = data.display_name
     if data.role is not None:
@@ -53,6 +56,12 @@ async def update_user(user_id: int, data: UserUpdate, admin: User = Depends(requ
         await User.filter(id=user.id).update(token_version=F('token_version') + 1)
     await user.save()
     await log_operation(admin, "UPDATE_USER", "USER", user.id, f"更新用户 {user.username}")
+    if data.role is not None and data.role != old_role:
+        await log_operation(admin, "USER_ROLE_CHANGE", "USER", user.id,
+            f"用户 {user.username} 角色变更: {old_role} → {data.role}")
+    if data.permissions is not None and data.permissions != old_permissions:
+        await log_operation(admin, "USER_PERMISSION_CHANGE", "USER", user.id,
+            f"用户 {user.username} 权限变更")
     return {"message": "更新成功"}
 
 

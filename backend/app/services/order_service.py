@@ -13,6 +13,7 @@ from app.models import (
     RebateLog
 )
 from app.models.department import Employee
+from app.constants import OrderType, PaymentSource, StockChangeType
 from app.models.customer_balance import CustomerAccountBalance
 from app.services.stock_service import (
     get_or_create_consignment_warehouse, update_weighted_entry_date,
@@ -48,7 +49,7 @@ async def validate_order_entities(data):
             raise HTTPException(status_code=404, detail="仓库不存在")
 
     # 需要实体仓库的订单类型
-    if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT"]:
+    if data.order_type in OrderType.needs_warehouse():
         if not warehouse:
             for idx, item in enumerate(data.items):
                 if not item.warehouse_id or not item.location_id:
@@ -57,19 +58,19 @@ async def validate_order_entities(data):
             raise HTTPException(status_code=400, detail="需要选择实体仓库")
 
     # 需要客户的订单类型
-    if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT", "CONSIGN_SETTLE", "RETURN"]:
+    if data.order_type in OrderType.needs_customer():
         if not customer:
             raise HTTPException(status_code=400, detail="需要选择客户")
 
     # 寄售虚拟仓
     consignment_wh = None
-    if data.order_type in ["CONSIGN_OUT", "CONSIGN_SETTLE"]:
+    if data.order_type in [OrderType.CONSIGN_OUT, OrderType.CONSIGN_SETTLE]:
         consignment_wh = await get_or_create_consignment_warehouse(customer.id)
-    if data.order_type == "CONSIGN_SETTLE":
+    if data.order_type == OrderType.CONSIGN_SETTLE:
         warehouse = consignment_wh
 
     # 退货校验
-    if data.order_type == "RETURN":
+    if data.order_type == OrderType.RETURN:
         if not data.related_order_id:
             raise HTTPException(status_code=400, detail="退货需要选择原始销售订单")
         if not warehouse:
@@ -82,7 +83,7 @@ async def validate_order_entities(data):
             location = await Location.filter(id=data.location_id, is_active=True).first()
             if not location:
                 raise HTTPException(status_code=404, detail="仓位不存在")
-        related_order = await Order.filter(id=data.related_order_id, order_type__in=["CASH", "CREDIT"]).first()
+        related_order = await Order.filter(id=data.related_order_id, order_type__in=[OrderType.CASH.value, OrderType.CREDIT.value]).first()
         if not related_order:
             raise HTTPException(status_code=404, detail="关联的销售订单不存在或类型错误")
         if related_order.customer_id != customer.id:
@@ -128,7 +129,7 @@ async def resolve_item_entities(item, warehouse, data, entities_cache=None):
         await Location.filter(id=data.location_id).first() if data.location_id else None
     )
 
-    if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT", "RETURN"]:
+    if data.order_type in [OrderType.CASH, OrderType.CREDIT, OrderType.CONSIGN_OUT, OrderType.RETURN]:
         if working_warehouse and working_warehouse.is_virtual:
             raise HTTPException(status_code=400, detail=f"商品 {product.name} 不能从寄售虚拟仓出库，请选择实体仓库")
 
@@ -151,7 +152,7 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
     根据订单类型处理单个商品的库存操作（使用行锁保证并发安全）：
     预留(CASH/CREDIT)、寄售调拨(CONSIGN_OUT)、寄售结算(CONSIGN_SETTLE)、退货入库(RETURN)。
     """
-    if order_type in ["CASH", "CREDIT"]:
+    if order_type in [OrderType.CASH, OrderType.CREDIT]:
         if not working_warehouse:
             raise HTTPException(status_code=400, detail=f"商品 {product.name} 没有指定仓库")
         if not working_location:
@@ -168,13 +169,13 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
         before_qty = stock.quantity - stock.reserved_qty
         await WarehouseStock.filter(id=stock.id).update(reserved_qty=F('reserved_qty') + qty)
         await StockLog.create(
-            product=product, warehouse=working_warehouse, change_type="RESERVE",
+            product=product, warehouse=working_warehouse, change_type=StockChangeType.RESERVE.value,
             quantity=-qty, before_qty=before_qty, after_qty=before_qty - qty,
             reference_type="ORDER", reference_id=order.id,
             remark=f"预留库存 {qty}", creator=user
         )
 
-    elif order_type == "CONSIGN_OUT":
+    elif order_type == OrderType.CONSIGN_OUT:
         if not working_warehouse:
             raise HTTPException(status_code=400, detail=f"商品 {product.name} 没有指定仓库")
         if not working_location:
@@ -191,13 +192,13 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
         before_qty = stock.quantity - stock.reserved_qty
         await WarehouseStock.filter(id=stock.id).update(reserved_qty=F('reserved_qty') + qty)
         await StockLog.create(
-            product=product, warehouse=working_warehouse, change_type="RESERVE",
+            product=product, warehouse=working_warehouse, change_type=StockChangeType.RESERVE.value,
             quantity=-qty, before_qty=before_qty, after_qty=before_qty - qty,
             reference_type="ORDER", reference_id=order.id,
             remark=f"寄售调拨预留库存 {qty}", creator=user
         )
 
-    elif order_type == "CONSIGN_SETTLE":
+    elif order_type == OrderType.CONSIGN_SETTLE:
         stock = await WarehouseStock.filter(
             warehouse_id=consignment_wh.id, product_id=product.id
         ).select_for_update().first()
@@ -206,12 +207,12 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
         before_qty = stock.quantity
         await WarehouseStock.filter(id=stock.id).update(quantity=F('quantity') - qty)
         await StockLog.create(
-            product=product, warehouse=consignment_wh, change_type="CONSIGN_SETTLE",
+            product=product, warehouse=consignment_wh, change_type=StockChangeType.CONSIGN_SETTLE.value,
             quantity=-qty, before_qty=before_qty, after_qty=before_qty - qty,
             reference_type="ORDER", reference_id=order.id, creator=user
         )
 
-    elif order_type == "RETURN":
+    elif order_type == OrderType.RETURN:
         if not working_warehouse:
             raise HTTPException(status_code=400, detail=f"商品 {product.name} 没有指定退货仓库")
         if not working_location:
@@ -221,7 +222,7 @@ async def process_item_stock(order_type, product, working_warehouse, working_loc
             warehouse_id=working_warehouse.id, product_id=product.id, location_id=working_location.id
         ).select_for_update().first()
         await StockLog.create(
-            product=product, warehouse=working_warehouse, change_type="RETURN",
+            product=product, warehouse=working_warehouse, change_type=StockChangeType.RETURN.value,
             quantity=qty, before_qty=stock.quantity - qty, after_qty=stock.quantity,
             reference_type="ORDER", reference_id=order.id, creator=user
         )
@@ -233,7 +234,7 @@ async def process_rebate_deduction(data, customer, order, order_no, user):
         Decimal(str(it.rebate_amount)) if it.rebate_amount else Decimal("0")
         for it in data.items
     )
-    if total_rebate > 0 and data.order_type != "RETURN":
+    if total_rebate > 0 and data.order_type != OrderType.RETURN:
         if not customer:
             raise HTTPException(status_code=400, detail="使用返利需要选择客户")
         account_set_id = getattr(order, 'account_set_id', None)
@@ -276,7 +277,7 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
     """
     actual_credit_used = 0
 
-    if customer and data.order_type in ["CREDIT", "CONSIGN_SETTLE"]:
+    if customer and data.order_type in OrderType.credit_types():
         customer = await Customer.filter(id=customer.id).select_for_update().first()
         old_balance = customer.balance
         await Customer.filter(id=customer.id).update(balance=F('balance') + total_amount)
@@ -288,7 +289,7 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
                 order.is_cleared = True
             await order.save()
 
-    elif customer and data.order_type == "CASH":
+    elif customer and data.order_type == OrderType.CASH:
         customer = await Customer.filter(id=customer.id).select_for_update().first()
         if data.use_credit and customer.balance < 0:
             available_credit = abs(customer.balance)
@@ -300,24 +301,24 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
             await order.save()
             actual_credit_used = amount_to_use
 
-    elif customer and data.order_type == "RETURN":
+    elif customer and data.order_type == OrderType.RETURN:
         if not data.refunded:
             # 仅 CREDIT 退货需调整余额（减少应收），CASH 退货未退款无需改余额
             related_order = await Order.filter(id=data.related_order_id).first() if data.related_order_id else None
-            if related_order and related_order.order_type == "CREDIT":
+            if related_order and related_order.order_type == OrderType.CREDIT:
                 await Customer.filter(id=customer.id).update(balance=F('balance') + total_amount)
 
     # 计算 credit_used 返回值
     credit_used = 0
-    if data.order_type == "CASH":
+    if data.order_type == OrderType.CASH:
         if actual_credit_used > 0:
             credit_used = float(actual_credit_used)
-    elif data.order_type in ["CREDIT", "CONSIGN_SETTLE"]:
+    elif data.order_type in OrderType.credit_types():
         if order.paid_amount > 0:
             credit_used = float(order.paid_amount)
 
     # CASH 订单创建收款记录（多账套时按账套拆分）
-    if data.order_type == "CASH" and customer:
+    if data.order_type == OrderType.CASH and customer:
         actual_pay = abs(Decimal(str(total_amount))) - Decimal(str(credit_used))
         if actual_pay > 0:
             if amount_by_account_set and len(amount_by_account_set) > 1:
@@ -338,7 +339,7 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
                             payment_no=pay_no, customer=customer, order=order,
                             amount=split_pay,
                             payment_method=data.payment_method or "cash",
-                            source="CASH", is_confirmed=False,
+                            source=PaymentSource.CASH.value, is_confirmed=False,
                             remark=f"现款销售 {order_no}", creator=user,
                             account_set_id=as_id
                         )
@@ -348,7 +349,7 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
                     payment_no=pay_no, customer=customer, order=order,
                     amount=actual_pay,
                     payment_method=data.payment_method or "cash",
-                    source="CASH", is_confirmed=False,
+                    source=PaymentSource.CASH, is_confirmed=False,
                     remark=f"现款销售 {order_no}", creator=user,
                     account_set_id=order.account_set_id
                 )
@@ -383,7 +384,7 @@ async def release_cancelled_stock(items, order, user):
                     )
                     await StockLog.create(
                         product_id=item.product_id, warehouse_id=wh_id,
-                        change_type="RESERVE_CANCEL",
+                        change_type=StockChangeType.RESERVE_CANCEL.value,
                         quantity=release_amount,
                         before_qty=before_available, after_qty=before_available + release_amount,
                         reference_type="ORDER", reference_id=order.id,

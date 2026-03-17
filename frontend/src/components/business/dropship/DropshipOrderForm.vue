@@ -381,7 +381,7 @@ const loadSuppliers = async () => {
     const params = {}
     if (form.account_set_id) params.account_set_id = form.account_set_id
     const { data } = await getSuppliers(params)
-    suppliers.value = data
+    suppliers.value = data.items || data
   } catch (e) {
     console.error('加载供应商失败:', e)
   }
@@ -401,7 +401,7 @@ const loadCustomers = async () => {
 const loadAccountSets = async () => {
   try {
     const { data } = await getAccountSets()
-    accountSets.value = data
+    accountSets.value = data.items || data
   } catch (e) {
     /* 静默失败 */
   }

@@ -63,7 +63,7 @@ const loadBankAccounts = async () => {
   if (!setId) return
   try {
     const { data } = await getBankAccounts({ account_set_id: setId })
-    bankAccounts.value = data
+    bankAccounts.value = data.items || data
   } catch (e) {
     bankAccounts.value = []
   }

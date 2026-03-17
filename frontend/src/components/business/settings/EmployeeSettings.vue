@@ -112,7 +112,7 @@ const empForm = reactive({ id: null, code: '', name: '', phone: '', department_i
 const loadDepartments = async () => {
   try {
     const { data } = await getDepartments()
-    departments.value = data
+    departments.value = data.items || data
   } catch (e) {
     console.error('加载部门列表失败:', e)
   }
@@ -121,7 +121,7 @@ const loadDepartments = async () => {
 const loadEmployees = async () => {
   try {
     const { data } = await getEmployees()
-    employees.value = data
+    employees.value = data.items || data
   } catch (e) {
     console.error('加载员工列表失败:', e)
   }

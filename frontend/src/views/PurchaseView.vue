@@ -34,13 +34,13 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTabs from '../components/common/AppTabs.vue'
 import PurchaseOrdersPanel from '../components/business/PurchaseOrdersPanel.vue'
 import PurchaseSuppliersPanel from '../components/business/PurchaseSuppliersPanel.vue'
-import PurchaseReturnTab from '../components/business/purchase/PurchaseReturnTab.vue'
-import MaterialsTab from '../components/business/purchase/MaterialsTab.vue'
+const PurchaseReturnTab = defineAsyncComponent(() => import('../components/business/purchase/PurchaseReturnTab.vue'))
+const MaterialsTab = defineAsyncComponent(() => import('../components/business/purchase/MaterialsTab.vue'))
 
 const route = useRoute()
 const router = useRouter()

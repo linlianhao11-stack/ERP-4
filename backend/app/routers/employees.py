@@ -4,6 +4,7 @@ from typing import Optional
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.models.department import Department, Employee
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/employees", tags=["员工管理"])
 
@@ -36,7 +37,7 @@ async def list_employees(
     if department_id is not None:
         qs = qs.filter(department_id=department_id)
     employees = await qs.order_by("id").prefetch_related("department")
-    return [
+    return paginated_response([
         {
             "id": e.id, "code": e.code, "name": e.name,
             "phone": e.phone,
@@ -45,7 +46,7 @@ async def list_employees(
             "is_salesperson": e.is_salesperson,
         }
         for e in employees
-    ]
+    ])
 
 
 @router.post("")

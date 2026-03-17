@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAccountSets, getChartOfAccounts, getAccountingPeriods } from '../api/accounting'
+import { useAppStore } from './app'
 
 export const useAccountingStore = defineStore('accounting', () => {
   const accountSets = ref([])
@@ -16,11 +17,15 @@ export const useAccountingStore = defineStore('accounting', () => {
   async function loadAccountSets() {
     try {
       const { data } = await getAccountSets()
-      accountSets.value = data
-      if (!currentAccountSetId.value && data.length > 0) {
-        currentAccountSetId.value = data[0].id
+      const items = data.items || data
+      accountSets.value = items
+      if (!currentAccountSetId.value && items.length > 0) {
+        currentAccountSetId.value = items[0].id
       }
-    } catch (e) { console.error('加载失败', e) }
+    } catch (e) {
+      console.error('加载账套失败', e)
+      useAppStore().showToast('加载账套失败', 'error')
+    }
   }
 
   function setCurrentAccountSet(id) {
@@ -33,16 +38,22 @@ export const useAccountingStore = defineStore('accounting', () => {
     if (!currentAccountSetId.value) return
     try {
       const { data } = await getChartOfAccounts(currentAccountSetId.value)
-      chartOfAccounts.value = data
-    } catch (e) { console.error('加载失败', e) }
+      chartOfAccounts.value = data.items || data
+    } catch (e) {
+      console.error('加载科目表失败', e)
+      useAppStore().showToast('加载科目表失败', 'error')
+    }
   }
 
   async function loadPeriods(year) {
     if (!currentAccountSetId.value) return
     try {
       const { data } = await getAccountingPeriods(currentAccountSetId.value, year)
-      periods.value = data
-    } catch (e) { console.error('加载失败', e) }
+      periods.value = data.items || data
+    } catch (e) {
+      console.error('加载会计期间失败', e)
+      useAppStore().showToast('加载会计期间失败', 'error')
+    }
   }
 
   return {

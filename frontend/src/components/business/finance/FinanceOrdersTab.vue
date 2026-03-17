@@ -329,7 +329,7 @@ const toggleExpand = async (orderId, e) => {
   expandedRows[orderId] = true
   if (!expandedItems[orderId]) {
     loadingItems[orderId] = true
-    try { const { data } = await getOrderItems(orderId); expandedItems[orderId] = data }
+    try { const { data } = await getOrderItems(orderId); expandedItems[orderId] = data.items || data }
     catch (err) { console.error(err) }
     finally { loadingItems[orderId] = false }
   }
@@ -341,7 +341,7 @@ const loadAllItems = async () => {
   await Promise.all(orders.map(async (o) => {
     if (!expandedItems[o.id]) {
       loadingItems[o.id] = true
-      try { const { data } = await getOrderItems(o.id); expandedItems[o.id] = data }
+      try { const { data } = await getOrderItems(o.id); expandedItems[o.id] = data.items || data }
       catch (err) { console.error(err) }
       finally { loadingItems[o.id] = false }
     }
@@ -567,7 +567,7 @@ defineExpose({ refresh, viewOrder })
 // ===== 初始化 =====
 onMounted(async () => {
   // 加载账套列表
-  try { const res = await getAccountSets(); accountSets.value = res.data || [] } catch {}
+  try { const res = await getAccountSets(); const d = res.data; accountSets.value = d.items || d || [] } catch {}
   // 激活时加载订单
   if (props.active) loadOrders()
 })

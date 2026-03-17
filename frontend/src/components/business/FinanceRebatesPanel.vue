@@ -197,7 +197,7 @@ const loadRebateSummaryData = async (targetType) => {
       params.account_set_id = selectedAccountSetId.value
     }
     const { data } = await getRebateSummary(params)
-    rebateSummary.value = data
+    rebateSummary.value = data.items || data
   } catch (e) {
     console.error(e)
     appStore.showToast(e.response?.data?.detail || '加载返利数据失败', 'error')
@@ -247,9 +247,10 @@ const onChargeAccountSetChange = async () => {
       account_set_id: chargeAccountSetId.value
     }
     const { data } = await getRebateSummary(params)
-    chargeTargetList.value = data
+    const summaryItems = data.items || data
+    chargeTargetList.value = summaryItems
     if (rebateChargeForm.target_id) {
-      const item = data.find(x => x.id === rebateChargeForm.target_id)
+      const item = summaryItems.find(x => x.id === rebateChargeForm.target_id)
       rebateChargeForm.current_balance = item?.rebate_balance || 0
     }
   } catch (e) {
@@ -297,7 +298,7 @@ const viewRebateDetail = async (targetType, targetId, name) => {
       params.account_set_id = selectedAccountSetId.value
     }
     const { data } = await getRebateLogs(params)
-    rebateLogs.value = data
+    rebateLogs.value = data.items || data
     showRebateDetailModal.value = true
   } catch (e) {
     appStore.showToast('加载失败', 'error')

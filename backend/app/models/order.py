@@ -48,4 +48,4 @@ class OrderItem(models.Model):
 
     class Meta:
         table = "order_items"
-        indexes = (("order_id", "product_id"),)
+        indexes = (("order_id", "product_id"), ("warehouse_id", "location_id"),)

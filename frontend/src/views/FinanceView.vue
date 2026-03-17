@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, nextTick, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomersStore } from '../stores/customers'
 import { useSettingsStore } from '../stores/settings'
@@ -48,9 +48,9 @@ import { useAccountingStore } from '../stores/accounting'
 import { usePermission } from '../composables/usePermission'
 import FinanceOrdersPanel from '../components/business/FinanceOrdersPanel.vue'
 import FinancePaymentsPanel from '../components/business/FinancePaymentsPanel.vue'
-import FinancePayablesPanel from '../components/business/FinancePayablesPanel.vue'
-import FinanceLogsPanel from '../components/business/FinanceLogsPanel.vue'
-import FinanceRebatesPanel from '../components/business/FinanceRebatesPanel.vue'
+const FinancePayablesPanel = defineAsyncComponent(() => import('../components/business/FinancePayablesPanel.vue'))
+const FinanceLogsPanel = defineAsyncComponent(() => import('../components/business/FinanceLogsPanel.vue'))
+const FinanceRebatesPanel = defineAsyncComponent(() => import('../components/business/FinanceRebatesPanel.vue'))
 
 const route = useRoute()
 const router = useRouter()

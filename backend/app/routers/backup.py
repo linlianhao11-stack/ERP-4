@@ -5,14 +5,17 @@ import glob
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 
 from app.auth.dependencies import require_permission
 from app.models import User
-from app.services.backup_service import do_backup, do_restore, get_backup_dir, is_postgres
+from app.config import BACKUP_ENCRYPTION_KEY
+from app.services.backup_service import do_backup, do_restore, decrypt_file_content, get_backup_dir, is_postgres
 from app.services.operation_log_service import log_operation
 from app.logger import get_logger
+from app.rate_limit import limiter
+from app.utils.response import paginated_response
 
 logger = get_logger("backup")
 
@@ -30,7 +33,8 @@ async def _run_post_restore_migrations():
 
 
 @router.post("/backup")
-async def create_backup(user: User = Depends(require_permission("admin"))):
+@limiter.limit("5/hour")
+async def create_backup(request: Request, user: User = Depends(require_permission("admin"))):
     """手动创建备份"""
     try:
         path = do_backup("manual")
@@ -51,23 +55,24 @@ async def list_backups(user: User = Depends(require_permission("admin"))):
     """获取备份列表"""
     backup_dir = get_backup_dir()
     if not backup_dir:
-        return []
-    files = glob.glob(os.path.join(backup_dir, "erp_*.db")) + glob.glob(os.path.join(backup_dir, "erp_*.sql")) + glob.glob(os.path.join(backup_dir, "erp_*.tar.gz"))
-    result = []
+        return paginated_response([])
+    files = glob.glob(os.path.join(backup_dir, "erp_*.db")) + glob.glob(os.path.join(backup_dir, "erp_*.sql")) + glob.glob(os.path.join(backup_dir, "erp_*.tar.gz")) + glob.glob(os.path.join(backup_dir, "erp_*.tar.gz.enc"))
+    items = []
     for f in sorted(files, key=os.path.getmtime, reverse=True):
         stat = os.stat(f)
-        result.append({
+        items.append({
             "filename": os.path.basename(f),
             "size_mb": round(stat.st_size / 1024 / 1024, 2),
             "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
         })
-    return result
+    return paginated_response(items)
 
 
 @router.get("/backups/{filename}")
-async def download_backup(filename: str, user: User = Depends(require_permission("admin"))):
-    """下载备份文件"""
-    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
+@limiter.limit("5/hour")
+async def download_backup(request: Request, filename: str, user: User = Depends(require_permission("admin"))):
+    """下载备份文件（加密文件自动解密后下载）"""
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz|tar\.gz\.enc)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
     backup_dir = get_backup_dir()
     if not backup_dir:
@@ -77,6 +82,27 @@ async def download_backup(filename: str, user: User = Depends(require_permission
         raise HTTPException(status_code=400, detail="非法文件路径")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="备份文件不存在")
+
+    await log_operation(user, "BACKUP_DOWNLOAD", "SYSTEM", None, f"下载备份 {filename}")
+
+    if filename.endswith(".enc"):
+        # 加密文件：解密后流式下载
+        if not BACKUP_ENCRYPTION_KEY:
+            raise HTTPException(status_code=500, detail="备份文件已加密但未配置解密密钥")
+        try:
+            decrypted = decrypt_file_content(filepath)
+        except Exception:
+            raise HTTPException(status_code=500, detail="备份文件解密失败")
+        download_name = filename[:-4]  # 去掉 .enc
+
+        def iter_decrypted():
+            offset = 0
+            while offset < len(decrypted):
+                yield decrypted[offset:offset + 8192]
+                offset += 8192
+
+        return StreamingResponse(iter_decrypted(), media_type="application/octet-stream",
+                                 headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(download_name)}"})
 
     def iter_file():
         with open(filepath, "rb") as f:
@@ -88,21 +114,30 @@ async def download_backup(filename: str, user: User = Depends(require_permission
 
 
 @router.post("/backups/upload-restore")
-async def upload_restore_backup(file: UploadFile = File(...), user: User = Depends(require_permission("admin"))):
+@limiter.limit("5/hour")
+async def upload_restore_backup(request: Request, file: UploadFile = File(...), user: User = Depends(require_permission("admin"))):
     """上传备份文件并恢复数据库"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="未选择文件")
     fname = file.filename.lower()
-    if fname.endswith(".tar.gz"):
+    if fname.endswith(".tar.gz.enc"):
+        ext = ".tar.gz.enc"
+    elif fname.endswith(".tar.gz"):
         ext = ".tar.gz"
     else:
         ext = os.path.splitext(fname)[1]
-    if ext not in (".sql", ".db", ".tar.gz"):
-        raise HTTPException(status_code=400, detail="仅支持 .sql、.db 或 .tar.gz 备份文件")
+    if ext not in (".sql", ".db", ".tar.gz", ".tar.gz.enc"):
+        raise HTTPException(status_code=400, detail="仅支持 .sql、.db、.tar.gz 或 .tar.gz.enc 备份文件")
 
-    if is_postgres() and ext == ".db":
+    # 加密文件需要解密密钥
+    if ext == ".tar.gz.enc" and not BACKUP_ENCRYPTION_KEY:
+        raise HTTPException(status_code=400, detail="备份文件已加密但未配置 BACKUP_ENCRYPTION_KEY，无法恢复")
+
+    # 判断底层格式（去掉 .enc 后缀）
+    base_ext = ext.replace(".enc", "")
+    if is_postgres() and base_ext == ".db":
         raise HTTPException(status_code=400, detail="当前使用 PostgreSQL 数据库，无法恢复 SQLite (.db) 备份文件")
-    if not is_postgres() and ext in (".sql", ".tar.gz"):
+    if not is_postgres() and base_ext in (".sql", ".tar.gz"):
         raise HTTPException(status_code=400, detail="当前使用 SQLite 数据库，无法恢复 PostgreSQL 备份文件，请上传 .db 格式的备份")
 
     backup_dir = get_backup_dir()
@@ -148,16 +183,22 @@ async def upload_restore_backup(file: UploadFile = File(...), user: User = Depen
 
 
 @router.post("/backups/{filename}/restore")
-async def restore_backup(filename: str, user: User = Depends(require_permission("admin"))):
+@limiter.limit("5/hour")
+async def restore_backup(request: Request, filename: str, user: User = Depends(require_permission("admin"))):
     """从已有备份恢复数据库"""
-    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz|tar\.gz\.enc)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
 
-    # 校验备份格式与当前数据库类型是否匹配
-    if filename.endswith(".tar.gz"):
+    # 加密文件需要解密密钥
+    if filename.endswith(".enc") and not BACKUP_ENCRYPTION_KEY:
+        raise HTTPException(status_code=400, detail="备份文件已加密但未配置 BACKUP_ENCRYPTION_KEY，无法恢复")
+
+    # 校验备份格式与当前数据库类型是否匹配（去掉 .enc 后判断底层格式）
+    check_name = filename[:-4] if filename.endswith(".enc") else filename
+    if check_name.endswith(".tar.gz"):
         ext = ".tar.gz"
     else:
-        ext = os.path.splitext(filename)[1].lower()
+        ext = os.path.splitext(check_name)[1].lower()
     if is_postgres() and ext == ".db":
         raise HTTPException(status_code=400, detail="当前使用 PostgreSQL 数据库，无法恢复 SQLite (.db) 备份文件")
     if not is_postgres() and ext == ".sql":
@@ -183,7 +224,7 @@ async def restore_backup(filename: str, user: User = Depends(require_permission(
 @router.delete("/backups/{filename}")
 async def delete_backup(filename: str, user: User = Depends(require_permission("admin"))):
     """删除备份文件"""
-    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz)$', filename):
+    if not re.match(r'^erp_[\w]+\.(sql|db|tar\.gz|tar\.gz\.enc)$', filename):
         raise HTTPException(status_code=400, detail="非法文件名格式")
     backup_dir = get_backup_dir()
     if not backup_dir:

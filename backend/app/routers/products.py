@@ -16,6 +16,7 @@ from app.schemas.product import ProductCreate, ProductUpdate
 from app.schemas.warehouse import DEFAULT_LOCATION_COLOR
 from app.utils.time import now, to_naive, days_between
 from app.services.operation_log_service import log_operation
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/products", tags=["商品管理"])
 
@@ -39,7 +40,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
                         has_stock: bool = False,
                         offset: int = 0, limit: int = 200,
                         user: User = Depends(get_current_user)):
-    limit = min(limit, 10000)  # 安全上限
+    limit = min(limit, 1000)  # 安全上限
     query = Product.all() if include_inactive else Product.filter(is_active=True)
     if keyword:
         for word in keyword.split():
@@ -120,7 +121,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
 @router.get("/categories/list")
 async def list_categories(user: User = Depends(get_current_user)):
     products = await Product.filter(is_active=True, category__isnull=False).distinct().values_list("category", flat=True)
-    return list(set(p for p in products if p))
+    return paginated_response(list(set(p for p in products if p)))
 
 
 @router.get("/export")

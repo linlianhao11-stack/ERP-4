@@ -182,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '../stores/accounting'
 import { useAuthStore } from '../stores/auth'
@@ -190,14 +190,14 @@ import { useAppStore } from '../stores/app'
 import { createAccountSet, updateAccountSet, getAccountSet } from '../api/accounting'
 import AppTabs from '../components/common/AppTabs.vue'
 import VoucherPanel from '../components/business/VoucherPanel.vue'
-import ChartOfAccountsPanel from '../components/business/ChartOfAccountsPanel.vue'
-import AccountingPeriodsPanel from '../components/business/AccountingPeriodsPanel.vue'
-import LedgerPanel from '../components/business/LedgerPanel.vue'
-import ReceivablePanel from '../components/business/ReceivablePanel.vue'
-import PayablePanel from '../components/business/PayablePanel.vue'
-import InvoicePanel from '../components/business/InvoicePanel.vue'
-import PeriodEndPanel from '../components/business/PeriodEndPanel.vue'
-import FinancialReportPanel from '../components/business/FinancialReportPanel.vue'
+const ChartOfAccountsPanel = defineAsyncComponent(() => import('../components/business/ChartOfAccountsPanel.vue'))
+const AccountingPeriodsPanel = defineAsyncComponent(() => import('../components/business/AccountingPeriodsPanel.vue'))
+const LedgerPanel = defineAsyncComponent(() => import('../components/business/LedgerPanel.vue'))
+const ReceivablePanel = defineAsyncComponent(() => import('../components/business/ReceivablePanel.vue'))
+const PayablePanel = defineAsyncComponent(() => import('../components/business/PayablePanel.vue'))
+const InvoicePanel = defineAsyncComponent(() => import('../components/business/InvoicePanel.vue'))
+const PeriodEndPanel = defineAsyncComponent(() => import('../components/business/PeriodEndPanel.vue'))
+const FinancialReportPanel = defineAsyncComponent(() => import('../components/business/FinancialReportPanel.vue'))
 
 const route = useRoute()
 const router = useRouter()

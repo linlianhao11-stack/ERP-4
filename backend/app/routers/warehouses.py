@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Warehouse, Location, WarehouseStock, AccountSet
 from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/warehouses", tags=["仓库管理"])
 
@@ -27,17 +28,17 @@ async def list_warehouses(include_virtual: bool = False, user: User = Depends(ge
         for a in await AccountSet.filter(id__in=as_ids):
             as_map[a.id] = a.name
 
-    result = []
+    items = []
     for w in warehouses:
         locs = locs_by_wh.get(w.id, [])
-        result.append({
+        items.append({
             "id": w.id, "name": w.name, "is_default": w.is_default,
             "is_virtual": w.is_virtual, "customer_id": w.customer_id,
             "account_set_id": w.account_set_id,
             "account_set_name": as_map.get(w.account_set_id) if w.account_set_id else None,
             "locations": [{"id": loc.id, "code": loc.code, "name": loc.name, "color": loc.color or "blue"} for loc in locs]
         })
-    return result
+    return paginated_response(items)
 
 
 @router.post("")

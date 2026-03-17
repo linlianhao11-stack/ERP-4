@@ -143,11 +143,19 @@
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0 }
   button, a, input, select, textarea { touch-action: manipulation }
-  :focus-visible {
+  /* 全局焦点可见样式 — 无障碍性基线 */
+  *:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
   :focus:not(:focus-visible) { outline: none }
+
+  /* 输入框焦点样式覆盖 */
+  .input:focus-visible,
+  select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary);
+  }
   tbody tr:nth-child(even) { background: var(--elevated) }
 }
 

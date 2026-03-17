@@ -11,6 +11,7 @@ class User(models.Model):
     is_active = fields.BooleanField(default=True)
     must_change_password = fields.BooleanField(default=False)
     token_version = fields.IntField(default=0)
+    password_changed_at = fields.DatetimeField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     def has_permission(self, perm: str) -> bool:

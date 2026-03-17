@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, reactive } from 'vue'
 import { getAllOrders, getUnpaidOrders, getPayments, getStockLogs } from '../api/finance'
+import { useAppStore } from './app'
 
 export const useFinanceStore = defineStore('finance', () => {
   const allOrders = ref([])
@@ -23,6 +24,7 @@ export const useFinanceStore = defineStore('finance', () => {
       allOrders.value = data.items || data
     } catch (e) {
       console.error('加载订单失败', e)
+      useAppStore().showToast('加载订单失败', 'error')
     }
   }
 
@@ -32,9 +34,10 @@ export const useFinanceStore = defineStore('finance', () => {
     try {
       const p = financeCustomerId.value ? { customer_id: financeCustomerId.value } : {}
       const { data } = await getUnpaidOrders(p)
-      unpaidOrders.value = data
+      unpaidOrders.value = data.items || data
     } catch (e) {
       console.error('加载未付订单失败', e)
+      useAppStore().showToast('加载未付订单失败', 'error')
       throw e
     }
   }
@@ -42,9 +45,10 @@ export const useFinanceStore = defineStore('finance', () => {
   const loadPayments = async () => {
     try {
       const { data } = await getPayments()
-      payments.value = data
+      payments.value = data.items || data
     } catch (e) {
       console.error('加载收款记录失败', e)
+      useAppStore().showToast('加载收款记录失败', 'error')
       throw e
     }
   }
@@ -56,7 +60,10 @@ export const useFinanceStore = defineStore('finance', () => {
     if (_loadingPromise) return _loadingPromise
     _loadingPromise = Promise.all([loadUnpaidOrders(), loadPayments()])
       .then(() => { _loaded.value = true })
-      .catch(e => { console.error('加载财务数据失败', e) })
+      .catch(e => {
+        console.error('加载财务数据失败', e)
+        useAppStore().showToast('加载财务数据失败', 'error')
+      })
       .finally(() => { _loadingPromise = null })
     return _loadingPromise
   }
@@ -66,9 +73,10 @@ export const useFinanceStore = defineStore('finance', () => {
       const params = {}
       if (logFilter.type) params.change_type = logFilter.type
       const { data } = await getStockLogs(params)
-      stockLogs.value = data
+      stockLogs.value = data.items || data
     } catch (e) {
       console.error('加载库存日志失败', e)
+      useAppStore().showToast('加载库存日志失败', 'error')
     }
   }
 

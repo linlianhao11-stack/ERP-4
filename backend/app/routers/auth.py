@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from tortoise.expressions import F
 from app.auth.jwt import create_access_token
@@ -63,7 +63,14 @@ async def login(data: LoginRequest, request: Request):
         await user.save()
     await log_operation(user, "LOGIN_SUCCESS", "USER", user.id, f"登录成功，IP: {client_ip}")
     token = create_access_token({"user_id": user.id, "username": user.username, "role": user.role, "token_version": user.token_version})
-    return {
+    # 检查密码是否过期
+    # password_changed_at 为 NULL 表示迁移前的老用户，不视为过期（从首次修改密码开始计算）
+    from app.config import PASSWORD_EXPIRY_DAYS
+    password_expired = False
+    if PASSWORD_EXPIRY_DAYS > 0 and user.password_changed_at is not None:
+        if datetime.now(timezone.utc) - user.password_changed_at > timedelta(days=PASSWORD_EXPIRY_DAYS):
+            password_expired = True
+    resp = {
         "access_token": token,
         "must_change_password": user.must_change_password,
         "user": {
@@ -72,6 +79,9 @@ async def login(data: LoginRequest, request: Request):
             "permissions": user.permissions or []
         }
     }
+    if password_expired:
+        resp["password_expired"] = True
+    return resp
 
 
 @router.get("/me")
@@ -92,8 +102,11 @@ async def change_password(data: ChangePasswordRequest, user: User = Depends(get_
     user.password_hash = hash_password(data.new_password)
     user.must_change_password = False
     await user.save()
-    # Atomic increment of token_version to avoid lost-update under concurrent requests
-    await User.filter(id=user.id).update(token_version=F('token_version') + 1)
+    # 更新密码修改时间 + 原子递增 token_version
+    await User.filter(id=user.id).update(
+        password_changed_at=datetime.now(timezone.utc),
+        token_version=F('token_version') + 1,
+    )
     # Re-fetch to get the updated token_version for creating the new JWT token
     user = await User.get(id=user.id)
     await log_operation(user, "PASSWORD_CHANGE", "USER", user.id, f"用户 {user.username} 修改密码")

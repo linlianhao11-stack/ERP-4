@@ -157,7 +157,7 @@ const loadPaymentsData = async () => {
     if (payFilter.end) params.end_date = payFilter.end
     if (payFilter.search) params.search = payFilter.search
     const { data } = await getPayments(params)
-    payments.value = data
+    payments.value = data.items || data
   } catch (e) {
     console.error(e)
     appStore.showToast(e.response?.data?.detail || '加载收款记录失败', 'error')

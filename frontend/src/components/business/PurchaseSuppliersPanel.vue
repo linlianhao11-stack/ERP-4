@@ -308,7 +308,7 @@ const filteredSuppliers = computed(() => {
 const loadSuppliers = async () => {
   try {
     const { data } = await getSuppliers()
-    suppliers.value = data
+    suppliers.value = data.items || data
   } catch (e) {
     console.error(e)
   }

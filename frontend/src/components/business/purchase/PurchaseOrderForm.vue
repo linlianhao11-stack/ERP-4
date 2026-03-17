@@ -343,7 +343,7 @@ const loadSuppliers = async () => {
     const params = {}
     if (poForm.account_set_id) params.account_set_id = poForm.account_set_id
     const { data } = await getSuppliers(params)
-    suppliers.value = data
+    suppliers.value = data.items || data
   } catch (e) {
     console.error(e)
   }

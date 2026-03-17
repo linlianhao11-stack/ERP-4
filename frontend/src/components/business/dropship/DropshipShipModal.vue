@@ -96,7 +96,7 @@ const shipBtnText = computed(() => shipActionText(form.carrier_code))
 const loadCarriers = async () => {
   try {
     const { data } = await getCarriers()
-    carriers.value = data
+    carriers.value = data.items || data
   } catch (e) {
     console.error(e)
   }

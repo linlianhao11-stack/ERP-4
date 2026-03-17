@@ -35,4 +35,4 @@ class StockLog(models.Model):
 
     class Meta:
         table = "stock_logs"
-        indexes = (("product_id", "warehouse_id", "created_at"),)
+        indexes = (("product_id", "warehouse_id", "created_at"), ("warehouse_id", "created_at"),)

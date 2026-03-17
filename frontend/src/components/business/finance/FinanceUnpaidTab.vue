@@ -183,7 +183,7 @@ const loadUnpaid = async () => {
     if (unpaidFilter.end) p.end_date = unpaidFilter.end
     if (unpaidFilter.search) p.search = unpaidFilter.search
     const { data } = await getUnpaidOrders(p)
-    unpaidOrders.value = data
+    unpaidOrders.value = data.items || data
   } catch (e) {
     console.error(e)
   }
@@ -212,9 +212,10 @@ const loadCustomerUnpaid = async () => {
   }
   try {
     const { data } = await getUnpaidOrders({ customer_id: paymentForm.customer_id })
-    customerUnpaidOrders.value = data
+    const unpaidItems = data.items || data
+    customerUnpaidOrders.value = unpaidItems
     // 自动填充总欠款金额
-    paymentForm.amount = data.reduce((s, o) => s + o.unpaid_amount, 0)
+    paymentForm.amount = unpaidItems.reduce((s, o) => s + o.unpaid_amount, 0)
   } catch (e) {
     console.error(e)
   }

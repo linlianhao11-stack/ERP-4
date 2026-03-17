@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Location, Warehouse, WarehouseStock
 from app.schemas.warehouse import LocationCreate, LocationUpdate
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/locations", tags=["仓位管理"])
 
@@ -13,7 +14,7 @@ async def list_locations(warehouse_id: Optional[int] = None, user: User = Depend
     if warehouse_id:
         query = query.filter(warehouse_id=warehouse_id)
     locations = await query.order_by("code")
-    return [{"id": loc.id, "code": loc.code, "name": loc.name, "warehouse_id": loc.warehouse_id, "color": loc.color or "blue"} for loc in locations]
+    return paginated_response([{"id": loc.id, "code": loc.code, "name": loc.name, "warehouse_id": loc.warehouse_id, "color": loc.color or "blue"} for loc in locations])
 
 
 @router.post("")

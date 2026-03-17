@@ -25,7 +25,7 @@ class ReceivableBill(models.Model):
 
     class Meta:
         table = "receivable_bills"
-        indexes = (("account_set_id", "customer_id"), ("account_set_id", "status"),)
+        indexes = (("account_set_id", "customer_id"), ("account_set_id", "status"), ("bill_date",),)
 
 
 class ReceiptBill(models.Model):

@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
+from app.constants import SnCodeStatus
 from app.models import Product, SnConfig, SnCode
 from app.utils.time import now
 
@@ -35,7 +36,7 @@ async def validate_and_add_sn_codes(sn_codes: List[str], warehouse_id: int, prod
             await SnCode.bulk_create([
                 SnCode(
                     sn_code=sn, warehouse_id=warehouse_id, product_id=product_id,
-                    location_id=location_id, status="in_stock", entry_type=entry_type,
+                    location_id=location_id, status=SnCodeStatus.IN_STOCK.value, entry_type=entry_type,
                     entry_reference_id=reference_id, entry_cost=entry_cost,
                     entry_date=now(), entry_user=user
                 )
@@ -53,7 +54,7 @@ async def validate_and_consume_sn_codes(sn_codes: List[str], shipment, user,
     """
     async with in_transaction():
         for sn in sn_codes:
-            filters = {"sn_code": sn, "status": "in_stock"}
+            filters = {"sn_code": sn, "status": SnCodeStatus.IN_STOCK.value}
             if product_id:
                 filters["product_id"] = product_id
             if warehouse_id:
@@ -66,7 +67,7 @@ async def validate_and_consume_sn_codes(sn_codes: List[str], shipment, user,
                 if product_id or warehouse_id:
                     detail = f"SN码不可用(不存在、已发货或不属于当前商品/仓库): {sn}"
                 raise HTTPException(status_code=400, detail=detail)
-            sn_obj.status = "shipped"
+            sn_obj.status = SnCodeStatus.SHIPPED.value
             sn_obj.shipment = shipment
             sn_obj.ship_date = now()
             sn_obj.ship_user = user

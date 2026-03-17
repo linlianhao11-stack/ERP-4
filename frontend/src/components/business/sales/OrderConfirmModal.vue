@@ -11,10 +11,10 @@
       class="modal-overlay"
       @click.self="$emit('update:visible', false)"
     >
-      <div class="modal-content" @click.stop>
+      <div class="modal-content" @click.stop role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <!-- 弹窗标题 -->
         <div class="modal-header">
-          <h3 class="modal-title">确认提交订单</h3>
+          <h3 id="confirm-modal-title" class="modal-title">确认提交订单</h3>
           <button @click="$emit('update:visible', false)" class="modal-close">&times;</button>
         </div>
 
@@ -82,14 +82,30 @@
             <!-- 退款方式和金额（勾选已退款时显示） -->
             <div v-if="orderConfirm.refunded" class="mt-3 space-y-2 border-t border-warning/30 pt-3">
               <div>
-                <label class="text-xs text-secondary" for="refund-method">退款方式</label>
-                <select id="refund-method" v-model="orderConfirm.refund_method" class="input text-sm mt-0.5">
+                <label class="text-xs text-secondary" for="refund-method">退款方式 *</label>
+                <select
+                  id="refund-method"
+                  v-model="orderConfirm.refund_method"
+                  class="input text-sm mt-0.5"
+                  required
+                  :class="{ 'border-error': validationTriggered && !orderConfirm.refund_method }"
+                >
                   <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">{{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}</option>
                 </select>
+                <div v-if="validationTriggered && !orderConfirm.refund_method" class="text-xs text-error mt-1">请选择退款方式</div>
               </div>
               <div>
-                <label class="text-xs text-secondary" for="refund-amount">退款金额</label>
-                <input id="refund-amount" v-model.number="orderConfirm.refund_amount" type="number" step="0.01" min="0" class="input text-sm mt-0.5" />
+                <label class="text-xs text-secondary" for="refund-amount">退款金额 *</label>
+                <input
+                  id="refund-amount"
+                  v-model.number="orderConfirm.refund_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input text-sm mt-0.5"
+                  required
+                  :class="{ 'border-error': validationTriggered && (orderConfirm.refund_amount === null || orderConfirm.refund_amount === undefined || orderConfirm.refund_amount === '') }"
+                />
                 <div class="text-xs text-muted mt-0.5">默认为订单总金额，可调整实际退款金额</div>
               </div>
             </div>
@@ -167,10 +183,17 @@
 
           <!-- 收款方式选择（仅现款） -->
           <div v-if="orderConfirm.order_type === 'CASH'" class="mb-4">
-            <label class="label">收款方式 *</label>
-            <select v-model="orderConfirm.payment_method" class="input text-sm">
+            <label class="label" for="order-confirm-payment-method">收款方式 *</label>
+            <select
+              id="order-confirm-payment-method"
+              v-model="orderConfirm.payment_method"
+              class="input text-sm"
+              required
+              :class="{ 'border-error': validationTriggered && !orderConfirm.payment_method }"
+            >
               <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">{{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}</option>
             </select>
+            <div v-if="validationTriggered && !orderConfirm.payment_method" class="text-xs text-error mt-1">请选择收款方式</div>
           </div>
 
           <!-- 财务账套（自动推断，只读展示） -->
@@ -201,7 +224,7 @@
           <!-- 操作按钮 -->
           <div class="flex gap-3 pt-3">
             <button type="button" @click="$emit('update:visible', false)" class="btn btn-secondary flex-1">取消</button>
-            <button type="button" @click="$emit('confirm')" :disabled="submitting" class="btn btn-primary flex-1">
+            <button type="button" @click="handleConfirm" :disabled="submitting" class="btn btn-primary flex-1">
               {{ submitting ? '提交中...' : '确认提交' }}
             </button>
           </div>
@@ -216,7 +239,7 @@
  * 订单确认弹窗组件
  * 所有确认数据通过 orderConfirm prop 直接修改（reactive 对象）
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useFormat } from '../../../composables/useFormat'
 import { orderTypeNames, orderTypeBadges } from '../../../utils/constants'
 
@@ -236,6 +259,22 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'confirm'])
 
 const { fmt } = useFormat()
+
+/** 表单验证状态 */
+const validationTriggered = ref(false)
+
+/** 验证并提交 */
+const handleConfirm = () => {
+  validationTriggered.value = true
+  // 现款订单必须选择收款方式
+  if (props.orderConfirm.order_type === 'CASH' && !props.orderConfirm.payment_method) return
+  // 退货已退款必须选择退款方式和金额
+  if (props.orderConfirm.order_type === 'RETURN' && props.orderConfirm.refunded) {
+    if (!props.orderConfirm.refund_method) return
+    if (props.orderConfirm.refund_amount === null || props.orderConfirm.refund_amount === undefined || props.orderConfirm.refund_amount === '') return
+  }
+  emit('confirm')
+}
 
 /** 返利总额 */
 const rebateTotal = computed(() =>

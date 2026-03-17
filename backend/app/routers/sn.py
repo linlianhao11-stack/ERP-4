@@ -2,9 +2,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user, require_permission
+from app.constants import SnCodeStatus
 from app.models import User, Warehouse, SnConfig, SnCode
 from app.schemas.sn import SnConfigCreate
 from app.services.sn_service import check_sn_required
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api", tags=["SN码管理"])
 
@@ -13,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["SN码管理"])
 async def list_sn_configs(user: User = Depends(require_permission("settings", "admin"))):
     """获取SN配置列表"""
     configs = await SnConfig.filter(is_active=True).select_related("warehouse").order_by("-created_at")
-    return [{"id": c.id, "warehouse_id": c.warehouse_id, "warehouse_name": c.warehouse.name if c.warehouse else "", "brand": c.brand} for c in configs]
+    return paginated_response([{"id": c.id, "warehouse_id": c.warehouse_id, "warehouse_name": c.warehouse.name if c.warehouse else "", "brand": c.brand} for c in configs])
 
 
 @router.post("/sn-configs")
@@ -56,5 +58,5 @@ async def check_sn_required_api(warehouse_id: int, product_id: int, user: User =
 @router.get("/sn-codes/available")
 async def list_available_sn_codes(warehouse_id: int, product_id: int, user: User = Depends(require_permission("stock_view", "logistics", "sales"))):
     """查询可用SN码"""
-    codes = await SnCode.filter(warehouse_id=warehouse_id, product_id=product_id, status="in_stock").order_by("entry_date")
-    return [{"id": c.id, "sn_code": c.sn_code, "entry_date": c.entry_date.isoformat() if c.entry_date else None} for c in codes]
+    codes = await SnCode.filter(warehouse_id=warehouse_id, product_id=product_id, status=SnCodeStatus.IN_STOCK.value).order_by("entry_date")
+    return paginated_response([{"id": c.id, "sn_code": c.sn_code, "entry_date": c.entry_date.isoformat() if c.entry_date else None} for c in codes])

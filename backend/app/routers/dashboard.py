@@ -9,6 +9,7 @@ from tortoise import connections
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.utils.time import now
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api", tags=["仪表盘"])
 
@@ -281,7 +282,7 @@ async def get_recent_orders(
         LIMIT $1
     """, [limit])
 
-    return [
+    return paginated_response([
         {
             "id": r["id"],
             "order_no": r["order_no"],
@@ -294,4 +295,4 @@ async def get_recent_orders(
             "source": r["source"],
         }
         for r in rows
-    ]
+    ])

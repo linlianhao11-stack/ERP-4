@@ -17,6 +17,10 @@ from app.models import User, Supplier, PurchaseOrder, RebateLog
 from app.models.supplier_balance import SupplierAccountBalance
 from app.schemas.supplier import SupplierRequest, CreditRefundRequest
 from app.services.operation_log_service import log_operation
+from app.utils.response import paginated_response
+from app.logger import get_logger
+
+logger = get_logger("suppliers")
 
 router = APIRouter(prefix="/api/suppliers", tags=["供应商管理"])
 
@@ -132,12 +136,13 @@ async def list_suppliers(account_set_id: Optional[int] = None, user: User = Depe
         balances = await SupplierAccountBalance.filter(account_set_id=account_set_id).all()
         balance_map = {b.supplier_id: b for b in balances}
 
-    return [{"id": s.id, "name": s.name, "contact_person": s.contact_person, "phone": s.phone,
+    items = [{"id": s.id, "name": s.name, "contact_person": s.contact_person, "phone": s.phone,
              "tax_id": s.tax_id, "bank_account": s.bank_account, "bank_name": s.bank_name,
              "address": s.address,
              "rebate_balance": float(balance_map[s.id].rebate_balance) if s.id in balance_map else (0 if account_set_id else float(s.rebate_balance)),
              "credit_balance": float(balance_map[s.id].credit_balance) if s.id in balance_map else (0 if account_set_id else float(s.credit_balance)),
              "created_at": s.created_at.isoformat()} for s in suppliers]
+    return paginated_response(items)
 
 
 @router.post("")
@@ -217,10 +222,10 @@ async def get_supplier_transactions(
             else:
                 end = datetime(int(year), int(mon) + 1, 1)
             po_query = po_query.filter(created_at__gte=start, created_at__lt=end)
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"供应商交易记录月份参数解析失败: month={month}, {e}")
 
-    orders = await po_query.order_by("-created_at").select_related("creator")
+    orders = await po_query.order_by("-created_at").limit(1000).select_related("creator")
 
     # 统计
     from tortoise.functions import Count, Sum, Coalesce

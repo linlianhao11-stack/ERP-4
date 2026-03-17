@@ -13,7 +13,11 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.utils.csv import csv_safe
 from app.models import (
     User, Order, OrderItem, Payment, PaymentOrder, Customer,
-    StockLog, Shipment
+    StockLog, Shipment, ShipmentItem
+)
+from app.constants import (
+    OrderType, ShippingStatus, PaymentSource,
+    ORDER_TYPE_NAMES, STOCK_CHANGE_TYPE_NAMES,
 )
 from app.schemas.finance import PaymentCreate
 from app.services.operation_log_service import log_operation
@@ -21,6 +25,8 @@ from app.utils.generators import generate_order_no
 from app.utils.pagination import apply_cursor_pagination, build_next_cursor
 from app.utils.time import now
 from app.utils.errors import parse_date
+from app.utils.batch_load import batch_load_related
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/finance", tags=["财务管理"])
 
@@ -60,11 +66,11 @@ async def get_all_orders(
         query = query.filter(order_type=order_type)
     if payment_status:
         if payment_status == "cancelled":
-            query = query.filter(shipping_status="cancelled")
+            query = query.filter(shipping_status=ShippingStatus.CANCELLED.value)
         elif payment_status == "cleared":
-            query = query.filter(is_cleared=True).exclude(shipping_status="cancelled")
+            query = query.filter(is_cleared=True).exclude(shipping_status=ShippingStatus.CANCELLED.value)
         elif payment_status == "uncleared":
-            query = query.filter(is_cleared=False).exclude(shipping_status="cancelled")
+            query = query.filter(is_cleared=False).exclude(shipping_status=ShippingStatus.CANCELLED.value)
         elif payment_status == "unconfirmed":
             from tortoise import connections
             conn = connections.get("default")
@@ -179,7 +185,7 @@ async def get_order_items(order_id: int, user: User = Depends(require_permission
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
     items = await OrderItem.filter(order_id=order_id).select_related("product")
-    return [{
+    return paginated_response([{
         "id": i.id,
         "product_sku": i.product.sku if i.product else "",
         "product_name": i.product.name if i.product else "",
@@ -189,7 +195,7 @@ async def get_order_items(order_id: int, user: User = Depends(require_permission
         "amount": float(i.amount),
         "profit": float(i.profit),
         "shipped_qty": i.shipped_qty,
-    } for i in items]
+    } for i in items])
 
 
 @router.get("/all-orders/export")
@@ -215,22 +221,73 @@ async def export_orders(
     output.write('\ufeff')
 
     headers = ["订单号", "订单类型", "客户", "仓库", "金额", "成本", "毛利", "已付", "状态", "退款状态", "备注", "业务员", "创建人", "创建时间", "关联订单",
-               "商品SKU", "商品名称", "数量", "单价", "成本价", "小计", "利润"]
+               "商品SKU", "商品名称", "数量", "单价", "成本价", "小计", "利润", "SN码"]
     output.write(','.join(headers) + '\n')
 
-    type_names = {
-        "CASH": "现款", "CREDIT": "账期",
-        "CONSIGN_OUT": "寄售调拨", "CONSIGN_SETTLE": "寄售结算",
-        "CONSIGN_RETURN": "寄售退货",
-        "RETURN": "退货"
-    }
+    type_names = ORDER_TYPE_NAMES
 
     # 批量查询所有订单明细（避免 N+1）
     order_ids = [o.id for o in orders]
-    all_items = await OrderItem.filter(order_id__in=order_ids).select_related("product") if order_ids else []
-    items_by_order = {}
-    for item in all_items:
-        items_by_order.setdefault(item.order_id, []).append(item)
+    items_by_order = await batch_load_related(OrderItem, 'order_id', order_ids, ['product'])
+
+    # 批量查询 SN 码：通过 Shipment → ShipmentItem 关联，按 (order_id, product_id) 聚合
+    # 同时回退到 Shipment.sn_code（通过"更新SN"功能写入的聚合字段）
+    import json as _json
+
+    def _parse_sn(raw):
+        """解析 SN 码字符串，兼容 JSON 数组和逗号/空格分隔"""
+        if not raw:
+            return []
+        try:
+            parsed = _json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(c) for c in parsed]
+        except Exception:
+            pass
+        return [c.strip() for c in str(raw).split(',') if c.strip()]
+
+    sn_by_order_product = {}
+    if order_ids:
+        shipments = await Shipment.filter(order_id__in=order_ids).all()
+        shipment_order_map = {s.id: s.order_id for s in shipments}
+        shipment_ids = list(shipment_order_map.keys())
+
+        # 记录每个 shipment 是否已有 item 级 SN
+        shipments_with_item_sn = set()
+
+        if shipment_ids:
+            all_si = await ShipmentItem.filter(shipment_id__in=shipment_ids).all()
+            si_by_shipment = {}
+            for si in all_si:
+                si_by_shipment.setdefault(si.shipment_id, []).append(si)
+
+            for si in all_si:
+                codes = _parse_sn(si.sn_codes)
+                if codes:
+                    shipments_with_item_sn.add(si.shipment_id)
+                    oid = shipment_order_map[si.shipment_id]
+                    key = (oid, si.product_id)
+                    sn_by_order_product.setdefault(key, []).extend(codes)
+
+            # 回退：Shipment.sn_code 有值但 ShipmentItem 无 SN 的，按商品关联
+            for s in shipments:
+                if s.id in shipments_with_item_sn or not s.sn_code:
+                    continue
+                codes = _parse_sn(s.sn_code)
+                if not codes:
+                    continue
+                oid = s.order_id
+                si_list = si_by_shipment.get(s.id, [])
+                if si_list:
+                    # 有 ShipmentItem 时关联到第一个商品
+                    key = (oid, si_list[0].product_id)
+                    sn_by_order_product.setdefault(key, []).extend(codes)
+                else:
+                    # 无 ShipmentItem：尝试关联到订单的第一个商品
+                    order_items = items_by_order.get(oid, [])
+                    if order_items:
+                        key = (oid, order_items[0].product_id)
+                        sn_by_order_product.setdefault(key, []).extend(codes)
 
     for o in orders:
         order_base = [
@@ -242,8 +299,8 @@ async def export_orders(
             f"{float(o.total_cost):.2f}",
             f"{float(o.total_profit):.2f}",
             f"{float(o.paid_amount):.2f}",
-            "已取消" if o.shipping_status == "cancelled" else ("已结清" if o.is_cleared else "未结清"),
-            ("已退款" if o.refunded else "未退款") if o.order_type == "RETURN" else "-",
+            "已取消" if o.shipping_status == ShippingStatus.CANCELLED else ("已结清" if o.is_cleared else "未结清"),
+            ("已退款" if o.refunded else "未退款") if o.order_type == OrderType.RETURN else "-",
             (o.remark or "").replace('\n', ' '),
             o.employee.name if o.employee else "-",
             o.creator.display_name if o.creator else "-",
@@ -253,6 +310,7 @@ async def export_orders(
         items = items_by_order.get(o.id, [])
         if items:
             for it in items:
+                sn_codes = sn_by_order_product.get((o.id, it.product_id), [])
                 row = order_base + [
                     it.product.sku if it.product else "-",
                     it.product.name if it.product else "-",
@@ -260,11 +318,12 @@ async def export_orders(
                     f"{float(it.unit_price):.2f}",
                     f"{float(it.cost_price):.2f}",
                     f"{float(it.amount):.2f}",
-                    f"{float(it.profit):.2f}"
+                    f"{float(it.profit):.2f}",
+                    " / ".join(sn_codes) if sn_codes else "-"
                 ]
                 output.write(','.join(csv_safe(item) for item in row) + '\n')
         else:
-            row = order_base + ["-"] * 7
+            row = order_base + ["-"] * 8
             output.write(','.join(csv_safe(item) for item in row) + '\n')
 
     output.seek(0)
@@ -290,21 +349,7 @@ async def get_finance_stock_logs(
 ):
     """获取所有出入库日志（财务视角）"""
     limit = min(limit, 200)
-    type_names = {
-        "RESTOCK": "入库",
-        "SALE": "销售出库",
-        "RETURN": "退货入库",
-        "CONSIGN_OUT": "寄售调拨",
-        "CONSIGN_SETTLE": "寄售结算",
-        "CONSIGN_RETURN": "寄售退货",
-        "ADJUST": "库存调整",
-        "PURCHASE_IN": "采购入库",
-        "PURCHASE_RETURN": "采购退货",
-        "TRANSFER_OUT": "调拨出库",
-        "TRANSFER_IN": "调拨入库",
-        "RESERVE": "库存预留",
-        "RESERVE_CANCEL": "取消预留",
-    }
+    type_names = STOCK_CHANGE_TYPE_NAMES
 
     query = StockLog.all()
     if change_type:
@@ -353,7 +398,7 @@ async def get_unpaid_orders(
     """获取未结清的账期/寄售结算订单（仅显示实际欠款 > 0 的订单）"""
     query = Order.filter(
         is_cleared=False,
-        order_type__in=["CREDIT", "CONSIGN_SETTLE"],
+        order_type__in=OrderType.credit_types(),
         total_amount__gt=F('paid_amount')
     )
     if customer_id:
@@ -367,14 +412,14 @@ async def get_unpaid_orders(
     if search:
         query = query.filter(Q(order_no__icontains=search) | Q(customer__name__icontains=search))
     orders = await query.order_by("created_at").select_related("customer", "employee")
-    return [{
+    return paginated_response([{
         "id": o.id, "order_no": o.order_no, "order_type": o.order_type,
         "customer_id": o.customer_id, "customer_name": o.customer.name if o.customer else None,
         "employee_name": o.employee.name if o.employee else None,
         "total_amount": float(o.total_amount), "paid_amount": float(o.paid_amount),
         "unpaid_amount": float(o.total_amount - o.paid_amount),
         "created_at": o.created_at.isoformat()
-    } for o in orders]
+    } for o in orders])
 
 
 @router.post("/payment")
@@ -400,7 +445,7 @@ async def create_payment(data: PaymentCreate, user: User = Depends(require_permi
             customer=customer,
             amount=Decimal(str(data.amount)),
             payment_method=data.payment_method,
-            source="CREDIT",
+            source=PaymentSource.CREDIT.value,
             is_confirmed=False,
             remark=data.remark,
             creator=user,
@@ -470,10 +515,7 @@ async def list_payments(
 
     # 批量查询关联订单（避免 N+1）
     payment_ids_need_links = [p.id for p in payments if not (p.order_id and p.order)]
-    all_po_links = await PaymentOrder.filter(payment_id__in=payment_ids_need_links).select_related("order") if payment_ids_need_links else []
-    po_links_by_payment = {}
-    for link in all_po_links:
-        po_links_by_payment.setdefault(link.payment_id, []).append(link)
+    po_links_by_payment = await batch_load_related(PaymentOrder, 'payment_id', payment_ids_need_links, ['order'])
 
     result = []
     for p in payments:
@@ -497,7 +539,7 @@ async def list_payments(
             "created_at": p.created_at.isoformat(),
             "order_nos": order_nos
         })
-    return result
+    return paginated_response(result)
 
 
 @router.post("/payment/{payment_id}/confirm")

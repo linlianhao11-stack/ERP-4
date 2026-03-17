@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getProducts } from '../api/products'
+import { createLazyLoader } from '../utils/createLazyLoader'
 
 export const useProductsStore = defineStore('products', () => {
   const products = ref([])
   const error = ref(null)
-  const _loaded = ref(false)
 
   const loadProducts = async (warehouseId) => {
     error.value = null
@@ -15,7 +15,6 @@ export const useProductsStore = defineStore('products', () => {
       const { data } = await getProducts(params)
       if (!warehouseId) {
         products.value = data.items ?? data
-        _loaded.value = true
       }
       return data
     } catch (e) {
@@ -24,14 +23,7 @@ export const useProductsStore = defineStore('products', () => {
     }
   }
 
-  let _loadingPromise = null
-
-  const ensureLoaded = async () => {
-    if (_loaded.value) return
-    if (_loadingPromise) return _loadingPromise
-    _loadingPromise = loadProducts().finally(() => { _loadingPromise = null })
-    return _loadingPromise
-  }
+  const { ensureLoaded } = createLazyLoader(() => loadProducts())
 
   return { products, error, loadProducts, ensureLoaded }
 })

@@ -189,8 +189,8 @@ const onFilterChange = () => {
 const loadFilters = async () => {
   try {
     const [brandsRes, catsRes] = await Promise.all([getProductBrands(), getCategories()])
-    brands.value = brandsRes.data || []
-    categories.value = catsRes.data || []
+    const bd = brandsRes.data; brands.value = bd.items || bd || []
+    const cd = catsRes.data; categories.value = cd.items || cd || []
   } catch (e) {
     console.error(e)
   }

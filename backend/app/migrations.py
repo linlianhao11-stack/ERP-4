@@ -31,6 +31,7 @@ async def _run_migrations_inner():
     # DDL 迁移必须在 ORM 查询之前执行（否则新字段不存在会报错）
     await migrate_user_must_change_password()
     await migrate_user_token_version()
+    await migrate_user_password_changed_at()
     await migrate_order_updated_at()
     await migrate_order_item_warehouse()
     await migrate_purchase_order_payment_method()
@@ -119,6 +120,10 @@ async def _run_migrations_inner():
     # 一次性权限迁移（从 main.py 移入，统一在 advisory lock 保护下）
     await _migrate_ai_permissions()
     await _migrate_dropship_permissions()
+
+    # Phase 3: 缺失索引 + CHECK 约束
+    await migrate_add_missing_indexes()
+    await migrate_add_check_constraints()
 
     logger.info("数据库初始化完成")
 
@@ -1143,3 +1148,54 @@ async def _migrate_dropship_permissions():
     if migrated:
         logger.info(f"代采代发权限迁移完成，已为 {migrated} 个用户添加权限")
     await SystemSetting.get_or_create(key="dropship.permissions_migrated", defaults={"value": "1"})
+
+
+async def migrate_user_password_changed_at():
+    """为 users 表添加 password_changed_at 列（密码过期检查用）"""
+    conn = connections.get("default")
+    try:
+        await conn.execute_query("ALTER TABLE users ADD COLUMN password_changed_at TIMESTAMPTZ")
+        logger.info("迁移: users 表添加 password_changed_at 列")
+    except Exception:
+        pass  # 列已存在，跳过
+
+
+async def migrate_add_missing_indexes():
+    """添加审查发现的缺失复合索引"""
+    conn = connections.get("default")
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_voucher_as_period ON vouchers(account_set_id, period_name)",
+        "CREATE INDEX IF NOT EXISTS idx_receivable_bill_as_status ON receivable_bills(account_set_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_receivable_bill_date ON receivable_bills(bill_date)",
+        "CREATE INDEX IF NOT EXISTS idx_payable_bill_as_status ON payable_bills(account_set_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_order_item_wh_loc ON order_items(warehouse_id, location_id)",
+        "CREATE INDEX IF NOT EXISTS idx_shipment_tracking ON shipments(tracking_no)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_log_wh_date ON stock_logs(warehouse_id, created_at DESC)",
+    ]
+    for sql in indexes:
+        try:
+            await conn.execute_query(sql)
+        except Exception:
+            pass  # 索引已存在或表不存在（SQLite 开发环境）
+    logger.info("迁移: 检查/创建缺失复合索引")
+
+
+async def migrate_add_check_constraints():
+    """添加数据库级 CHECK 约束"""
+    conn = connections.get("default")
+    constraints = [
+        ("order_items", "chk_oi_qty_positive", "quantity > 0"),
+        ("orders", "chk_order_total_nonneg", "total_amount >= 0"),
+        ("warehouse_stocks", "chk_ws_reserved_nonneg", "reserved_qty >= 0"),
+        ("invoice_items", "chk_ii_tax_rate_range", "tax_rate >= 0 AND tax_rate <= 100"),
+        ("purchase_order_items", "chk_poi_tax_rate_range", "tax_rate >= 0 AND tax_rate <= 100"),
+    ]
+    for table, name, check_expr in constraints:
+        try:
+            await conn.execute_query(
+                f"ALTER TABLE {table} ADD CONSTRAINT {name} CHECK ({check_expr})"
+            )
+        except Exception as e:
+            if "already exists" not in str(e):
+                logger.warning(f"CHECK 约束 {name} 创建失败: {e}")
+    logger.info("迁移: 检查/创建 CHECK 约束")

@@ -152,7 +152,7 @@ async function loadAccountSetDisbursementMethods() {
   }
   try {
     const { data } = await getDisbursementMethodsApi({ account_set_id: accountingStore.currentAccountSetId })
-    accountSetDisbursementMethods.value = data
+    accountSetDisbursementMethods.value = data.items || data
   } catch {
     accountSetDisbursementMethods.value = settingsStore.disbursementMethods
   }

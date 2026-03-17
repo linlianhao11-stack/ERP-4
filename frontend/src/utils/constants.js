@@ -24,7 +24,7 @@ export const menuItems = [
   { key: 'stock', name: '库存', perm: 'stock_view', group: '业务' },
   { key: 'purchase', name: '采购', perm: 'purchase', group: '业务' },
   { key: 'consignment', name: '寄售', perm: 'consignment', group: '业务' },
-  { key: 'dropship', name: '代采代发', perm: 'dropship', group: '业务' },
+  { key: 'dropship', name: '代发', perm: 'dropship', group: '业务' },
   { key: 'logistics', name: '物流', perm: 'logistics', group: '业务' },
   { key: 'customers', name: '客户', perm: 'customer', group: '业务' },
   { key: 'finance', name: '财务', perm: 'finance', group: '财务' },
@@ -133,7 +133,7 @@ export const orderTypeBadges = {
   CASH: 'badge badge-green', CREDIT: 'badge badge-yellow',
   CONSIGN_OUT: 'badge badge-purple', CONSIGN_SETTLE: 'badge badge-blue',
   CONSIGN_RETURN: 'badge badge-orange', RETURN: 'badge badge-red',
-  DROPSHIP: 'badge badge-cyan',
+  DROPSHIP: 'badge badge-gray',
 }
 
 export const logTypeNames = {
@@ -221,3 +221,66 @@ export const locationColorCssVarMap = Object.fromEntries(
 )
 
 export const IDLE_TIMEOUT = 4 * 60 * 60 * 1000
+
+/** 权限标识常量 — 消除 hasPermission() 调用中的魔法字符串 */
+export const PERMISSIONS = {
+  // 系统
+  ADMIN: 'admin',
+  SETTINGS: 'settings',
+  LOGS: 'logs',
+  DASHBOARD: 'dashboard',
+  // 销售
+  SALES: 'sales',
+  // 库存
+  STOCK_VIEW: 'stock_view',
+  STOCK_EDIT: 'stock_edit',
+  // 采购
+  PURCHASE: 'purchase',
+  PURCHASE_APPROVE: 'purchase_approve',
+  PURCHASE_PAY: 'purchase_pay',
+  PURCHASE_RECEIVE: 'purchase_receive',
+  // 寄售
+  CONSIGNMENT: 'consignment',
+  // 代采代发
+  DROPSHIP: 'dropship',
+  DROPSHIP_PAY: 'dropship_pay',
+  // 物流
+  LOGISTICS: 'logistics',
+  // 客户
+  CUSTOMER: 'customer',
+  // 财务
+  FINANCE: 'finance',
+  FINANCE_CONFIRM: 'finance_confirm',
+  FINANCE_PAY: 'finance_pay',
+  FINANCE_REBATE: 'finance_rebate',
+  // 会计
+  ACCOUNTING_VIEW: 'accounting_view',
+  ACCOUNTING_EDIT: 'accounting_edit',
+  ACCOUNTING_APPROVE: 'accounting_approve',
+  ACCOUNTING_POST: 'accounting_post',
+  PERIOD_END: 'period_end',
+  // 应收
+  ACCOUNTING_AR_VIEW: 'accounting_ar_view',
+  ACCOUNTING_AR_EDIT: 'accounting_ar_edit',
+  ACCOUNTING_AR_CONFIRM: 'accounting_ar_confirm',
+  // 应付
+  ACCOUNTING_AP_VIEW: 'accounting_ap_view',
+  ACCOUNTING_AP_EDIT: 'accounting_ap_edit',
+  ACCOUNTING_AP_CONFIRM: 'accounting_ap_confirm',
+  // AI 助手
+  AI_CHAT: 'ai_chat',
+  AI_SALES: 'ai_sales',
+  AI_PURCHASE: 'ai_purchase',
+  AI_STOCK: 'ai_stock',
+  AI_CUSTOMER: 'ai_customer',
+  AI_FINANCE: 'ai_finance',
+  AI_ACCOUNTING: 'ai_accounting',
+  AI_DROPSHIP: 'ai_dropship',
+}
+
+/** 统一防抖时间（毫秒） */
+export const DEBOUNCE_MS = {
+  SEARCH: 200,     // 搜索输入
+  FILTER: 300,     // 筛选器变更
+  SAVE: 500,       // 自动保存
+}

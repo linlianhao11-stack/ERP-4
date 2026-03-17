@@ -21,6 +21,10 @@ from app.services.order_service import (
     validate_order_entities, resolve_item_entities, process_item_stock,
     process_rebate_deduction, process_order_settlement, release_cancelled_stock
 )
+from app.constants import (
+    OrderType, ShippingStatus, PaymentSource, BillStatus, ReceiptBillStatus,
+    ORDER_TYPE_NAMES,
+)
 from app.services.operation_log_service import log_operation
 from app.utils.generators import generate_order_no, generate_sequential_no
 from app.utils.errors import parse_date
@@ -82,15 +86,15 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
             # 3. 创建订单主记录
             # 退货订单不再自动 is_cleared，等待财务确认退款后才结清
-            is_cleared = data.order_type == "CASH"
-            shipping_status = "pending" if data.order_type in ["CASH", "CREDIT", "CONSIGN_OUT"] else "completed"
+            is_cleared = data.order_type == OrderType.CASH
+            shipping_status = ShippingStatus.PENDING.value if data.order_type in OrderType.shippable() else ShippingStatus.COMPLETED.value
             order = await Order.create(
                 order_no=order_no, order_type=data.order_type,
                 customer=customer, warehouse=warehouse,
-                related_order_id=data.related_order_id if data.order_type == "RETURN" else None,
-                refunded=data.refunded if data.order_type == "RETURN" else False,
-                refund_method=data.refund_method if data.order_type == "RETURN" else None,
-                refund_amount=data.refund_amount if data.order_type == "RETURN" else None,
+                related_order_id=data.related_order_id if data.order_type == OrderType.RETURN else None,
+                refunded=data.refunded if data.order_type == OrderType.RETURN else False,
+                refund_method=data.refund_method if data.order_type == OrderType.RETURN else None,
+                refund_amount=data.refund_amount if data.order_type == OrderType.RETURN else None,
                 remark=data.remark, employee=employee,
                 creator=user, is_cleared=is_cleared,
                 shipping_status=shipping_status,
@@ -129,7 +133,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     amount = amount - item_rebate
                 profit = amount - cost_price * qty
 
-                if data.order_type == "RETURN":
+                if data.order_type == OrderType.RETURN:
                     # profit was already correctly calculated as (amount - cost_price * qty)
                     # before negation, so we negate the actual profit value, not abs(profit)
                     profit = -profit
@@ -144,7 +148,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 await OrderItem.create(
                     order=order, product=product,
                     warehouse=working_warehouse, location=working_location,
-                    quantity=qty if data.order_type != "RETURN" else -qty,
+                    quantity=qty if data.order_type != OrderType.RETURN else -qty,
                     unit_price=unit_price, cost_price=cost_price,
                     amount=amount, profit=profit, rebate_amount=item_rebate
                 )
@@ -167,7 +171,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             order.total_amount = total_amount
             order.total_cost = total_cost
             order.total_profit = total_profit
-            if data.order_type == "RETURN" and data.refunded:
+            if data.order_type == OrderType.RETURN and data.refunded:
                 # 不再自动 is_cleared，等待财务确认退款
                 order.paid_amount = abs(total_amount)
             elif is_cleared:
@@ -184,7 +188,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
             # 6.5 钩子：寄售结算 → 应收单（pending，无发货流程所以在此创建）
             # 支持多账套：按账套拆分生成应收单
-            if data.order_type == "CONSIGN_SETTLE" and amount_by_account_set:
+            if data.order_type == OrderType.CONSIGN_SETTLE and amount_by_account_set:
                 try:
                     from app.services.ar_service import create_receivable_bill
                     for as_id, group_amount in amount_by_account_set.items():
@@ -193,14 +197,14 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                             customer_id=order.customer_id,
                             order_id=order.id,
                             total_amount=abs(group_amount),
-                            status="pending",
+                            status=BillStatus.PENDING.value,
                             creator=user,
                         )
                 except Exception as e:
                     logger.error(f"寄售结算自动生成应收单失败: {e}")
 
             # 6.5b 钩子：退货 → 红字应收单（按账套拆分）
-            if data.order_type == "RETURN" and amount_by_account_set:
+            if data.order_type == OrderType.RETURN and amount_by_account_set:
                 try:
                     from app.services.ar_service import create_receivable_bill
                     for as_id, group_amount in amount_by_account_set.items():
@@ -209,7 +213,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                             customer_id=order.customer_id,
                             order_id=order.id,
                             total_amount=group_amount,  # 已为负数
-                            status="completed",
+                            status=BillStatus.COMPLETED.value,
                             creator=user,
                         )
                 except Exception as e:
@@ -217,7 +221,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
 
             # 6.6 钩子：销售退货 + 已退款 → 自动生成退款收款单（按账套拆分，draft 状态）
-            if data.order_type == "RETURN" and data.refunded and amount_by_account_set:
+            if data.order_type == OrderType.RETURN and data.refunded and amount_by_account_set:
                 try:
                     from app.models.ar_ap import ReceivableBill, ReceiptBill
                     for as_id, group_amount in amount_by_account_set.items():
@@ -239,7 +243,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                             payment_method=data.refund_method or "",
                             bill_type="return_refund",
                             return_order=order,
-                            status="draft",
+                            status=ReceiptBillStatus.DRAFT.value,
                             remark=f"销售退货退款 | 退货单：{order.order_no} | 原订单：{original_order_no}",
                             creator=user,
                         )
@@ -247,7 +251,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                     logger.error(f"销售退货自动生成退款收款单失败: {e}")
 
             # 7. 操作日志
-            order_type_names = {'CASH':'现款','CREDIT':'账期','CONSIGN_OUT':'寄售调拨','CONSIGN_SETTLE':'寄售结算','RETURN':'退货'}
+            order_type_names = ORDER_TYPE_NAMES
             await log_operation(user, "ORDER_CREATE", "ORDER", order.id,
                 f"创建{order_type_names.get(data.order_type, data.order_type)}订单 {order_no}，金额 ¥{float(total_amount):.2f}")
 
@@ -335,8 +339,8 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
             _as_name_map[_as.id] = _as.name
 
     returned_quantities = {}
-    if order.order_type in ["CASH", "CREDIT"]:
-        return_orders = await Order.filter(related_order_id=order_id, order_type="RETURN")
+    if order.order_type in [OrderType.CASH, OrderType.CREDIT]:
+        return_orders = await Order.filter(related_order_id=order_id, order_type=OrderType.RETURN.value)
         if return_orders:
             ret_order_ids = [r.id for r in return_orders]
             ret_items = await OrderItem.filter(order_id__in=ret_order_ids)
@@ -347,12 +351,12 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
 
     credit_used = 0
     other_payment = 0
-    if order.order_type == "CASH":
+    if order.order_type == OrderType.CASH:
         if order.paid_amount > 0:
             credit_used = float(order.paid_amount)
             if order.paid_amount < order.total_amount:
                 other_payment = float(order.total_amount) - float(order.paid_amount)
-    elif order.order_type in ["CREDIT", "CONSIGN_SETTLE"]:
+    elif order.order_type in OrderType.credit_types():
         if order.paid_amount > 0:
             credit_used = float(order.paid_amount)
             other_payment = float(order.total_amount) - float(order.paid_amount)
@@ -438,8 +442,8 @@ async def get_order(order_id: int, user: User = Depends(require_permission("sale
                     "received_amount": float(rb.received_amount),
                     "status": rb.status,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"加载订单关联应收单失败: {e}")
 
     return {
         "id": order.id, "order_no": order.order_no, "order_type": order.order_type,
@@ -490,7 +494,7 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
     order = await Order.filter(id=order_id).select_related("customer").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if order.shipping_status not in ("pending", "partial"):
+    if order.shipping_status not in (ShippingStatus.PENDING, ShippingStatus.PARTIAL):
         raise HTTPException(status_code=400, detail="该订单不可取消")
 
     items = await OrderItem.filter(order_id=order_id).select_related("product").all()
@@ -573,7 +577,7 @@ async def cancel_preview(order_id: int, user: User = Depends(require_permission(
     # 检查是否有已确认的收款记录
     confirmed_payments = await Payment.filter(
         order_id=order.id, is_confirmed=True
-    ).exclude(source="REFUND").count()
+    ).exclude(source=PaymentSource.REFUND.value).count()
     has_confirmed_payment = confirmed_payments > 0
 
     return {
@@ -606,16 +610,16 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
             await order.fetch_related("customer", "warehouse")
         if not order:
             raise HTTPException(status_code=404, detail="订单不存在")
-        if order.shipping_status not in ("pending", "partial"):
+        if order.shipping_status not in (ShippingStatus.PENDING, ShippingStatus.PARTIAL):
             raise HTTPException(status_code=400, detail="该订单不可取消")
-        if order.order_type not in ("CASH", "CREDIT", "CONSIGN_OUT"):
+        if order.order_type not in OrderType.shippable():
             raise HTTPException(status_code=400, detail="该订单类型不支持取消")
 
         customer = order.customer
         items = await OrderItem.filter(order_id=order_id).select_related("product", "warehouse", "location").all()
 
         # 提前校验退款金额，避免不可逆操作后才发现参数错误
-        if customer and order.order_type in ("CASH", "CREDIT"):
+        if customer and order.order_type in (OrderType.CASH, OrderType.CREDIT):
             if data.refund_amount is not None and Decimal(str(data.refund_amount)) > order.paid_amount:
                 raise HTTPException(status_code=400, detail="退款金额不能超过已收款金额")
             if data.refund_rebate is not None and Decimal(str(data.refund_rebate)) > (order.rebate_used or Decimal("0")):
@@ -640,7 +644,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                 customer=customer,
                 warehouse=order.warehouse,
                 related_order=order,
-                shipping_status="completed",
+                shipping_status=ShippingStatus.COMPLETED.value,
                 remark=f"由取消订单 {order.order_no} 拆分生成（已发货部分）",
                 employee_id=order.employee_id,
                 account_set_id=order.account_set_id,
@@ -697,17 +701,17 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
 
         # 3. 财务回退
         # 未发货且所有收款未确认时，直接删除未确认收款记录，无需退款
-        if not has_shipped and customer and order.order_type in ("CASH", "CREDIT"):
+        if not has_shipped and customer and order.order_type in (OrderType.CASH, OrderType.CREDIT):
             confirmed_count = await Payment.filter(
                 order_id=order.id, is_confirmed=True
-            ).exclude(source="REFUND").count()
+            ).exclude(source=PaymentSource.REFUND.value).count()
             unconfirmed_count = await Payment.filter(
                 order_id=order.id, is_confirmed=False
-            ).exclude(source="REFUND").count()
+            ).exclude(source=PaymentSource.REFUND.value).count()
             if confirmed_count == 0 and unconfirmed_count > 0:
                 await Payment.filter(
                     order_id=order.id, is_confirmed=False
-                ).exclude(source="REFUND").delete()
+                ).exclude(source=PaymentSource.REFUND.value).delete()
                 order.paid_amount = Decimal("0")
 
                 # 退回返利
@@ -744,7 +748,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                     )
 
                 # 账期订单退回挂账
-                if order.order_type == "CREDIT":
+                if order.order_type == OrderType.CREDIT:
                     cancel_balance_amount = abs(order.total_amount)
                     if cancel_balance_amount > 0:
                         await Customer.filter(id=customer.id).update(
@@ -752,13 +756,13 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         )
 
                 # 跳过后续退款逻辑，直接到标记取消
-                order.shipping_status = "cancelled"
+                order.shipping_status = ShippingStatus.CANCELLED.value
                 await order.save()
                 await log_operation(user, "ORDER_CANCEL", "ORDER", order.id,
                     f"取消订单 {order.order_no}（未发货、收款未确认，直接取消）")
-                return {"message": "订单已取消", "shipping_status": "cancelled"}
+                return {"message": "订单已取消", "shipping_status": ShippingStatus.CANCELLED.value}
 
-        if customer and order.order_type in ("CASH", "CREDIT"):
+        if customer and order.order_type in (OrderType.CASH, OrderType.CREDIT):
             refund_amount = Decimal(str(data.refund_amount or 0))
             refund_rebate = Decimal(str(data.refund_rebate or 0))
 
@@ -805,7 +809,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         payment_no=pay_no, customer=customer, order=order,
                         amount=-refund_amount,
                         payment_method=data.refund_payment_method or "cash",
-                        source="REFUND", is_confirmed=False,
+                        source=PaymentSource.REFUND.value, is_confirmed=False,
                         remark=f"取消订单 {order.order_no} 退款",
                         creator=user,
                         account_set_id=order.account_set_id
@@ -823,7 +827,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                                 total_amount=-abs(refund_amount),
                                 received_amount=Decimal("0"),
                                 unreceived_amount=-abs(refund_amount),
-                                status="pending",
+                                status=BillStatus.PENDING.value,
                                 creator=user,
                             )
                             await ReceiptBill.create(
@@ -836,14 +840,14 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                                 payment_method=data.refund_payment_method or "",
                                 bill_type="return_refund",
                                 return_order=order,
-                                status="draft",
+                                status=ReceiptBillStatus.DRAFT.value,
                                 remark=f"取消订单退款 | 订单：{order.order_no}",
                                 creator=user,
                             )
                         except Exception as e:
                             logger.error(f"取消订单自动生成退款收款单失败: {e}")
 
-            if order.order_type == "CREDIT":
+            if order.order_type == OrderType.CREDIT:
                 cancel_balance_amount = abs(order.total_amount) - (abs(new_order.total_amount) if new_order else Decimal("0"))
                 if cancel_balance_amount > 0:
                     await Customer.filter(id=customer.id).update(
@@ -851,7 +855,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                     )
 
         # 4. 标记原订单取消
-        order.shipping_status = "cancelled"
+        order.shipping_status = ShippingStatus.CANCELLED.value
         await order.save()
 
         await log_operation(user, "ORDER_CANCEL", "ORDER", order.id,
@@ -859,7 +863,7 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
 
     result = {
         "message": "订单已取消",
-        "shipping_status": "cancelled"
+        "shipping_status": ShippingStatus.CANCELLED.value
     }
     if new_order:
         result["new_order_id"] = new_order.id

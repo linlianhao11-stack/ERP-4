@@ -9,6 +9,7 @@ from app.models.supplier_balance import SupplierAccountBalance
 from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.rebate import RebateChargeRequest
 from app.services.operation_log_service import log_operation
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/rebates", tags=["返利管理"])
 
@@ -24,10 +25,10 @@ async def get_rebate_summary(target_type: str, account_set_id: int = None, user:
         ).all()
         balance_map = {b.customer_id: b for b in balances}
         customers = await Customer.filter(is_active=True).order_by("name")
-        return [{
+        return paginated_response([{
             "id": c.id, "name": c.name,
             "rebate_balance": float(balance_map[c.id].rebate_balance) if c.id in balance_map else 0,
-        } for c in customers]
+        } for c in customers])
     elif target_type == "supplier":
         if not account_set_id:
             raise HTTPException(status_code=400, detail="供应商返利需要指定账套")
@@ -36,11 +37,11 @@ async def get_rebate_summary(target_type: str, account_set_id: int = None, user:
         ).all()
         balance_map = {b.supplier_id: b for b in balances}
         suppliers = await Supplier.filter(is_active=True).order_by("-created_at")
-        return [{
+        return paginated_response([{
             "id": s.id, "name": s.name,
             "rebate_balance": float(balance_map[s.id].rebate_balance) if s.id in balance_map else 0,
             "credit_balance": float(balance_map[s.id].credit_balance) if s.id in balance_map else 0,
-        } for s in suppliers]
+        } for s in suppliers])
     else:
         raise HTTPException(status_code=400, detail="target_type 必须是 customer 或 supplier")
 
@@ -52,14 +53,14 @@ async def get_rebate_logs(target_type: str, target_id: int, account_set_id: int 
     if account_set_id:
         query = query.filter(account_set_id=account_set_id)
     logs = await query.order_by("-created_at").select_related("creator")
-    return [{
+    return paginated_response([{
         "id": l.id, "type": l.type, "amount": float(l.amount),
         "balance_after": float(l.balance_after),
         "reference_type": l.reference_type, "reference_id": l.reference_id,
         "remark": l.remark,
         "creator_name": l.creator.display_name if l.creator else None,
         "created_at": l.created_at.isoformat()
-    } for l in logs]
+    } for l in logs])
 
 
 @router.post("/charge")

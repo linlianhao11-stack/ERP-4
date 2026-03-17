@@ -7,6 +7,7 @@ from app.models.accounting import AccountSet, ChartOfAccount, AccountingPeriod
 from app.schemas.accounting import AccountSetCreate, AccountSetUpdate
 from app.services.accounting_init import init_chart_of_accounts, init_accounting_periods
 from app.logger import get_logger
+from app.utils.response import paginated_response
 
 logger = get_logger("account_sets")
 
@@ -16,11 +17,11 @@ router = APIRouter(prefix="/api/account-sets", tags=["账套管理"])
 @router.get("")
 async def list_account_sets(user: User = Depends(get_current_user)):
     sets = await AccountSet.filter(is_active=True).order_by("id")
-    return [{
+    return paginated_response([{
         "id": s.id, "code": s.code, "name": s.name,
         "company_name": s.company_name, "tax_id": s.tax_id,
         "current_period": s.current_period, "is_active": s.is_active,
-    } for s in sets]
+    } for s in sets])
 
 
 @router.get("/{set_id}")

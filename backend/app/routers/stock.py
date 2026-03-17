@@ -17,7 +17,9 @@ from app.models import (
 from app.schemas.stock import RestockRequest, StockAdjustRequest, StockTransferRequest
 from app.services.stock_service import update_weighted_entry_date, get_product_weighted_cost
 from app.services.sn_service import check_sn_required, validate_and_add_sn_codes
+from app.constants import SnCodeStatus
 from app.services.operation_log_service import log_operation
+from app.utils.response import paginated_response
 from app.utils.time import now, to_naive, days_between
 from app.logger import get_logger
 
@@ -230,14 +232,14 @@ async def get_stock_logs(product_id: Optional[int] = None, warehouse_id: Optiona
     if warehouse_id:
         query = query.filter(warehouse_id=warehouse_id)
     logs = await query.order_by("-created_at").limit(limit).select_related("product", "warehouse", "creator")
-    return [{
+    return paginated_response([{
         "id": l.id, "product_name": l.product.name, "product_sku": l.product.sku,
         "warehouse_name": l.warehouse.name, "change_type": l.change_type,
         "quantity": l.quantity, "before_qty": l.before_qty, "after_qty": l.after_qty,
         "remark": l.remark,
         "creator_name": l.creator.display_name if l.creator else None,
         "created_at": l.created_at.isoformat()
-    } for l in logs]
+    } for l in logs])
 
 
 @router.get("/export")
@@ -257,7 +259,7 @@ async def export_stock(warehouse_id: Optional[int] = None, user: User = Depends(
 
         # 批量统计 SN 码数量（避免 N+1）
         # 仅查询当前导出范围内的 SN 码
-        sn_query = SnCode.filter(status="in_stock")
+        sn_query = SnCode.filter(status=SnCodeStatus.IN_STOCK.value)
         if warehouse_id:
             sn_query = sn_query.filter(warehouse_id=warehouse_id)
         product_ids_for_sn = [p.id for p in products]

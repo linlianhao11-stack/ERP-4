@@ -35,8 +35,8 @@ async def _get_kd100_config() -> tuple:
         customer_setting = await SystemSetting.filter(key="api.kd100.customer").first()
         if customer_setting and customer_setting.value:
             customer = customer_setting.value or ""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("从数据库读取 KD100 配置失败，将使用环境变量", exc_info=e)
 
     # Fallback 到环境变量
     if not key:

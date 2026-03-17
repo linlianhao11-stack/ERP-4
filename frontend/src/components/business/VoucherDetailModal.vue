@@ -248,12 +248,12 @@ const loadLeafAccounts = async () => {
   const needProduct = leafAccounts.value.some(a => a.aux_product)
   const needBank = leafAccounts.value.some(a => a.aux_bank)
   const tasks = []
-  if (needCustomer && !customerList.value.length) tasks.push(getCustomers().then(r => { customerList.value = r.data }).catch(() => {}))
-  if (needSupplier && !supplierList.value.length) tasks.push(getSuppliers().then(r => { supplierList.value = r.data }).catch(() => {}))
-  if (needEmployee && !employeeList.value.length) tasks.push(getEmployees().then(r => { employeeList.value = r.data }).catch(() => {}))
-  if (needDepartment && !departmentList.value.length) tasks.push(getDepartments().then(r => { departmentList.value = r.data }).catch(() => {}))
-  if (needProduct && !productList.value.length) tasks.push(getProducts().then(r => { productList.value = Array.isArray(r.data) ? r.data : (r.data.items || []) }).catch(() => {}))
-  if (needBank && !bankAccountList.value.length) tasks.push(getBankAccounts({ account_set_id: props.accountSetId }).then(r => { bankAccountList.value = r.data }).catch(() => {}))
+  if (needCustomer && !customerList.value.length) tasks.push(getCustomers().then(r => { customerList.value = r.data.items || r.data }).catch(() => {}))
+  if (needSupplier && !supplierList.value.length) tasks.push(getSuppliers().then(r => { supplierList.value = r.data.items || r.data }).catch(() => {}))
+  if (needEmployee && !employeeList.value.length) tasks.push(getEmployees().then(r => { employeeList.value = r.data.items || r.data }).catch(() => {}))
+  if (needDepartment && !departmentList.value.length) tasks.push(getDepartments().then(r => { departmentList.value = r.data.items || r.data }).catch(() => {}))
+  if (needProduct && !productList.value.length) tasks.push(getProducts().then(r => { productList.value = r.data.items || r.data }).catch(() => {}))
+  if (needBank && !bankAccountList.value.length) tasks.push(getBankAccounts({ account_set_id: props.accountSetId }).then(r => { bankAccountList.value = r.data.items || r.data }).catch(() => {}))
   if (tasks.length) await Promise.all(tasks)
 }
 

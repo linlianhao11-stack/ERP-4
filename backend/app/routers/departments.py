@@ -4,6 +4,7 @@ from typing import Optional
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.models.department import Department
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/departments", tags=["部门管理"])
 
@@ -21,7 +22,7 @@ class DepartmentUpdate(BaseModel):
 @router.get("")
 async def list_departments(user: User = Depends(get_current_user)):
     depts = await Department.filter(is_active=True).order_by("sort_order", "id")
-    return [{"id": d.id, "code": d.code, "name": d.name, "sort_order": d.sort_order} for d in depts]
+    return paginated_response([{"id": d.id, "code": d.code, "name": d.name, "sort_order": d.sort_order} for d in depts])
 
 
 @router.post("")

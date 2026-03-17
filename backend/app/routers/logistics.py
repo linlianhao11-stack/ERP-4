@@ -17,11 +17,17 @@ from app.schemas.logistics import ShipmentUpdate, SNCodeUpdate, ShipRequest
 from app.services.logistics_service import (
     subscribe_kd100, refresh_shipment_tracking, parse_kd100_state
 )
+from app.constants import (
+    OrderType, ShippingStatus, ShipmentStatus, BillStatus,
+    SnCodeStatus, StockChangeType,
+)
 from app.services.sn_service import validate_and_consume_sn_codes
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
 from app.utils.generators import generate_sequential_no
 from app.utils.pagination import apply_cursor_pagination, encode_cursor
+from app.utils.batch_load import batch_load_related
 from app.logger import get_logger
+from app.utils.response import paginated_response
 
 logger = get_logger("logistics")
 
@@ -66,7 +72,7 @@ def _no_logistics_message(carrier_code: str) -> str:
 
 @router.get("/carriers")
 async def get_carriers(user: User = Depends(require_permission("logistics", "sales", "dropship"))):
-    return CARRIER_LIST
+    return paginated_response(CARRIER_LIST)
 
 
 @router.get("/pending-orders")
@@ -74,8 +80,8 @@ async def list_pending_orders(offset: int = 0, limit: int = 50, user: User = Dep
     """获取待发货/部分发货的订单列表"""
     limit = min(limit, 500)
     base_query = Order.filter(
-        shipping_status__in=["pending", "partial"],
-        order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
+        shipping_status__in=[ShippingStatus.PENDING.value, ShippingStatus.PARTIAL.value],
+        order_type__in=OrderType.shippable()
     )
     total = await base_query.count()
     orders = await base_query.order_by("-created_at").offset(offset).limit(limit).select_related("customer", "warehouse")
@@ -85,10 +91,7 @@ async def list_pending_orders(offset: int = 0, limit: int = 50, user: User = Dep
 
     # 批量查询所有订单的 OrderItem（消除 N+1）
     order_ids = [o.id for o in orders]
-    all_items = await OrderItem.filter(order_id__in=order_ids).select_related("product").all()
-    items_by_order = {}
-    for i in all_items:
-        items_by_order.setdefault(i.order_id, []).append(i)
+    items_by_order = await batch_load_related(OrderItem, 'order_id', order_ids, ['product'])
 
     result = []
     for o in orders:
@@ -125,8 +128,8 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
     # 1. 以订单为主体构建查询（而非加载全部 shipments）
     if status == 'pending':
         order_query = Order.filter(
-            shipping_status__in=["pending", "partial"],
-            order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
+            shipping_status__in=[ShippingStatus.PENDING.value, ShippingStatus.PARTIAL.value],
+            order_type__in=OrderType.shippable()
         )
     elif status:
         # 其他物流状态 tab：找到有该状态 shipment 的订单
@@ -139,7 +142,7 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
     else:
         # 默认：所有物流相关订单
         order_query = Order.filter(
-            order_type__in=["CASH", "CREDIT", "CONSIGN_OUT"]
+            order_type__in=OrderType.shippable()
         )
 
     # 2. SQL 级搜索（订单号、客户名）
@@ -195,10 +198,10 @@ async def list_shipments(status: Optional[str] = None, search: Optional[str] = N
             "order_type": order.order_type,
             "customer_name": order.customer.name if order.customer else None,
             "total_amount": float(order.total_amount),
-            "shipping_status": order.shipping_status if hasattr(order, 'shipping_status') else "completed",
+            "shipping_status": order.shipping_status if hasattr(order, 'shipping_status') else ShippingStatus.COMPLETED.value,
             "carrier_name": first.carrier_name if first else None,
             "tracking_no": first.tracking_no if first else None,
-            "status": first.status if first else "pending",
+            "status": first.status if first else ShipmentStatus.PENDING.value,
             "status_text": first.status_text if first else "待发货",
             "last_info": last_info,
             "shipment_count": len(slist),
@@ -299,9 +302,9 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
     order = await Order.filter(id=order_id).select_related("customer", "warehouse").first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if order.shipping_status not in ("pending", "partial"):
+    if order.shipping_status not in (ShippingStatus.PENDING, ShippingStatus.PARTIAL):
         raise HTTPException(status_code=400, detail="该订单不在待发货状态")
-    if order.order_type not in ("CASH", "CREDIT", "CONSIGN_OUT"):
+    if order.order_type not in OrderType.shippable():
         raise HTTPException(status_code=400, detail="该订单类型不支持发货操作")
     if not data.items:
         raise HTTPException(status_code=400, detail="请选择要发货的商品")
@@ -319,12 +322,12 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
             carrier_name=data.carrier_name,
             tracking_no=data.tracking_no or None,
             phone=data.phone or None,
-            status="signed" if is_no_logistics else "shipped",
+            status=ShipmentStatus.SIGNED.value if is_no_logistics else ShipmentStatus.SHIPPED.value,
             status_text=_no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
         )
 
         consignment_wh = None
-        if order.order_type == "CONSIGN_OUT" and order.customer_id:
+        if order.order_type == OrderType.CONSIGN_OUT and order.customer_id:
             consignment_wh = await get_or_create_consignment_warehouse(order.customer_id)
 
         all_sn_display = []
@@ -380,7 +383,7 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
                 reserved_qty=F('reserved_qty') - ship_item.quantity
             )
 
-            change_type = "CONSIGN_OUT" if order.order_type == "CONSIGN_OUT" else "SALE"
+            change_type = StockChangeType.CONSIGN_OUT.value if order.order_type == OrderType.CONSIGN_OUT else StockChangeType.SALE.value
             await StockLog.create(
                 product_id=oi.product_id, warehouse=wh, change_type=change_type,
                 quantity=-ship_item.quantity,
@@ -388,11 +391,11 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
                 reference_type="ORDER", reference_id=order.id, creator=user
             )
 
-            if order.order_type == "CONSIGN_OUT" and consignment_wh:
+            if order.order_type == OrderType.CONSIGN_OUT and consignment_wh:
                 await update_weighted_entry_date(consignment_wh.id, oi.product_id, ship_item.quantity)
                 v_stock = await WarehouseStock.filter(warehouse_id=consignment_wh.id, product_id=oi.product_id).first()
                 await StockLog.create(
-                    product_id=oi.product_id, warehouse=consignment_wh, change_type="CONSIGN_OUT",
+                    product_id=oi.product_id, warehouse=consignment_wh, change_type=StockChangeType.CONSIGN_OUT.value,
                     quantity=ship_item.quantity,
                     before_qty=v_stock.quantity - ship_item.quantity, after_qty=v_stock.quantity,
                     reference_type="ORDER", reference_id=order.id, creator=user
@@ -417,25 +420,25 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
 
         all_items = await OrderItem.filter(order_id=order_id).all()
         all_shipped = all(abs(item.quantity) <= item.shipped_qty for item in all_items)
-        order.shipping_status = "completed" if all_shipped else "partial"
+        order.shipping_status = ShippingStatus.COMPLETED.value if all_shipped else ShippingStatus.PARTIAL.value
         await order.save()
 
     # 钩子放在事务外部：钩子失败不会回滚核心发货操作
-    if order.shipping_status == "completed" and getattr(order, "account_set_id", None):
+    if order.shipping_status == ShippingStatus.COMPLETED and getattr(order, "account_set_id", None):
         # 钩子：发货完成 → 自动生成应收单
         try:
             from app.services.ar_service import create_receivable_bill, create_receipt_bill_for_payment
             from app.models import Payment
 
-            if order.order_type in ("CASH", "CREDIT", "CONSIGN_SETTLE"):
+            if order.order_type in (OrderType.CASH, OrderType.CREDIT, OrderType.CONSIGN_SETTLE):
                 total = abs(order.total_amount)
-                if order.order_type == "CASH":
+                if order.order_type == OrderType.CASH:
                     rb = await create_receivable_bill(
                         account_set_id=order.account_set_id,
                         customer_id=order.customer_id,
                         order_id=order.id,
                         total_amount=total,
-                        status="completed",
+                        status=BillStatus.COMPLETED.value,
                         creator=user,
                     )
                     payment = await Payment.filter(order_id=order.id).first()
@@ -455,7 +458,7 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
                         customer_id=order.customer_id,
                         order_id=order.id,
                         total_amount=total,
-                        status="pending",
+                        status=BillStatus.PENDING.value,
                         creator=user,
                     )
         except Exception as e:
@@ -519,7 +522,7 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
     order = await Order.filter(id=order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if order.order_type not in ("CASH", "CREDIT", "CONSIGN_OUT"):
+    if order.order_type not in OrderType.shippable():
         raise HTTPException(status_code=400, detail="该订单类型不支持添加物流单")
 
     is_no_logistics = data.carrier_code in NO_LOGISTICS_CARRIERS
@@ -532,7 +535,7 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
         tracking_no=data.tracking_no or None,
         phone=data.phone or None,
         sn_code=data.sn_code or None,
-        status="signed" if is_no_logistics else "shipped",
+        status=ShipmentStatus.SIGNED.value if is_no_logistics else ShipmentStatus.SHIPPED.value,
         status_text=_no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
     )
 
@@ -550,8 +553,8 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
             if resp.get("returnCode") == "200" or resp.get("result") is True:
                 shipment.kd100_subscribed = True
                 await shipment.save()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"KD100订阅失败（不影响物流单创建）: {e}")
 
     return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "物流单已添加", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
@@ -570,7 +573,7 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
     shipment.tracking_no = data.tracking_no or None
     shipment.phone = data.phone or shipment.phone
     shipment.sn_code = data.sn_code if data.sn_code is not None else shipment.sn_code
-    shipment.status = "signed" if is_no_logistics else "shipped"
+    shipment.status = ShipmentStatus.SIGNED.value if is_no_logistics else ShipmentStatus.SHIPPED.value
     shipment.status_text = _no_logistics_status_text(data.carrier_code) if is_no_logistics else "已发货"
 
     if tracking_changed:
@@ -590,8 +593,8 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
             if resp.get("returnCode") == "200" or resp.get("result") is True:
                 shipment.kd100_subscribed = True
                 await shipment.save()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"KD100订阅失败（不影响发货）: {e}")
 
     return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "发货信息已保存", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
@@ -604,9 +607,9 @@ async def update_shipment_sn(shipment_id: int, data: SNCodeUpdate, user: User = 
         raise HTTPException(status_code=404, detail="物流记录不存在")
 
     async with transactions.in_transaction():
-        old_sn_objs = await SnCode.filter(shipment_id=shipment_id, status="shipped").select_for_update().all()
+        old_sn_objs = await SnCode.filter(shipment_id=shipment_id, status=SnCodeStatus.SHIPPED.value).select_for_update().all()
         for sn_obj in old_sn_objs:
-            sn_obj.status = "in_stock"
+            sn_obj.status = SnCodeStatus.IN_STOCK.value
             sn_obj.shipment = None
             sn_obj.ship_date = None
             sn_obj.ship_user = None
@@ -634,7 +637,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
         ship_items = await ShipmentItem.filter(shipment_id=shipment_id).all()
 
         consignment_wh = None
-        if order and order.order_type == "CONSIGN_OUT" and order.customer_id:
+        if order and order.order_type == OrderType.CONSIGN_OUT and order.customer_id:
             consignment_wh = await get_or_create_consignment_warehouse(order.customer_id)
 
         for si in ship_items:
@@ -673,7 +676,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                     # 创建库存恢复日志
                     await StockLog.create(
                         product_id=si.product_id, warehouse=wh,
-                        change_type="ADJUST",
+                        change_type=StockChangeType.ADJUST.value,
                         quantity=si.quantity,
                         before_qty=before_qty, after_qty=before_qty + si.quantity,
                         reference_type="ORDER", reference_id=shipment.order_id,
@@ -682,7 +685,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                     )
 
                     # 对于寄售调拨订单，扣减寄售（虚拟）仓库库存
-                    if order and order.order_type == "CONSIGN_OUT" and consignment_wh:
+                    if order and order.order_type == OrderType.CONSIGN_OUT and consignment_wh:
                         try:
                             v_stock = await WarehouseStock.filter(
                                 warehouse_id=consignment_wh.id, product_id=si.product_id
@@ -694,7 +697,7 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                                 ).update(quantity=F('quantity') - si.quantity)
                                 await StockLog.create(
                                     product_id=si.product_id, warehouse=consignment_wh,
-                                    change_type="ADJUST",
+                                    change_type=StockChangeType.ADJUST.value,
                                     quantity=-si.quantity,
                                     before_qty=v_before_qty, after_qty=v_before_qty - si.quantity,
                                     reference_type="ORDER", reference_id=shipment.order_id,
@@ -723,9 +726,9 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                 # Log warning but don't fail - shipped_qty was already 0 or lower
                 logger.warning("shipped_qty underflow prevented", extra={"data": {"order_item_id": si.order_item_id}})
             # 恢复 SN 码状态
-            sn_objs = await SnCode.filter(shipment_id=shipment_id, product_id=si.product_id, status="shipped").all()
+            sn_objs = await SnCode.filter(shipment_id=shipment_id, product_id=si.product_id, status=SnCodeStatus.SHIPPED.value).all()
             for sn_obj in sn_objs:
-                sn_obj.status = "in_stock"
+                sn_obj.status = SnCodeStatus.IN_STOCK.value
                 sn_obj.shipment = None
                 sn_obj.ship_date = None
                 sn_obj.ship_user = None
@@ -741,11 +744,11 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                 all_shipped = all(abs(item.quantity) <= item.shipped_qty for item in all_items)
                 any_shipped = any(item.shipped_qty > 0 for item in all_items)
                 if all_shipped:
-                    order.shipping_status = "completed"
+                    order.shipping_status = ShippingStatus.COMPLETED.value
                 elif any_shipped:
-                    order.shipping_status = "partial"
+                    order.shipping_status = ShippingStatus.PARTIAL.value
                 else:
-                    order.shipping_status = "pending"
+                    order.shipping_status = ShippingStatus.PENDING.value
                 await order.save()
 
     return {"message": "物流单已删除"}
@@ -799,7 +802,7 @@ async def kd100_callback(request: Request, order_id: Optional[int] = None, shipm
                 logger.warning(f"快递100回调单号不匹配: callback={tracking_no}, shipment={shipment.tracking_no}")
                 return {"result": True, "returnCode": "200", "message": "成功"}
             if str(param.get("lastResult", {}).get("ischeck")) == "1":
-                shipment.status = "signed"
+                shipment.status = ShipmentStatus.SIGNED.value
                 shipment.status_text = "已签收"
             else:
                 status_info = parse_kd100_state(state)

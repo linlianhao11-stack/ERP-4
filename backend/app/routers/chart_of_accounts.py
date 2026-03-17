@@ -6,6 +6,7 @@ from app.models import User
 from app.models.accounting import AccountSet, ChartOfAccount
 from app.models.voucher import VoucherEntry
 from app.schemas.accounting import ChartOfAccountCreate, ChartOfAccountUpdate
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/chart-of-accounts", tags=["会计科目"])
 
@@ -18,7 +19,7 @@ async def list_accounts(
     accounts = await ChartOfAccount.filter(
         account_set_id=account_set_id, is_active=True
     ).order_by("code")
-    return [{
+    return paginated_response([{
         "id": a.id, "code": a.code, "name": a.name,
         "parent_code": a.parent_code, "level": a.level,
         "category": a.category, "direction": a.direction,
@@ -28,7 +29,7 @@ async def list_accounts(
         "aux_department": a.aux_department,
         "aux_product": a.aux_product,
         "aux_bank": a.aux_bank,
-    } for a in accounts]
+    } for a in accounts])
 
 
 @router.post("")

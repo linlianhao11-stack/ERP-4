@@ -171,7 +171,7 @@ async function loadAccountSetPaymentMethods() {
   }
   try {
     const { data } = await getPaymentMethods({ account_set_id: accountingStore.currentAccountSetId })
-    accountSetPaymentMethods.value = data
+    accountSetPaymentMethods.value = data.items || data
   } catch {
     accountSetPaymentMethods.value = settingsStore.paymentMethods
   }

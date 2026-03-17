@@ -1,72 +1,66 @@
 <!--
   销售页面 - 瘦容器
-  编排 ProductSelector、ShoppingCart、OrderConfirmModal 三个子组件
+  编排 SalesToolbar、SalesWorksheet、SalesFooter、OrderConfirmModal
   管理全局状态、退货订单搜索逻辑、订单提交流程
 -->
 <template>
-  <div class="md:flex md:gap-5 md:items-start">
-    <!-- 左栏：商品选择器 -->
-    <ProductSelector
-      ref="productSelectorRef"
-      :products="products"
-      :warehouses="warehouses"
-      :virtual-warehouses="virtualWarehouses"
-      :filter-locations="filterLocations"
-      :warehouse-id="saleForm.warehouse_id"
-      :location-id="saleForm.location_id"
-      :order-type="saleForm.order_type"
-      :selected-return-order="selectedReturnOrder"
-      :show-virtual-stock="showVirtualStock"
-      :cart="cart"
-      @update:warehouse-id="saleForm.warehouse_id = $event"
-      @update:location-id="saleForm.location_id = $event"
-      @update:show-virtual-stock="onToggleVirtualStock"
-      @add-to-cart="handleAddToCart"
-    />
-
-    <!-- 右栏：购物车 -->
-    <ShoppingCart
-      :cart="cart"
+  <div class="flex flex-col" style="height: calc(100vh - 72px)">
+    <!-- 顶栏 -->
+    <SalesToolbar
       :order-type="saleForm.order_type"
       :customer-id="saleForm.customer_id"
       :employee-id="saleForm.employee_id"
       :customers="customers"
       :employees="salespersonEmployees"
-      :warehouses="warehouses"
-      :cart-total="cartTotal"
       :need-customer="needCustomer"
       :return-order-search="returnOrderSearch"
       :return-order-dropdown="returnOrderDropdown"
       :filtered-return-orders="filteredReturnOrders"
       :selected-return-order="selectedReturnOrder"
-      :get-cart-stock="getCartStock"
-      @clear="clearCart"
-      @submit="submitOrder"
-      @remove-item="idx => cart.splice(idx, 1)"
-      @duplicate-line="handleDuplicateLine"
-      @increment-quantity="item => incrementQuantity(item, saleForm.order_type, appStore)"
-      @update-warehouse="(idx, wid) => updateCartWarehouse(idx)"
-      @update-location="(idx, lid) => updateCartLocation(idx, lid)"
+      :remark="saleForm.remark"
+      @update:order-type="saleForm.order_type = $event"
       @update:customer-id="saleForm.customer_id = $event"
       @update:employee-id="saleForm.employee_id = $event"
-      @update:order-type="saleForm.order_type = $event"
       @update:return-order-search="returnOrderSearch = $event"
       @update:return-order-dropdown="returnOrderDropdown = $event"
       @search-return-orders="searchReturnOrders"
       @select-return-order="selectReturnOrder"
+      @update:remark="saleForm.remark = $event"
+    />
+
+    <!-- 工作台表格 -->
+    <SalesWorksheet class="flex-1 min-h-0 overflow-y-auto"
+      :cart="cart"
+      :order-type="saleForm.order_type"
+      :warehouses="warehouses"
+      :products="products"
+      :is-multi-account-set="isMultiAccountSet"
+      @remove-item="idx => cart.splice(idx, 1)"
+      @duplicate-line="handleDuplicateLine"
+      @add-from-search="handleAddFromSearch"
+    />
+
+    <!-- 底栏（固定底部） -->
+    <SalesFooter
+      :cart-total="cartTotal"
+      :cart-length="cart.length"
+      :account-set-groups="accountSetGroups"
+      :is-multi-account-set="isMultiAccountSet"
+      @clear="clearCart"
+      @submit="submitOrder"
+    />
+
+    <!-- 订单确认弹窗（保持不变） -->
+    <OrderConfirmModal
+      :visible="appStore.modal.show && appStore.modal.type === 'order_confirm'"
+      :order-confirm="orderConfirm"
+      :employees="salespersonEmployees"
+      :payment-methods="paymentMethods"
+      :submitting="appStore.submitting"
+      @update:visible="!$event && appStore.closeModal()"
+      @confirm="confirmSubmitOrder"
     />
   </div>
-
-  <!-- 订单确认弹窗 -->
-  <OrderConfirmModal
-    :visible="appStore.modal.show && appStore.modal.type === 'order_confirm'"
-    :order-confirm="orderConfirm"
-    :employees="salespersonEmployees"
-    :payment-methods="paymentMethods"
-    :submitting="appStore.submitting"
-    @update:visible="!$event && appStore.closeModal()"
-    @confirm="confirmSubmitOrder"
-  />
 </template>
 
 <script setup>
@@ -74,7 +68,7 @@
  * 销售页面瘦容器
  * 负责：store 初始化、状态编排、退货搜索、订单提交
  */
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useProductsStore } from '../stores/products'
 import { useWarehousesStore } from '../stores/warehouses'
@@ -83,15 +77,15 @@ import { useSettingsStore } from '../stores/settings'
 import { useFormat } from '../composables/useFormat'
 import { useSalesCart } from '../composables/useSalesCart'
 import { getOrders, getOrder, createOrder } from '../api/orders'
-import { getWarehouses } from '../api/warehouses'
 import { getAccountSets } from '../api/accounting'
 import { getPaymentMethods as getPaymentMethodsApi } from '../api/settings'
 import { fuzzyMatchAny } from '../utils/helpers'
-import ProductSelector from '../components/business/sales/ProductSelector.vue'
-import ShoppingCart from '../components/business/sales/ShoppingCart.vue'
-import OrderConfirmModal from '../components/business/sales/OrderConfirmModal.vue'
+import SalesToolbar from '../components/business/sales/SalesToolbar.vue'
+import SalesWorksheet from '../components/business/sales/SalesWorksheet.vue'
+import SalesFooter from '../components/business/sales/SalesFooter.vue'
+const OrderConfirmModal = defineAsyncComponent(() => import('../components/business/sales/OrderConfirmModal.vue'))
 
-// ---------- Store 初始化 ----------
+// ---------- Store ----------
 const appStore = useAppStore()
 const productsStore = useProductsStore()
 const warehousesStore = useWarehousesStore()
@@ -100,7 +94,6 @@ const settingsStore = useSettingsStore()
 
 const { fmt } = useFormat()
 
-// Store 别名
 const products = computed(() => productsStore.products)
 const warehouses = computed(() => warehousesStore.warehouses)
 const locations = computed(() => warehousesStore.locations)
@@ -108,41 +101,29 @@ const customers = computed(() => customersStore.customers)
 const salespersonEmployees = computed(() => settingsStore.employees.filter(e => e.is_salesperson))
 const allPaymentMethods = computed(() => settingsStore.paymentMethods)
 
-// 按账套过滤的收款方式（用于订单确认弹窗）
+// 按账套过滤的收款方式
 const filteredPaymentMethodsList = ref([])
 async function loadFilteredPaymentMethods(accountSetId) {
-  if (!accountSetId) {
-    filteredPaymentMethodsList.value = []
-    return
-  }
+  if (!accountSetId) { filteredPaymentMethodsList.value = []; return }
   try {
     const { data } = await getPaymentMethodsApi({ account_set_id: accountSetId })
-    filteredPaymentMethodsList.value = data
-  } catch {
-    filteredPaymentMethodsList.value = []
-  }
+    filteredPaymentMethodsList.value = data.items || data
+  } catch { filteredPaymentMethodsList.value = [] }
 }
 const paymentMethods = computed(() =>
   filteredPaymentMethodsList.value.length ? filteredPaymentMethodsList.value : allPaymentMethods.value
 )
 
-// ---------- 购物车 composable ----------
+// ---------- 购物车 ----------
 const {
-  cart, addToCart, incrementQuantity, duplicateCartLine,
-  updateCartWarehouse, updateCartLocation, getCartStock,
+  cart, addFromSearch, populateReturnItems, duplicateCartLine,
   cartTotal, clearCart
 } = useSalesCart()
 
 // ---------- 本地状态 ----------
-const accountSets = ref([])
-const showVirtualStock = ref(false)
-const virtualWarehouses = ref([])
-const productSelectorRef = ref(null)
 
 const saleForm = reactive({
   order_type: 'CASH',
-  warehouse_id: '',
-  location_id: '',
   customer_id: '',
   employee_id: '',
   related_order_id: '',
@@ -164,48 +145,42 @@ const orderConfirm = ref({
 })
 
 // ---------- 计算属性 ----------
-/** 是否必须选择客户 */
-const needCustomer = computed(() => ['CASH', 'CREDIT', 'CONSIGN_OUT', 'CONSIGN_SETTLE', 'RETURN'].includes(saleForm.order_type))
+const needCustomer = computed(() =>
+  ['CASH', 'CREDIT', 'CONSIGN_OUT', 'CONSIGN_SETTLE', 'RETURN'].includes(saleForm.order_type)
+)
 
-/** 过滤后的退货订单列表 */
 const filteredReturnOrders = computed(() => {
   const kw = returnOrderSearch.value
   if (!kw) return salesOrders.value.slice(0, 20)
   return salesOrders.value.filter(o => fuzzyMatchAny([o.order_no, o.customer_name], kw)).slice(0, 20)
 })
 
-/** 筛选仓位列表（根据选中仓库） */
-const filterLocations = computed(() => {
-  if (!saleForm.warehouse_id) return []
-  return warehousesStore.getLocationsByWarehouse(saleForm.warehouse_id)
+/** 按账套分组 */
+const accountSetGroups = computed(() => {
+  const groups = new Map()
+  for (const item of cart.value) {
+    const wh = warehouses.value.find(w => w.id === parseInt(item.warehouse_id))
+    const asId = wh?.account_set_id || 0
+    const asName = wh?.account_set_name || '未关联账套'
+    if (!groups.has(asId)) groups.set(asId, { key: asId, name: asName, subtotal: 0 })
+    groups.get(asId).subtotal += Math.round(item.unit_price * item.quantity * 100) / 100
+  }
+  return [...groups.values()]
 })
+
+const isMultiAccountSet = computed(() => accountSetGroups.value.length > 1)
 
 // ---------- 函数 ----------
 
-/** 切换寄售库存显示，首次开启时加载虚拟仓库 */
-const onToggleVirtualStock = async (val) => {
-  showVirtualStock.value = val
-  if (val && !virtualWarehouses.value.length) {
-    try {
-      const { data } = await getWarehouses({ include_virtual: true })
-      virtualWarehouses.value = data.filter(w => w.is_virtual)
-    } catch (e) {
-      console.error(e)
-      appStore.showToast(e.response?.data?.detail || '加载数据失败', 'error')
-    }
-  }
+/** 内联搜索添加商品 */
+const handleAddFromSearch = (product, stockRow) => {
+  addFromSearch(product, stockRow, saleForm.order_type, appStore)
 }
 
-/** 添加商品到购物车（桥接子组件事件到 composable） */
-const handleAddToCart = (p) => {
-  const getStock = productSelectorRef.value?.getStock || (() => 0)
-  addToCart(p, saleForm.order_type, getStock, products, appStore)
-}
-
-/** 复制购物车行（桥接事件，避免模板自动解包 ref 导致 .value 失效） */
+/** 复制购物车行 */
 const handleDuplicateLine = (idx) => duplicateCartLine(idx, products)
 
-/** 搜索退货关联订单（含请求取消） */
+/** 搜索退货关联订单 */
 let _returnOrderAbort = null
 const searchReturnOrders = async () => {
   if (saleForm.order_type !== 'RETURN') return
@@ -232,6 +207,7 @@ const selectReturnOrder = async (o) => {
   try {
     const { data } = await getOrder(o.id)
     selectedReturnOrder.value = data
+    populateReturnItems(data, products)
   } catch (e) {
     appStore.showToast('加载订单详情失败', 'error')
   }
@@ -239,10 +215,18 @@ const selectReturnOrder = async (o) => {
 
 /** 提交订单前校验并打开确认弹窗 */
 const submitOrder = () => {
-  if (!cart.value.length) return
+  // 退货模式过滤掉数量为0的行
+  const activeItems = saleForm.order_type === 'RETURN'
+    ? cart.value.filter(i => i.quantity > 0)
+    : cart.value
+
+  if (!activeItems.length) {
+    appStore.showToast('请至少添加一件商品', 'error')
+    return
+  }
 
   // 校验数量和单价
-  for (const item of cart.value) {
+  for (const item of activeItems) {
     if (!item.quantity || item.quantity <= 0) {
       appStore.showToast(`【${item.name}】数量必须大于0`, 'error'); return
     }
@@ -263,35 +247,35 @@ const submitOrder = () => {
 
   // 校验仓库/仓位
   if (saleForm.order_type !== 'CONSIGN_SETTLE') {
-    for (let i = 0; i < cart.value.length; i++) {
-      if (!cart.value[i].warehouse_id || !cart.value[i].location_id) {
+    for (const item of activeItems) {
+      if (!item.warehouse_id || !item.location_id) {
         const label = saleForm.order_type === 'RETURN' ? '退货仓库和仓位' : '仓库和仓位'
-        appStore.showToast(`请为【${cart.value[i].name}】选择${label}`, 'error'); return
+        appStore.showToast(`请为【${item.name}】选择${label}`, 'error'); return
       }
     }
   }
 
   // 构建确认数据
   const customer = customers.value.find(c => c.id === saleForm.customer_id)
-  const total = cart.value.reduce((s, i) => s + Math.round(i.quantity * i.unit_price * 100) / 100, 0)
+  const total = activeItems.reduce((s, i) => s + Math.round(i.quantity * i.unit_price * 100) / 100, 0)
   const availableCredit = customer && customer.balance < 0 ? Math.abs(customer.balance) : 0
   const rebateBalance = customer?.rebate_balance || 0
 
   // 自动检测账套
   let autoAccountSetId = null
-  if (cart.value.length > 0 && cart.value[0]?.warehouse_id) {
-    const firstWarehouse = warehouses.value.find(w => w.id === parseInt(cart.value[0]?.warehouse_id))
+  if (activeItems.length > 0 && activeItems[0]?.warehouse_id) {
+    const firstWarehouse = warehouses.value.find(w => w.id === parseInt(activeItems[0]?.warehouse_id))
     if (firstWarehouse?.account_set_id) autoAccountSetId = firstWarehouse.account_set_id
   }
 
   orderConfirm.value = {
-    items: cart.value.map(i => {
+    items: activeItems.map(i => {
       const warehouse = warehouses.value.find(w => w.id === parseInt(i.warehouse_id))
       const location = locations.value.find(l => l.id === parseInt(i.location_id))
       return {
         ...i,
-        warehouse_name: warehouse?.name || '-',
-        location_code: location?.code || '-',
+        warehouse_name: warehouse?.name || i.warehouse_name || '-',
+        location_code: location?.code || i.location_code || '-',
         account_set_id: warehouse?.account_set_id || null,
         account_set_name: warehouse?.account_set_name || null,
         rebate_amount: 0
@@ -306,24 +290,23 @@ const submitOrder = () => {
     use_rebate: false, rebate_balance: rebateBalance,
     employee_id: saleForm.employee_id || '',
     employee_name: salespersonEmployees.value.find(s => s.id === parseInt(saleForm.employee_id))?.name || '',
-    remark: '', payment_method: 'cash',
+    remark: saleForm.remark || '',
+    payment_method: 'cash',
     account_set_id: autoAccountSetId
   }
-  // 按账套加载收款方式
   if (orderConfirm.value.account_set_id) {
     loadFilteredPaymentMethods(orderConfirm.value.account_set_id)
   }
   appStore.openModal('order_confirm', '确认提交订单')
 }
 
-/** 确认提交订单（调用 API） */
+/** 确认提交订单 */
 const confirmSubmitOrder = async () => {
   if (appStore.submitting) return
 
   const useRebate = orderConfirm.value.use_rebate
   const totalRebate = useRebate ? orderConfirm.value.items.reduce((s, i) => s + (i.rebate_amount || 0), 0) : 0
 
-  // 返利校验
   if (useRebate) {
     for (const item of orderConfirm.value.items) {
       if (item.rebate_amount && item.rebate_amount > item.unit_price * item.quantity) {
@@ -334,6 +317,11 @@ const confirmSubmitOrder = async () => {
   if (useRebate && totalRebate > orderConfirm.value.rebate_balance) {
     appStore.showToast('返利总额超过可用余额', 'error'); return
   }
+
+  // 退货模式过滤0数量行
+  const submitItems = saleForm.order_type === 'RETURN'
+    ? cart.value.filter(i => i.quantity > 0)
+    : cart.value
 
   appStore.submitting = true
   try {
@@ -349,7 +337,7 @@ const confirmSubmitOrder = async () => {
       use_credit: orderConfirm.value.use_credit || false,
       payment_method: orderConfirm.value.payment_method || null,
       rebate_amount: totalRebate > 0 ? totalRebate : null,
-      items: cart.value.map((i, idx) => ({
+      items: submitItems.map((i, idx) => ({
         product_id: i.product_id, quantity: i.quantity, unit_price: i.unit_price,
         warehouse_id: i.warehouse_id ? parseInt(i.warehouse_id) : null,
         location_id: i.location_id ? parseInt(i.location_id) : null,
@@ -359,24 +347,21 @@ const confirmSubmitOrder = async () => {
       account_set_id: orderConfirm.value.account_set_id || null
     })
 
-    // 构建成功提示
     let msg = '订单创建成功'
     if (result.data.rebate_used && result.data.rebate_used > 0) msg += `，已使用返利 ¥${fmt(result.data.rebate_used)}`
     if (result.data.credit_used && result.data.credit_used > 0) msg += `，已使用在账资金 ¥${fmt(result.data.credit_used)}`
     if (result.data.amount_due > 0) msg += `，还需支付 ¥${fmt(result.data.amount_due)}`
     appStore.showToast(msg)
 
-    // 重置状态
     clearCart()
     Object.assign(saleForm, {
-      warehouse_id: '', location_id: '', employee_id: '',
-      related_order_id: '', customer_id: '', order_type: 'CASH'
+      employee_id: '', related_order_id: '',
+      customer_id: '', order_type: 'CASH', remark: ''
     })
     returnOrderSearch.value = ''
     selectedReturnOrder.value = null
     appStore.closeModal()
 
-    // 重新加载数据
     productsStore.loadProducts()
     customersStore.loadCustomers()
   } catch (e) {
@@ -390,8 +375,6 @@ const confirmSubmitOrder = async () => {
 watch(() => orderConfirm.value.account_set_id, (newId) => {
   loadFilteredPaymentMethods(newId)
 })
-
-watch(() => saleForm.warehouse_id, () => { saleForm.location_id = '' })
 
 watch(() => saleForm.order_type, (newType, oldType) => {
   if ((newType === 'RETURN' && oldType !== 'RETURN') || (oldType === 'RETURN' && newType !== 'RETURN')) {
@@ -414,10 +397,7 @@ onMounted(async () => {
   if (!customers.value.length) customersStore.loadCustomers()
   if (!salespersonEmployees.value.length) settingsStore.loadEmployees()
   if (!paymentMethods.value.length) settingsStore.loadPaymentMethods()
-  try {
-    const { data } = await getAccountSets()
-    accountSets.value = data
-  } catch (e) { /* ignore */ }
+  try { await getAccountSets() } catch { /* ignore */ }
 })
 
 onUnmounted(() => {

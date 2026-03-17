@@ -7,13 +7,16 @@ from tortoise import transactions
 from tortoise.expressions import F
 
 from app.auth.dependencies import get_current_user, require_permission
+from app.constants import OrderType, StockChangeType
 from app.models import (
     User, Order, OrderItem, Customer, Product, Warehouse, Location,
     WarehouseStock, StockLog
 )
 from app.schemas.consignment import ConsignmentReturnRequest
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
+from app.utils.batch_load import batch_load_related
 from app.logger import get_logger
+from app.utils.response import paginated_response
 
 logger = get_logger("consignment")
 
@@ -38,7 +41,7 @@ async def get_consignment_summary(user: User = Depends(require_permission("sales
         GROUP BY customer_id, order_type
     """)
     # 收集有 CONSIGN_OUT 记录的客户
-    customer_ids = list(set(r["customer_id"] for r in order_agg if r["order_type"] == "CONSIGN_OUT"))
+    customer_ids = list(set(r["customer_id"] for r in order_agg if r["order_type"] == OrderType.CONSIGN_OUT))
     if not customer_ids:
         return {
             "total_cost_value": 0, "total_sales_value": 0, "total_settle_unpaid": 0,
@@ -72,9 +75,9 @@ async def get_consignment_summary(user: User = Depends(require_permission("sales
         customer = customer_map.get(cid)
         if not customer:
             continue
-        out_agg = agg_map.get((cid, "CONSIGN_OUT"), {})
-        settle_agg = agg_map.get((cid, "CONSIGN_SETTLE"), {})
-        return_agg = agg_map.get((cid, "CONSIGN_RETURN"), {})
+        out_agg = agg_map.get((cid, OrderType.CONSIGN_OUT), {})
+        settle_agg = agg_map.get((cid, OrderType.CONSIGN_SETTLE), {})
+        return_agg = agg_map.get((cid, OrderType.CONSIGN_RETURN), {})
 
         total_out = float(out_agg.get("total_cost", 0))
         total_settle = float(settle_agg.get("total_cost", 0))
@@ -205,20 +208,17 @@ async def get_customer_consignment(customer_id: int, user: User = Depends(requir
 
     consignment_wh = await get_or_create_consignment_warehouse(customer_id)
 
-    out_orders = await Order.filter(customer_id=customer_id, order_type="CONSIGN_OUT").order_by("-created_at")
-    settle_orders = await Order.filter(customer_id=customer_id, order_type="CONSIGN_SETTLE").order_by("-created_at")
+    out_orders = await Order.filter(customer_id=customer_id, order_type=OrderType.CONSIGN_OUT.value).order_by("-created_at")
+    settle_orders = await Order.filter(customer_id=customer_id, order_type=OrderType.CONSIGN_SETTLE.value).order_by("-created_at")
 
     product_stats = {}  # key: (product_id, unit_price)
 
     # 批量查询所有订单的明细（避免 N+1）
     all_order_ids = [o.id for o in out_orders] + [o.id for o in settle_orders]
-    return_orders = await Order.filter(customer_id=customer_id, order_type="CONSIGN_RETURN")
+    return_orders = await Order.filter(customer_id=customer_id, order_type=OrderType.CONSIGN_RETURN.value)
     all_order_ids += [o.id for o in return_orders]
 
-    all_items = await OrderItem.filter(order_id__in=all_order_ids).select_related("product") if all_order_ids else []
-    items_by_order = {}
-    for item in all_items:
-        items_by_order.setdefault(item.order_id, []).append(item)
+    items_by_order = await batch_load_related(OrderItem, 'order_id', all_order_ids, ['product'])
 
     # 按 (product_id, unit_price) 分组调拨记录
     for order in out_orders:
@@ -252,7 +252,7 @@ async def get_customer_consignment(customer_id: int, user: User = Depends(requir
             deductions_by_product[item.product_id] += abs(item.quantity)
 
     return_logs = await StockLog.filter(
-        change_type="CONSIGN_RETURN", reference_type="CONSIGN_RETURN",
+        change_type=StockChangeType.CONSIGN_RETURN.value, reference_type="CONSIGN_RETURN",
         reference_id=customer_id, warehouse__is_virtual=True, quantity__lt=0
     ).select_related("product")
     for log in return_logs:
@@ -325,12 +325,12 @@ async def get_consignment_customers(user: User = Depends(require_permission("sal
     agg_map = {}
     for r in order_agg:
         agg_map[(r["customer_id"], r["order_type"])] = r
-        if r["order_type"] == "CONSIGN_OUT":
+        if r["order_type"] == OrderType.CONSIGN_OUT:
             out_customer_ids.add(r["customer_id"])
 
     customer_ids = list(out_customer_ids)
     if not customer_ids:
-        return []
+        return paginated_response([])
 
     customers = await Customer.filter(id__in=customer_ids)
     customer_map = {c.id: c for c in customers}
@@ -353,9 +353,9 @@ async def get_consignment_customers(user: User = Depends(require_permission("sal
         customer = customer_map.get(cid)
         if not customer:
             continue
-        out_agg = agg_map.get((cid, "CONSIGN_OUT"), {})
-        settle_agg = agg_map.get((cid, "CONSIGN_SETTLE"), {})
-        return_agg = agg_map.get((cid, "CONSIGN_RETURN"), {})
+        out_agg = agg_map.get((cid, OrderType.CONSIGN_OUT), {})
+        settle_agg = agg_map.get((cid, OrderType.CONSIGN_SETTLE), {})
+        return_agg = agg_map.get((cid, OrderType.CONSIGN_RETURN), {})
 
         total_out = float(out_agg.get("total_cost", 0))
         total_settle = float(settle_agg.get("total_cost", 0))
@@ -375,7 +375,7 @@ async def get_consignment_customers(user: User = Depends(require_permission("sal
             "consign_remaining_cost": total_out - total_settle - total_return
         })
 
-    return result
+    return paginated_response(result)
 
 
 @router.post("/return")
@@ -398,7 +398,7 @@ async def consignment_return(
 
         async with transactions.in_transaction():
             order = await Order.create(
-                order_no=order_no, order_type="CONSIGN_RETURN",
+                order_no=order_no, order_type=OrderType.CONSIGN_RETURN.value,
                 customer=customer, warehouse=None,
                 total_amount=Decimal("0"), total_cost=Decimal("0"), total_profit=Decimal("0"),
                 is_cleared=True, creator=user
@@ -447,7 +447,7 @@ async def consignment_return(
 
                 await StockLog.create(
                     product=product, warehouse=consignment_wh,
-                    change_type="CONSIGN_RETURN", quantity=-quantity,
+                    change_type=StockChangeType.CONSIGN_RETURN.value, quantity=-quantity,
                     before_qty=virtual_stock.quantity + quantity, after_qty=virtual_stock.quantity,
                     reference_type="ORDER", reference_id=order.id,
                     creator=user, remark=f"寄售退货-{customer.name}"
@@ -468,7 +468,7 @@ async def consignment_return(
 
                 await StockLog.create(
                     product=product, warehouse=warehouse,
-                    change_type="CONSIGN_RETURN", quantity=quantity,
+                    change_type=StockChangeType.CONSIGN_RETURN.value, quantity=quantity,
                     before_qty=before_qty, after_qty=real_stock.quantity if real_stock else quantity,
                     reference_type="ORDER", reference_id=order.id,
                     creator=user, remark=f"寄售退货-{customer.name}"

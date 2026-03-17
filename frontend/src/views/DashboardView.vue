@@ -318,7 +318,7 @@ const loadSalesTrend = async () => {
 const loadRecentOrders = async () => {
   try {
     const { data } = await getRecentOrders(10)
-    recentOrders.value = data
+    recentOrders.value = data.items || data
   } catch (e) { /* silent */ }
 }
 

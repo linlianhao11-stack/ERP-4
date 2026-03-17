@@ -7,10 +7,33 @@ import tempfile
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from app.config import BACKUP_KEEP_DAYS, BACKUP_HOUR, DATABASE_URL, UPLOAD_ROOT
+from app.config import BACKUP_KEEP_DAYS, BACKUP_HOUR, BACKUP_ENCRYPTION_KEY, DATABASE_URL, UPLOAD_ROOT
 from app.logger import get_logger
 
 logger = get_logger("backup")
+
+
+def _encrypt_file(filepath: str) -> str:
+    """使用 Fernet 加密文件，返回 .enc 文件路径"""
+    from cryptography.fernet import Fernet
+    fernet = Fernet(BACKUP_ENCRYPTION_KEY.encode())
+    with open(filepath, "rb") as f:
+        data = f.read()
+    encrypted = fernet.encrypt(data)
+    enc_path = filepath + ".enc"
+    with open(enc_path, "wb") as f:
+        f.write(encrypted)
+    os.remove(filepath)
+    return enc_path
+
+
+def decrypt_file_content(filepath: str) -> bytes:
+    """使用 Fernet 解密 .enc 文件，返回解密后的字节内容"""
+    from cryptography.fernet import Fernet
+    fernet = Fernet(BACKUP_ENCRYPTION_KEY.encode())
+    with open(filepath, "rb") as f:
+        encrypted = f.read()
+    return fernet.decrypt(encrypted)
 
 
 def get_db_path():
@@ -103,6 +126,14 @@ def do_backup(tag="auto"):
         finally:
             if os.path.exists(tmp_sql):
                 os.remove(tmp_sql)
+
+        # 如果配置了加密密钥，加密备份文件
+        if BACKUP_ENCRYPTION_KEY:
+            tar_path = _encrypt_file(tar_path)
+            logger.info("备份文件已加密", extra={"data": {"file": os.path.basename(tar_path)}})
+        else:
+            logger.warning("BACKUP_ENCRYPTION_KEY 未设置，备份文件未加密")
+
         return tar_path
     else:
         db_path = get_db_path()
@@ -176,6 +207,39 @@ def do_restore(filename):
     if not os.path.exists(filepath):
         raise FileNotFoundError("备份文件不存在")
 
+    # 如果是加密文件，先解密为临时文件
+    _tmp_decrypted = None
+    if filename.endswith(".enc"):
+        if not BACKUP_ENCRYPTION_KEY:
+            raise RuntimeError("备份文件已加密但未配置 BACKUP_ENCRYPTION_KEY，无法恢复")
+        decrypted_data = decrypt_file_content(filepath)
+        # 去掉 .enc 后缀得到原始文件名
+        decrypted_name = filename[:-4]  # 去掉 .enc
+        _tmp_decrypted = os.path.join(backup_dir, f"_tmp_dec_{decrypted_name}")
+        with open(_tmp_decrypted, "wb") as f:
+            f.write(decrypted_data)
+        filepath = _tmp_decrypted
+        filename = decrypted_name
+        logger.info("加密备份文件已解密", extra={"data": {"file": filename}})
+
+    try:
+        return _do_restore_inner(filename, filepath, backup_dir)
+    finally:
+        if _tmp_decrypted and os.path.exists(_tmp_decrypted):
+            os.remove(_tmp_decrypted)
+
+
+def _open_tar_gz(path):
+    """打开 tar.gz 文件（支持 .enc 加密文件自动解密）"""
+    import io
+    if path.endswith(".enc"):
+        decrypted = decrypt_file_content(path)
+        return tarfile.open(fileobj=io.BytesIO(decrypted), mode="r:gz")
+    return tarfile.open(path, "r:gz")
+
+
+def _do_restore_inner(filename, filepath, backup_dir):
+    """实际恢复逻辑（解密后调用）"""
     # 恢复前自动备份当前数据（安全网）
     pre_backup = do_backup("pre_restore")
     if not pre_backup:
@@ -197,9 +261,9 @@ def do_restore(filename):
                 # 恢复失败，尝试从安全备份恢复
                 logger.error("tar.gz 恢复失败，尝试自动恢复")
                 try:
-                    # 安全备份也是 tar.gz，需要提取 SQL
+                    # 安全备份可能是加密的 .enc 或普通 .tar.gz
                     with tempfile.TemporaryDirectory() as tmpdir2:
-                        with tarfile.open(pre_backup, "r:gz") as tar2:
+                        with _open_tar_gz(pre_backup) as tar2:
                             tar2.extractall(tmpdir2, filter="data")
                         _restore_pg_sql(os.path.join(tmpdir2, "database.sql"))
                 except Exception:
@@ -225,7 +289,7 @@ def do_restore(filename):
             logger.error("恢复验证失败，尝试自动恢复")
             try:
                 with tempfile.TemporaryDirectory() as tmpdir2:
-                    with tarfile.open(pre_backup, "r:gz") as tar2:
+                    with _open_tar_gz(pre_backup) as tar2:
                         tar2.extractall(tmpdir2, filter="data")
                     _restore_pg_sql(os.path.join(tmpdir2, "database.sql"))
             except Exception:

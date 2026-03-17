@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
+from app.utils.response import paginated_response
 
 
 class MethodCreate(BaseModel):
@@ -33,7 +34,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
         if account_set_id is not None:
             filters["account_set_id"] = account_set_id
         methods = await model_class.filter(**filters).select_related("account_set").order_by("sort_order", "id").offset(offset).limit(limit)
-        return [
+        return paginated_response([
             {
                 "id": m.id,
                 "code": m.code,
@@ -43,7 +44,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
                 "account_set_name": m.account_set.name if m.account_set else None,
             }
             for m in methods
-        ]
+        ])
 
     @router.post("")
     async def create_method(data: MethodCreate, user: User = Depends(require_permission("finance"))):

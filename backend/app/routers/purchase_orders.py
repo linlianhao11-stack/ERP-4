@@ -12,6 +12,7 @@ from tortoise.expressions import F
 from tortoise.queryset import Q
 
 from app.auth.dependencies import require_permission
+from app.constants import PurchaseOrderStatus, StockChangeType
 from app.logger import get_logger
 from app.utils.csv import csv_safe
 from app.models import (
@@ -27,6 +28,8 @@ from app.services.sn_service import validate_and_add_sn_codes
 from app.utils.generators import generate_order_no, generate_sequential_no
 from app.utils.time import now
 from app.utils.errors import parse_date
+from app.utils.batch_load import batch_load_related
+from app.utils.response import paginated_response
 
 logger = get_logger("purchase_orders")
 
@@ -62,10 +65,7 @@ async def list_purchase_orders(
 
     # 批量预取采购项（用于 item_count 和 tax_amount 计算）
     po_ids = [o.id for o in orders]
-    all_items = await PurchaseOrderItem.filter(purchase_order_id__in=po_ids).all() if po_ids else []
-    items_by_po = {}
-    for item in all_items:
-        items_by_po.setdefault(item.purchase_order_id, []).append(item)
+    items_by_po = await batch_load_related(PurchaseOrderItem, 'purchase_order_id', po_ids)
 
     # 批量查询账套名称
     as_ids = list(set(o.account_set_id for o in orders if o.account_set_id))
@@ -122,8 +122,8 @@ async def export_purchase_orders(
         "supplier", "creator", "paid_by", "reviewed_by", "target_warehouse", "target_location")
 
     status_names = {
-        "pending_review": "待审核", "pending": "待付款", "paid": "在途",
-        "partial": "部分到货", "completed": "已完成", "cancelled": "已取消",
+        PurchaseOrderStatus.PENDING_REVIEW: "待审核", PurchaseOrderStatus.PENDING: "待付款", PurchaseOrderStatus.PAID: "在途",
+        PurchaseOrderStatus.PARTIAL: "部分到货", PurchaseOrderStatus.COMPLETED: "已完成", PurchaseOrderStatus.CANCELLED: "已取消",
         "rejected": "已拒绝", "returned": "已退货"
     }
 
@@ -133,10 +133,7 @@ async def export_purchase_orders(
 
     # 批量查询所有采购明细（避免 N+1）
     po_ids = [o.id for o in orders]
-    all_po_items = await PurchaseOrderItem.filter(purchase_order_id__in=po_ids).select_related("product") if po_ids else []
-    po_items_by_order = {}
-    for item in all_po_items:
-        po_items_by_order.setdefault(item.purchase_order_id, []).append(item)
+    po_items_by_order = await batch_load_related(PurchaseOrderItem, 'purchase_order_id', po_ids, ['product'])
 
     def generate_csv():
         buf = io.StringIO()
@@ -227,7 +224,7 @@ async def create_purchase_order(data: PurchaseOrderCreate, user: User = Depends(
             account_set_id = wh.account_set_id
     async with transactions.in_transaction():
         po = await PurchaseOrder.create(
-            po_no=po_no, supplier=supplier, status="pending_review",
+            po_no=po_no, supplier=supplier, status=PurchaseOrderStatus.PENDING_REVIEW.value,
             target_warehouse_id=data.target_warehouse_id,
             target_location_id=data.target_location_id,
             remark=data.remark, creator=user,
@@ -316,16 +313,15 @@ async def create_purchase_order(data: PurchaseOrderCreate, user: User = Depends(
 
 @router.get("/receivable")
 async def list_receivable_orders(user: User = Depends(require_permission("purchase_receive"))):
-    orders = await PurchaseOrder.filter(status__in=["paid", "partial"]).order_by("-created_at") \
+    orders = await PurchaseOrder.filter(status__in=[PurchaseOrderStatus.PAID.value, PurchaseOrderStatus.PARTIAL.value]).order_by("-created_at") \
         .select_related("supplier", "target_warehouse", "target_location")
 
     # 批量查询所有待收货明细（避免 N+1）
     po_ids = [o.id for o in orders]
-    all_items = await PurchaseOrderItem.filter(purchase_order_id__in=po_ids).select_related(
-        "product", "target_warehouse", "target_location") if po_ids else []
-    items_by_po = {}
-    for it in all_items:
-        items_by_po.setdefault(it.purchase_order_id, []).append(it)
+    items_by_po = await batch_load_related(
+        PurchaseOrderItem, 'purchase_order_id', po_ids,
+        ['product', 'target_warehouse', 'target_location']
+    )
 
     result = []
     for o in orders:
@@ -350,7 +346,7 @@ async def list_receivable_orders(user: User = Depends(require_permission("purcha
                 "status": o.status, "total_amount": float(o.total_amount),
                 "items": item_list
             })
-    return result
+    return paginated_response(result)
 
 
 @router.get("/{po_id}/items")
@@ -360,7 +356,7 @@ async def get_purchase_order_items(po_id: int, user: User = Depends(require_perm
     if not po:
         raise HTTPException(status_code=404, detail="采购单不存在")
     items = await PurchaseOrderItem.filter(purchase_order_id=po_id).select_related("product", "target_warehouse", "target_location")
-    return [{
+    return paginated_response([{
         "id": i.id,
         "product_sku": i.product.sku if i.product else "",
         "product_name": i.product.name if i.product else "",
@@ -372,7 +368,7 @@ async def get_purchase_order_items(po_id: int, user: User = Depends(require_perm
         "amount": float(i.amount),
         "received_quantity": i.received_quantity,
         "returned_quantity": i.returned_quantity,
-    } for i in items]
+    } for i in items])
 
 
 @router.get("/{po_id}")
@@ -441,10 +437,10 @@ async def confirm_purchase_payment(po_id: int, data: PurchasePayRequest = Purcha
         po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
         if not po:
             raise HTTPException(status_code=404, detail="采购订单不存在")
-        if po.status != "pending":
+        if po.status != PurchaseOrderStatus.PENDING:
             raise HTTPException(status_code=400, detail="该采购单不是待付款状态")
         await po.fetch_related("supplier")
-        po.status = "paid"
+        po.status = PurchaseOrderStatus.PAID.value
         po.payment_method = data.payment_method
         po.paid_by = user
         po.paid_at = now()
@@ -494,10 +490,10 @@ async def approve_purchase_order(po_id: int, user: User = Depends(require_permis
         po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
         if not po:
             raise HTTPException(status_code=404, detail="采购订单不存在")
-        if po.status != "pending_review":
+        if po.status != PurchaseOrderStatus.PENDING_REVIEW:
             raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
         await po.fetch_related("supplier")
-        po.status = "pending"
+        po.status = PurchaseOrderStatus.PENDING.value
         po.reviewed_by = user
         po.reviewed_at = now()
         await po.save()
@@ -512,7 +508,7 @@ async def reject_purchase_order(po_id: int, user: User = Depends(require_permiss
         po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
         if not po:
             raise HTTPException(status_code=404, detail="采购订单不存在")
-        if po.status != "pending_review":
+        if po.status != PurchaseOrderStatus.PENDING_REVIEW:
             raise HTTPException(status_code=400, detail="该采购单不是待审核状态")
         await po.fetch_related("supplier")
         po.status = "rejected"
@@ -530,7 +526,7 @@ async def cancel_purchase_order(po_id: int, user: User = Depends(require_permiss
         po = await PurchaseOrder.filter(id=po_id).select_for_update().first()
         if not po:
             raise HTTPException(status_code=404, detail="采购订单不存在")
-        if po.status not in ("pending_review", "pending"):
+        if po.status not in (PurchaseOrderStatus.PENDING_REVIEW, PurchaseOrderStatus.PENDING):
             raise HTTPException(status_code=400, detail="只有待审核或待付款状态的采购单才能取消")
         # Load supplier relation
         await po.fetch_related("supplier")
@@ -578,7 +574,7 @@ async def cancel_purchase_order(po_id: int, user: User = Depends(require_permiss
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"取消采购单 {po.po_no} 退还在账资金", creator=user
             )
-        po.status = "cancelled"
+        po.status = PurchaseOrderStatus.CANCELLED.value
         await po.save()
 
     await log_operation(user, "PURCHASE_CANCEL", "PURCHASE_ORDER", po.id,
@@ -591,7 +587,7 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
     po = await PurchaseOrder.filter(id=po_id).select_related("supplier").first()
     if not po:
         raise HTTPException(status_code=404, detail="采购订单不存在")
-    if po.status not in ("paid", "partial"):
+    if po.status not in (PurchaseOrderStatus.PAID, PurchaseOrderStatus.PARTIAL):
         raise HTTPException(status_code=400, detail="该采购单不可收货（需为已付款或部分到货状态）")
 
     async with transactions.in_transaction():
@@ -662,7 +658,7 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             if sn_required and recv_item.sn_codes:
                 await validate_and_add_sn_codes(
                     recv_item.sn_codes, wh_id, poi.product_id, loc_id,
-                    recv_item.receive_quantity, "PURCHASE_IN", cost_price, user, po.id
+                    recv_item.receive_quantity, StockChangeType.PURCHASE_IN.value, cost_price, user, po.id
                 )
 
             stock = await WarehouseStock.filter(warehouse_id=wh_id, product_id=poi.product_id, location_id=loc_id).first()
@@ -679,7 +675,7 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
 
             await StockLog.create(
                 product_id=poi.product_id, warehouse_id=wh_id,
-                change_type="PURCHASE_IN", quantity=recv_item.receive_quantity,
+                change_type=StockChangeType.PURCHASE_IN.value, quantity=recv_item.receive_quantity,
                 before_qty=before_qty, after_qty=stock.quantity if stock else recv_item.receive_quantity,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"采购收货 {po.po_no}，仓位:{location.code}，成本:¥{float(cost_price)}",
@@ -695,9 +691,9 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
         any_received = any(it.received_quantity > 0 for it in all_items)
 
         if all_received:
-            po.status = "completed"
+            po.status = PurchaseOrderStatus.COMPLETED.value
         elif any_received:
-            po.status = "partial"
+            po.status = PurchaseOrderStatus.PARTIAL.value
         await po.save()
 
         # 钩子：采购收货 → 自动生成/更新应付单
@@ -779,7 +775,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
     po = await PurchaseOrder.filter(id=po_id).select_related("supplier").first()
     if not po:
         raise HTTPException(status_code=404, detail="采购订单不存在")
-    if po.status not in ("completed", ):
+    if po.status not in (PurchaseOrderStatus.COMPLETED, ):
         raise HTTPException(status_code=400, detail="只有已完成的采购单才能退货")
     if not data.items:
         raise HTTPException(status_code=400, detail="请选择退货商品")
@@ -826,7 +822,7 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
 
             await StockLog.create(
                 product_id=poi.product_id, warehouse_id=wh_id,
-                change_type="PURCHASE_RETURN", quantity=-ret_item.return_quantity,
+                change_type=StockChangeType.PURCHASE_RETURN.value, quantity=-ret_item.return_quantity,
                 before_qty=total_stock, after_qty=total_stock - ret_item.return_quantity,
                 reference_type="PURCHASE_ORDER", reference_id=po.id,
                 remark=f"采购退货 {po.po_no}，退回{ret_item.return_quantity}件",

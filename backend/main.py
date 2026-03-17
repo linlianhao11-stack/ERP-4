@@ -8,8 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.config import CORS_ORIGINS
+from app.rate_limit import limiter
 from app.database import init_db, close_db
 from app.exceptions import http_exception_handler, unhandled_exception_handler
 from app.migrations import run_migrations
@@ -62,19 +65,24 @@ async def lifespan(app: FastAPI):
         from app.ai.deepseek_client import close_client
         await close_ai_pool()
         await close_client()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger("main").error("关闭 AI 资源失败", exc_info=e)
     await close_db()
 
 
 _debug = os.environ.get("DEBUG", "false").lower() == "true"
 app = FastAPI(
-    title="轻量级ERP系统 v4.15.0",
+    title="轻量级ERP系统 v4.17.0",
     lifespan=lifespan,
     docs_url="/docs" if _debug else None,
     redoc_url="/redoc" if _debug else None,
     openapi_url="/openapi.json" if _debug else None,
 )
+
+# 速率限制
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 全局异常处理
 app.add_exception_handler(HTTPException, http_exception_handler)
@@ -98,6 +106,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+        # HSTS: 仅在 HTTPS 请求时添加（直接 HTTPS 或经反向代理转发）
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -201,17 +214,18 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    db_ok = False
+async def health_check():
+    """健康检查端点（含数据库连接状态）"""
+    from tortoise import connections
     try:
-        from tortoise import connections
         conn = connections.get("default")
         await conn.execute_query("SELECT 1")
-        db_ok = True
-    except Exception:
-        pass
-    status = "ok" if db_ok else "degraded"
-    return {"status": status, "db": db_ok}
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": str(e)}
+        )
 
 
 # SPA catch-all: 非 /api、非静态资源的前端路由返回 index.html

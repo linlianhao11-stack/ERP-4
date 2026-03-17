@@ -20,6 +20,7 @@ from app.services.invoice_service import (
 )
 from app.config import UPLOAD_ROOT
 from app.logger import get_logger
+from app.services.operation_log_service import log_operation
 
 logger = get_logger("invoices")
 
@@ -284,6 +285,8 @@ async def update_invoice(
 
         await inv.save()
 
+    await log_operation(user, "INVOICE_UPDATE", "INVOICE", inv.id,
+        f"更新发票 {inv.invoice_no}")
     return {"id": inv.id, "invoice_no": inv.invoice_no, "message": "更新成功"}
 
 
@@ -308,6 +311,8 @@ async def cancel_invoice_endpoint(
         inv = await cancel_invoice(invoice_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await log_operation(user, "INVOICE_VOID", "INVOICE", inv.id,
+        f"作废发票 {inv.invoice_no}")
     return {"message": "已作废", "invoice_no": inv.invoice_no}
 
 
@@ -330,6 +335,19 @@ async def upload_invoice_pdf(
     if not header.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="文件内容不是有效的 PDF")
     await file.seek(0)
+
+    # PDF 结构完整性校验：检查 %%EOF 标记
+    try:
+        await file.seek(0)
+        content = await file.read()
+        # Try basic PDF structure validation
+        if not content.endswith(b'%%EOF') and b'%%EOF' not in content[-1024:]:
+            raise HTTPException(status_code=400, detail="PDF 文件结构不完整")
+        await file.seek(0)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析 PDF 文件")
 
     current_files = inv.pdf_files or []
     if len(current_files) >= 5:

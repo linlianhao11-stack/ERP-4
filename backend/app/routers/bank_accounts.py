@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from app.auth.dependencies import require_permission
 from app.models import User, BankAccount
+from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/bank-accounts", tags=["bank-accounts"])
 
@@ -27,8 +28,8 @@ async def list_bank_accounts(
     filters = {"is_active": True}
     if account_set_id is not None:
         filters["account_set_id"] = account_set_id
-    items = await BankAccount.filter(**filters).order_by("sort_order", "id")
-    return [
+    rows = await BankAccount.filter(**filters).order_by("sort_order", "id")
+    return paginated_response([
         {
             "id": b.id,
             "account_set_id": b.account_set_id,
@@ -37,8 +38,8 @@ async def list_bank_accounts(
             "short_name": b.short_name or b.bank_name,
             "sort_order": b.sort_order,
         }
-        for b in items
-    ]
+        for b in rows
+    ])
 
 @router.post("")
 async def create_bank_account(

@@ -5,6 +5,11 @@ import os
 import secrets
 import logging
 
+_logger = logging.getLogger("erp.config")
+
+# 调试模式
+DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+
 # 数据库配置 - PostgreSQL
 def get_database_url():
     url = os.environ.get("DATABASE_URL")
@@ -13,11 +18,13 @@ def get_database_url():
 DATABASE_URL = get_database_url()
 
 # JWT 配置
-_default_secret = secrets.token_hex(32)
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
-    SECRET_KEY = _default_secret
-    logging.getLogger("erp.config").warning("SECRET_KEY 未设置环境变量，已自动生成随机密钥（重启后所有用户需重新登录）")
+    if DEBUG:
+        SECRET_KEY = secrets.token_hex(32)
+        _logger.warning("SECRET_KEY 未设置环境变量，DEBUG 模式下已自动生成随机密钥（重启后所有用户需重新登录）")
+    else:
+        raise RuntimeError("SECRET_KEY must be set via environment variable")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
@@ -40,8 +47,19 @@ KD100_QUERY_URL = "https://poll.kuaidi100.com/poll/query.do"
 KD100_CALLBACK_URL = os.environ.get("KD100_CALLBACK_URL", "")
 
 # CORS（生产环境请设置 CORS_ORIGINS 环境变量为前端域名，如 "https://erp.example.com"）
+# 生产环境应设置为实际域名（如 "https://erp.example.com"），不应包含 localhost
 _cors_raw = os.environ.get("CORS_ORIGINS", "")
 CORS_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()] if _cors_raw else ["http://localhost:5173", "http://localhost:8090"]
+
+# CORS 生产环境校验：未设置或包含 localhost 时发出警告（不阻止启动，因内网部署可能合理使用 localhost）
+if not DEBUG:
+    if not _cors_raw:
+        _logger.warning("CORS_ORIGINS 未设置，默认允许 localhost。生产环境请设置为实际前端域名")
+    elif any("localhost" in o or "127.0.0.1" in o for o in CORS_ORIGINS):
+        _logger.warning("CORS_ORIGINS 包含 localhost/127.0.0.1 地址，请确认是否为生产环境")
+
+# 备份加密密钥（Phase 1.5 预留，可选）
+BACKUP_ENCRYPTION_KEY = os.environ.get("BACKUP_ENCRYPTION_KEY", "")
 
 # 快递公司列表
 CARRIER_LIST = [
@@ -98,6 +116,9 @@ KD100_STATE_MAP = {
 # 登录限制
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 300
+
+# 密码过期天数（0 表示不过期）
+PASSWORD_EXPIRY_DAYS = int(os.environ.get("PASSWORD_EXPIRY_DAYS", "90"))
 
 # AI 数据库只读用户密码
 AI_DB_PASSWORD = os.environ.get("AI_DB_PASSWORD", "")

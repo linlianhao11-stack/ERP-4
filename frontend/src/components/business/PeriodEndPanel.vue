@@ -282,7 +282,7 @@ async function loadPeriodOptions() {
   if (!accountingStore.currentAccountSetId) return
   try {
     const { data } = await getAccountingPeriods(accountingStore.currentAccountSetId)
-    periodOptions.value = data || []
+    periodOptions.value = data.items || data || []
     // 默认选当前期间
     if (!selectedPeriod.value && accountingStore.currentAccountSet?.current_period) {
       selectedPeriod.value = accountingStore.currentAccountSet.current_period
@@ -294,7 +294,7 @@ async function loadPeriodList() {
   if (!accountingStore.currentAccountSetId) return
   try {
     const { data } = await getAccountingPeriods(accountingStore.currentAccountSetId, listYear.value)
-    periodList.value = data || []
+    periodList.value = data.items || data || []
   } catch (e) { /* ignore */ }
 }
 

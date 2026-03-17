@@ -27,7 +27,7 @@ class Voucher(models.Model):
 
     class Meta:
         table = "vouchers"
-        indexes = (("status",),)
+        indexes = (("status",), ("account_set_id", "period_name"),)
 
 
 class VoucherEntry(models.Model):

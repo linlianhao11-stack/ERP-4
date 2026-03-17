@@ -181,7 +181,8 @@ const submitReturn = async () => {
     }
     let locationId = null
     try {
-      const { data: locs } = await getLocations({ warehouse_id: warehouseId })
+      const { data: rawLocs } = await getLocations({ warehouse_id: warehouseId })
+      const locs = rawLocs.items || rawLocs
       if (locs.length) locationId = locs[0].id
     } catch (e) {
       console.warn('获取仓位失败:', e)

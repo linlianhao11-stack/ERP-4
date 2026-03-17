@@ -304,7 +304,7 @@ const toggleExpand = async (orderId, e) => {
     loadingItems[orderId] = true
     try {
       const { data } = await getPurchaseOrderItems(orderId)
-      expandedItems[orderId] = data
+      expandedItems[orderId] = data.items || data
     } catch (err) {
       console.error(err)
     } finally {
@@ -321,7 +321,7 @@ const loadAllItems = async () => {
       loadingItems[o.id] = true
       try {
         const { data } = await getPurchaseOrderItems(o.id)
-        expandedItems[o.id] = data
+        expandedItems[o.id] = data.items || data
       } catch (err) { console.error(err) }
       finally { loadingItems[o.id] = false }
     }
@@ -369,7 +369,7 @@ onMounted(async () => {
   warehousesStore.loadLocations()
   try {
     const { data } = await getAccountSets()
-    accountSets.value = data
+    accountSets.value = data.items || data
   } catch (e) { /* ignore */ }
 })
 </script>

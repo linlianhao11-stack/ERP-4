@@ -341,7 +341,7 @@ const loadConsignSummary = async () => {
 const loadConsignCustomers = async () => {
   try {
     const { data } = await getConsignCustomers()
-    consignCustomers.value = data
+    consignCustomers.value = data.items || data
   } catch (e) {
     appStore.showToast('加载寄售客户失败', 'error')
   }

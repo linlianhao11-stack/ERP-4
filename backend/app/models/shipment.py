@@ -20,7 +20,7 @@ class Shipment(models.Model):
 
     class Meta:
         table = "shipments"
-        indexes = (("order_id", "status"),)
+        indexes = (("order_id", "status"), ("tracking_no",),)
 
 
 class ShipmentItem(models.Model):

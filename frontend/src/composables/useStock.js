@@ -122,7 +122,8 @@ export function useStock() {
   const loadVirtualWarehouses = async () => {
     try {
       const { data } = await getWarehouses({ include_virtual: true })
-      virtualWarehouses.value = data.filter(w => w.is_virtual)
+      const items = data.items || data
+      virtualWarehouses.value = items.filter(w => w.is_virtual)
     } catch (e) {
       console.error(e)
       appStore.showToast(e.response?.data?.detail || '加载数据失败', 'error')

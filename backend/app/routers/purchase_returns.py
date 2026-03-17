@@ -19,6 +19,7 @@ async def list_purchase_returns(
     user: User = Depends(require_permission("purchase")),
 ):
     """退货单列表（分页）"""
+    limit = min(limit, 1000)
     q = PurchaseReturn.all()
     if supplier_id:
         q = q.filter(supplier_id=supplier_id)

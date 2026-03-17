@@ -368,7 +368,7 @@ onMounted(async () => {
   settingsStore.loadProductBrands()
   try {
     const { data } = await getAccountSets()
-    accountSets.value = data
+    accountSets.value = data.items || data
   } catch (e) { /* ignore */ }
 })
 </script>
