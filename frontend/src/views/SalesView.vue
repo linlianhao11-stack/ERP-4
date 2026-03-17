@@ -43,7 +43,7 @@
       @clear="clearCart"
       @submit="submitOrder"
       @remove-item="idx => cart.splice(idx, 1)"
-      @duplicate-line="idx => duplicateCartLine(idx, products)"
+      @duplicate-line="handleDuplicateLine"
       @increment-quantity="item => incrementQuantity(item, saleForm.order_type, appStore)"
       @update-warehouse="(idx, wid) => updateCartWarehouse(idx)"
       @update-location="(idx, lid) => updateCartLocation(idx, lid)"
@@ -201,6 +201,9 @@ const handleAddToCart = (p) => {
   const getStock = productSelectorRef.value?.getStock || (() => 0)
   addToCart(p, saleForm.order_type, getStock, products, appStore)
 }
+
+/** 复制购物车行（桥接事件，避免模板自动解包 ref 导致 .value 失效） */
+const handleDuplicateLine = (idx) => duplicateCartLine(idx, products)
 
 /** 搜索退货关联订单（含请求取消） */
 let _returnOrderAbort = null
