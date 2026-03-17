@@ -1,5 +1,104 @@
 # 迭代记录
 
+## v4.26.1 — 代码质量优化 + 组件拆分（2026-03-16）
+
+> Code Review 修复 + FinanceOrdersTab 组件拆分，提升可维护性。
+
+### 组件拆分
+
+- **FinanceOrdersTab.vue**（1226→574 行，-53%）：按弹窗边界拆分为 3 个独立组件
+  - `FinanceOrderDetailModal.vue`（433 行）— 订单详情弹窗 + 退货表单，watch visible 加载数据
+  - `FinanceOrderCancelWizard.vue`（319 行）— 3 步取消向导（确认商品→财务分配→退款方式）
+  - 父组件保留列表/筛选/导出 + 简单/复杂取消路径分流逻辑
+
+### Bug 修复
+
+- **收款方式下拉框 key 冲突**：`:key` 从 `pm.code` 改为 `pm.id`，避免同名支付方式渲染异常
+- **收款方式缺少账套区分**：下拉选项显示「账套名 - 方式名」格式
+
+---
+
+## v4.26.0 — 代采代发模块（2026-03-16）
+
+> 新增代采代发（Dropship）完整业务模块，覆盖订单全生命周期管理、付款工作台、报表分析，含财务联动和物流追踪。
+
+### 核心功能
+
+- **DropshipOrder 模型**：35 个字段，覆盖采购/销售/物流/财务全维度；FK 循环规避（payable/disbursement/receivable_bill_id 使用 IntField）
+- **订单全流程**：`draft → pending_payment → paid_pending_ship → shipped → completed`，任意非终态可取消
+- **14 个 API 端点**：订单 CRUD + 提交/催付/批量付款/发货/完成/取消 + 月度汇总/毛利分析/应收未收报表 + 付款工作台
+- **毛利计算**：区分专票（扣除进项/销项税额）和普票（采购含税作为成本），实时计算毛利和毛利率
+- **发货方式**：供应商直发（direct）/ 过手转发（transit，自动生成虚拟出入库记录）
+
+### 财务联动
+
+- **提交**：自动创建 PayableBill（应付单）
+- **批量付款**：按供应商合并生成 DisbursementBill + 付款凭证（类型"付"），支持银行转账/冲减借支两种方式
+- **发货**：自动创建 ReceivableBill（应收单），关联平台订单号
+- **取消回滚**：状态感知 — 草稿直接取消 / 待付取消应付 / 已付取消应付+付款单+红字冲回凭证
+
+### 付款工作台
+
+- 按供应商分组展示待付款订单，支持展开/折叠
+- 供应商级全选 + 单笔勾选，实时统计已选金额
+- 支持银行转账、冲减借支（关联员工）两种付款方式
+- 顶部统计：待付笔数、合计金额、已预付笔数
+
+### 报表
+
+- **月度汇总**：按客户/供应商维度聚合订单数、采购额、销售额、毛利，支持月份切换
+- **毛利分析**：按日期范围查看每笔订单的毛利和毛利率，含汇总行
+- **应收未收**：展示已发货未收款订单，按发货天数降序排列（账龄预警），含已收/未收金额
+
+### 前端
+
+- **DropshipView**（57 行）：三 Tab 容器（订单/付款工作台/报表），路由 `/dropship`
+- **DropshipOrdersPanel**（652 行）：订单列表，移动卡片+桌面表格响应式布局，状态/日期/搜索筛选，排序，列配置，分页摘要
+- **DropshipOrderForm**（561 行）：新建/编辑表单，供应商快速创建，毛利实时计算，发货方式悬停说明
+- **DropshipPaymentPanel**（272 行）：付款工作台
+- **DropshipReportsPanel**（317 行）：报表面板（3 个子 Tab）
+- **useDropshipOrder** composable（113 行）：列表状态管理（筛选/排序/列配置/分页/防抖搜索）
+- **dropship.js** API 模块（34 行）：16 个导出函数
+
+### 权限
+
+- `dropship`：代采代发通用权限（订单 CRUD/提交/发货/完成/取消/报表）
+- `dropship_pay`：批量付款扩展权限
+- 启动时自动迁移权限到管理员角色（`_migrate_dropship_permissions`）
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `backend/app/models/dropship.py` | DropshipOrder 模型 |
+| `backend/app/routers/dropship.py` | 14 个 API 端点 |
+| `backend/app/services/dropship_service.py` | 业务逻辑层（7 个核心函数） |
+| `backend/app/schemas/dropship.py` | 5 个 Pydantic Schema |
+| `frontend/src/views/DropshipView.vue` | 页面视图 |
+| `frontend/src/components/business/DropshipOrdersPanel.vue` | 订单列表面板 |
+| `frontend/src/components/business/dropship/DropshipOrderForm.vue` | 订单表单 |
+| `frontend/src/components/business/dropship/DropshipPaymentPanel.vue` | 付款工作台 |
+| `frontend/src/components/business/dropship/DropshipReportsPanel.vue` | 报表面板 |
+| `frontend/src/composables/useDropshipOrder.js` | 列表 composable |
+| `frontend/src/api/dropship.js` | API 模块 |
+
+### 修改文件
+
+- `backend/main.py`：注册 dropship router
+- `backend/app/migrations.py`：代采代发建表 + 权限迁移 + receivable_bills 新增 dropship_order_id/platform_order_no 列
+- `backend/app/models/ar_ap.py`：ReceivableBill 新增 dropship_order FK + platform_order_no 字段
+- `frontend/src/router/index.js`：新增 `/dropship` 路由
+- `frontend/src/components/layout/Sidebar.vue`：新增代采代发菜单项
+- `frontend/src/utils/constants.js`：新增 dropship 权限和菜单常量
+
+### 性能优化（同期）
+
+- 游标分页替代 offset 分页（大数据集场景）
+- 原生 SQL 聚合替代 ORM 循环计算
+- 动画精简减少渲染开销
+
+---
+
 ## v4.25.0 — 凭证增强 + 辅助核算扩展 + 发票下推 + 全局搜索（2026-03-15）
 
 > 五大计划并行开发：凭证核心功能增强（Plan A）、辅助核算+勾单生成凭证（Plan B）、凭证 PDF 打印重写（Plan C）、发票多单合并下推（Plan D）、Bug 修复+体验优化（Plan E）。含 21 项 Code Review 修复。

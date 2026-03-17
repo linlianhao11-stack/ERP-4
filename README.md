@@ -1,6 +1,6 @@
-# 轻量级 ERP 系统 v4.25.0
+# 轻量级 ERP 系统 v4.26.1
 
-面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计等核心业务流程，含完整的业财一体化财务会计模块。
+面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计、代采代发等核心业务流程，含完整的业财一体化财务会计模块。
 
 ## 技术栈
 
@@ -31,7 +31,7 @@ erp-4/
 ├── backend/
 │   ├── main.py                 # FastAPI 入口，lifespan 管理
 │   ├── requirements.txt        # Python 依赖
-│   ├── tests/                  # pytest 测试（147 个用例：认证/会计/账簿/应收应付/发票/出入库/期末/报表/业务流程/员工部门/收付款方式集成测试）
+│   ├── tests/                  # pytest 测试（147 个用例）
 │   ├── pytest.ini              # pytest 配置
 │   ├── app/
 │   │   ├── config.py           # 全局配置（环境变量 + 默认值 + UPLOAD_ROOT）
@@ -40,10 +40,10 @@ erp-4/
 │   │   ├── exceptions.py       # 全局异常处理器
 │   │   ├── migrations.py       # 启动时幂等初始化默认数据
 │   │   ├── auth/               # JWT 签发 & 权限校验（含 token 版本机制）
-│   │   ├── models/             # 数据模型（45 个）
-│   │   ├── routers/            # API 路由（37 个模块，200+ 个端点，含通用 CRUD 工厂）
-│   │   ├── schemas/            # Pydantic 请求/响应模型（23 个文件）
-│   │   ├── services/           # 业务逻辑层（18 个服务）
+│   │   ├── models/             # 数据模型（47 个）
+│   │   ├── routers/            # API 路由（42 个模块，220+ 个端点，含通用 CRUD 工厂）
+│   │   ├── schemas/            # Pydantic 请求/响应模型（24 个文件）
+│   │   ├── services/           # 业务逻辑层（19 个服务）
 │   │   └── utils/              # 工具函数（订单号生成、UTC 时间处理）
 │   ├── backups/                # 备份目录（tar.gz 归档：数据库 + 上传文件）
 │   ├── uploads/                # 上传文件目录（发票 PDF 等，Docker volume 挂载）
@@ -58,14 +58,14 @@ erp-4/
         ├── main.js             # Vue 应用入口
         ├── App.vue             # 根组件
         ├── router/             # 路由定义
-        ├── api/                # 后端 API 调用封装（20 个模块）
+        ├── api/                # 后端 API 调用封装（21 个模块）
         ├── stores/             # Pinia 状态管理（10 个 store）
-        ├── views/              # 页面视图（12 个）
-        ├── components/         # 组件（layout / business / common）
+        ├── views/              # 页面视图（14 个）
+        ├── components/         # 组件（layout / business / common，91 个 .vue）
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
-        │   ├── business/       # 业务面板（FinanceOrdersPanel, PurchaseOrdersPanel 等）
+        │   ├── business/       # 业务面板（按模块子目录：sales/purchase/finance/logistics/stock/dropship/settings）
         │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect, DateRangePicker, ColumnMenu）
-        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig、useSearch、useDownload 等 17 个）
+        ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig、useSearch、useDownload、useDropshipOrder 等 18 个）
         └── styles/             # 全局样式
 ```
 
@@ -77,6 +77,7 @@ erp-4/
 | 销售管理 | `/sales` | 现款/账期/寄售调拨/寄售结算/退货订单 |
 | 库存管理 | `/stock` | 入库、调拨、盘点调整、库存导出、SN 码管理 |
 | 采购管理 | `/purchase` | 采购订单（创建→审核→付款→收货→退货）完整流程，供应商在账资金管理 |
+| 代采代发 | `/dropship` | 代采代发订单全流程（草稿→待付→已付→已发→完成），付款工作台（按供应商分组批量付款），报表（月度汇总/毛利分析/应收未收） |
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
 | 物流管理 | `/logistics` | 发货确认、拆单发货、包裹商品明细、SN码记录、快递100对接 |
 | 财务管理 | `/finance` | 收款、对账、欠款管理、返利管理（客户/供应商双向），退货退款自动推送收/付款单，各子模块支持筛选/搜索/重置 |
@@ -87,7 +88,7 @@ erp-4/
 
 ## 数据模型
 
-核心模型共 45 个：
+核心模型共 47 个：
 
 - **用户与权限**: User
 - **商品**: Product, ProductBrand
@@ -102,6 +103,7 @@ erp-4/
 - **应付**: PayableBill, DisbursementBill（含退货退款 bill_type）, DisbursementRefundBill
 - **发票**: Invoice, InvoiceItem
 - **出入库单**: SalesDeliveryBill, SalesDeliveryItem, PurchaseReceiptBill, PurchaseReceiptItem
+- **代采代发**: DropshipOrder
 - **物流**: Shipment, ShipmentItem
 - **系统**: OperationLog, SystemSetting
 
@@ -174,7 +176,7 @@ docker compose up -d
 
 ### 数据库迁移（已有部署升级时）
 
-如果是**已有数据库**从旧版本升级，需要执行一次迁移脚本：
+如果是**已有数据库**从旧版本升级，需要执行迁移脚本：
 
 ```bash
 # 在 Docker 环境中
@@ -188,7 +190,7 @@ psql -U erp -d erp -f backend/migrations/2026-03-15-plan-b-aux-bank.sql
 psql -U erp -d erp -f backend/migrations/2026-03-15-plan-d-invoice-multi-source.sql
 ```
 
-> **注意**：新部署无需执行此脚本，Tortoise ORM 会直接按最新模型创建表结构。脚本中所有操作均带 `IF NOT EXISTS` / `IF EXISTS` 保护，重复执行不会报错。
+> **注意**：新部署无需执行迁移脚本，Tortoise ORM 会直接按最新模型创建表结构（含代采代发模块的 `dropship_orders` 表）。脚本中所有操作均带 `IF NOT EXISTS` / `IF EXISTS` 保护，重复执行不会报错。代采代发模块的建表和权限迁移由应用启动时 `migrations.py` 自动完成，无需额外 SQL 脚本。
 
 ### 本地开发
 
@@ -228,7 +230,7 @@ npm run build
 
 系统采用基于权限列表的 RBAC 模型，用户角色为 `admin`（管理员，自动拥有全部权限）或 `user`（普通用户，按需分配）。
 
-共 28 个权限码，分 10 个权限组：
+共 30 个权限码，分 11 个权限组：
 
 | 权限组 | 权限标识 | 说明 |
 |--------|---------|------|
@@ -255,6 +257,8 @@ npm run build
 | | `accounting_ap_view` | 应付查看 |
 | | `accounting_ap_edit` | 应付编辑 |
 | | `accounting_ap_confirm` | 应付确认 |
+| 代采代发 | `dropship` | 代采代发订单管理（创建/提交/发货/完成/取消/报表） |
+| | `dropship_pay` | 代采代发批量付款 |
 | 客户管理 | `customer` | 客户信息维护 |
 | 系统设置 | `settings` | 系统配置 |
 | | `logs` | 操作日志查看 |

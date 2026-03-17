@@ -1,6 +1,6 @@
 # ERP-4 API 端点索引
 
-> 基于 v4.25.0 代码生成，共 **210+** 个端点
+> 基于 v4.26.1 代码生成，共 **220+** 个端点
 > 运行时 Swagger 文档：启动后端后访问 http://localhost:8090/docs（需设置 `DEBUG=true`）
 
 ## 目录
@@ -10,9 +10,10 @@
 3. [销售管理](#3-销售管理)
 4. [采购管理](#4-采购管理)
 5. [物流管理](#5-物流管理)
-6. [财务管理](#6-财务管理)
-7. [会计管理](#7-会计管理)
-8. [系统管理](#8-系统管理)
+6. [代采代发](#6-代采代发)
+7. [财务管理](#7-财务管理)
+8. [会计管理](#8-会计管理)
+9. [系统管理](#9-系统管理)
 
 ---
 
@@ -143,17 +144,6 @@
 | DELETE | `/api/customers/{customer_id}` | 删除客户（软删除） | `customer` / `sales` |
 | GET | `/api/customers/{customer_id}/transactions` | 客户交易记录 | 登录 |
 
-### 销售员管理 (`/api/salespersons`)
-
-> 路由文件：`app/routers/salespersons.py`
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/salespersons` | 销售员列表 | 登录 |
-| POST | `/api/salespersons` | 创建销售员 | `admin` |
-| PUT | `/api/salespersons/{sp_id}` | 更新销售员 | `admin` |
-| DELETE | `/api/salespersons/{sp_id}` | 删除销售员（软删除） | `admin` |
-
 ### 寄售管理 (`/api/consignment`)
 
 > 路由文件：`app/routers/consignment.py`
@@ -224,7 +214,32 @@
 
 ---
 
-## 6. 财务管理
+## 6. 代采代发
+
+### 代采代发订单 (`/api/dropship`)
+
+> 路由文件：`app/routers/dropship.py`
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/dropship` | 订单列表（分页，支持 status/search/日期筛选） | `dropship` |
+| GET | `/api/dropship/{order_id}` | 订单详情 | `dropship` |
+| POST | `/api/dropship` | 创建订单（?submit=true 可直接提交） | `dropship` |
+| PUT | `/api/dropship/{order_id}` | 更新订单（仅草稿） | `dropship` |
+| POST | `/api/dropship/{order_id}/submit` | 提交订单（草稿→待付款，生成应付单） | `dropship` |
+| POST | `/api/dropship/{order_id}/urge` | 催付（标记 urged_at 时间戳） | `dropship` |
+| POST | `/api/dropship/batch-pay` | 批量付款（生成付款单+凭证） | `dropship` / `dropship_pay` |
+| POST | `/api/dropship/{order_id}/ship` | 确认发货（记录物流+生成应收单） | `dropship` |
+| POST | `/api/dropship/{order_id}/complete` | 手动完成订单 | `dropship` |
+| POST | `/api/dropship/{order_id}/cancel` | 取消订单（含状态感知回滚） | `dropship` |
+| GET | `/api/dropship/reports/summary` | 月度汇总（按客户/供应商维度） | `dropship` |
+| GET | `/api/dropship/reports/profit` | 毛利分析（日期范围筛选） | `dropship` |
+| GET | `/api/dropship/reports/receivable` | 应收未收（按发货天数排序） | `dropship` |
+| GET | `/api/dropship/payment-workbench` | 付款工作台（按供应商分组） | `dropship` |
+
+---
+
+## 7. 财务管理
 
 ### 财务/回款 (`/api/finance`)
 
@@ -275,7 +290,7 @@
 
 ---
 
-## 7. 会计管理
+## 8. 会计管理
 
 ### 账套管理 (`/api/account-sets`)
 
@@ -463,7 +478,7 @@
 
 ---
 
-## 8. 系统管理
+## 9. 系统管理
 
 ### 系统设置 (`/api/settings`)
 
@@ -521,6 +536,8 @@
 | `purchase_approve` | 采购审核 |
 | `purchase_pay` | 采购付款 |
 | `purchase_receive` | 采购收货 |
+| `dropship` | 代采代发管理 |
+| `dropship_pay` | 代采代发批量付款 |
 | `logs` | 日志查看 |
 | `settings` | 系统设置 |
 | `accounting_view` | 会计查看 |
