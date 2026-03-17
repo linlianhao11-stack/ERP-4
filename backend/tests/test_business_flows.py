@@ -222,9 +222,10 @@ async def test_purchase_full_flow():
     assert stock_b.weighted_cost == Decimal("200.00")
 
     # === 步骤6：期末生成AP凭证 ===
-    ap_vouchers = await generate_ap_vouchers(
-        d["account_set"].id, d["current_period"], d["user"],
+    ap_result = await generate_ap_vouchers(
+        d["account_set"].id, [d["current_period"]], d["user"],
     )
+    ap_vouchers = ap_result["vouchers"]
     assert len(ap_vouchers) == 1
     assert ap_vouchers[0]["source"].startswith("付款单")
 
@@ -357,7 +358,7 @@ async def test_sales_cash_flow():
     # === 步骤7：推送发票 ===
     invoice = await push_invoice_from_receivable(
         account_set_id=d["account_set"].id,
-        receivable_bill_id=receivable.id,
+        receivable_bill_ids=[receivable.id],
         invoice_type="special",
         items=[{
             "product_id": d["product_a"].id,
@@ -387,17 +388,18 @@ async def test_sales_cash_flow():
     assert total_d == total_c  # 借贷平衡
 
     # === 步骤9：期末AR凭证 ===
-    ar_vouchers = await generate_ar_vouchers(
-        d["account_set"].id, d["current_period"], d["user"],
+    ar_result = await generate_ar_vouchers(
+        d["account_set"].id, [d["current_period"]], d["user"],
     )
+    ar_vouchers = ar_result["vouchers"]
     assert len(ar_vouchers) == 1
     assert ar_vouchers[0]["source"].startswith("收款单")
 
     # 幂等性验证
-    ar_vouchers_2 = await generate_ar_vouchers(
-        d["account_set"].id, d["current_period"], d["user"],
+    ar_result_2 = await generate_ar_vouchers(
+        d["account_set"].id, [d["current_period"]], d["user"],
     )
-    assert len(ar_vouchers_2) == 0  # 不重复生成
+    assert len(ar_result_2["vouchers"]) == 0  # 不重复生成
 
 
 # ─── 流程3：挂账销售全流程 ──────────────────────────────────────────────
@@ -487,7 +489,7 @@ async def test_sales_credit_flow():
     # 推送+确认发票
     invoice = await push_invoice_from_receivable(
         account_set_id=d["account_set"].id,
-        receivable_bill_id=receivable.id,
+        receivable_bill_ids=[receivable.id],
         invoice_type="special",
         items=[{
             "product_id": d["product_b"].id,
@@ -505,10 +507,10 @@ async def test_sales_credit_flow():
     payment_count = await Payment.filter(order=order).count()
     assert payment_count == 0
 
-    ar_vouchers = await generate_ar_vouchers(
-        d["account_set"].id, d["current_period"], d["user"],
+    ar_result = await generate_ar_vouchers(
+        d["account_set"].id, [d["current_period"]], d["user"],
     )
-    assert len(ar_vouchers) == 0
+    assert len(ar_result["vouchers"]) == 0
 
     # 客户挂账余额不变
     await d["customer"].refresh_from_db()

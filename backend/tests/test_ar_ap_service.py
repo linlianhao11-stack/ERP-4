@@ -182,7 +182,8 @@ async def test_generate_ar_vouchers():
         receivable_bill=rb, payment_id=None,
         amount=Decimal("1000.00"), payment_method="银行转账", creator=u,
     )
-    vouchers = await generate_ar_vouchers(a.id, current_period, u)
+    result = await generate_ar_vouchers(a.id, [current_period], u)
+    vouchers = result["vouchers"]
     assert len(vouchers) == 1
     assert vouchers[0]["source"].startswith("收款单")
 
@@ -207,7 +208,8 @@ async def test_generate_ap_vouchers():
         payable_bill=pb, amount=Decimal("5000.00"),
         disbursement_method="对公转账", creator=u,
     )
-    vouchers = await generate_ap_vouchers(a.id, current_period, u)
+    result = await generate_ap_vouchers(a.id, [current_period], u)
+    vouchers = result["vouchers"]
     assert len(vouchers) == 1
     assert vouchers[0]["source"].startswith("付款单")
 
@@ -231,7 +233,7 @@ async def test_voucher_generation_idempotent():
         receivable_bill=rb, payment_id=None,
         amount=Decimal("500.00"), payment_method="现金", creator=u,
     )
-    v1 = await generate_ar_vouchers(a.id, current_period, u)
-    v2 = await generate_ar_vouchers(a.id, current_period, u)
-    assert len(v1) == 1
-    assert len(v2) == 0  # 已生成凭证的不会重复生成
+    r1 = await generate_ar_vouchers(a.id, [current_period], u)
+    r2 = await generate_ar_vouchers(a.id, [current_period], u)
+    assert len(r1["vouchers"]) == 1
+    assert len(r2["vouchers"]) == 0  # 已生成凭证的不会重复生成
