@@ -127,7 +127,7 @@ async def test_push_invoice_from_receivable():
     )
     # 从应收单推送发票
     inv = await push_invoice_from_receivable(
-        account_set_id=a.id, receivable_bill_id=rb.id,
+        account_set_id=a.id, receivable_bill_ids=[rb.id],
         invoice_type="special",
         items=[{
             "product_id": p.id, "product_name": "测试产品",
@@ -193,7 +193,7 @@ async def test_confirm_output_invoice_voucher():
     )
     # 推送发票
     inv = await push_invoice_from_receivable(
-        account_set_id=a.id, receivable_bill_id=rb.id,
+        account_set_id=a.id, receivable_bill_ids=[rb.id],
         invoice_type="special",
         items=[{
             "product_id": p.id, "product_name": "测试产品",

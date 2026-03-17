@@ -17,7 +17,7 @@ class TestPasswordHashing:
 
     def test_password_strength_valid(self):
         # 不应该抛出异常
-        validate_password_strength("Abc12345")
+        validate_password_strength("Xyz98765")
 
     def test_password_strength_too_short(self):
         with pytest.raises(HTTPException) as exc:

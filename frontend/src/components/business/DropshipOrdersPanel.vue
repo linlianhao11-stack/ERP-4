@@ -24,7 +24,6 @@
           <button type="button" class="font-medium text-sm font-mono text-primary hover:underline" @click="openDetail(o)">
             <span v-if="['pending_payment','paid_pending_ship'].includes(o.status)" class="todo-dot mr-1"></span>
             {{ o.ds_no }}
-            <span v-if="o.urged_at" class="badge badge-orange text-[10px] ml-1">催</span>
           </button>
           <div class="text-lg font-bold text-primary">¥{{ fmt(o.sale_total) }}</div>
         </div>
@@ -136,7 +135,6 @@
                 <button type="button" class="text-primary hover:underline cursor-pointer" @click="openDetail(o)">
                   {{ o.ds_no }}
                 </button>
-                <span v-if="o.urged_at" class="badge badge-orange text-[10px] ml-1">催</span>
               </td>
               <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center">
                 <StatusBadge type="dropshipStatus" :status="o.status" />

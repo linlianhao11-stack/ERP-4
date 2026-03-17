@@ -254,7 +254,7 @@ import { usePermission } from '../composables/usePermission'
 import {
   TrendingUp, CircleDollarSign, Package, Receipt,
   Truck, ClipboardCheck, PackageSearch, CreditCard, AlertTriangle, FileText,
-  Wallet, ChevronRight, CheckCircle
+  Wallet, ChevronRight, CheckCircle, Repeat
 } from 'lucide-vue-next'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
@@ -286,6 +286,9 @@ const todoItemDefs = [
   { key: 'pending_collection', label: '待收款客户', route: '/finance', perm: 'finance', icon: CreditCard, iconBg: 'bg-warning-subtle', iconColor: 'text-warning' },
   { key: 'low_stock', label: '低库存预警', route: '/stock', perm: 'stock_view', icon: AlertTriangle, iconBg: 'bg-error-subtle', iconColor: 'text-error' },
   { key: 'pending_receivable', label: '待处理应收', route: '/accounting', perm: 'accounting_view', icon: FileText, iconBg: 'bg-orange-subtle', iconColor: 'text-orange-emphasis' },
+  { key: 'ds_pending_payment', label: '代采代发待付款', route: '/dropship', perm: 'dropship', icon: Repeat, iconBg: 'bg-warning-subtle', iconColor: 'text-warning' },
+  { key: 'ds_paid_pending_ship', label: '代采代发待发货', route: '/dropship', perm: 'dropship', icon: Repeat, iconBg: 'bg-info-subtle', iconColor: 'text-info' },
+  { key: 'ds_urged_unpaid', label: '代采代发催付未处理', route: '/dropship', perm: 'dropship', icon: Repeat, iconBg: 'bg-error-subtle', iconColor: 'text-error' },
 ]
 
 const todoItems = computed(() => {

@@ -191,6 +191,27 @@ async def get_todo_counts(user: User = Depends(get_current_user)):
         )
         counts["pending_receivable"] = int(r[0]["c"]) if r else 0
 
+    # 代采代发待付款（dropship 权限）
+    if is_admin or "dropship" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM dropship_orders WHERE status = 'pending_payment'"
+        )
+        counts["ds_pending_payment"] = int(r[0]["c"]) if r else 0
+
+    # 代采代发已付待发（dropship 权限）
+    if is_admin or "dropship" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM dropship_orders WHERE status = 'paid_pending_ship'"
+        )
+        counts["ds_paid_pending_ship"] = int(r[0]["c"]) if r else 0
+
+    # 代采代发催付未处理（dropship 权限）
+    if is_admin or "dropship" in perms:
+        r = await conn.execute_query_dict(
+            "SELECT COUNT(*) as c FROM dropship_orders WHERE status = 'pending_payment' AND urged_at IS NOT NULL"
+        )
+        counts["ds_urged_unpaid"] = int(r[0]["c"]) if r else 0
+
     return counts
 
 
