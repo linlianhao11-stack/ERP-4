@@ -88,7 +88,8 @@ const badgeMap = {
   purchase: ['pending_review', 'in_transit'],
   finance: ['pending_collection', 'pending_payment'],
   stock: ['low_stock'],
-  accounting: ['pending_receivable']
+  accounting: ['pending_receivable'],
+  dropship: ['ds_pending_payment', 'ds_paid_pending_ship', 'ds_urged_unpaid']
 }
 
 const getBadgeCount = (key) => {
