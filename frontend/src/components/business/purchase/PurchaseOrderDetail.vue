@@ -91,10 +91,10 @@
       </div>
       </div>
       <div class="modal-footer flex-wrap">
-        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:var(--primary);color:#fff">审核通过</button>
-        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn btn-sm" style="background:var(--error);color:#fff">拒绝</button>
+        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleApprovePO(purchaseOrderDetail.id)" class="btn btn-sm btn-primary">审核通过</button>
+        <button v-if="purchaseOrderDetail.status === 'pending_review' && hasPermission('purchase_approve')" @click="handleRejectPO(purchaseOrderDetail.id)" class="btn btn-sm btn-danger">拒绝</button>
         <button v-if="['paid','partial'].includes(purchaseOrderDetail.status) && hasPermission('purchase_receive')" @click="openReceiveFromDetail(purchaseOrderDetail.id)" class="btn btn-sm btn-success">采购收货</button>
-        <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn btn-sm" style="background:var(--warning);color:#fff">采购退货</button>
+        <button v-if="purchaseOrderDetail.status === 'completed' && hasPermission('purchase')" @click="openReturnModal(purchaseOrderDetail)" class="btn btn-sm btn-warning">采购退货</button>
         <button @click="showPODetailModal = false" class="btn btn-sm btn-secondary">关闭</button>
       </div>
     </div>
@@ -247,7 +247,7 @@
         <!-- 退货操作按钮 -->
         <div class="flex gap-3 pt-2">
           <button @click="showReturnModal = false" class="btn btn-secondary flex-1">取消</button>
-          <button @click="confirmReturn" class="btn flex-1" style="background:#ff9f0a;color:#fff" :disabled="appStore.submitting">{{ appStore.submitting ? '处理中...' : '确认退货' }}</button>
+          <button @click="confirmReturn" class="btn btn-warning flex-1" :disabled="appStore.submitting">{{ appStore.submitting ? '处理中...' : '确认退货' }}</button>
         </div>
       </div>
     </div>

@@ -117,7 +117,7 @@
                 @click="copyTrackingNo((s.carrier_name || '未知') + ' 单号：' + s.tracking_no + (s.sn_code ? ' SN：' + s.sn_code : ''))"
                 class="btn btn-secondary btn-sm text-xs"
               >复制</button>
-              <button @click="deleteShipmentItem(s.id)" class="btn btn-sm text-xs" style="background:#fee2e2;color:#b91c1c">删除</button>
+              <button @click="deleteShipmentItem(s.id)" class="btn btn-sm btn-danger text-xs">删除</button>
             </div>
 
             <!-- 物流轨迹时间线 -->

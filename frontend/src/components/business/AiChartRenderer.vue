@@ -64,9 +64,9 @@ const chartHeight = computed(() => {
 const getColors = () => {
   const style = getComputedStyle(document.documentElement)
   return {
-    text: style.getPropertyValue('--text')?.trim() || '#333',
-    textMuted: style.getPropertyValue('--text-muted')?.trim() || '#999',
-    border: style.getPropertyValue('--border')?.trim() || '#eee',
+    text: style.getPropertyValue('--text')?.trim() || 'oklch(0.13 0 0)',
+    textMuted: style.getPropertyValue('--text-muted')?.trim() || 'oklch(0.55 0 0)',
+    border: style.getPropertyValue('--border')?.trim() || 'oklch(0.92 0 0)',
   }
 }
 

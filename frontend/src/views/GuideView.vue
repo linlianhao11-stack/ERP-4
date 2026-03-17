@@ -1,7 +1,7 @@
 <template>
   <div class="guide-page">
     <div class="guide-header">
-      <h1 class="text-2xl font-bold mb-1">轻量级ERP系统 v4.15 使用手册</h1>
+      <h1 class="text-2xl font-bold mb-1">轻量级ERP系统 v4.26 使用手册</h1>
       <p class="text-muted text-sm">完整功能指南 · 业财一体化</p>
     </div>
 
@@ -36,11 +36,13 @@
             <tr><td class="px-2 py-2"><span class="badge badge-purple">库存</span></td><td class="px-2 py-2">多仓库多仓位管理、入库/调拨/盘点、SN码管理、Excel导入导出</td><td class="px-2 py-2">仓管人员</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-orange">采购</span></td><td class="px-2 py-2">采购订单全流程（下单→审核→付款→收货→退货）、供应商管理</td><td class="px-2 py-2">采购人员</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-yellow">寄售</span></td><td class="px-2 py-2">寄售调拨、寄售结算、寄售退货</td><td class="px-2 py-2">销售/财务</td></tr>
+            <tr><td class="px-2 py-2"><span class="badge badge-purple">代采代发</span></td><td class="px-2 py-2">代采代发全流程（下单→付款→发货→完成）、付款工作台、报表分析</td><td class="px-2 py-2">采购/财务</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-blue">物流</span></td><td class="px-2 py-2">多批次发货、快递100实时追踪、SN码绑定</td><td class="px-2 py-2">物流/销售</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-red">财务</span></td><td class="px-2 py-2">收款管理、欠款明细、返利管理（客户/供应商双向）</td><td class="px-2 py-2">财务人员</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-green">会计</span></td><td class="px-2 py-2">多账套、凭证管理、账簿查询、应收应付、发票、出入库单、期末处理、财务报表</td><td class="px-2 py-2">会计人员</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-blue">客户</span></td><td class="px-2 py-2">客户档案、交易明细、余额/返利/欠款管理</td><td class="px-2 py-2">销售/财务</td></tr>
             <tr><td class="px-2 py-2"><span class="badge badge-purple">设置</span></td><td class="px-2 py-2">用户管理、权限配置、仓库仓位、收付款方式、备份管理</td><td class="px-2 py-2">管理员</td></tr>
+            <tr><td class="px-2 py-2"><span class="badge badge-green">AI 助手</span></td><td class="px-2 py-2">自然语言数据查询、智能分析、图表生成、Excel 导出</td><td class="px-2 py-2">所有人员</td></tr>
           </tbody>
         </table>
       </div>
@@ -60,7 +62,7 @@
       </div>
 
       <h3 class="font-semibold mt-4 mb-2">权限说明</h3>
-      <p class="text-sm text-secondary mb-2">系统角色分为 <strong>管理员</strong>（拥有全部权限）和 <strong>普通用户</strong>（按需分配），共 28 个细粒度权限，分 10 个权限组。管理员可在「设置 → 权限管理」中为每个用户独立配置。</p>
+      <p class="text-sm text-secondary mb-2">系统角色分为 <strong>管理员</strong>（拥有全部权限）和 <strong>普通用户</strong>（按需分配），共 30 个细粒度权限，分 11 个权限组。管理员可在「设置 → 权限管理」中为每个用户独立配置。</p>
       <div class="overflow-x-auto">
         <table class="guide-table w-full text-sm">
           <thead><tr><th class="px-2 py-2 text-left bg-elevated">权限组</th><th class="px-2 py-2 text-left bg-elevated">可访问的功能</th></tr></thead>
@@ -73,6 +75,7 @@
             <tr><td class="px-2 py-2">物流管理</td><td class="px-2 py-2">发货、物流追踪</td></tr>
             <tr><td class="px-2 py-2">财务管理</td><td class="px-2 py-2">收款管理 + 确认收款（子权限独立控制）</td></tr>
             <tr><td class="px-2 py-2">会计管理</td><td class="px-2 py-2">查看 + 录入 + 审核 + 过账 + 期末处理 + 应收（查看/编辑/确认）+ 应付（查看/编辑/确认）共 11 个子权限</td></tr>
+            <tr><td class="px-2 py-2">代采代发</td><td class="px-2 py-2">代采代发订单管理 + 批量付款（子权限独立控制）</td></tr>
             <tr><td class="px-2 py-2">客户管理</td><td class="px-2 py-2">客户档案维护、交易明细查询</td></tr>
             <tr><td class="px-2 py-2">系统设置</td><td class="px-2 py-2">系统配置 + 操作日志 + 系统管理（用户/备份/账套）</td></tr>
           </tbody>
@@ -244,6 +247,100 @@
         <li><strong>寄售结算</strong> — 在销售页面选择「寄售结算」，或从寄售详情点击「去结算」，选择已售出的商品和数量</li>
         <li><strong>寄售退货</strong> — 在寄售详情页面点击「寄售退货」，选择退货商品和入库仓位</li>
       </ul>
+    </div>
+
+    <!-- Dropship -->
+    <div v-if="guideSection === 'dropship'" class="guide-section">
+      <h2 class="text-lg font-bold mb-4">代采代发</h2>
+
+      <h3 class="font-semibold mt-4 mb-2">什么是代采代发？</h3>
+      <p class="text-sm text-secondary mb-4">代采代发是指客户下单后，公司向供应商采购并由供应商直接发货给客户（或经过公司中转），公司赚取中间差价的业务模式。适用于无需备货、按单采购的场景。</p>
+
+      <h3 class="font-semibold mt-4 mb-2">页面标签</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">标签</th><th class="px-2 py-2 text-left bg-elevated">功能</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">代发订单</td><td class="px-2 py-2">管理所有代采代发订单，支持按状态/日期/关键词筛选</td></tr>
+            <tr><td class="px-2 py-2">付款工作台</td><td class="px-2 py-2">批量付款操作，按供应商聚合待付订单</td></tr>
+            <tr><td class="px-2 py-2">报表分析</td><td class="px-2 py-2">毛利分析、供应商排名、客户排名三个维度</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">订单状态流转</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">状态</th><th class="px-2 py-2 text-left bg-elevated">说明</th><th class="px-2 py-2 text-left bg-elevated">操作</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">草稿</td><td class="px-2 py-2">订单已创建，可编辑</td><td class="px-2 py-2">编辑、删除、提交</td></tr>
+            <tr><td class="px-2 py-2">待付款</td><td class="px-2 py-2">已提交待向供应商付款</td><td class="px-2 py-2">在付款工作台批量付款</td></tr>
+            <tr><td class="px-2 py-2">已付待发</td><td class="px-2 py-2">已付款，等待发货</td><td class="px-2 py-2">确认发货（填写物流信息）</td></tr>
+            <tr><td class="px-2 py-2">已发货</td><td class="px-2 py-2">供应商已发货</td><td class="px-2 py-2">确认完成</td></tr>
+            <tr><td class="px-2 py-2">已完成</td><td class="px-2 py-2">交易完成</td><td class="px-2 py-2">—</td></tr>
+            <tr><td class="px-2 py-2">已取消</td><td class="px-2 py-2">订单已取消</td><td class="px-2 py-2">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">创建代发订单</h3>
+      <div class="space-y-3 mb-4">
+        <div v-for="(step, i) in dropshipSteps" :key="i" class="flex gap-3 items-start">
+          <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">{{ i + 1 }}</div>
+          <div class="text-sm"><strong>{{ step.title }}</strong><br><span class="text-secondary">{{ step.desc }}</span></div>
+        </div>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">发货方式</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">方式</th><th class="px-2 py-2 text-left bg-elevated">说明</th><th class="px-2 py-2 text-left bg-elevated">库存影响</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">供应商直发</td><td class="px-2 py-2">供应商直接发货给客户，公司不经手</td><td class="px-2 py-2">无库存变动</td></tr>
+            <tr><td class="px-2 py-2">过手转发</td><td class="px-2 py-2">供应商发到公司，公司再转发给客户</td><td class="px-2 py-2">生成虚拟出入库记录</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">付款工作台</h3>
+      <p class="text-sm text-secondary mb-2">付款工作台将待付款订单按供应商聚合，方便批量操作：</p>
+      <ul class="text-sm text-secondary space-y-2 mb-4 list-disc list-inside">
+        <li><strong>按供应商聚合</strong> — 同一供应商的待付款订单归为一组，显示汇总金额</li>
+        <li><strong>批量选择</strong> — 勾选需要付款的订单，支持全选</li>
+        <li><strong>付款方式</strong> — 银行转账或冲减借支（关联员工借支余额）</li>
+        <li><strong>确认付款</strong> — 提交后自动生成付款单据，订单状态变为「已付待发」</li>
+      </ul>
+
+      <h3 class="font-semibold mt-4 mb-2">报表分析</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">报表</th><th class="px-2 py-2 text-left bg-elevated">说明</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">毛利分析</td><td class="px-2 py-2">按月统计销售额、成本、毛利和毛利率，区分专票（可抵扣税额）和普票</td></tr>
+            <tr><td class="px-2 py-2">供应商排名</td><td class="px-2 py-2">按采购金额和订单数量排名，查看各供应商的合作数据</td></tr>
+            <tr><td class="px-2 py-2">客户排名</td><td class="px-2 py-2">按销售金额和订单数量排名，查看各客户的交易数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-info-subtle border border-primary rounded p-3 mb-4 text-sm text-primary">
+        <strong>业财联动</strong><br>
+        <ul class="list-disc list-inside mt-1 space-y-0.5">
+          <li>提交订单自动生成应付单（会计模块）</li>
+          <li>批量付款自动生成付款单和记账凭证</li>
+          <li>确认发货自动生成应收单（记录客户应收）</li>
+          <li>过手转发模式自动生成虚拟出入库日志</li>
+        </ul>
+      </div>
+
+      <div class="bg-warning-subtle border border-warning rounded p-3 text-sm text-warning">
+        <strong>注意事项</strong><br>
+        <ul class="list-disc list-inside mt-1 space-y-0.5">
+          <li>批量付款需要 <strong>dropship_pay</strong> 权限，普通代发管理只需 <strong>dropship</strong> 权限</li>
+          <li>已提交的订单不可编辑，如需修改需先取消</li>
+          <li>冲减借支付款方式需要关联员工，且员工借支余额必须充足</li>
+        </ul>
+      </div>
     </div>
 
     <!-- Logistics -->
@@ -460,7 +557,7 @@
             <tr><td class="px-2 py-2">仓位管理</td><td class="px-2 py-2">按仓库管理仓位编码（如 A-01、B-02）</td><td class="px-2 py-2">系统设置</td></tr>
             <tr><td class="px-2 py-2">收款方式</td><td class="px-2 py-2">管理销售收款方式（现金、银行转账、微信等）</td><td class="px-2 py-2">系统设置</td></tr>
             <tr><td class="px-2 py-2">付款方式</td><td class="px-2 py-2">管理采购付款方式</td><td class="px-2 py-2">系统设置</td></tr>
-            <tr><td class="px-2 py-2">销售员</td><td class="px-2 py-2">管理销售员列表</td><td class="px-2 py-2">系统设置</td></tr>
+            <tr><td class="px-2 py-2">员工/部门</td><td class="px-2 py-2">员工档案和部门管理</td><td class="px-2 py-2">系统设置</td></tr>
             <tr><td class="px-2 py-2">用户管理</td><td class="px-2 py-2">创建用户、修改密码、启用/禁用账号</td><td class="px-2 py-2">管理员</td></tr>
             <tr><td class="px-2 py-2">权限管理</td><td class="px-2 py-2">为每个用户配置细粒度权限（iOS 风格开关矩阵）</td><td class="px-2 py-2">管理员</td></tr>
             <tr><td class="px-2 py-2">操作日志</td><td class="px-2 py-2">查看系统操作审计日志</td><td class="px-2 py-2">日志权限</td></tr>
@@ -477,6 +574,73 @@
           <li>为不同岗位的员工分配最小必要权限</li>
           <li>员工离职后及时禁用其账号</li>
           <li>定期检查备份是否正常执行</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- AI Chat -->
+    <div v-if="guideSection === 'aichat'" class="guide-section">
+      <h2 class="text-lg font-bold mb-4">AI 助手</h2>
+
+      <h3 class="font-semibold mt-4 mb-2">功能简介</h3>
+      <p class="text-sm text-secondary mb-4">AI 助手是内置的智能数据查询工具，支持用自然语言提问，系统自动将问题转换为 SQL 查询并返回分析结果。基于 DeepSeek 大模型，支持表格、图表、导出等多种展示形式。</p>
+
+      <h3 class="font-semibold mt-4 mb-2">如何使用</h3>
+      <div class="space-y-3 mb-4">
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div><div class="text-sm"><strong>打开 AI 助手</strong><br><span class="text-secondary">点击页面右下角的 AI 浮动按钮</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div><div class="text-sm"><strong>输入问题</strong><br><span class="text-secondary">用自然语言描述要查询的数据，如「本月销售额是多少」「库存低于10件的商品有哪些」</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div><div class="text-sm"><strong>查看结果</strong><br><span class="text-secondary">系统返回数据分析摘要、表格数据、图表可视化</span></div></div>
+        <div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold flex-shrink-0">4</div><div class="text-sm"><strong>导出或收藏</strong><br><span class="text-secondary">支持将结果导出为 Excel，或收藏常用查询方便下次使用</span></div></div>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">支持的查询类型</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">类别</th><th class="px-2 py-2 text-left bg-elevated">示例问题</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">销售分析</td><td class="px-2 py-2">本月销售额、某客户交易明细、畅销商品排名</td></tr>
+            <tr><td class="px-2 py-2">库存查询</td><td class="px-2 py-2">库存预警商品、某仓库库存汇总、商品库龄分析</td></tr>
+            <tr><td class="px-2 py-2">采购统计</td><td class="px-2 py-2">采购订单汇总、供应商采购排名、在途商品</td></tr>
+            <tr><td class="px-2 py-2">财务数据</td><td class="px-2 py-2">应收账款汇总、欠款客户列表、收款记录</td></tr>
+            <tr><td class="px-2 py-2">综合报表</td><td class="px-2 py-2">月度经营概览、毛利分析、同比环比对比</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="font-semibold mt-4 mb-2">结果展示</h3>
+      <ul class="text-sm text-secondary space-y-2 mb-4 list-disc list-inside">
+        <li><strong>智能摘要</strong> — AI 自动生成数据分析和关键洞察</li>
+        <li><strong>数据表格</strong> — 查询结果以表格形式展示，支持数字对齐和货币格式</li>
+        <li><strong>图表可视化</strong> — 适合的数据自动生成柱状图、饼图、折线图等</li>
+        <li><strong>SQL 查看</strong> — 可展开查看 AI 生成的 SQL 语句</li>
+        <li><strong>相关建议</strong> — AI 会推荐相关的后续查询问题</li>
+      </ul>
+
+      <h3 class="font-semibold mt-4 mb-2">快捷功能</h3>
+      <div class="overflow-x-auto mb-4">
+        <table class="guide-table w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left bg-elevated">功能</th><th class="px-2 py-2 text-left bg-elevated">说明</th></tr></thead>
+          <tbody class="divide-y">
+            <tr><td class="px-2 py-2">预设查询</td><td class="px-2 py-2">欢迎页提供常用查询快捷入口，点击即可执行</td></tr>
+            <tr><td class="px-2 py-2">收藏查询</td><td class="px-2 py-2">对有价值的查询点击收藏，下次可从收藏列表快速访问</td></tr>
+            <tr><td class="px-2 py-2">导出 Excel</td><td class="px-2 py-2">将表格数据一键导出为 Excel 文件</td></tr>
+            <tr><td class="px-2 py-2">反馈</td><td class="px-2 py-2">对回答点赞或点踩，帮助 AI 持续优化</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-info-subtle border border-primary rounded p-3 mb-4 text-sm text-primary">
+        <strong>权限隔离</strong><br>
+        AI 助手严格遵循用户权限：普通用户只能查询自己有权限访问的模块数据，管理员可查询所有数据。查询结果不会超出用户的权限范围。
+      </div>
+
+      <div class="bg-warning-subtle border border-warning rounded p-3 text-sm text-warning">
+        <strong>使用提示</strong><br>
+        <ul class="list-disc list-inside mt-1 space-y-0.5">
+          <li>提问尽量具体明确，例如指定时间范围、客户名称等</li>
+          <li>支持多轮对话，可在前一个查询基础上追问</li>
+          <li>AI 助手需要管理员在设置中配置 DeepSeek API 密钥后才可使用</li>
+          <li>查询结果最多返回 5000 行数据</li>
         </ul>
       </div>
     </div>
@@ -523,7 +687,7 @@
 
     <!-- Footer -->
     <div class="mt-8 pt-4 border-t border-line-strong text-center text-xs text-muted">
-      <p>轻量级ERP系统 v4.15 使用手册 | 如有疑问，请联系系统管理员</p>
+      <p>轻量级ERP系统 v4.26 使用手册 | 如有疑问，请联系系统管理员</p>
     </div>
   </div>
 </template>
@@ -539,11 +703,13 @@ const sections = [
   { key: 'stock', label: '库存管理' },
   { key: 'purchase', label: '采购管理' },
   { key: 'consignment', label: '寄售管理' },
+  { key: 'dropship', label: '代采代发' },
   { key: 'logistics', label: '物流管理' },
   { key: 'finance', label: '财务管理' },
   { key: 'accounting', label: '会计管理' },
   { key: 'customers', label: '客户管理' },
   { key: 'settings', label: '系统设置' },
+  { key: 'aichat', label: 'AI 助手' },
   { key: 'faq', label: '常见问题' },
 ]
 
@@ -553,6 +719,14 @@ const salesSteps = [
   { title: '添加商品到购物车', desc: '在商品列表中搜索商品，点击添加到右侧购物车，可修改数量和单价' },
   { title: '选择出库仓位', desc: '为每个商品选择出库的仓库和仓位，系统会显示该仓位的可用库存' },
   { title: '提交订单', desc: '点击「提交订单」按钮，确认订单信息后完成创建' },
+]
+
+const dropshipSteps = [
+  { title: '填写基本信息', desc: '选择客户、供应商，填写收货地址和备注' },
+  { title: '添加商品明细', desc: '填写商品名称、数量、采购单价（向供应商）和销售单价（向客户）' },
+  { title: '选择结算方式', desc: '选择预付或挂账，选择发票类型（专票/普票）' },
+  { title: '选择发货方式', desc: '供应商直发（不经手）或过手转发（经公司中转）' },
+  { title: '保存或提交', desc: '保存为草稿可后续编辑，提交后进入待付款状态' },
 ]
 
 const returnSteps = [

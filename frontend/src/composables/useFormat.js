@@ -15,7 +15,7 @@ export function useFormat() {
   const formatBalance = (v) => fmt(-(v || 0))
 
   const getBalanceLabel = (v) => v < 0 ? '在账资金' : (v > 0 ? '欠款' : '两清')
-  const getBalanceClass = (v) => v < 0 ? 'text-[#0071e3]' : (v > 0 ? 'text-[#ff3b30]' : 'text-[#86868b]')
+  const getBalanceClass = (v) => v < 0 ? 'text-primary' : (v > 0 ? 'text-error' : 'text-muted')
 
   const getAgeClass = (d) => d < 30 ? 'age-normal' : d < 90 ? 'age-slow' : 'age-dead'
 

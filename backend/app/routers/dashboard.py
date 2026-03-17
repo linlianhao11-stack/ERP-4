@@ -250,9 +250,10 @@ async def get_recent_orders(
             UNION ALL
             SELECT d.id, d.ds_no as order_no, 'DROPSHIP' as order_type, d.sale_total as total_amount,
                    d.status as shipping_status, false as is_cleared, d.created_at,
-                   d.customer_name,
+                   c2.name as customer_name,
                    'dropship' as source
             FROM dropship_orders d
+            LEFT JOIN customers c2 ON d.customer_id = c2.id
             WHERE d.status NOT IN ('draft', 'cancelled')
         ) combined
         ORDER BY created_at DESC

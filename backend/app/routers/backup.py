@@ -72,7 +72,9 @@ async def download_backup(filename: str, user: User = Depends(require_permission
     backup_dir = get_backup_dir()
     if not backup_dir:
         raise HTTPException(status_code=404, detail="备份目录不存在")
-    filepath = os.path.join(backup_dir, filename)
+    filepath = os.path.realpath(os.path.join(backup_dir, filename))
+    if not filepath.startswith(os.path.realpath(backup_dir) + os.sep):
+        raise HTTPException(status_code=400, detail="非法文件路径")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="备份文件不存在")
 
@@ -186,7 +188,9 @@ async def delete_backup(filename: str, user: User = Depends(require_permission("
     backup_dir = get_backup_dir()
     if not backup_dir:
         raise HTTPException(status_code=404, detail="备份目录不存在")
-    filepath = os.path.join(backup_dir, filename)
+    filepath = os.path.realpath(os.path.join(backup_dir, filename))
+    if not filepath.startswith(os.path.realpath(backup_dir) + os.sep):
+        raise HTTPException(status_code=400, detail="非法文件路径")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="备份文件不存在")
     os.remove(filepath)

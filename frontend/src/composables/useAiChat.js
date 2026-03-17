@@ -1,10 +1,12 @@
 import { ref, onUnmounted } from 'vue'
 import { useAppStore } from '../stores/app'
+import { useAuthStore } from '../stores/auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export function useAiChat() {
   const appStore = useAppStore()
+  const authStore = useAuthStore()
   const messages = ref([])
   const loading = ref(false)
   let abortController = null
@@ -135,7 +137,7 @@ export function useAiChat() {
     abortController = new AbortController()
 
     try {
-      const token = localStorage.getItem('erp_token')
+      const token = authStore.token
       const history = buildHistory().slice(0, -2)
 
       const response = await fetch(`${API_BASE}/api/ai/chat`, {

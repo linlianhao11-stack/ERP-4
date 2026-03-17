@@ -16,7 +16,7 @@ const routes = [
   { path: '/customers', name: 'customers', component: () => import('../views/CustomersView.vue'), meta: { perm: 'customer' } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { perm: '_any' } },
   { path: '/guide', name: 'guide', component: () => import('../views/GuideView.vue') },
-  { path: '/:pathMatch(.*)*', name: 'not-found', redirect: '/dashboard' },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },
 ]
 
 const router = createRouter({

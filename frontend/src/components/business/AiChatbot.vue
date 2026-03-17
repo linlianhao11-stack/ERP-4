@@ -172,9 +172,10 @@ const handleExport = async (msg) => {
   }
 }
 
-const handleFeedback = async (msg, type) => {
+const handleFeedback = async (msg, type, reason) => {
   if (msg.feedback) return
   msg.feedback = type
+  if (reason) msg.negative_reason = reason
   try {
     await aiFeedback({
       message_id: msg.message_id,

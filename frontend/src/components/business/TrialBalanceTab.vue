@@ -71,6 +71,7 @@ import PageToolbar from '../common/PageToolbar.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { getTrialBalance, exportTrialBalance } from '../../api/accounting'
+import { downloadBlob } from '../../composables/useDownload'
 
 const accountingStore = useAccountingStore()
 const appStore = useAppStore()
@@ -103,12 +104,7 @@ const handleExport = async () => {
       account_set_id: accountingStore.currentAccountSetId,
       period_name: periodName.value,
     })
-    const url = URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `科目余额表_${periodName.value}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(res.data, `科目余额表_${periodName.value}.xlsx`)
   } catch (e) {
     appStore.showToast('导出失败', 'error')
   }

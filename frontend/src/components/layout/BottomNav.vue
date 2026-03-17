@@ -12,12 +12,12 @@
       </span>
       <span class="bottom-nav-label">{{ item.name }}</span>
     </router-link>
-    <div class="bottom-nav-item" @click="$emit('more')">
+    <button class="bottom-nav-item" @click="$emit('more')">
       <span class="bottom-nav-icon">
         <MoreHorizontal :size="20" :stroke-width="1.5" />
       </span>
       <span class="bottom-nav-label">更多</span>
-    </div>
+    </button>
   </nav>
 </template>
 

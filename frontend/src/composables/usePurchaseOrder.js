@@ -8,6 +8,7 @@ import { useAppStore } from '../stores/app'
 import { usePagination } from './usePagination'
 import { useSort } from './useSort'
 import { useColumnConfig } from './useColumnConfig'
+import { downloadBlob } from './useDownload'
 
 // 采购订单列定义（模块级常量，所有实例共享同一结构）
 const purchaseColumnDefs = {
@@ -106,15 +107,7 @@ export function usePurchaseOrder() {
       if (purchaseSearch.value) params.search = purchaseSearch.value
       if (purchaseAccountSetFilter.value) params.account_set_id = purchaseAccountSetFilter.value
       const response = await exportPurchaseOrdersApi(params)
-      // 创建下载链接并触发下载
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', '采购订单_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      downloadBlob(response.data, '采购订单_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
       appStore.showToast('导出成功')
     } catch (e) {
       appStore.showToast('导出失败', 'error')

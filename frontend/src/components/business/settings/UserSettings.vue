@@ -37,7 +37,7 @@
       <div class="flex gap-2 mb-3">
         <button @click="handleCreateBackup" class="btn btn-primary btn-sm" :disabled="backupLoading">{{ backupLoading ? '备份中...' : '立即备份' }}</button>
         <button @click="loadBackups" class="btn btn-secondary btn-sm">刷新列表</button>
-        <button @click="showRestoreModal = true" class="btn btn-sm" style="background:#16a34a;color:#fff" :disabled="restoreLoading">备份恢复</button>
+        <button @click="showRestoreModal = true" class="btn btn-sm btn-success" :disabled="restoreLoading">备份恢复</button>
       </div>
       <!-- 备份列表 -->
       <div class="space-y-1.5 max-h-48 overflow-y-auto">
@@ -137,6 +137,7 @@ import {
   createBackup as createBackupApi, downloadBackup as downloadBackupApi,
   deleteBackup as deleteBackupApi, uploadRestoreBackup
 } from '../../../api/settings'
+import { downloadBlob } from '../../../composables/useDownload'
 
 const emit = defineEmits(['data-changed', 'go-to-permissions'])
 
@@ -253,12 +254,7 @@ const handleCreateBackup = async () => {
 const handleDownloadBackup = async (filename) => {
   try {
     const { data } = await downloadBackupApi(filename)
-    const url = URL.createObjectURL(new Blob([data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(data, filename)
   } catch (e) {
     appStore.showToast('下载失败', 'error')
   }

@@ -16,6 +16,28 @@ export const useSettingsStore = defineStore('settings', () => {
   const productBrands = ref([])
   const companyName = ref('')
 
+  // ensureLoaded 防止重复加载（用于 employees、companyName 等高频引用数据）
+  const _loaded = ref(false)
+  let _loadingPromise = null
+
+  /**
+   * 确保常用引用数据已加载（employees、companyName）。
+   * 多次调用只会触发一次请求，适合在各页面入口调用。
+   */
+  async function ensureLoaded() {
+    if (_loaded.value) return
+    if (_loadingPromise) return _loadingPromise
+    _loadingPromise = Promise.all([
+      loadEmployees(),
+      loadCompanyName(),
+    ]).then(() => {
+      _loaded.value = true
+    }).finally(() => {
+      _loadingPromise = null
+    })
+    return _loadingPromise
+  }
+
   const loadUsers = async () => {
     try { const { data } = await getUsers(); users.value = data } catch (e) { console.error('加载用户列表失败:', e) }
   }
@@ -54,7 +76,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     users, employees, paymentMethods, disbursementMethods, backups, opLogs, snConfigs, productBrands, companyName,
-    loadUsers, loadEmployees, loadPaymentMethods, loadDisbursementMethods, loadBackups, loadOpLogs,
+    ensureLoaded, loadUsers, loadEmployees, loadPaymentMethods, loadDisbursementMethods, loadBackups, loadOpLogs,
     loadSnConfigs, loadProductBrands, loadCompanyName
   }
 })

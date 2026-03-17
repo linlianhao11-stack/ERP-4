@@ -322,15 +322,19 @@ const loadRecentOrders = async () => {
 // --- Chart (dark-mode aware) ---
 const getChartColors = () => {
   const style = getComputedStyle(document.documentElement)
-  const primary = style.getPropertyValue('--primary').trim() || '#4878c8'
+  const primary = style.getPropertyValue('--primary').trim()
+  const text = style.getPropertyValue('--text').trim()
+  const textMuted = style.getPropertyValue('--text-muted').trim()
+  const border = style.getPropertyValue('--border').trim()
+  const surface = style.getPropertyValue('--surface').trim()
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
   return {
     primary,
-    tickColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
-    gridColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    tooltipBg: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)',
-    tooltipText: isDark ? '#111' : '#fff',
-    fillColor: isDark ? 'rgba(100,160,240,0.10)' : 'rgba(72,120,200,0.08)',
+    tickColor: textMuted,
+    gridColor: border,
+    tooltipBg: isDark ? surface : text,
+    tooltipText: isDark ? text : surface,
+    fillColor: isDark ? 'oklch(0.55 0.20 250 / 0.10)' : 'oklch(0.55 0.20 250 / 0.08)',
   }
 }
 

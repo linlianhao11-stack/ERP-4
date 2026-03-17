@@ -5,6 +5,9 @@ from typing import Optional, List, Literal
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
+# 默认增值税税率（%），将来可改为从 system_settings 表读取
+DEFAULT_VAT_RATE = Decimal("13")
+
 
 class DropshipOrderCreate(BaseModel):
     account_set_id: int
@@ -15,11 +18,11 @@ class DropshipOrderCreate(BaseModel):
     purchase_price: Decimal = Field(gt=0)
     quantity: int = Field(gt=0)
     invoice_type: Literal["special", "normal"] = "special"
-    purchase_tax_rate: Decimal = Field(default=Decimal("13"), ge=0, le=100)
+    purchase_tax_rate: Decimal = Field(default=DEFAULT_VAT_RATE, ge=0, le=100)
     customer_id: int
     platform_order_no: str
     sale_price: Decimal = Field(gt=0)
-    sale_tax_rate: Decimal = Field(default=Decimal("13"), ge=0, le=100)
+    sale_tax_rate: Decimal = Field(default=DEFAULT_VAT_RATE, ge=0, le=100)
     settlement_type: Literal["prepaid", "credit"] = "credit"
     advance_receipt_id: Optional[int] = None
     shipping_mode: Literal["direct", "transit"] = "direct"

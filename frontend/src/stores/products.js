@@ -10,7 +10,8 @@ export const useProductsStore = defineStore('products', () => {
   const loadProducts = async (warehouseId) => {
     error.value = null
     try {
-      const params = warehouseId ? { warehouse_id: warehouseId } : { limit: 10000 }
+      // 全量加载商品列表，使用足够大的 limit 避免数据截断
+      const params = warehouseId ? { warehouse_id: warehouseId } : { limit: 99999 }
       const { data } = await getProducts(params)
       if (!warehouseId) {
         products.value = data.items ?? data

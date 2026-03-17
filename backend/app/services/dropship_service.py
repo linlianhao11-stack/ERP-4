@@ -25,6 +25,11 @@ from app.utils.voucher_no import next_voucher_no
 
 logger = get_logger("dropship_service")
 
+# ── 会计科目编码常量（将来可改为从 system_settings 表读取） ──
+ACCOUNT_PREPAID = "1123"           # 预付账款
+ACCOUNT_BANK = "1002"              # 银行存款
+ACCOUNT_OTHER_RECEIVABLE = "1221"  # 其他应收款
+
 
 def calculate_gross_profit(
     purchase_total: Decimal,
@@ -280,21 +285,21 @@ async def batch_pay_dropship(
         supplier_map = {s.id: s.name for s in await Supplier.filter(id__in=supplier_ids)}
 
         account_set_id = orders[0].account_set_id
-        account_codes = ["1123", "1002", "1221"]
+        account_codes = [ACCOUNT_PREPAID, ACCOUNT_BANK, ACCOUNT_OTHER_RECEIVABLE]
         accounts = await ChartOfAccount.filter(
             account_set_id=account_set_id, code__in=account_codes, is_active=True
         )
         account_map = {a.code: a for a in accounts}
-        prepaid_account = account_map.get("1123")
-        bank_account = account_map.get("1002")
-        other_receivable_account = account_map.get("1221")
+        prepaid_account = account_map.get(ACCOUNT_PREPAID)
+        bank_account = account_map.get(ACCOUNT_BANK)
+        other_receivable_account = account_map.get(ACCOUNT_OTHER_RECEIVABLE)
 
         if not prepaid_account:
-            raise HTTPException(status_code=400, detail="缺少必要科目：预付账款(1123)")
+            raise HTTPException(status_code=400, detail=f"缺少必要科目：预付账款({ACCOUNT_PREPAID})")
         if payment_method == "employee_advance" and not other_receivable_account:
-            raise HTTPException(status_code=400, detail="缺少必要科目：其他应收款(1221)")
+            raise HTTPException(status_code=400, detail=f"缺少必要科目：其他应收款({ACCOUNT_OTHER_RECEIVABLE})")
         if payment_method != "employee_advance" and not bank_account:
-            raise HTTPException(status_code=400, detail="缺少必要科目：银行存款(1002)")
+            raise HTTPException(status_code=400, detail=f"缺少必要科目：银行存款({ACCOUNT_BANK})")
 
         # 按供应商合并生成凭证A
         vouchers_created = []

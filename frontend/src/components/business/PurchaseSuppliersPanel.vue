@@ -254,7 +254,7 @@
         </div>
         <div class="modal-footer">
           <button @click="showCreditRefundModal = false" class="btn btn-secondary flex-1">取消</button>
-          <button @click="confirmCreditRefund" class="btn flex-1" style="background:#ff9f0a;color:#fff"
+          <button @click="confirmCreditRefund" class="btn btn-warning flex-1"
             :disabled="appStore.submitting">{{ appStore.submitting ? '处理中...' : '确认退款' }}</button>
         </div>
       </div>

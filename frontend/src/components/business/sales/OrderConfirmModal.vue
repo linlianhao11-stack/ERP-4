@@ -84,7 +84,7 @@
               <div>
                 <label class="text-xs text-secondary" for="refund-method">退款方式</label>
                 <select id="refund-method" v-model="orderConfirm.refund_method" class="input text-sm mt-0.5">
-                  <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+                  <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">{{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}</option>
                 </select>
               </div>
               <div>
@@ -169,7 +169,7 @@
           <div v-if="orderConfirm.order_type === 'CASH'" class="mb-4">
             <label class="label">收款方式 *</label>
             <select v-model="orderConfirm.payment_method" class="input text-sm">
-              <option v-for="pm in paymentMethods" :key="pm.code" :value="pm.code">{{ pm.name }}</option>
+              <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">{{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}</option>
             </select>
           </div>
 

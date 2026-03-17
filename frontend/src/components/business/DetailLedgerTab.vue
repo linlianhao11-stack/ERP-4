@@ -100,6 +100,7 @@ import PageToolbar from '../common/PageToolbar.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { getDetailLedger, exportDetailLedger } from '../../api/accounting'
+import { downloadBlob } from '../../composables/useDownload'
 import api from '../../api/index'
 
 defineEmits(['viewVoucher'])
@@ -168,12 +169,7 @@ const handleExport = async () => {
     if (customerId.value) params.customer_id = customerId.value
     if (supplierId.value) params.supplier_id = supplierId.value
     const res = await exportDetailLedger(params)
-    const url = URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `明细分类账_${data.value.account_code}_${startPeriod.value}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(res.data, `明细分类账_${data.value.account_code}_${startPeriod.value}.xlsx`)
   } catch (e) {
     appStore.showToast('导出失败', 'error')
   }

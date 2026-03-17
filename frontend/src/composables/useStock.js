@@ -11,6 +11,7 @@ import { exportStock as apiExportStock } from '../api/stock'
 import { getWarehouses } from '../api/warehouses'
 import { usePagination } from './usePagination'
 import { useColumnConfig } from './useColumnConfig'
+import { downloadBlob } from './useDownload'
 
 const stockColumnDefs = {
   brand: { label: '品牌', defaultVisible: true },
@@ -141,14 +142,7 @@ export function useStock() {
       const params = {}
       if (stockWarehouseFilter.value) params.warehouse_id = stockWarehouseFilter.value
       const response = await apiExportStock(params)
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', '库存表_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      downloadBlob(response.data, '库存表_' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.csv')
       appStore.showToast('导出成功')
     } catch (e) {
       appStore.showToast('导出失败', 'error')

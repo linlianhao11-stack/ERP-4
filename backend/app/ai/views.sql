@@ -236,7 +236,7 @@ SELECT
     d.created_at::date AS order_date,
     d.status,
     sup.name AS supplier_name,
-    d.customer_name,
+    c.name AS customer_name,
     d.product_name,
     d.quantity,
     ROUND(d.purchase_price::numeric, 2) AS purchase_price,
@@ -249,9 +249,10 @@ SELECT
     d.tracking_no,
     d.settlement_type,
     d.note,
-    u.name AS creator_name
+    COALESCE(u.display_name, u.username) AS creator_name
 FROM dropship_orders d
 LEFT JOIN suppliers sup ON sup.id = d.supplier_id
+LEFT JOIN customers c ON c.id = d.customer_id
 LEFT JOIN users u ON u.id = d.creator_id;
 
 -- 11. 代采代发按月汇总
@@ -268,7 +269,7 @@ SELECT
              ELSE 0 END,
         2
     ) AS profit_rate,
-    COUNT(DISTINCT d.customer_name) AS customer_count,
+    COUNT(DISTINCT d.customer_id) AS customer_count,
     COUNT(DISTINCT d.supplier_id) AS supplier_count
 FROM dropship_orders d
 WHERE d.status NOT IN ('draft', 'cancelled')

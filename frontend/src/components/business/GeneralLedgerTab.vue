@@ -85,6 +85,7 @@ import PageToolbar from '../common/PageToolbar.vue'
 import { useAccountingStore } from '../../stores/accounting'
 import { useAppStore } from '../../stores/app'
 import { getGeneralLedger, exportGeneralLedger } from '../../api/accounting'
+import { downloadBlob } from '../../composables/useDownload'
 
 defineEmits(['viewVoucher'])
 
@@ -130,12 +131,7 @@ const handleExport = async () => {
       start_period: startPeriod.value,
       end_period: endPeriod.value,
     })
-    const url = URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `总分类账_${data.value.account_code}_${startPeriod.value}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(res.data, `总分类账_${data.value.account_code}_${startPeriod.value}.xlsx`)
   } catch (e) {
     appStore.showToast('导出失败', 'error')
   }

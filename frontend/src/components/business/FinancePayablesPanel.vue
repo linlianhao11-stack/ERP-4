@@ -27,13 +27,13 @@
         <div class="flex justify-between items-center">
           <div class="text-xs text-muted">{{ o.supplier_name }} · {{ fmtDate(o.created_at) }}</div>
           <div v-if="o.status === 'pending_review' && hasPermission('purchase_approve')" class="flex gap-1">
-            <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm text-xs" style="background:#1677FF;color:#fff">通过</button>
-            <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">拒绝</button>
+            <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm btn-primary text-xs">通过</button>
+            <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm btn-danger text-xs">拒绝</button>
           </div>
           <div v-else-if="o.status === 'pending_review'" class="text-xs text-purple-emphasis">待审核</div>
           <div v-else-if="o.status === 'pending'" class="flex gap-1">
             <button @click.stop="handleConfirmPurchasePayment(o.id)" class="btn btn-warning btn-sm text-xs">确认</button>
-            <button @click.stop="handleCancelPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">取消</button>
+            <button @click.stop="handleCancelPO(o.id)" class="btn btn-sm btn-danger text-xs">取消</button>
           </div>
           <div v-else-if="o.status === 'cancelled'" class="text-xs text-muted">已取消</div>
           <div v-else-if="o.status === 'rejected'" class="text-xs text-error">已拒绝</div>
@@ -92,13 +92,13 @@
               <td v-if="isColumnVisible('status')" class="px-2 py-2 text-center"><StatusBadge type="purchaseStatus" :status="o.status" /></td>
               <td v-if="isColumnVisible('actions')" class="px-2 py-2 text-center">
                 <div v-if="o.status === 'pending_review' && hasPermission('purchase_approve')" class="flex gap-1 justify-center">
-                  <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm text-xs" style="background:#1677FF;color:#fff">通过</button>
-                  <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">拒绝</button>
+                  <button @click.stop="handleApprovePO(o.id)" class="btn btn-sm btn-primary text-xs">通过</button>
+                  <button @click.stop="handleRejectPO(o.id)" class="btn btn-sm btn-danger text-xs">拒绝</button>
                 </div>
                 <span v-else-if="o.status === 'pending_review'" class="text-xs text-purple-emphasis">待审核</span>
                 <div v-else-if="o.status === 'pending'" class="flex gap-1 justify-center">
                   <button @click.stop="handleConfirmPurchasePayment(o.id)" class="btn btn-warning btn-sm text-xs">确认</button>
-                  <button @click.stop="handleCancelPO(o.id)" class="btn btn-sm text-xs" style="background:#ef4444;color:#fff">取消</button>
+                  <button @click.stop="handleCancelPO(o.id)" class="btn btn-sm btn-danger text-xs">取消</button>
                 </div>
                 <span v-else-if="o.status === 'cancelled'" class="text-xs text-muted">已取消</span>
                 <span v-else-if="o.status === 'rejected'" class="text-xs text-error">已拒绝</span>

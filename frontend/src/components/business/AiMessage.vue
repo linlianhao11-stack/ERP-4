@@ -163,8 +163,7 @@ const handlePositiveFeedback = () => {
 }
 
 const handleNegativeReason = (reason) => {
-  props.msg.negative_reason = reason
-  emit('feedback', props.msg, 'negative')
+  emit('feedback', props.msg, 'negative', reason)
   showNegativeMenu.value = false
 }
 

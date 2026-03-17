@@ -20,15 +20,19 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
     """创建通用的收款/付款方式 CRUD 路由"""
     router = APIRouter(prefix=prefix, tags=[tag])
 
+    MAX_LIMIT = 200
+
     @router.get("")
     async def list_methods(
         account_set_id: Optional[int] = Query(default=None),
+        limit: int = Query(default=MAX_LIMIT, ge=1, le=MAX_LIMIT),
+        offset: int = Query(default=0, ge=0),
         user: User = Depends(get_current_user),
     ):
         filters = {"is_active": True}
         if account_set_id is not None:
             filters["account_set_id"] = account_set_id
-        methods = await model_class.filter(**filters).order_by("sort_order", "id")
+        methods = await model_class.filter(**filters).select_related("account_set").order_by("sort_order", "id").offset(offset).limit(limit)
         return [
             {
                 "id": m.id,
@@ -36,6 +40,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
                 "name": m.name,
                 "sort_order": m.sort_order,
                 "account_set_id": m.account_set_id,
+                "account_set_name": m.account_set.name if m.account_set else None,
             }
             for m in methods
         ]

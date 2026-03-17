@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useAppStore } from './stores/app'
@@ -185,5 +185,12 @@ onMounted(async () => {
     await router.replace('/login')
   }
   ready.value = true
+})
+
+onUnmounted(() => {
+  if (todoPollTimer) {
+    clearInterval(todoPollTimer)
+    todoPollTimer = null
+  }
 })
 </script>

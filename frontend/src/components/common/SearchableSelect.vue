@@ -1,10 +1,10 @@
 <template>
   <div class="searchable-select" ref="wrapperRef">
-    <div class="input input-sm flex items-center cursor-pointer" @click="toggle" :class="{ 'text-muted': !selectedLabel }">
+    <button type="button" class="input input-sm flex items-center cursor-pointer text-left" @click="toggle" :class="{ 'text-muted': !selectedLabel }">
       <span class="flex-1 truncate">{{ selectedLabel || placeholder }}</span>
       <span v-if="modelValue" class="ml-1 text-muted hover:text-foreground" @click.stop="clear">&times;</span>
       <span v-else class="ml-1 text-muted">&#9662;</span>
-    </div>
+    </button>
     <div v-if="open" class="searchable-select-dropdown">
       <input
         ref="searchInputRef"
@@ -14,16 +14,17 @@
         @keydown.esc="open = false"
       />
       <div class="searchable-select-options">
-        <div
+        <button
+          type="button"
           v-for="opt in filtered"
           :key="opt.id"
-          class="searchable-select-option"
+          class="searchable-select-option text-left w-full"
           :class="{ active: opt.id == modelValue }"
           @click="select(opt)"
         >
           <div class="truncate">{{ opt.label }}</div>
           <div v-if="opt.sublabel" class="text-xs text-muted truncate">{{ opt.sublabel }}</div>
-        </div>
+        </button>
         <div v-if="!filtered.length" class="px-3 py-2 text-xs text-muted text-center">无匹配项</div>
       </div>
     </div>

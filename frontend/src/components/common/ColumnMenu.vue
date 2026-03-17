@@ -6,15 +6,16 @@
     <Teleport to="body">
       <div v-if="open" ref="menuRef" class="col-menu-dropdown" :style="menuStyle" @click.stop>
         <template v-for="(label, key) in labels" :key="key">
-          <div v-if="key !== pinned"
+          <button v-if="key !== pinned"
+            type="button"
             @click="$emit('toggle', key)"
             class="col-menu-item">
             <span class="w-4 text-center text-[13px]">{{ visible[key] ? '✓' : '' }}</span>
             <span>{{ label }}</span>
-          </div>
+          </button>
         </template>
         <div class="border-t mt-1 pt-1">
-          <div @click="$emit('reset')" class="col-menu-item col-menu-reset">重置列</div>
+          <button type="button" @click="$emit('reset')" class="col-menu-item col-menu-reset">重置列</button>
         </div>
       </div>
     </Teleport>
