@@ -582,20 +582,32 @@ const refreshShipmentItem = async (shipmentId) => {
 }
 
 // ---- 复制功能 ----
-/** 复制单个快递单号文本 */
-const copyTrackingNo = (no) => {
-  if (!no) return
-  navigator.clipboard.writeText(no).then(() => {
-    appStore.showToast('已复制快递单号')
-  }).catch(() => {
+/** 复制文本到剪贴板（兼容非 HTTPS 环境） */
+const copyText = (text, toast) => {
+  const fallback = () => {
     const t = document.createElement('textarea')
-    t.value = no
+    t.value = text
+    t.style.position = 'fixed'
+    t.style.opacity = '0'
     document.body.appendChild(t)
     t.select()
     document.execCommand('copy')
     document.body.removeChild(t)
-    appStore.showToast('已复制快递单号')
-  })
+    appStore.showToast(toast)
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => appStore.showToast(toast)).catch(fallback)
+    } else {
+      fallback()
+    }
+  } catch { fallback() }
+}
+
+/** 复制单个快递单号文本 */
+const copyTrackingNo = (no) => {
+  if (!no) return
+  copyText(no, '已复制快递单号')
 }
 
 /** 复制所有快递单号 */
@@ -606,17 +618,7 @@ const copyAllTracking = (trackingList) => {
     if (t.sn_code) s += ' SN：' + t.sn_code
     return s
   }).join(', ')
-  navigator.clipboard.writeText(text).then(() => {
-    appStore.showToast('已复制' + trackingList.length + '个快递单号')
-  }).catch(() => {
-    const t = document.createElement('textarea')
-    t.value = text
-    document.body.appendChild(t)
-    t.select()
-    document.execCommand('copy')
-    document.body.removeChild(t)
-    appStore.showToast('已复制' + trackingList.length + '个快递单号')
-  })
+  copyText(text, '已复制' + trackingList.length + '个快递单号')
 }
 
 // ---- SN码编辑 ----
