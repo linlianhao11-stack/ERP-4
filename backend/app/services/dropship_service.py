@@ -501,15 +501,17 @@ async def ship_dropship_order(
         order.status = "shipped"
         await order.save()
 
-    # 6. 订阅快递100（事务外，失败不阻断）
-    try:
-        from app.services.logistics_service import subscribe_kd100
-        await subscribe_kd100(carrier_code, tracking_no, order.id, phone=phone)
-        order.kd100_subscribed = True
-        await order.save()
-        logger.info(f"快递100订阅成功: {order.ds_no}, 快递={carrier_code}, 单号={tracking_no}")
-    except Exception as e:
-        logger.warning(f"快递100订阅失败（不影响发货）: {order.ds_no}, 错误: {e}")
+    # 6. 订阅快递100（事务外，失败不阻断；自提/自配送跳过）
+    from app.config import NO_LOGISTICS_CARRIERS
+    if carrier_code not in NO_LOGISTICS_CARRIERS and tracking_no:
+        try:
+            from app.services.logistics_service import subscribe_kd100
+            await subscribe_kd100(carrier_code, tracking_no, order.id, phone=phone)
+            order.kd100_subscribed = True
+            await order.save()
+            logger.info(f"快递100订阅成功: {order.ds_no}, 快递={carrier_code}, 单号={tracking_no}")
+        except Exception as e:
+            logger.warning(f"快递100订阅失败（不影响发货）: {order.ds_no}, 错误: {e}")
 
     logger.info(f"代采代发发货: {order.ds_no} → shipped, 应收单={bill_no}")
     return order

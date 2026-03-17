@@ -65,7 +65,7 @@ def _no_logistics_message(carrier_code: str) -> str:
 
 
 @router.get("/carriers")
-async def get_carriers(user: User = Depends(require_permission("logistics", "sales"))):
+async def get_carriers(user: User = Depends(require_permission("logistics", "sales", "dropship"))):
     return CARRIER_LIST
 
 

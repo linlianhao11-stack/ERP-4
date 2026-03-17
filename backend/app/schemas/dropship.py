@@ -52,7 +52,7 @@ class DropshipOrderUpdate(BaseModel):
 class DropshipShipRequest(BaseModel):
     carrier_code: str
     carrier_name: str
-    tracking_no: str
+    tracking_no: Optional[str] = None  # 自提/自配送时可为空
     phone: Optional[str] = None  # 收/寄件人手机号（顺丰/中通需要）
 
 
