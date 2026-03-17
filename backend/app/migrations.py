@@ -1088,16 +1088,18 @@ async def migrate_tracking_refresh_fields():
 
 
 async def migrate_warehouse_color():
-    """v4.17: 仓库颜色标记字段"""
+    """v4.17: 仓位颜色标记字段"""
     conn = connections.get("default")
-    cols = [r["name"] for r in (await conn.execute_query(
-        "SELECT column_name as name FROM information_schema.columns WHERE table_name='warehouses'"
+    # locations 表加 color 字段
+    loc_cols = [r["name"] for r in (await conn.execute_query(
+        "SELECT column_name as name FROM information_schema.columns WHERE table_name='locations'"
     ))[1]]
-    if "color" not in cols:
+    if "color" not in loc_cols:
         await conn.execute_query(
-            "ALTER TABLE warehouses ADD COLUMN color VARCHAR(20) DEFAULT 'blue'"
+            "ALTER TABLE locations ADD COLUMN color VARCHAR(20) DEFAULT 'blue'"
         )
-        logger.info("迁移完成: warehouses.color")
+        logger.info("迁移完成: locations.color")
+    # warehouses 表的 color 字段保留（向后兼容），不再使用
 
 
 async def _migrate_ai_permissions():

@@ -13,7 +13,7 @@ async def list_locations(warehouse_id: Optional[int] = None, user: User = Depend
     if warehouse_id:
         query = query.filter(warehouse_id=warehouse_id)
     locations = await query.order_by("code")
-    return [{"id": loc.id, "code": loc.code, "name": loc.name, "warehouse_id": loc.warehouse_id} for loc in locations]
+    return [{"id": loc.id, "code": loc.code, "name": loc.name, "warehouse_id": loc.warehouse_id, "color": loc.color or "blue"} for loc in locations]
 
 
 @router.post("")
@@ -23,7 +23,7 @@ async def create_location(data: LocationCreate, user: User = Depends(require_per
         raise HTTPException(status_code=404, detail="仓库不存在")
     if await Location.filter(warehouse_id=data.warehouse_id, code=data.code).exists():
         raise HTTPException(status_code=400, detail="该仓库下仓位编号已存在")
-    loc = await Location.create(warehouse_id=data.warehouse_id, code=data.code, name=data.name)
+    loc = await Location.create(warehouse_id=data.warehouse_id, code=data.code, name=data.name, color=data.color)
     return {"id": loc.id, "message": "创建成功"}
 
 

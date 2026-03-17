@@ -204,7 +204,7 @@ export const dropshipStatusBadges = {
   completed: 'badge badge-green', cancelled: 'badge badge-red'
 }
 
-export const WAREHOUSE_COLORS = [
+export const LOCATION_COLORS = [
   { value: 'blue', label: '蓝色', cssVar: 'info-emphasis' },
   { value: 'green', label: '绿色', cssVar: 'success-emphasis' },
   { value: 'red', label: '红色', cssVar: 'error-emphasis' },
@@ -214,10 +214,10 @@ export const WAREHOUSE_COLORS = [
   { value: 'orange', label: '橙色', cssVar: 'orange-emphasis' },
 ]
 
-export const DEFAULT_WAREHOUSE_COLOR = 'blue'
+export const DEFAULT_LOCATION_COLOR = 'blue'
 
-export const warehouseColorCssVarMap = Object.fromEntries(
-  WAREHOUSE_COLORS.map(c => [c.value, c.cssVar])
+export const locationColorCssVarMap = Object.fromEntries(
+  LOCATION_COLORS.map(c => [c.value, c.cssVar])
 )
 
 export const IDLE_TIMEOUT = 4 * 60 * 60 * 1000

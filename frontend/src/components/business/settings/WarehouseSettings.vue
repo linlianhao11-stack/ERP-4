@@ -1,7 +1,7 @@
 <!--
   仓库与仓位管理组件
   功能：仓库列表展开/折叠、仓库新建/改名/删除/设为默认、
-        仓位新增/编辑/删除、仓库关联账套、SN码管理配置
+        仓位新增/编辑/删除（含颜色标记）、仓库关联账套、SN码管理配置
   从 SettingsView.vue 常规设置标签页提取
 -->
 <template>
@@ -16,7 +16,6 @@
           <div class="flex justify-between items-center p-3 bg-elevated cursor-pointer" @click="toggleExpandWarehouse(w.id)">
             <div class="flex items-center gap-2">
               <span class="text-xs text-muted">{{ expandedWarehouse === w.id ? '▼' : '▶' }}</span>
-              <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" :style="`background-color: var(--${colorCssVarMap[w.color || DEFAULT_WAREHOUSE_COLOR] || 'info-emphasis'})`"></span>
               <span class="font-medium text-sm">{{ w.name }}</span>
               <span v-if="w.is_default" class="text-xs text-primary bg-info-subtle px-1.5 py-0.5 rounded">(默认)</span>
               <span v-if="w.account_set_name" class="text-xs text-white bg-primary px-1.5 py-0.5 rounded">{{ w.account_set_name }}</span>
@@ -33,7 +32,10 @@
           <div v-if="expandedWarehouse === w.id" class="p-3 border-t bg-surface">
             <div class="space-y-1.5 mb-3 max-h-48 overflow-y-auto">
               <div v-for="loc in (w.locations || [])" :key="loc.id" class="flex justify-between items-center px-3 py-1.5 bg-elevated rounded text-sm">
-                <span>{{ loc.code }} <span v-if="loc.name" class="text-xs text-muted">{{ loc.name }}</span></span>
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" :style="`background-color: var(--${colorCssVarMap[loc.color || DEFAULT_LOCATION_COLOR] || 'info-emphasis'})`"></span>
+                  <span>{{ loc.code }} <span v-if="loc.name" class="text-xs text-muted">{{ loc.name }}</span></span>
+                </div>
                 <div>
                   <button @click="editLocation(loc, w.id)" class="text-primary text-xs mr-2">编辑</button>
                   <button @click="handleDeleteLocation(loc.id)" class="text-error text-xs">删除</button>
@@ -42,9 +44,21 @@
               <div v-if="!(w.locations || []).length" class="text-muted text-center py-2 text-xs">暂无仓位</div>
             </div>
             <!-- 新增仓位表单 -->
-            <form @submit.prevent="handleCreateLocation(w.id)" class="flex gap-2">
+            <form @submit.prevent="handleCreateLocation(w.id)" class="flex gap-2 items-end">
               <input v-model="getLocationInput(w.id).code" class="input flex-1 text-sm" placeholder="仓位编号(如 A-01-02)">
               <input v-model="getLocationInput(w.id).name" class="input flex-1 text-sm" placeholder="名称(可选)">
+              <div class="flex gap-1 flex-shrink-0">
+                <button
+                  v-for="c in colorOptions"
+                  :key="c.value"
+                  type="button"
+                  @click="getLocationInput(w.id).color = c.value"
+                  class="w-5 h-5 rounded-full border-2 flex-shrink-0"
+                  :class="(getLocationInput(w.id).color || DEFAULT_LOCATION_COLOR) === c.value ? 'border-foreground scale-110' : 'border-transparent opacity-50 hover:opacity-100'"
+                  :style="`background-color: var(--${c.cssVar})`"
+                  :title="c.label"
+                ></button>
+              </div>
               <button type="submit" class="btn btn-primary btn-sm">添加</button>
             </form>
           </div>
@@ -87,23 +101,6 @@
         </div>
         <div class="modal-body"><div class="space-y-3">
           <div><label class="label">仓库名称 *</label><input v-model="warehouseForm.name" class="input" required placeholder="请输入新名称"></div>
-          <div>
-            <label class="label">标记颜色</label>
-            <div class="flex gap-2 mt-1">
-              <button
-                v-for="c in colorOptions"
-                :key="c.value"
-                type="button"
-                @click="warehouseForm.color = c.value"
-                class="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center"
-                :class="warehouseForm.color === c.value ? 'border-foreground scale-110' : 'border-transparent opacity-60 hover:opacity-100'"
-                :style="`background-color: var(--${c.cssVar})`"
-                :title="c.label"
-              >
-                <svg v-if="warehouseForm.color === c.value" class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </button>
-            </div>
-          </div>
           <div><label class="flex items-center"><input type="checkbox" v-model="warehouseForm.is_default" class="mr-2">设为默认仓库</label></div>
           <div v-if="accountSets.length">
             <label class="label">关联账套</label>
@@ -130,6 +127,23 @@
         <div class="modal-body"><div class="space-y-3">
           <div><label class="label">仓位编号 *</label><input v-model="locationForm.code" class="input" required placeholder="如 A-01-02"></div>
           <div><label class="label">仓位名称</label><input v-model="locationForm.name" class="input" placeholder="可选，如：主通道左侧"></div>
+          <div>
+            <label class="label">标记颜色</label>
+            <div class="flex gap-2 mt-1">
+              <button
+                v-for="c in colorOptions"
+                :key="c.value"
+                type="button"
+                @click="locationForm.color = c.value"
+                class="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center"
+                :class="locationForm.color === c.value ? 'border-foreground scale-110' : 'border-transparent opacity-60 hover:opacity-100'"
+                :style="`background-color: var(--${c.cssVar})`"
+                :title="c.label"
+              >
+                <svg v-if="locationForm.color === c.value" class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </button>
+            </div>
+          </div>
         </div></div>
         <div class="modal-footer">
           <button type="button" @click="showLocationModal = false" class="btn btn-sm btn-secondary">取消</button>
@@ -143,7 +157,7 @@
 <script setup>
 /**
  * 仓库与仓位管理 + SN码配置
- * 包含：仓库CRUD、仓位CRUD、账套关联、SN配置CRUD
+ * 包含：仓库CRUD、仓位CRUD（含颜色标记）、账套关联、SN配置CRUD
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAppStore } from '../../../stores/app'
@@ -155,10 +169,10 @@ import {
 } from '../../../api/warehouses'
 import { createSnConfig, deleteSnConfig as deleteSnConfigApi } from '../../../api/sn'
 import { getAccountSets } from '../../../api/accounting'
-import { WAREHOUSE_COLORS, DEFAULT_WAREHOUSE_COLOR, warehouseColorCssVarMap } from '../../../utils/constants'
+import { LOCATION_COLORS, DEFAULT_LOCATION_COLOR, locationColorCssVarMap } from '../../../utils/constants'
 
-const colorOptions = WAREHOUSE_COLORS
-const colorCssVarMap = warehouseColorCssVarMap
+const colorOptions = LOCATION_COLORS
+const colorCssVarMap = locationColorCssVarMap
 
 const emit = defineEmits(['data-changed'])
 
@@ -174,19 +188,19 @@ const accountSets = ref([])
 
 // 仓库相关状态
 const showWarehouseModal = ref(false)
-const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null, color: DEFAULT_WAREHOUSE_COLOR })
+const warehouseForm = reactive({ id: null, name: '', is_default: false, account_set_id: null })
 const expandedWarehouse = ref(null)
 
 // 仓位相关状态
 const newLocationInputs = ref({})
 const getLocationInput = (whId) => {
   if (!newLocationInputs.value[whId]) {
-    newLocationInputs.value[whId] = { code: '', name: '' }
+    newLocationInputs.value[whId] = { code: '', name: '', color: DEFAULT_LOCATION_COLOR }
   }
   return newLocationInputs.value[whId]
 }
 const showLocationModal = ref(false)
-const locationForm = reactive({ id: null, code: '', name: '' })
+const locationForm = reactive({ id: null, code: '', name: '', color: DEFAULT_LOCATION_COLOR })
 
 // SN配置状态
 const newSnConfigWarehouse = ref('')
@@ -199,12 +213,12 @@ const toggleExpandWarehouse = (id) => {
 
 // === 仓库操作 ===
 const openCreateWarehouse = () => {
-  Object.assign(warehouseForm, { id: null, name: '', is_default: false, account_set_id: null, color: DEFAULT_WAREHOUSE_COLOR })
+  Object.assign(warehouseForm, { id: null, name: '', is_default: false, account_set_id: null })
   showWarehouseModal.value = true
 }
 
 const editWarehouse = (w) => {
-  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null, color: w.color || DEFAULT_WAREHOUSE_COLOR })
+  Object.assign(warehouseForm, { id: w.id, name: w.name, is_default: w.is_default, account_set_id: w.account_set_id || null })
   showWarehouseModal.value = true
 }
 
@@ -217,9 +231,9 @@ const saveWarehouse = async () => {
   appStore.submitting = true
   try {
     if (warehouseForm.id) {
-      await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null, color: warehouseForm.color })
+      await updateWarehouse(warehouseForm.id, { name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
     } else {
-      await createWarehouse({ name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null, color: warehouseForm.color })
+      await createWarehouse({ name: warehouseForm.name.trim(), is_default: warehouseForm.is_default, account_set_id: warehouseForm.account_set_id || null })
     }
     appStore.showToast(warehouseForm.id ? '保存成功' : '创建成功')
     showWarehouseModal.value = false
@@ -257,7 +271,7 @@ const handleSetDefaultWarehouse = async (id) => {
 
 // === 仓位操作 ===
 const editLocation = (loc, warehouseId) => {
-  Object.assign(locationForm, { id: loc.id, code: loc.code, name: loc.name || '' })
+  Object.assign(locationForm, { id: loc.id, code: loc.code, name: loc.name || '', color: loc.color || DEFAULT_LOCATION_COLOR })
   showLocationModal.value = true
 }
 
@@ -269,7 +283,7 @@ const saveLocation = async () => {
   if (appStore.submitting) return
   appStore.submitting = true
   try {
-    await updateLocation(locationForm.id, { code: locationForm.code.trim(), name: locationForm.name || null })
+    await updateLocation(locationForm.id, { code: locationForm.code.trim(), name: locationForm.name || null, color: locationForm.color })
     appStore.showToast('保存成功')
     showLocationModal.value = false
     warehousesStore.loadWarehouses()
@@ -288,10 +302,11 @@ const handleCreateLocation = async (warehouseId) => {
   if (appStore.submitting) return
   appStore.submitting = true
   try {
-    await createLocation({ warehouse_id: warehouseId, code: input.code.trim(), name: input.name.trim() || null })
+    await createLocation({ warehouse_id: warehouseId, code: input.code.trim(), name: input.name.trim() || null, color: input.color || DEFAULT_LOCATION_COLOR })
     appStore.showToast('创建成功')
     input.code = ''
     input.name = ''
+    input.color = DEFAULT_LOCATION_COLOR
     warehousesStore.loadWarehouses()
     warehousesStore.loadLocations()
     emit('data-changed')

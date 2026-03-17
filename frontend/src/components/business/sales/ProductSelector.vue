@@ -87,7 +87,7 @@
               </td>
               <td class="px-2 py-2 md-hide">
                 <span v-if="p.is_virtual_stock" class="badge badge-purple text-xs">寄售</span>
-                <span v-else-if="p.location_code" :class="`badge badge-${p.warehouse_color || DEFAULT_WAREHOUSE_COLOR} text-xs`">{{ p.location_code }}</span>
+                <span v-else-if="p.location_code" :class="`badge badge-${p.location_color || DEFAULT_LOCATION_COLOR} text-xs`">{{ p.location_code }}</span>
                 <span v-else class="text-muted text-xs">-</span>
               </td>
               <td class="px-2 py-2 text-right text-primary font-bold">&yen;{{ p.retail_price }}</td>
@@ -127,7 +127,7 @@ import { ref, computed } from 'vue'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import { fuzzyMatchAny } from '../../../utils/helpers'
-import { DEFAULT_WAREHOUSE_COLOR } from '../../../utils/constants'
+import { DEFAULT_LOCATION_COLOR } from '../../../utils/constants'
 
 const props = defineProps({
   /** 全部商品列表（已从 store 取出） */
@@ -206,7 +206,7 @@ const displayProducts = computed(() => {
             original_quantity: Math.abs(item.quantity),
             returned_quantity: item.returned_quantity || 0,
             max_return_qty: availableQty,
-            warehouse_color: s.warehouse_color || DEFAULT_WAREHOUSE_COLOR
+            location_color: s.location_color || DEFAULT_LOCATION_COLOR
           })
         })
         if (!product.stocks || product.stocks.length === 0) {
@@ -243,7 +243,7 @@ const displayProducts = computed(() => {
           location_id: s.location_id,
           is_virtual_stock: !!s.is_virtual,
           virtual_warehouse_name: s.warehouse_name || '',
-          warehouse_color: s.warehouse_color || DEFAULT_WAREHOUSE_COLOR
+          location_color: s.location_color || DEFAULT_LOCATION_COLOR
         })
       })
     }

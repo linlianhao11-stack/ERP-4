@@ -13,7 +13,7 @@ from app.models import (
     User, Product, Warehouse, Location, WarehouseStock, StockLog, SnCode
 )
 from app.schemas.product import ProductCreate, ProductUpdate
-from app.schemas.warehouse import DEFAULT_WAREHOUSE_COLOR
+from app.schemas.warehouse import DEFAULT_LOCATION_COLOR
 from app.utils.time import now, to_naive, days_between
 from app.services.operation_log_service import log_operation
 
@@ -93,7 +93,7 @@ async def list_products(keyword: Optional[str] = None, category: Optional[str] =
                 stock_details.append({
                     "warehouse_id": s.warehouse_id,
                     "warehouse_name": s.warehouse.name,
-                    "warehouse_color": s.warehouse.color or DEFAULT_WAREHOUSE_COLOR,
+                    "location_color": (s.location.color if s.location else None) or DEFAULT_LOCATION_COLOR,
                     "location_id": s.location_id,
                     "location_code": s.location.code if s.location else None,
                     "quantity": s.quantity,
@@ -512,11 +512,11 @@ async def get_product(product_id: int, user: User = Depends(get_current_user)):
     if not p:
         raise HTTPException(status_code=404, detail="商品不存在")
     has_finance = user.role == "admin" or "finance" in (user.permissions or [])
-    stocks = await WarehouseStock.filter(product_id=p.id, warehouse__is_virtual=False).select_related("warehouse")
+    stocks = await WarehouseStock.filter(product_id=p.id, warehouse__is_virtual=False).select_related("warehouse", "location")
     result = {
         "id": p.id, "sku": p.sku, "name": p.name, "brand": p.brand, "category": p.category,
         "retail_price": float(p.retail_price), "unit": p.unit,
-        "stocks": [{"warehouse_id": s.warehouse_id, "warehouse_name": s.warehouse.name, "warehouse_color": s.warehouse.color or DEFAULT_WAREHOUSE_COLOR, "quantity": s.quantity} for s in stocks]
+        "stocks": [{"warehouse_id": s.warehouse_id, "warehouse_name": s.warehouse.name, "location_color": (s.location.color if s.location else None) or DEFAULT_LOCATION_COLOR, "quantity": s.quantity} for s in stocks]
     }
     if has_finance:
         result["cost_price"] = float(p.cost_price)
