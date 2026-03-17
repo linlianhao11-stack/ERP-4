@@ -231,7 +231,7 @@ async def report_receivable(
 ):
     """报表：应收未收 — 已发货但客户未回款的订单"""
     # 查询关联了代采代发订单且未完成的应收单
-    q = Q(dropship_order__isnull=False, status__in=["pending", "partial"])
+    q = Q(dropship_order_id__isnull=False, status__in=["pending", "partial"])
     if account_set_id:
         q &= Q(dropship_order__account_set_id=account_set_id)
     receivables = await (
