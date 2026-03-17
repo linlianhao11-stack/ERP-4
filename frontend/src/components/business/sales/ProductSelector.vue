@@ -87,7 +87,7 @@
               </td>
               <td class="px-2 py-2 md-hide">
                 <span v-if="p.is_virtual_stock" class="badge badge-purple text-xs">寄售</span>
-                <span v-else-if="p.location_code" class="badge badge-blue text-xs">{{ p.location_code }}</span>
+                <span v-else-if="p.location_code" :class="`badge badge-${p.warehouse_color || 'blue'} text-xs`">{{ p.location_code }}</span>
                 <span v-else class="text-muted text-xs">-</span>
               </td>
               <td class="px-2 py-2 text-right text-primary font-bold">&yen;{{ p.retail_price }}</td>
@@ -204,7 +204,8 @@ const displayProducts = computed(() => {
             location_id: s.location_id,
             original_quantity: Math.abs(item.quantity),
             returned_quantity: item.returned_quantity || 0,
-            max_return_qty: availableQty
+            max_return_qty: availableQty,
+            warehouse_color: s.warehouse_color || 'blue'
           })
         })
         if (!product.stocks || product.stocks.length === 0) {
@@ -240,7 +241,8 @@ const displayProducts = computed(() => {
           warehouse_id: s.warehouse_id,
           location_id: s.location_id,
           is_virtual_stock: !!s.is_virtual,
-          virtual_warehouse_name: s.warehouse_name || ''
+          virtual_warehouse_name: s.warehouse_name || '',
+          warehouse_color: s.warehouse_color || 'blue'
         })
       })
     }
