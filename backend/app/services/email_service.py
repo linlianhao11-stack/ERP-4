@@ -39,10 +39,14 @@ async def send_email(
 
         if attachments:
             for filename, content in attachments:
-                part = MIMEBase("application", "octet-stream")
+                if filename.endswith(".xlsx"):
+                    part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else:
+                    part = MIMEBase("application", "octet-stream")
                 part.set_payload(content)
                 encoders.encode_base64(part)
-                part.add_header("Content-Disposition", f"attachment; filename=\"{filename}\"")
+                # RFC 2231 编码中文文件名
+                part.add_header("Content-Disposition", "attachment", filename=("utf-8", "", filename))
                 msg.attach(part)
 
         if smtp_port == 465:
