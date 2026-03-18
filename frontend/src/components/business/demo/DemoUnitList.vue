@@ -33,8 +33,9 @@
       <div
         v-for="u in sortedUnits"
         :key="u.id"
-        class="card p-3"
+        class="card p-3 cursor-pointer"
         :class="{ 'border-error': u.is_overdue }"
+        @click="openDetail(u)"
       >
         <div class="flex justify-between items-start mb-1.5">
           <div class="flex-1 min-w-0 mr-2">
@@ -56,11 +57,11 @@
           </span>
           <div class="flex items-center gap-2">
             <template v-if="u.status === 'in_stock'">
-              <button class="text-primary" @click="openLoan(u)">借出</button>
-              <button class="text-success" @click="openDisposal(u, 'sale')">转销售</button>
+              <button class="text-primary" @click.stop="openLoan(u)">借出</button>
+              <button class="text-success" @click.stop="openDisposal(u, 'sale')">转销售</button>
             </template>
             <template v-else-if="u.status === 'lent_out'">
-              <button class="text-primary" @click="openReturn(u)">归还</button>
+              <button class="text-primary" @click.stop="openReturn(u)">归还</button>
             </template>
           </div>
         </div>
@@ -80,8 +81,9 @@
       <tr
         v-for="u in sortedUnits"
         :key="u.id"
-        class="hover:bg-elevated"
+        class="hover:bg-elevated cursor-pointer"
         :class="{ 'text-error': u.is_overdue }"
+        @click="openDetail(u)"
       >
         <td class="px-3 py-2 font-mono text-xs">{{ u.code }}</td>
         <td class="px-3 py-2">
@@ -101,18 +103,18 @@
         <td class="px-3 py-2">
           <div class="flex items-center gap-1.5 justify-end">
             <template v-if="u.status === 'in_stock'">
-              <button class="btn btn-primary btn-sm text-xs" @click="openLoan(u)">借出</button>
-              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'sale')">转销售</button>
-              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'conversion')">翻新</button>
-              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'scrap')">报废</button>
+              <button class="btn btn-primary btn-sm text-xs" @click.stop="openLoan(u)">借出</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click.stop="openDisposal(u, 'sale')">转销售</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click.stop="openDisposal(u, 'conversion')">翻新</button>
+              <button class="btn btn-error btn-sm text-xs" @click.stop="openDisposal(u, 'scrap')">报废</button>
             </template>
             <template v-else-if="u.status === 'lent_out'">
-              <button class="btn btn-primary btn-sm text-xs" @click="openReturn(u)">归还</button>
-              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'sale')">转销售</button>
-              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'loss')">登记丢失</button>
+              <button class="btn btn-primary btn-sm text-xs" @click.stop="openReturn(u)">归还</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click.stop="openDisposal(u, 'sale')">转销售</button>
+              <button class="btn btn-error btn-sm text-xs" @click.stop="openDisposal(u, 'loss')">登记丢失</button>
             </template>
             <template v-else-if="u.status === 'repairing'">
-              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'scrap')">报废</button>
+              <button class="btn btn-error btn-sm text-xs" @click.stop="openDisposal(u, 'scrap')">报废</button>
             </template>
           </div>
         </td>
@@ -162,6 +164,12 @@
       @close="showDisposalModal = false"
       @saved="onDisposalSaved"
     />
+
+    <DemoUnitDetailModal
+      :visible="showDetailModal"
+      :unit-id="detailUnitId"
+      @update:visible="showDetailModal = $event"
+    />
   </div>
 </template>
 
@@ -172,6 +180,7 @@ import DemoUnitForm from './DemoUnitForm.vue'
 import DemoLoanForm from './DemoLoanForm.vue'
 import DemoReturnModal from './DemoReturnModal.vue'
 import DemoDisposalModal from './DemoDisposalModal.vue'
+import DemoUnitDetailModal from './DemoUnitDetailModal.vue'
 import { useDemoUnit } from '../../../composables/useDemoUnit'
 import { exportDemoUnits } from '../../../api/demo'
 import { downloadBlob } from '../../../composables/useDownload'
@@ -229,6 +238,14 @@ const loanUnit = ref(null)
 const returnUnit = ref(null)
 const disposalUnit = ref(null)
 const disposalType = ref('sale')
+
+const showDetailModal = ref(false)
+const detailUnitId = ref(null)
+
+const openDetail = (u) => {
+  detailUnitId.value = u.id
+  showDetailModal.value = true
+}
 
 const openLoan = (u) => {
   loanUnit.value = u

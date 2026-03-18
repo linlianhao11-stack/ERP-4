@@ -299,7 +299,7 @@ async def list_units(
         query = query.filter(warehouse_id=warehouse_id)
     if search:
         from tortoise.queryset import Q
-        q = Q(code__icontains=search) | Q(product__name__icontains=search) | Q(product__sku__icontains=search)
+        q = Q(code__icontains=search) | Q(product__name__icontains=search) | Q(product__sku__icontains=search) | Q(sn_code__sn_code__icontains=search)
         query = DemoUnit.all().filter(q)
         if status:
             query = query.filter(status=status)
