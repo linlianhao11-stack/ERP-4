@@ -24,6 +24,7 @@ from app.services.demo_service import (
     delete_demo_unit,
     get_demo_stats,
 )
+from app.services.operation_log_service import log_operation
 from app.utils.response import paginated_response
 from app.utils.time import to_naive
 from app.logger import get_logger
@@ -270,6 +271,7 @@ async def export_units(user: User = Depends(require_permission("stock_view"))):
 
         from datetime import datetime
         filename = f"样机列表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        await log_operation(user, "DEMO_EXPORT", "DEMO_UNIT", None, "导出样机列表 Excel")
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

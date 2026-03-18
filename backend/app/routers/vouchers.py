@@ -14,6 +14,7 @@ from app.models.voucher import Voucher, VoucherEntry
 from app.models.system_setting import SystemSetting
 from app.schemas.accounting import VoucherCreate, VoucherUpdate
 from app.logger import get_logger
+from app.services.operation_log_service import log_operation
 from tortoise.expressions import Q
 from io import BytesIO
 from starlette.responses import StreamingResponse as _StreamingResponse
@@ -279,6 +280,7 @@ async def export_voucher_entries(
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
+    await log_operation(user, "VOUCHER_EXPORT", "VOUCHER", None, "导出凭证分录 Excel")
     return _StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

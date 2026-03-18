@@ -304,6 +304,7 @@ async def export_stock(warehouse_id: Optional[int] = None, user: User = Depends(
 
         output.seek(0)
         filename = f"库存表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        await log_operation(user, "STOCK_EXPORT", "STOCK", None, "导出库存列表 Excel")
         return StreamingResponse(
             iter([output.getvalue().encode('utf-8')]),
             media_type="text/csv",
