@@ -18,6 +18,7 @@ class Order(models.Model):
     refund_method = fields.CharField(max_length=50, null=True)
     refund_amount = fields.DecimalField(max_digits=18, decimal_places=2, null=True)
     remark = fields.TextField(null=True)
+    refund_info = fields.TextField(default="")  # 退款备注信息（业务员填写）
     employee = fields.ForeignKeyField("models.Employee", related_name="orders", null=True, on_delete=fields.SET_NULL)
     creator = fields.ForeignKeyField("models.User", related_name="orders", null=True, on_delete=fields.SET_NULL)
     shipping_status = fields.CharField(max_length=20, default="pending")

@@ -67,6 +67,7 @@ class PurchaseReturn(models.Model):
     refund_amount = fields.DecimalField(max_digits=18, decimal_places=2, null=True)
     tracking_no = fields.CharField(max_length=100, null=True)
     reason = fields.TextField(null=True)
+    refund_info = fields.TextField(default="")  # 退款备注信息
     voucher = fields.ForeignKeyField("models.Voucher", null=True, on_delete=fields.SET_NULL, related_name="purchase_return_vouchers")
     voucher_no = fields.CharField(max_length=30, null=True)
     created_by = fields.ForeignKeyField("models.User", related_name="created_purchase_returns", null=True, on_delete=fields.SET_NULL)
