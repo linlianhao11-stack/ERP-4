@@ -6,6 +6,7 @@ from app.models import User, Customer, Order, OrderItem
 from app.models.customer_balance import CustomerAccountBalance
 from app.schemas.customer import CustomerCreate
 from app.utils.query_helpers import paginated_query
+from app.services.operation_log_service import log_operation
 
 router = APIRouter(prefix="/api/customers", tags=["客户管理"])
 
@@ -24,6 +25,7 @@ async def list_customers(keyword: Optional[str] = None, limit: int = 200, offset
 @router.post("")
 async def create_customer(data: CustomerCreate, user: User = Depends(require_permission("customer", "sales"))):
     c = await Customer.create(**data.model_dump())
+    await log_operation(user, "CUSTOMER_CREATE", "CUSTOMER", c.id, f"新建客户 {c.name}")
     return {"id": c.id, "message": "创建成功"}
 
 
@@ -33,6 +35,7 @@ async def update_customer(customer_id: int, data: CustomerCreate, user: User = D
     if not c:
         raise HTTPException(status_code=404, detail="客户不存在")
     await Customer.filter(id=customer_id).update(**data.model_dump())
+    await log_operation(user, "CUSTOMER_UPDATE", "CUSTOMER", c.id, f"更新客户 {c.name}")
     return {"message": "更新成功"}
 
 
@@ -52,6 +55,7 @@ async def delete_customer(customer_id: int, user: User = Depends(require_permiss
         raise HTTPException(status_code=400, detail=f"该客户有 {order_count} 个关联订单，无法删除")
     c.is_active = False
     await c.save()
+    await log_operation(user, "CUSTOMER_DELETE", "CUSTOMER", c.id, f"删除客户 {c.name}")
     return {"message": "删除成功"}
 
 
