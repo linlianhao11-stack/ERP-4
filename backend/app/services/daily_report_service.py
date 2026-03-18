@@ -51,12 +51,13 @@ REPORT_QUERIES = [
         """,
     },
     {
-        "title": "今日销售额 TOP5 商品",
+        "title": "今日销售商品明细",
         "sql": """
-            SELECT product_name AS 商品, brand AS 品牌, SUM(quantity) AS 销量,
-                   ROUND(SUM(amount)::numeric, 2) AS 销售额
+            SELECT customer_name AS 客户, product_name AS 商品, brand AS 品牌,
+                   quantity AS 数量, ROUND(unit_price::numeric, 2) AS 单价,
+                   ROUND(amount::numeric, 2) AS 金额
             FROM vw_sales_detail WHERE order_date = CURRENT_DATE
-            GROUP BY product_name, brand ORDER BY 销售额 DESC LIMIT 5
+            ORDER BY customer_name, amount DESC
         """,
     },
     {
