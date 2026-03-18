@@ -59,6 +59,21 @@ async def _serialize_unit(u: DemoUnit) -> dict:
             e = await Employee.filter(id=u.current_holder_id).first()
             holder_name = e.name if e else None
 
+    # 查询当前活跃借出记录
+    current_loan_id = None
+    current_loan_date = None
+    days_borrowed = 0
+    is_overdue = False
+    if u.status == "lent_out":
+        active_loan = await DemoLoan.filter(demo_unit_id=u.id, status="lent_out").first()
+        if active_loan:
+            current_loan_id = active_loan.id
+            current_loan_date = active_loan.loan_date.isoformat() if active_loan.loan_date else None
+            if active_loan.loan_date:
+                days_borrowed = (date.today() - active_loan.loan_date).days
+            if active_loan.expected_return_date and active_loan.expected_return_date < date.today():
+                is_overdue = True
+
     return {
         "id": u.id,
         "code": u.code,
@@ -77,6 +92,10 @@ async def _serialize_unit(u: DemoUnit) -> dict:
         "current_holder_type": u.current_holder_type,
         "current_holder_id": u.current_holder_id,
         "holder_name": holder_name,
+        "current_loan_id": current_loan_id,
+        "current_loan_date": current_loan_date,
+        "days_borrowed": days_borrowed,
+        "is_overdue": is_overdue,
         "total_loan_count": u.total_loan_count,
         "total_loan_days": u.total_loan_days,
         "notes": u.notes,
@@ -108,11 +127,22 @@ async def _serialize_loan(loan: DemoLoan) -> dict:
         and loan.expected_return_date < date.today()
     )
 
+    # 产品名称（通过 demo_unit 关联）
+    product_name = None
+    unit = loan.demo_unit if hasattr(loan, "demo_unit") and loan.demo_unit else None
+    if unit:
+        try:
+            await unit.fetch_related("product")
+            product_name = unit.product.name if unit.product else None
+        except Exception:
+            pass
+
     return {
         "id": loan.id,
         "loan_no": loan.loan_no,
         "demo_unit_id": loan.demo_unit_id,
-        "demo_unit_code": loan.demo_unit.code if hasattr(loan, "demo_unit") and loan.demo_unit else None,
+        "demo_unit_code": unit.code if unit else None,
+        "product_name": product_name,
         "loan_type": loan.loan_type,
         "loan_type_label": LOAN_TYPE_LABELS.get(loan.loan_type, loan.loan_type),
         "borrower_type": loan.borrower_type,

@@ -16,9 +16,9 @@
           <span class="text-muted">产品</span>
           <span>{{ unit.product_name }}</span>
         </div>
-        <div v-if="unit.current_holder_name" class="flex justify-between">
+        <div v-if="unit.holder_name" class="flex justify-between">
           <span class="text-muted">当前持有人</span>
-          <span>{{ unit.current_holder_name }}</span>
+          <span>{{ unit.holder_name }}</span>
         </div>
         <div v-if="unit.current_loan_date" class="flex justify-between">
           <span class="text-muted">借出日期</span>
@@ -107,7 +107,7 @@ const handleSubmit = async () => {
     }
     await returnDemoLoan(loanId, {
       condition_on_return: form.condition_on_return,
-      notes: form.notes || null,
+      return_notes: form.notes || null,
     })
     appStore.showToast('归还成功')
     emit('saved')

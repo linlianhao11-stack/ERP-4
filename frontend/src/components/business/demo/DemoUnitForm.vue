@@ -47,12 +47,12 @@
 
       <!-- SN码 -->
       <div>
-        <label class="label" for="demo-sn">SN码</label>
+        <label class="label" for="demo-sn">SN码 *</label>
         <input
           id="demo-sn"
           v-model="form.sn_code"
           class="input text-sm"
-          placeholder="输入SN码（可选）"
+          placeholder="输入SN码"
         >
       </div>
 
@@ -68,7 +68,7 @@
       <!-- 目标样机仓库 -->
       <div>
         <label class="label" for="demo-target-wh">样机仓库 *</label>
-        <select id="demo-target-wh" v-model="form.target_warehouse_id" class="input text-sm">
+        <select id="demo-target-wh" v-model="form.warehouse_id" class="input text-sm">
           <option :value="null">请选择样机仓库</option>
           <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
         </select>
@@ -158,7 +158,7 @@ const form = reactive({
   product_id: null,
   sn_code: '',
   source_warehouse_id: null,
-  target_warehouse_id: null,
+  warehouse_id: null,
   condition: 'new',
   cost_price: null,
   notes: '',
@@ -206,7 +206,7 @@ const resetForm = () => {
     product_id: null,
     sn_code: '',
     source_warehouse_id: null,
-    target_warehouse_id: null,
+    warehouse_id: null,
     condition: 'new',
     cost_price: null,
     notes: '',
@@ -227,7 +227,11 @@ const validate = () => {
     appStore.showToast('请选择产品', 'error')
     return false
   }
-  if (!form.target_warehouse_id) {
+  if (!form.sn_code?.trim()) {
+    appStore.showToast('请输入SN码', 'error')
+    return false
+  }
+  if (!form.warehouse_id) {
     appStore.showToast('请选择样机仓库', 'error')
     return false
   }
@@ -247,8 +251,8 @@ const handleSubmit = async () => {
     const payload = {
       source: form.source,
       product_id: form.product_id,
-      sn_code: form.sn_code || null,
-      target_warehouse_id: form.target_warehouse_id,
+      sn_code: form.sn_code.trim(),
+      warehouse_id: form.warehouse_id,
       condition: form.condition,
       notes: form.notes || null,
     }

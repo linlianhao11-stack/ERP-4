@@ -49,7 +49,7 @@
         <div class="flex justify-between items-center text-xs">
           <span class="text-muted">
             {{ u.condition_label || conditionLabel(u.condition) }}
-            <template v-if="u.current_holder_name"> &middot; {{ u.current_holder_name }}</template>
+            <template v-if="u.holder_name"> &middot; {{ u.holder_name }}</template>
           </span>
           <div class="flex items-center gap-2">
             <template v-if="u.status === 'in_stock'">
@@ -89,7 +89,7 @@
           <span :class="statusBadgeClass(u.status)">{{ statusLabel(u.status) }}</span>
         </td>
         <td class="px-3 py-2 text-xs">{{ conditionLabel(u.condition) }}</td>
-        <td class="px-3 py-2 text-xs">{{ u.current_holder_name || '-' }}</td>
+        <td class="px-3 py-2 text-xs">{{ u.holder_name || '-' }}</td>
         <td class="px-3 py-2 text-right font-mono">{{ u.total_loan_count || 0 }}</td>
         <td class="px-3 py-2">
           <div class="flex items-center gap-1.5 justify-end">

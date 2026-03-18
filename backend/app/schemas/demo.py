@@ -66,7 +66,7 @@ class DemoSellRequest(BaseModel):
     """转销售"""
     customer_id: int
     sale_price: Decimal = Field(gt=0)
-    account_set_id: int
+    account_set_id: Optional[int] = None
     employee_id: Optional[int] = None
     remark: Optional[str] = None
 
@@ -82,11 +82,11 @@ class DemoScrapRequest(BaseModel):
     """报废"""
     reason: str
     residual_value: Optional[Decimal] = Field(default=None, ge=0)
-    account_set_id: int
+    account_set_id: Optional[int] = None
 
 
 class DemoLossRequest(BaseModel):
     """丢失赔偿"""
     description: str
     compensation_amount: Decimal = Field(gt=0)
-    account_set_id: int
+    account_set_id: Optional[int] = None

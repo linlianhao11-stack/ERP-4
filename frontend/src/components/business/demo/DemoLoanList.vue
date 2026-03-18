@@ -14,6 +14,7 @@
         <option value="overdue">超期</option>
         <option value="returned">已归还</option>
         <option value="rejected">已拒绝</option>
+        <option value="closed">已关闭</option>
       </select>
       <DateRangePicker
         v-model:start="dateStart"
@@ -40,14 +41,14 @@
       >
         <div class="flex justify-between items-start mb-1.5">
           <div class="flex-1 min-w-0 mr-2">
-            <div class="font-medium text-sm truncate">{{ l.unit_code }} &middot; {{ l.product_name }}</div>
+            <div class="font-medium text-sm truncate">{{ l.demo_unit_code }} &middot; {{ l.product_name }}</div>
             <div class="text-xs text-muted">{{ loanTypeLabel(l.loan_type) }} &middot; {{ l.borrower_name }}</div>
           </div>
           <span :class="loanStatusBadge(l.status)">{{ loanStatusLabel(l.status) }}</span>
         </div>
         <div class="flex justify-between items-center text-xs">
           <span class="text-muted">
-            {{ l.lent_at?.slice(0, 10) || '-' }}
+            {{ l.loan_date?.slice(0, 10) || '-' }}
             <template v-if="l.expected_return_date"> &rarr; {{ l.expected_return_date }}</template>
           </span>
           <div class="flex items-center gap-2">
@@ -73,12 +74,12 @@
         :class="{ 'text-error': l.is_overdue }"
       >
         <td class="px-3 py-2 font-mono text-xs">{{ l.loan_no || '-' }}</td>
-        <td class="px-3 py-2 font-mono text-xs">{{ l.unit_code }}</td>
+        <td class="px-3 py-2 font-mono text-xs">{{ l.demo_unit_code }}</td>
         <td class="px-3 py-2">{{ l.product_name }}</td>
         <td class="px-3 py-2 text-xs">{{ loanTypeLabel(l.loan_type) }}</td>
         <td class="px-3 py-2 text-xs">{{ l.borrower_name }}</td>
         <td class="px-3 py-2 text-xs">{{ l.handler_name || '-' }}</td>
-        <td class="px-3 py-2 text-xs">{{ l.lent_at?.slice(0, 10) || '-' }}</td>
+        <td class="px-3 py-2 text-xs">{{ l.loan_date?.slice(0, 10) || '-' }}</td>
         <td class="px-3 py-2 text-xs">{{ l.expected_return_date || '-' }}</td>
         <td class="px-3 py-2">
           <span :class="loanStatusBadge(l.status)">{{ loanStatusLabel(l.status) }}</span>
@@ -130,19 +131,19 @@ const {
 
 const columns = [
   { key: 'loan_no', label: '借出单号' },
-  { key: 'unit_code', label: '样机编号' },
+  { key: 'demo_unit_code', label: '样机编号' },
   { key: 'product_name', label: '产品' },
   { key: 'loan_type', label: '借用类型' },
   { key: 'borrower', label: '借用人' },
   { key: 'handler', label: '经办人' },
-  { key: 'lent_at', label: '借出日期' },
+  { key: 'loan_date', label: '借出日期' },
   { key: 'expected_return_date', label: '预计归还' },
   { key: 'status', label: '状态' },
   { key: 'actions', label: '操作', align: 'right' },
 ]
 
 // 借用类型标签
-const LOAN_TYPE_MAP = { customer_trial: '客户试用', staff_carry: '业务员携带', exhibition: '展会' }
+const LOAN_TYPE_MAP = { customer_trial: '客户试用', salesperson: '业务员携带', exhibition: '展会' }
 const loanTypeLabel = (t) => LOAN_TYPE_MAP[t] || t || '-'
 
 // 借还状态标签
@@ -153,6 +154,7 @@ const LOAN_STATUS_MAP = {
   overdue: { label: '超期', cls: 'badge badge-red' },
   returned: { label: '已归还', cls: 'badge badge-green' },
   rejected: { label: '已拒绝', cls: 'badge badge-gray' },
+  closed: { label: '已关闭', cls: 'badge badge-gray' },
 }
 const loanStatusLabel = (s) => LOAN_STATUS_MAP[s]?.label || s
 const loanStatusBadge = (s) => LOAN_STATUS_MAP[s]?.cls || 'badge badge-gray'

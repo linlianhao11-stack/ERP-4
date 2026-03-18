@@ -37,7 +37,7 @@
         <label class="label" for="loan-type">借用类型 *</label>
         <select id="loan-type" v-model="form.loan_type" class="input text-sm">
           <option value="customer_trial">客户试用</option>
-          <option value="staff_carry">业务员携带</option>
+          <option value="salesperson">业务员携带</option>
           <option value="exhibition">展会</option>
         </select>
       </div>
