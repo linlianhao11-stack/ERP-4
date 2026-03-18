@@ -50,11 +50,26 @@ DEFAULT_FEW_SHOTS = [
         "question": "查一下所有账套本月的销售对比",
         "sql": "SELECT account_set_name AS 账套, COUNT(DISTINCT order_no) AS 订单数, ROUND(SUM(amount),2) AS 销售额, ROUND(SUM(profit),2) AS 毛利 FROM vw_sales_detail WHERE order_date >= date_trunc('month', CURRENT_DATE) GROUP BY account_set_name ORDER BY 销售额 DESC",
     },
+    {
+        "question": "帮我出一份昨天的业务日报",
+        "type": "multi_sql",
+        "queries": [
+            {"title": "销售概况", "sql": "SELECT COUNT(DISTINCT order_no) AS 订单数, ROUND(SUM(amount),2) AS 销售额, ROUND(SUM(cost),2) AS 成本, ROUND(SUM(profit),2) AS 毛利, ROUND(SUM(profit)/NULLIF(SUM(amount),0)*100,2) AS 毛利率 FROM vw_sales_detail WHERE order_date = CURRENT_DATE - INTERVAL '1 day'"},
+            {"title": "销售额TOP5客户", "sql": "SELECT customer_name AS 客户, COUNT(DISTINCT order_no) AS 订单数, ROUND(SUM(amount),2) AS 销售额 FROM vw_sales_detail WHERE order_date = CURRENT_DATE - INTERVAL '1 day' GROUP BY customer_name ORDER BY 销售额 DESC LIMIT 5"},
+            {"title": "销售额TOP5商品", "sql": "SELECT product_name AS 商品, brand AS 品牌, SUM(quantity) AS 销量, ROUND(SUM(amount),2) AS 销售额 FROM vw_sales_detail WHERE order_date = CURRENT_DATE - INTERVAL '1 day' GROUP BY product_name, brand ORDER BY 销售额 DESC LIMIT 5"},
+            {"title": "采购概况", "sql": "SELECT COUNT(DISTINCT po_no) AS 采购单数, ROUND(SUM(amount),2) AS 采购金额, COUNT(DISTINCT supplier_name) AS 供应商数 FROM vw_purchase_detail WHERE purchase_date = CURRENT_DATE - INTERVAL '1 day'"},
+            {"title": "库存周转率TOP10（最慢）", "sql": "SELECT product_name AS 商品, brand AS 品牌, current_stock AS 库存, sold_30d AS 近30天销量, ROUND(turnover_rate,2) AS 周转率 FROM vw_inventory_turnover WHERE current_stock > 0 ORDER BY turnover_rate ASC LIMIT 10"},
+            {"title": "应收账款概况", "sql": "SELECT COUNT(*) AS 笔数, ROUND(SUM(unreceived_amount),2) AS 未收总额, ROUND(SUM(CASE WHEN age_days > 30 THEN unreceived_amount ELSE 0 END),2) AS 逾期金额 FROM vw_receivables WHERE status != 'completed'"},
+            {"title": "应付账款概况", "sql": "SELECT COUNT(*) AS 笔数, ROUND(SUM(unpaid_amount),2) AS 未付总额, ROUND(SUM(CASE WHEN age_days > 30 THEN unpaid_amount ELSE 0 END),2) AS 逾期金额 FROM vw_payables WHERE status != 'completed'"},
+            {"title": "账龄超30天客户欠款", "sql": "SELECT customer_name AS 客户, bill_no AS 单号, bill_date AS 账单日期, ROUND(unreceived_amount,2) AS 未收金额, age_days AS 账龄天数 FROM vw_receivables WHERE status != 'completed' AND age_days > 30 ORDER BY age_days DESC"},
+        ],
+    },
 ]
 
 
 def format_few_shots(custom_shots: list | None = None) -> str:
     """格式化 few-shot 示例为 prompt 文本"""
+    import json as _json
     items = custom_shots if custom_shots else DEFAULT_FEW_SHOTS
     if not items:
         return ""
@@ -62,6 +77,10 @@ def format_few_shots(custom_shots: list | None = None) -> str:
     for i, item in enumerate(items, 1):
         lines.append(f"### 示例 {i}")
         lines.append(f"用户: {item['question']}")
-        lines.append(f"SQL: {item['sql']}")
+        if item.get("type") == "multi_sql":
+            resp = {"type": "multi_sql", "queries": item["queries"], "explanation": "综合查询多个维度"}
+            lines.append(f"响应: {_json.dumps(resp, ensure_ascii=False)}")
+        else:
+            lines.append(f"SQL: {item['sql']}")
         lines.append("")
     return "\n".join(lines)
