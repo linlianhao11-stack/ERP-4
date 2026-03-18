@@ -23,6 +23,9 @@ DEFAULT_BUSINESS_DICT = [
     {"term": "代采代发/代发/直发", "meaning": "从供应商直接发货给客户，不经过自己仓库的业务模式", "field_hint": "vw_dropship_detail, vw_dropship_summary"},
     {"term": "代采代发毛利", "meaning": "销售额 - 采购额，代采代发的利润", "field_hint": "gross_profit, gross_margin"},
     {"term": "代采代发状态", "meaning": "草稿→待付款→已付待发→已发货→已完成/已取消", "field_hint": "status: draft/pending_payment/paid_pending_ship/shipped/completed/cancelled"},
+    {"term": "采购单状态", "meaning": "待审核→待付款→已付款→部分到货→已完成/已取消", "field_hint": "status: pending_review=待审核, pending=待付款, paid=已付款, partial=部分到货, completed=已完成, cancelled=已取消。查询时必须用 CASE WHEN 翻译为中文"},
+    {"term": "发货状态", "meaning": "待发货→部分发货→已完成/已取消", "field_hint": "shipping_status: pending=待发货, partial=部分发货, completed=已完成, cancelled=已取消。查询时必须用 CASE WHEN 翻译为中文"},
+    {"term": "应收应付状态", "meaning": "待处理→部分收/付→已完成/已取消", "field_hint": "status: pending=待处理, partial=部分, completed=已完成, cancelled=已取消。查询时必须用 CASE WHEN 翻译为中文"},
 ]
 
 
