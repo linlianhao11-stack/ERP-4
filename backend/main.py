@@ -40,6 +40,7 @@ from app.routers import (
     bank_accounts,
     dropship,
     demo,
+    daily_report,
 )
 
 
@@ -51,6 +52,15 @@ async def lifespan(app: FastAPI):
     # 启动后台任务
     backup_task = asyncio.create_task(auto_backup_loop())
     tracking_task = asyncio.create_task(tracking_refresh_loop())
+    # 日报邮件定时任务
+    _dr_task = None
+    try:
+        from app.config import build_ai_dsn
+        _ai_dsn = build_ai_dsn()
+        from app.services.daily_report_service import daily_report_loop
+        _dr_task = asyncio.create_task(daily_report_loop(_ai_dsn))
+    except RuntimeError:
+        pass  # AI_DB_PASSWORD 未配置，跳过日报任务
     yield
     # 关闭
     backup_task.cancel()
@@ -63,6 +73,12 @@ async def lifespan(app: FastAPI):
         await tracking_task
     except asyncio.CancelledError:
         pass
+    if _dr_task:
+        _dr_task.cancel()
+        try:
+            await _dr_task
+        except asyncio.CancelledError:
+            pass
     # 关闭 AI 资源
     try:
         from app.services.ai_chat_service import close_ai_pool
@@ -222,6 +238,7 @@ app.include_router(employees.router)
 app.include_router(bank_accounts.router)
 app.include_router(dropship.router)
 app.include_router(demo.router)
+app.include_router(daily_report.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")

@@ -17,19 +17,22 @@
     </div>
 
     <!-- 常规设置标签页 -->
-    <div v-if="settingsTab === 'general'" key="general" class="grid md:grid-cols-2 gap-5">
-      <WarehouseSettings
-        v-if="hasPermission('settings') || hasPermission('stock_edit')"
-        @data-changed="onDataChanged" />
-      <DepartmentSettings
-        v-if="hasPermission('settings') || hasPermission('sales')"
-        @data-changed="onDataChanged" />
-      <EmployeeSettings
-        v-if="hasPermission('settings') || hasPermission('sales')"
-        @data-changed="onDataChanged" />
-      <UserSettings
-        @data-changed="onDataChanged"
-        @go-to-permissions="handleGoToPermissions" />
+    <div v-if="settingsTab === 'general'" key="general">
+      <div class="grid md:grid-cols-2 gap-5">
+        <WarehouseSettings
+          v-if="hasPermission('settings') || hasPermission('stock_edit')"
+          @data-changed="onDataChanged" />
+        <DepartmentSettings
+          v-if="hasPermission('settings') || hasPermission('sales')"
+          @data-changed="onDataChanged" />
+        <EmployeeSettings
+          v-if="hasPermission('settings') || hasPermission('sales')"
+          @data-changed="onDataChanged" />
+        <UserSettings
+          @data-changed="onDataChanged"
+          @go-to-permissions="handleGoToPermissions" />
+      </div>
+      <DailyReportSettings v-if="hasPermission('admin')" />
     </div>
 
     <!-- 财务设置标签页 -->
@@ -71,7 +74,7 @@
  * 子组件：WarehouseSettings、DepartmentSettings、EmployeeSettings、UserSettings、
  *         PaymentMethodSettings、LogsSettings、PermissionSettings、ApiKeysPanel
  */
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePermission } from '../composables/usePermission'
 import { useSettingsStore } from '../stores/settings'
@@ -88,6 +91,7 @@ import LogsSettings from '../components/business/settings/LogsSettings.vue'
 import PermissionSettings from '../components/business/settings/PermissionSettings.vue'
 import ApiKeysPanel from '../components/business/settings/ApiKeysPanel.vue'
 import BankAccountSettings from '../components/business/settings/BankAccountSettings.vue'
+const DailyReportSettings = defineAsyncComponent(() => import('../components/business/settings/DailyReportSettings.vue'))
 
 const route = useRoute()
 const router = useRouter()
