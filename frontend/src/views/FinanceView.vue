@@ -5,6 +5,7 @@
       <span @click="financeTab = 'orders'" :class="['tab', financeTab === 'orders' ? 'active' : '']">订单明细</span>
       <span @click="financeTab = 'unpaid'" :class="['tab', financeTab === 'unpaid' ? 'active' : '']">欠款明细</span>
       <span @click="financeTab = 'payments'" :class="['tab', financeTab === 'payments' ? 'active' : '']">收款管理</span>
+      <span @click="financeTab = 'refunds'" :class="['tab', financeTab === 'refunds' ? 'active' : '']">退款管理</span>
       <span v-if="hasPermission('purchase_pay') || hasPermission('finance_pay')" @click="financeTab = 'payables'" :class="['tab', financeTab === 'payables' ? 'active' : '']">付款管理</span>
       <span @click="financeTab = 'logs'" :class="['tab', financeTab === 'logs' ? 'active' : '']">出入库日志</span>
       <span @click="financeTab = 'rebates'" :class="['tab', financeTab === 'rebates' ? 'active' : '']">返利管理</span>
@@ -22,6 +23,11 @@
       key="payments"
       ref="paymentsPanel"
       @view-order="handleViewOrder"
+    />
+    <FinanceRefundsPanel
+      v-else-if="financeTab === 'refunds'"
+      key="refunds"
+      ref="refundsPanel"
     />
     <FinancePayablesPanel
       v-else-if="financeTab === 'payables'"
@@ -55,6 +61,7 @@ import { usePermission } from '../composables/usePermission'
 import FinanceOrdersPanel from '../components/business/FinanceOrdersPanel.vue'
 import FinancePaymentsPanel from '../components/business/FinancePaymentsPanel.vue'
 import FinanceOrderDetailModal from '../components/business/finance/FinanceOrderDetailModal.vue'
+const FinanceRefundsPanel = defineAsyncComponent(() => import('../components/business/finance/FinanceRefundsPanel.vue'))
 const FinancePayablesPanel = defineAsyncComponent(() => import('../components/business/FinancePayablesPanel.vue'))
 const FinanceLogsPanel = defineAsyncComponent(() => import('../components/business/FinanceLogsPanel.vue'))
 const FinanceRebatesPanel = defineAsyncComponent(() => import('../components/business/FinanceRebatesPanel.vue'))
@@ -66,11 +73,12 @@ const settingsStore = useSettingsStore()
 const accountingStore = useAccountingStore()
 const { hasPermission } = usePermission()
 
-const financeValidTabs = ['orders', 'unpaid', 'payments', 'payables', 'logs', 'rebates']
+const financeValidTabs = ['orders', 'unpaid', 'payments', 'refunds', 'payables', 'logs', 'rebates']
 const financeTab = ref(financeValidTabs.includes(route.query.tab) ? route.query.tab : 'orders')
 watch(financeTab, (val) => router.replace({ query: { ...route.query, tab: val === 'orders' ? undefined : val } }))
 const ordersPanel = ref(null)
 const paymentsPanel = ref(null)
+const refundsPanel = ref(null)
 
 const crossTabOrderId = ref(null)
 const showCrossTabDetail = ref(false)

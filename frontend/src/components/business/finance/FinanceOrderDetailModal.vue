@@ -63,7 +63,7 @@ const saveRemark = async () => {
 
 // --- 退货状态 ---
 const showReturnForm = ref(false)
-const returnForm = reactive({ items: [], refunded: false })
+const returnForm = reactive({ items: [], refunded: false, refund_method: '', refund_info: '' })
 const returnSubmitting = ref(false)
 
 // --- 收款方式名称 ---
@@ -204,6 +204,8 @@ const openReturnForm = async () => {
       }
     })
   returnForm.refunded = false
+  returnForm.refund_method = ''
+  returnForm.refund_info = ''
   showReturnForm.value = true
 }
 
@@ -240,6 +242,8 @@ const submitReturn = async () => {
       warehouse_id: null,
       related_order_id: orderDetail.id,
       refunded: returnForm.refunded,
+      refund_method: returnForm.refunded ? (returnForm.refund_method || null) : null,
+      refund_info: returnForm.refunded ? (returnForm.refund_info || null) : null,
       items: items.map(i => ({
         product_id: i.product_id,
         quantity: i.qty,
@@ -324,7 +328,7 @@ const cancelReturnForm = () => {
             <div v-if="orderDetail.shipping_status"><span class="text-muted">发货:</span> <StatusBadge type="shippingStatus" :status="orderDetail.shipping_status" /></div>
             <div v-if="orderDetail.order_type === 'RETURN'" class="col-span-2">
               <span class="text-muted">退款状态:</span>
-              <span :class="orderDetail.refunded ? 'text-warning' : 'text-error-emphasis'">{{ orderDetail.refunded ? '已退款给客户' : '形成在账资金' }}</span>
+              <span :class="orderDetail.refunded ? (orderDetail.is_cleared ? 'text-success' : 'text-warning') : 'text-error-emphasis'">{{ orderDetail.refunded ? (orderDetail.is_cleared ? '已退款' : '需要退款（待财务确认）') : '已转为在账资金' }}</span>
             </div>
             <div v-if="orderDetail.rebate_refund_records?.length" class="col-span-2">
               <div v-for="rr in orderDetail.rebate_refund_records" :key="rr.id" class="flex items-center gap-2 text-[13px] mb-1">
@@ -541,9 +545,24 @@ const cancelReturnForm = () => {
           <div class="mt-3 px-1">
             <label class="flex items-center gap-2 cursor-pointer text-[13px]">
               <input type="checkbox" v-model="returnForm.refunded" class="rounded" />
-              <span>已退款给客户</span>
+              <span>需要退款给客户</span>
               <span class="text-[11px] text-muted">（不勾选则形成在账资金）</span>
             </label>
+            <div v-if="returnForm.refunded" class="mt-2 space-y-2">
+              <div>
+                <label class="text-xs text-secondary">退款方式</label>
+                <select v-model="returnForm.refund_method" class="input text-sm mt-0.5">
+                  <option value="">请选择</option>
+                  <option v-for="pm in paymentMethods" :key="pm.id" :value="pm.code">
+                    {{ pm.account_set_name ? pm.account_set_name + ' - ' + pm.name : pm.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-secondary">退款信息</label>
+                <textarea v-model="returnForm.refund_info" class="input text-sm mt-0.5" rows="2" placeholder="退款备注（如银行账号等）"></textarea>
+              </div>
+            </div>
           </div>
           <div class="flex gap-3 pt-4 mt-4 border-t border-line">
             <button type="button" @click="cancelReturnForm" class="btn btn-secondary flex-1">取消</button>

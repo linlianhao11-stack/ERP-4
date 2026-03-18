@@ -223,7 +223,7 @@
         <div class="border-t pt-3 space-y-3">
           <label class="flex items-center gap-2">
             <input type="checkbox" v-model="returnForm.is_refunded" class="w-4 h-4">
-            <span class="text-sm">供应商已退款</span>
+            <span class="text-sm">需要供应商退款</span>
           </label>
           <div v-if="!returnForm.is_refunded" class="text-xs text-primary bg-info-subtle rounded p-2">
             未退款的金额将转为供应商"在账资金"，可在后续采购单中抵扣
@@ -234,6 +234,10 @@
               <option value="">请选择</option>
               <option v-for="m in disbursementMethods" :key="m.code" :value="m.name">{{ m.name }}</option>
             </select>
+          </div>
+          <div v-if="returnForm.is_refunded">
+            <label class="label text-xs">退款信息</label>
+            <textarea v-model="returnForm.refund_info" class="input text-sm" rows="2" placeholder="退款备注"></textarea>
           </div>
           <div>
             <label class="label text-xs">退货物流单号（选填）</label>
@@ -303,7 +307,7 @@ const receivablePOs = ref([])
 
 // ---- 退货状态 ----
 const showReturnModal = ref(false)
-const returnForm = reactive({ po_id: null, po_no: '', items: [], is_refunded: false, tracking_no: '', refund_method: '' })
+const returnForm = reactive({ po_id: null, po_no: '', items: [], is_refunded: false, tracking_no: '', refund_method: '', refund_info: '' })
 
 /** 退货总金额 */
 const returnTotalAmount = computed(() => {
@@ -568,6 +572,7 @@ const openReturnModal = (po) => {
   returnForm.is_refunded = false
   returnForm.tracking_no = ''
   returnForm.refund_method = ''
+  returnForm.refund_info = ''
   // 确保付款方式已加载
   if (!settingsStore.disbursementMethods.length) settingsStore.loadDisbursementMethods()
   returnForm.items = po.items
@@ -604,7 +609,8 @@ const confirmReturn = async () => {
       items: checkedItems.map(i => ({ item_id: i.item_id, return_quantity: i.return_quantity })),
       is_refunded: returnForm.is_refunded,
       tracking_no: returnForm.tracking_no || null,
-      refund_method: returnForm.is_refunded ? (returnForm.refund_method || null) : null
+      refund_method: returnForm.is_refunded ? (returnForm.refund_method || null) : null,
+      refund_info: returnForm.is_refunded ? (returnForm.refund_info || null) : null
     })
     appStore.showToast('退货成功')
     showReturnModal.value = false

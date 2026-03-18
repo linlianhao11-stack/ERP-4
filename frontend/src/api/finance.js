@@ -8,3 +8,8 @@ export const createPayment = (data) => api.post('/finance/payment', data)
 export const getPayments = (params) => api.get('/finance/payments', { params })
 export const confirmPayment = (id) => api.post('/finance/payment/' + id + '/confirm')
 export const getOrderItems = (orderId) => api.get(`/finance/all-orders/${orderId}/items`)
+
+// 退款管理
+export const getPendingRefunds = (params) => api.get('/finance/refunds', { params })
+export const confirmSalesRefund = (orderId) => api.post(`/finance/refunds/confirm-sales/${orderId}`)
+export const confirmPurchaseRefund = (returnId) => api.post(`/finance/refunds/confirm-purchase/${returnId}`)

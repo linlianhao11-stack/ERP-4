@@ -73,11 +73,11 @@
           <div v-if="orderConfirm.order_type === 'RETURN'" class="mb-4 p-3 bg-warning-subtle border border-warning rounded-lg">
             <label class="flex items-center cursor-pointer">
               <input type="checkbox" v-model="orderConfirm.refunded" class="mr-2 w-4 h-4">
-              <span class="font-medium text-sm">已退款给客户</span>
+              <span class="font-medium text-sm">需要退款给客户</span>
             </label>
             <div class="text-xs text-secondary mt-2">
-              <div class="mb-1"><b>已勾选</b>：货款已经退还给客户，不产生在账资金</div>
-              <div><b>未勾选</b>：货款未退还，将形成客户的在账资金（预付款），下次购货时可以抵扣</div>
+              <div class="mb-1"><b>已勾选</b>：需要退款给客户，将推送到财务退款管理确认</div>
+              <div><b>未勾选</b>：不退款，将形成客户的在账资金（预付款），下次购货时可以抵扣</div>
             </div>
             <!-- 退款方式和金额（勾选已退款时显示） -->
             <div v-if="orderConfirm.refunded" class="mt-3 space-y-2 border-t border-warning/30 pt-3">
@@ -107,6 +107,10 @@
                   :class="{ 'border-error': validationTriggered && (orderConfirm.refund_amount === null || orderConfirm.refund_amount === undefined || orderConfirm.refund_amount === '') }"
                 />
                 <div class="text-xs text-muted mt-0.5">默认为订单总金额，可调整实际退款金额</div>
+              </div>
+              <div>
+                <label class="text-xs text-secondary" for="refund-info">退款信息</label>
+                <textarea id="refund-info" v-model="orderConfirm.refund_info" class="input text-sm mt-0.5" rows="2" placeholder="退款备注（如银行账号、退款原因等）"></textarea>
               </div>
             </div>
           </div>
