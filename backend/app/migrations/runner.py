@@ -34,6 +34,11 @@ async def run_migrations():
     # 可能分配到不同连接导致锁失效。改用原始连接 + 阻塞式锁：
     # 第一个 worker 获取锁并执行迁移，第二个 worker 阻塞等待，
     # 等锁释放后所有迁移已完成，幂等检查会让它直接跳过。
+    # 注意: _pool 是 Tortoise ORM 的 asyncpg 连接池内部属性（tortoise-orm 0.20.x）
+    if not hasattr(pool, "_pool") or pool._pool is None:
+        logger.warning("无法获取原始连接池，跳过 advisory lock 直接执行迁移")
+        await _run_versioned_migrations()
+        return
     raw_conn = await pool._pool.acquire()
     try:
         await raw_conn.execute("SELECT pg_advisory_lock(20260315)")
