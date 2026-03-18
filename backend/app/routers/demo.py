@@ -320,6 +320,7 @@ async def create_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     unit = await create_demo_unit(data, user)
+    await log_operation(user, "DEMO_CREATE", "DEMO_UNIT", unit.id, f"新建样机 {unit.code}")
     # 重新加载关联
     unit = await DemoUnit.filter(id=unit.id).select_related("product", "warehouse", "sn_code").first()
     return await _serialize_unit(unit)
@@ -369,6 +370,7 @@ async def update_unit(
     if data.notes is not None:
         unit.notes = data.notes
     await unit.save()
+    await log_operation(user, "DEMO_UPDATE", "DEMO_UNIT", unit.id, f"更新样机 {unit.code}")
 
     unit = await DemoUnit.filter(id=unit_id).select_related("product", "warehouse", "sn_code").first()
     return await _serialize_unit(unit)
@@ -380,6 +382,7 @@ async def delete_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     await delete_demo_unit(unit_id, user)
+    await log_operation(user, "DEMO_DELETE", "DEMO_UNIT", unit_id, f"删除样机 ID={unit_id}")
     return {"ok": True}
 
 
@@ -426,6 +429,7 @@ async def create_loan(
     user: User = Depends(require_permission("stock_edit")),
 ):
     loan = await create_demo_loan(data, user)
+    await log_operation(user, "DEMO_LOAN_CREATE", "DEMO_UNIT", data.demo_unit_id, f"创建借出申请 {loan.loan_no}")
     loan = await DemoLoan.filter(id=loan.id).select_related("demo_unit").first()
     return await _serialize_loan(loan)
 
@@ -447,6 +451,7 @@ async def approve_loan(
     user: User = Depends(require_permission("stock_edit")),
 ):
     loan = await approve_demo_loan(loan_id, user)
+    await log_operation(user, "DEMO_LOAN_APPROVE", "DEMO_UNIT", loan.demo_unit_id, f"审批通过借出申请 {loan.loan_no}")
     loan = await DemoLoan.filter(id=loan.id).select_related("demo_unit").first()
     return await _serialize_loan(loan)
 
@@ -457,6 +462,7 @@ async def reject_loan(
     user: User = Depends(require_permission("stock_edit")),
 ):
     loan = await reject_demo_loan(loan_id, user)
+    await log_operation(user, "DEMO_LOAN_REJECT", "DEMO_UNIT", loan.demo_unit_id, f"拒绝借出申请 {loan.loan_no}")
     loan = await DemoLoan.filter(id=loan.id).select_related("demo_unit").first()
     return await _serialize_loan(loan)
 
@@ -467,6 +473,7 @@ async def lend_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     loan = await lend_demo_unit(loan_id, user)
+    await log_operation(user, "DEMO_LEND", "DEMO_UNIT", loan.demo_unit_id, f"样机借出 {loan.loan_no}")
     loan = await DemoLoan.filter(id=loan.id).select_related("demo_unit").first()
     return await _serialize_loan(loan)
 
@@ -478,6 +485,7 @@ async def return_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     loan = await return_demo_unit(loan_id, data, user)
+    await log_operation(user, "DEMO_RETURN", "DEMO_UNIT", loan.demo_unit_id, f"样机归还 {loan.loan_no}")
     loan = await DemoLoan.filter(id=loan.id).select_related("demo_unit").first()
     return await _serialize_loan(loan)
 
@@ -491,6 +499,7 @@ async def sell_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     disposal = await sell_demo_unit(unit_id, data, user)
+    await log_operation(user, "DEMO_SELL", "DEMO_UNIT", unit_id, f"样机转销售 ID={unit_id}")
     return {"message": "转销售成功", "disposal_id": disposal.id, "order_id": disposal.order_id}
 
 
@@ -501,6 +510,7 @@ async def convert_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     disposal = await convert_demo_unit(unit_id, data, user)
+    await log_operation(user, "DEMO_CONVERT", "DEMO_UNIT", unit_id, f"样机转良品 ID={unit_id}")
     return {"message": "转良品成功", "disposal_id": disposal.id}
 
 
@@ -511,6 +521,7 @@ async def scrap_unit(
     user: User = Depends(require_permission("stock_edit")),
 ):
     disposal = await scrap_demo_unit(unit_id, data, user)
+    await log_operation(user, "DEMO_SCRAP", "DEMO_UNIT", unit_id, f"样机报废 ID={unit_id}")
     return {"message": "报废成功", "disposal_id": disposal.id}
 
 
@@ -521,4 +532,5 @@ async def report_loss(
     user: User = Depends(require_permission("stock_edit")),
 ):
     disposal = await report_loss_demo_unit(unit_id, data, user)
+    await log_operation(user, "DEMO_LOSS", "DEMO_UNIT", unit_id, f"样机丢失报告 ID={unit_id}")
     return {"message": "丢失报告已提交", "disposal_id": disposal.id}

@@ -13,6 +13,7 @@ from app.models import (
     WarehouseStock, StockLog
 )
 from app.schemas.consignment import ConsignmentReturnRequest
+from app.services.operation_log_service import log_operation
 from app.services.stock_service import get_or_create_consignment_warehouse, update_weighted_entry_date
 from app.utils.batch_load import batch_load_related
 from app.logger import get_logger
@@ -478,6 +479,7 @@ async def consignment_return(
             order.total_cost = total_cost
             await order.save()
 
+            await log_operation(user, "CONSIGNMENT_RETURN", "CONSIGNMENT", order.id, f"寄售归还，客户 {customer.name}，共 {len(items)} 项")
             return {"message": "寄售退货成功", "count": len(items), "order_no": order_no}
 
     except HTTPException:
