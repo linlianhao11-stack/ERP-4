@@ -120,11 +120,11 @@ REPORT_QUERIES = [
 ]
 
 
-async def _load_config() -> dict | None:
-    """从 system_settings 加载日报配置"""
+async def _load_config(force: bool = False) -> dict | None:
+    """从 system_settings 加载日报配置。force=True 时跳过 enabled 检查。"""
     settings = await SystemSetting.filter(key__in=CONFIG_KEYS)
     cfg = {s.key: s.value for s in settings}
-    if cfg.get("daily_report.enabled") != "true":
+    if not force and cfg.get("daily_report.enabled") != "true":
         return None
     if not cfg.get("daily_report.recipients") or not cfg.get("daily_report.smtp_host"):
         return None
@@ -284,7 +284,7 @@ async def generate_and_send_report(db_dsn: str, force: bool = False):
     from app.services.email_service import send_email
     from app.services.operation_log_service import log_operation
 
-    cfg = await _load_config()
+    cfg = await _load_config(force=force)
     if not cfg:
         return
 
