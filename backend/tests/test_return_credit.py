@@ -54,6 +54,46 @@ async def test_cash_return_no_refund_creates_credit():
         f"CASH 退货未退款应产生在账资金，期望 balance=-5000，实际 {updated.balance}"
     )
 
+    # 不需要退款的退货应立即结清
+    updated_order = await Order.filter(id=return_order.id).first()
+    assert updated_order.is_cleared == True, (
+        f"不需要退款时应立即结清，期望 is_cleared=True，实际 {updated_order.is_cleared}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_cash_return_needs_refund_not_cleared():
+    """CASH 原单退货 + 需要退款(refunded=True) → 余额不变，订单未结清"""
+    user = await User.create(username="t_ret5", password_hash="x", display_name="T")
+    customer = await Customer.create(name="测试客户-需退款", balance=Decimal("0"))
+    original = await Order.create(
+        order_no="SO-TEST-CASH-004", order_type=OrderType.CASH,
+        customer=customer, total_amount=Decimal("5000"),
+        paid_amount=Decimal("5000"), is_cleared=True, creator=user,
+    )
+    return_order = await Order.create(
+        order_no="SO-TEST-RET-005", order_type=OrderType.RETURN,
+        customer=customer, total_amount=Decimal("-5000"),
+        related_order_id=original.id, refunded=True, creator=user,
+    )
+
+    data = _make_data(OrderType.RETURN, refunded=True, related_order_id=original.id)
+    await process_order_settlement(
+        data, customer, return_order, Decimal("-5000"), user, return_order.order_no
+    )
+
+    # 需要退款时，余额不应变动（不转为在账资金）
+    updated = await Customer.filter(id=customer.id).first()
+    assert updated.balance == Decimal("0"), (
+        f"需要退款时余额不应变动，期望 balance=0，实际 {updated.balance}"
+    )
+
+    # 需要退款时，订单不应结清（等待财务确认）
+    updated_order = await Order.filter(id=return_order.id).first()
+    assert updated_order.is_cleared == False, (
+        f"需要退款时不应结清，期望 is_cleared=False，实际 {updated_order.is_cleared}"
+    )
+
 
 @pytest.mark.asyncio
 async def test_credit_return_no_refund_creates_credit():
