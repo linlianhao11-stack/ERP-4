@@ -66,6 +66,7 @@
     </div>
 
     <!-- 桌面表格 -->
+    <div class="hidden md:block">
     <AppTable
       :columns="columns"
       :sort-key="sortState.key"
@@ -73,11 +74,6 @@
       :empty="!sortedUnits.length && !loading"
       @sort="onSort"
     >
-      <template #mobile>
-        <!-- 移动端已在上方处理, 此处占位以触发 AppTable 的 mobile 插槽逻辑 -->
-        <span></span>
-      </template>
-
       <tr
         v-for="u in sortedUnits"
         :key="u.id"
@@ -98,34 +94,35 @@
         <td class="px-3 py-2">
           <div class="flex items-center gap-1.5 justify-end">
             <template v-if="u.status === 'in_stock'">
-              <button class="btn btn-primary btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openLoan(u)">借出</button>
-              <button class="btn btn-secondary btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'sale')">转销售</button>
-              <button class="btn btn-secondary btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'conversion')">翻新</button>
-              <button class="btn btn-danger btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'scrap')">报废</button>
+              <button class="btn btn-primary btn-sm text-xs" @click="openLoan(u)">借出</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'sale')">转销售</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'conversion')">翻新</button>
+              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'scrap')">报废</button>
             </template>
             <template v-else-if="u.status === 'lent_out'">
-              <button class="btn btn-primary btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openReturn(u)">归还</button>
-              <button class="btn btn-secondary btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'sale')">转销售</button>
-              <button class="btn btn-danger btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'loss')">登记丢失</button>
+              <button class="btn btn-primary btn-sm text-xs" @click="openReturn(u)">归还</button>
+              <button class="btn btn-secondary btn-sm text-xs" @click="openDisposal(u, 'sale')">转销售</button>
+              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'loss')">登记丢失</button>
             </template>
             <template v-else-if="u.status === 'repairing'">
-              <button class="btn btn-danger btn-sm" style="padding:4px 8px;min-height:28px;font-size:12px" @click="openDisposal(u, 'scrap')">报废</button>
+              <button class="btn btn-error btn-sm text-xs" @click="openDisposal(u, 'scrap')">报废</button>
             </template>
           </div>
         </td>
       </tr>
     </AppTable>
+    </div>
 
     <!-- 分页 -->
     <div v-if="hasPagination" class="flex items-center justify-between mt-3 text-sm">
       <span class="text-xs text-muted">共 {{ pageItemCount }} 条</span>
       <div class="flex items-center gap-1">
-        <button @click="prevPage(); loadUnits()" :disabled="page <= 1" class="btn btn-secondary btn-sm" style="padding:4px 10px;min-height:28px">&lsaquo;</button>
+        <button @click="prevPage(); loadUnits()" :disabled="page <= 1" class="btn btn-secondary btn-sm text-xs">&lsaquo;</button>
         <template v-for="(p, i) in visiblePages" :key="i">
           <span v-if="p === '...'" class="px-1 text-muted">...</span>
-          <button v-else @click="goToPage(p); loadUnits()" :class="p === page ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'" style="padding:4px 10px;min-height:28px">{{ p }}</button>
+          <button v-else @click="goToPage(p); loadUnits()" :class="p === page ? 'btn btn-primary btn-sm text-xs' : 'btn btn-secondary btn-sm text-xs'">{{ p }}</button>
         </template>
-        <button @click="nextPage(); loadUnits()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm" style="padding:4px 10px;min-height:28px">&rsaquo;</button>
+        <button @click="nextPage(); loadUnits()" :disabled="page >= totalPages" class="btn btn-secondary btn-sm text-xs">&rsaquo;</button>
       </div>
       <span class="text-xs text-muted w-16"></span>
     </div>

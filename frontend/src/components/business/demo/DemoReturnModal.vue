@@ -100,7 +100,11 @@ const handleSubmit = async () => {
   if (appStore.submitting) return
   appStore.submitting = true
   try {
-    const loanId = props.unit.current_loan_id || props.unit.id
+    const loanId = props.unit.current_loan_id
+    if (!loanId) {
+      appStore.showToast('无法获取借出记录ID', 'error')
+      return
+    }
     await returnDemoLoan(loanId, {
       condition_on_return: form.condition_on_return,
       notes: form.notes || null,
