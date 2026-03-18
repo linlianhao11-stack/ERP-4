@@ -228,9 +228,10 @@ async def create_demo_loan(data, user) -> DemoLoan:
     return loan
 
 
+@transactions.atomic()
 async def approve_demo_loan(loan_id: int, user) -> DemoLoan:
     """审批通过"""
-    loan = await DemoLoan.filter(id=loan_id).first()
+    loan = await DemoLoan.filter(id=loan_id).select_for_update().first()
     if not loan:
         raise HTTPException(status_code=404, detail="借出记录不存在")
     if loan.status != "pending_approval":
@@ -244,9 +245,10 @@ async def approve_demo_loan(loan_id: int, user) -> DemoLoan:
     return loan
 
 
+@transactions.atomic()
 async def reject_demo_loan(loan_id: int, user) -> DemoLoan:
     """审批拒绝"""
-    loan = await DemoLoan.filter(id=loan_id).first()
+    loan = await DemoLoan.filter(id=loan_id).select_for_update().first()
     if not loan:
         raise HTTPException(status_code=404, detail="借出记录不存在")
     if loan.status != "pending_approval":
@@ -603,6 +605,44 @@ async def report_loss_demo_unit(unit_id: int, data, user) -> DemoDisposal:
     )
     logger.info(f"样机丢失: {unit.code}, 赔偿金额: {data.compensation_amount}")
     return disposal
+
+
+# ── 删除样机 ──
+
+@transactions.atomic()
+async def delete_demo_unit(unit_id: int, user):
+    """删除样机（仅在库且无借还记录）"""
+    unit = await DemoUnit.filter(id=unit_id).select_for_update().first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="样机不存在")
+    if unit.status != "in_stock":
+        raise HTTPException(status_code=400, detail="只能删除在库样机")
+    if await DemoLoan.filter(demo_unit_id=unit.id).exists():
+        raise HTTPException(status_code=400, detail="该样机有借还记录，不能删除")
+
+    # 反转库存操作
+    stock = await WarehouseStock.filter(
+        warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+    ).select_for_update().first()
+    if stock and stock.quantity > 0:
+        before = stock.quantity
+        stock.quantity -= 1
+        await stock.save()
+        await StockLog.create(
+            product_id=unit.product_id, warehouse_id=unit.warehouse_id,
+            change_type="DEMO_DELETE", quantity=-1,
+            before_qty=before, after_qty=stock.quantity,
+            reference_type="DEMO_UNIT", remark=f"删除样机 {unit.code}",
+            creator=user,
+        )
+
+    # 删除关联 SN 码（如果是样机模块创建的）
+    if unit.sn_code_id:
+        sn = await SnCode.filter(id=unit.sn_code_id).first()
+        if sn and sn.entry_type == "DEMO_IN":
+            await sn.delete()
+
+    await unit.delete()
 
 
 # ── 统计 ──

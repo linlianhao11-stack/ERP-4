@@ -21,6 +21,7 @@ from app.services.demo_service import (
     approve_demo_loan, reject_demo_loan,
     lend_demo_unit, return_demo_unit,
     sell_demo_unit, convert_demo_unit, scrap_demo_unit, report_loss_demo_unit,
+    delete_demo_unit,
     get_demo_stats,
 )
 from app.utils.response import paginated_response
@@ -357,19 +358,8 @@ async def delete_unit(
     unit_id: int,
     user: User = Depends(require_permission("stock_edit")),
 ):
-    unit = await DemoUnit.filter(id=unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="样机不存在")
-    if unit.status != "in_stock":
-        raise HTTPException(status_code=400, detail="仅在库状态的样机可删除")
-
-    # 检查是否有借出记录
-    loan_count = await DemoLoan.filter(demo_unit_id=unit_id).count()
-    if loan_count > 0:
-        raise HTTPException(status_code=400, detail="该样机存在借出记录，无法删除")
-
-    await unit.delete()
-    return {"message": "删除成功"}
+    await delete_demo_unit(unit_id, user)
+    return {"ok": True}
 
 
 # ── 借还 ──
