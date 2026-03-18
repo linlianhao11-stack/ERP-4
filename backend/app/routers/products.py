@@ -160,6 +160,7 @@ async def export_products(user: User = Depends(require_permission("stock_view"))
     output = io.BytesIO()
     df.to_excel(output, index=False, engine='openpyxl')
     output.seek(0)
+    await log_operation(user, "PRODUCT_EXPORT", "PRODUCT", None, "导出产品列表 Excel")
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -60,11 +60,14 @@
           <option value="INVOICE_CREATE">创建发票</option>
           <option value="INVOICE_UPDATE">更新发票</option>
           <option value="INVOICE_CONFIRM">确认发票</option>
-          <option value="INVOICE_VOID">作废发票</option>
-          <option value="INVOICE_CANCEL">取消发票</option>
+          <option value="INVOICE_CANCEL">作废发票</option>
+          <option value="INVOICE_UPLOAD_PDF">上传发票 PDF</option>
+          <option value="INVOICE_DELETE_PDF">删除发票 PDF</option>
         </optgroup>
         <optgroup label="凭证">
           <option value="VOUCHER_CREATE">创建凭证</option>
+          <option value="VOUCHER_UPDATE">更新凭证</option>
+          <option value="VOUCHER_DELETE">删除凭证</option>
           <option value="VOUCHER_SUBMIT">提交凭证</option>
           <option value="VOUCHER_APPROVE">审核凭证</option>
           <option value="VOUCHER_REJECT">驳回凭证</option>
@@ -81,6 +84,7 @@
           <option value="SUPPLIER_CREATE">新建供应商</option>
           <option value="SUPPLIER_UPDATE">更新供应商</option>
           <option value="SUPPLIER_DELETE">删除供应商</option>
+          <option value="SUPPLIER_IMPORT">导入供应商</option>
           <option value="CREDIT_REFUND">在账资金退款</option>
         </optgroup>
         <optgroup label="产品">
@@ -88,6 +92,30 @@
           <option value="PRODUCT_UPDATE">更新产品</option>
           <option value="PRODUCT_DELETE">删除产品</option>
           <option value="PRODUCT_IMPORT">导入产品</option>
+        </optgroup>
+        <optgroup label="样机管理">
+          <option value="DEMO_CREATE">新建样机</option>
+          <option value="DEMO_UPDATE">更新样机</option>
+          <option value="DEMO_DELETE">删除样机</option>
+          <option value="DEMO_LOAN_CREATE">借出申请</option>
+          <option value="DEMO_LOAN_APPROVE">审批借出</option>
+          <option value="DEMO_LEND">执行借出</option>
+          <option value="DEMO_RETURN">归还样机</option>
+          <option value="DEMO_SELL">出售样机</option>
+          <option value="DEMO_SCRAP">报废样机</option>
+          <option value="DEMO_LOSS">报损样机</option>
+        </optgroup>
+        <optgroup label="配置管理">
+          <option value="ACCOUNT_CREATE">新建科目</option>
+          <option value="ACCOUNT_UPDATE">更新科目</option>
+          <option value="ACCOUNT_DEACTIVATE">停用科目</option>
+          <option value="DEPARTMENT_CREATE">新建部门</option>
+          <option value="DEPARTMENT_UPDATE">更新部门</option>
+          <option value="DEPARTMENT_DELETE">删除部门</option>
+          <option value="WAREHOUSE_CREATE">新建仓库</option>
+          <option value="WAREHOUSE_UPDATE">更新仓库</option>
+          <option value="WAREHOUSE_DELETE">删除仓库</option>
+          <option value="CONSIGNMENT_RETURN">寄售归还</option>
         </optgroup>
         <optgroup label="数据导出">
           <option value="PRODUCT_EXPORT">导出产品</option>
@@ -98,6 +126,7 @@
           <option value="LEDGER_EXPORT">导出账簿</option>
           <option value="REPORT_EXPORT">导出报表</option>
           <option value="DEMO_EXPORT">导出样机</option>
+          <option value="AI_EXPORT">AI 导出</option>
         </optgroup>
         <optgroup label="系统">
           <option value="BACKUP_CREATE">创建备份</option>

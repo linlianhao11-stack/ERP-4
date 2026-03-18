@@ -200,7 +200,7 @@ async def export_purchase_orders(
             yield remaining
 
     filename = f"采购订单_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    await log_operation(user, "PURCHASE_EXPORT", "PURCHASE_ORDER", None, "导出采购单列表 Excel")
+    await log_operation(user, "PURCHASE_EXPORT", "PURCHASE_ORDER", None, "导出采购单列表 CSV")
     return StreamingResponse(
         generate_csv(),
         media_type="text/csv",

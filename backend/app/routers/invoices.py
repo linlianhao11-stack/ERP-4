@@ -319,7 +319,7 @@ async def cancel_invoice_endpoint(
         inv = await cancel_invoice(invoice_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    await log_operation(user, "INVOICE_VOID", "INVOICE", inv.id,
+    await log_operation(user, "INVOICE_CANCEL", "INVOICE", inv.id,
         f"作废发票 {inv.invoice_no}")
     return {"message": "已作废", "invoice_no": inv.invoice_no}
 

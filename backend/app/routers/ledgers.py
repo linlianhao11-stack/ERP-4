@@ -80,7 +80,7 @@ async def export_general_ledger_api(
         raise HTTPException(status_code=404, detail="科目不存在")
     output = export_general_ledger_excel(result)
     fname = f"总分类账_{result['account_code']}_{start_period}.xlsx"
-    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, "导出总分类账 Excel")
+    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, f"导出总分类账 {result['account_code']} {start_period}")
     return StreamingResponse(
         output, media_type=_EXCEL_MEDIA,
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
@@ -105,7 +105,7 @@ async def export_detail_ledger_api(
         raise HTTPException(status_code=404, detail="科目不存在")
     output = export_detail_ledger_excel(result)
     fname = f"明细分类账_{result['account_code']}_{start_period}.xlsx"
-    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, "导出明细分类账 Excel")
+    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, f"导出明细分类账 {result['account_code']} {start_period}")
     return StreamingResponse(
         output, media_type=_EXCEL_MEDIA,
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
@@ -121,7 +121,7 @@ async def export_trial_balance_api(
     result = await get_trial_balance(account_set_id, period_name)
     output = export_trial_balance_excel(result)
     fname = f"科目余额表_{period_name}.xlsx"
-    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, "导出科目余额表 Excel")
+    await log_operation(user, "LEDGER_EXPORT", "LEDGER", None, f"导出科目余额表 {period_name}")
     return StreamingResponse(
         output, media_type=_EXCEL_MEDIA,
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
