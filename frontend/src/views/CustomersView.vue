@@ -333,7 +333,7 @@
               <div><span class="text-muted">状态:</span> <span :class="orderDetail.is_cleared ? 'text-success' : 'text-error'">{{ orderDetail.is_cleared ? '已结清' : '未结清' }}</span></div>
               <div v-if="orderDetail.order_type === 'RETURN'" class="col-span-2">
                 <span class="text-muted">退款状态:</span>
-                <span :class="orderDetail.refunded ? 'text-warning' : 'text-error-emphasis'">{{ orderDetail.refunded ? '已退款给客户' : '形成在账资金' }}</span>
+                <span :class="orderDetail.refunded ? (orderDetail.is_cleared ? 'text-success' : 'text-warning') : 'text-error-emphasis'">{{ orderDetail.refunded ? (orderDetail.is_cleared ? '已退款' : '需要退款（待财务确认）') : '已转为在账资金' }}</span>
               </div>
               <div v-if="orderDetail.remark" class="col-span-2 pt-2 border-t">
                 <span class="text-muted">备注:</span> <span class="text-secondary">{{ orderDetail.remark }}</span>

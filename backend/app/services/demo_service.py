@@ -298,10 +298,12 @@ async def lend_demo_unit(loan_id: int, user) -> DemoLoan:
     # 扣减样机仓库存
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_qty = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -353,10 +355,12 @@ async def return_demo_unit(loan_id: int, data, user) -> DemoLoan:
     # 归还入库：样机仓库存 +1
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_qty = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, 1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -437,10 +441,12 @@ async def sell_demo_unit(unit_id: int, data, user) -> DemoDisposal:
     # 扣减样机仓库存
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_qty = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -489,10 +495,12 @@ async def convert_demo_unit(unit_id: int, data, user) -> DemoDisposal:
     # 扣减样机仓库存
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_demo = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -551,10 +559,12 @@ async def scrap_demo_unit(unit_id: int, data, user) -> DemoDisposal:
     # 扣减样机仓库存
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_qty = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -613,10 +623,12 @@ async def report_loss_demo_unit(unit_id: int, data, user) -> DemoDisposal:
     # 扣减样机仓库存
     demo_stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).first()
     before_qty = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+        unit.location_id,
     )
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
@@ -662,6 +674,7 @@ async def delete_demo_unit(unit_id: int, user):
     # 反转库存操作
     stock = await WarehouseStock.filter(
         warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+        location_id=unit.location_id,
     ).select_for_update().first()
     if stock and stock.quantity > 0:
         before = stock.quantity

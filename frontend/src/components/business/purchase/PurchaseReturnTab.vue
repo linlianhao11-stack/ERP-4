@@ -69,7 +69,7 @@
               <td class="px-2 py-2 font-mono text-sm text-primary max-w-48 truncate" :title="r.po_no">{{ r.po_no }}</td>
               <td class="px-2 py-2">{{ r.supplier_name }}</td>
               <td class="px-2 py-2 text-right font-semibold text-warning">{{ fmtMoney(r.total_amount) }}</td>
-              <td class="px-2 py-2">{{ r.is_refunded ? '供应商退款' : '转为在账资金' }}</td>
+              <td class="px-2 py-2">{{ r.is_refunded ? (r.refund_status === 'confirmed' ? '已退款' : '需要退款') : '转为在账资金' }}</td>
               <td class="px-2 py-2 text-center">
                 <span :class="refundStatusClass(r.refund_status)">{{ refundStatusLabel(r.refund_status) }}</span>
               </td>
@@ -117,7 +117,7 @@
                 <div><span class="text-muted">关联采购单：</span><span class="font-mono text-primary">{{ detail.po_no }}</span></div>
                 <div><span class="text-muted">供应商：</span>{{ detail.supplier_name }}</div>
                 <div><span class="text-muted">退货金额：</span><span class="font-semibold text-warning">{{ fmtMoney(detail.total_amount) }}</span></div>
-                <div><span class="text-muted">退款方式：</span>{{ detail.is_refunded ? '供应商退款' : '转为在账资金' }}</div>
+                <div><span class="text-muted">退款方式：</span>{{ detail.is_refunded ? (detail.refund_status === 'confirmed' ? '已退款' : '需要退款') : '转为在账资金' }}</div>
                 <div>
                   <span class="text-muted">退款状态：</span>
                   <span :class="refundStatusClass(detail.refund_status)">{{ refundStatusLabel(detail.refund_status) }}</span>

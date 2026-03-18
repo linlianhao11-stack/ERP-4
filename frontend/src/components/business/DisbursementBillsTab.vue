@@ -45,7 +45,6 @@
             <tr v-for="b in items" :key="b.id" class="hover:bg-elevated">
               <td class="px-2 py-2 font-mono text-[12px]">
                 <span class="max-w-48 truncate inline-block align-bottom" :title="b.bill_no">{{ b.bill_no }}</span>
-                <span v-if="b.bill_type === 'return_refund'" class="ml-1 px-1.5 py-0.5 text-xs bg-error/10 text-error rounded">退款</span>
               </td>
               <td class="px-2 py-2">{{ b.disbursement_date }}</td>
               <td class="px-2 py-2">{{ b.supplier_name }}</td>

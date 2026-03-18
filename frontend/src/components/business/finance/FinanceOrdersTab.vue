@@ -107,7 +107,7 @@
                 <td v-if="financeIsColumnVisible('employee')" class="px-2 py-2 text-muted">{{ o.employee_name || '-' }}</td>
                 <td v-if="financeIsColumnVisible('creator')" class="px-2 py-2 text-muted">{{ o.creator_name }}</td>
                 <td v-if="financeIsColumnVisible('created_at')" class="px-2 py-2 text-muted text-xs">{{ fmtDate(o.created_at) }}</td>
-                <td v-if="financeIsColumnVisible('refunded')" class="px-2 py-2 text-center"><span v-if="o.refunded" class="badge badge-warning text-xs">已退款</span><span v-else class="text-xs text-muted">-</span></td>
+                <td v-if="financeIsColumnVisible('refunded')" class="px-2 py-2 text-center"><span v-if="o.refunded && o.is_cleared" class="badge badge-green text-xs">已退款</span><span v-else-if="o.refunded" class="badge badge-warning text-xs">需要退款</span><span v-else class="text-xs text-muted">-</span></td>
                 <td v-if="financeIsColumnVisible('rebate_used')" class="px-2 py-2 text-right">{{ o.rebate_used ? '&#xA5;' + fmt(o.rebate_used) : '-' }}</td>
                 <td v-if="financeIsColumnVisible('account_set')" class="px-2 py-2">{{ o.account_set_name || '-' }}</td>
                 <td></td>

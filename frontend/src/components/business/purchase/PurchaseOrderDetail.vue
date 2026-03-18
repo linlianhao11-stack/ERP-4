@@ -30,7 +30,7 @@
           <h4 class="font-semibold text-sm text-warning mb-2">退货信息</h4>
           <div class="grid grid-cols-2 gap-2 text-sm">
             <div><span class="text-muted">退货金额:</span> <span class="font-semibold text-warning">¥{{ fmt(purchaseOrderDetail.return_amount) }}</span></div>
-            <div><span class="text-muted">退款状态:</span> <span :class="purchaseOrderDetail.is_refunded ? 'text-success' : 'text-error-emphasis'">{{ purchaseOrderDetail.is_refunded ? '已退款' : '转为在账资金' }}</span></div>
+            <div><span class="text-muted">退款状态:</span> <span :class="purchaseOrderDetail.is_refunded ? (purchaseOrderDetail.returns?.some(r => r.refund_status === 'confirmed') ? 'text-success' : 'text-warning') : 'text-error-emphasis'">{{ purchaseOrderDetail.is_refunded ? (purchaseOrderDetail.returns?.some(r => r.refund_status === 'confirmed') ? '已退款' : '需要退款（待确认）') : '转为在账资金' }}</span></div>
             <div v-if="purchaseOrderDetail.return_tracking_no"><span class="text-muted">退货物流:</span> {{ purchaseOrderDetail.return_tracking_no }}</div>
             <div v-if="purchaseOrderDetail.returned_by_name"><span class="text-muted">处理人:</span> {{ purchaseOrderDetail.returned_by_name }} {{ fmtDate(purchaseOrderDetail.returned_at) }}</div>
           </div>
