@@ -53,6 +53,29 @@ async def up(conn):
         if "already exists" not in str(e):
             logger.warning(f"添加 disbursement_refund_bills.purchase_return_id 外键失败: {e}")
 
+    # ── 2b. 先将 original_receipt_id / original_disbursement_id 改为 nullable（数据迁移需要）
+    col_info = await conn.execute_query_dict(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'receipt_refund_bills' AND column_name = 'original_receipt_id'"
+    )
+    if col_info and col_info[0]["is_nullable"] == "NO":
+        await conn.execute_query(
+            "ALTER TABLE receipt_refund_bills "
+            "ALTER COLUMN original_receipt_id DROP NOT NULL"
+        )
+        logger.info("receipt_refund_bills.original_receipt_id 已改为 nullable")
+
+    col_info2 = await conn.execute_query_dict(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'disbursement_refund_bills' AND column_name = 'original_disbursement_id'"
+    )
+    if col_info2 and col_info2[0]["is_nullable"] == "NO":
+        await conn.execute_query(
+            "ALTER TABLE disbursement_refund_bills "
+            "ALTER COLUMN original_disbursement_id DROP NOT NULL"
+        )
+        logger.info("disbursement_refund_bills.original_disbursement_id 已改为 nullable")
+
     # ── 3. 数据迁移：receipt_bills (bill_type='return_refund') → receipt_refund_bills ──
     # 仅在 bill_type 列存在时执行
     col_check = await conn.execute_query_dict(
@@ -75,7 +98,7 @@ async def up(conn):
                      status, confirmed_by_id, confirmed_at,
                      voucher_id, voucher_no, creator_id, created_at)
                 SELECT
-                    rb.bill_no || '-RF',
+                    SUBSTRING(rb.bill_no FROM 1 FOR 27) || '-RF',
                     rb.account_set_id,
                     rb.customer_id,
                     rb.return_order_id,
@@ -95,7 +118,7 @@ async def up(conn):
                 WHERE rb.bill_type = 'return_refund'
                   AND NOT EXISTS (
                       SELECT 1 FROM receipt_refund_bills rrf
-                      WHERE rrf.bill_no = rb.bill_no || '-RF'
+                      WHERE rrf.bill_no = SUBSTRING(rb.bill_no FROM 1 FOR 27) || '-RF'
                   )
             """)
             logger.info("receipt_bills (return_refund) 数据迁移完成")
@@ -138,7 +161,7 @@ async def up(conn):
                      status, confirmed_by_id, confirmed_at,
                      voucher_id, voucher_no, creator_id, created_at)
                 SELECT
-                    db.bill_no || '-RF',
+                    SUBSTRING(db.bill_no FROM 1 FOR 27) || '-RF',
                     db.account_set_id,
                     db.supplier_id,
                     db.purchase_return_id,
@@ -158,7 +181,7 @@ async def up(conn):
                 WHERE db.bill_type = 'return_refund'
                   AND NOT EXISTS (
                       SELECT 1 FROM disbursement_refund_bills drf
-                      WHERE drf.bill_no = db.bill_no || '-RF'
+                      WHERE drf.bill_no = SUBSTRING(db.bill_no FROM 1 FOR 27) || '-RF'
                   )
             """)
             logger.info("disbursement_bills (return_refund) 数据迁移完成")
@@ -192,30 +215,5 @@ async def up(conn):
     await conn.execute_query(
         "ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS refund_info TEXT NOT NULL DEFAULT ''"
     )
-
-    # ── 7. receipt_refund_bills.original_receipt_id 改为 nullable ───────
-    # 先检查当前是否为 NOT NULL，再执行 DROP NOT NULL
-    col_info = await conn.execute_query_dict(
-        "SELECT is_nullable FROM information_schema.columns "
-        "WHERE table_name = 'receipt_refund_bills' AND column_name = 'original_receipt_id'"
-    )
-    if col_info and col_info[0]["is_nullable"] == "NO":
-        await conn.execute_query(
-            "ALTER TABLE receipt_refund_bills "
-            "ALTER COLUMN original_receipt_id DROP NOT NULL"
-        )
-        logger.info("receipt_refund_bills.original_receipt_id 已改为 nullable")
-
-    # ── 8. disbursement_refund_bills.original_disbursement_id 改为 nullable ──
-    col_info2 = await conn.execute_query_dict(
-        "SELECT is_nullable FROM information_schema.columns "
-        "WHERE table_name = 'disbursement_refund_bills' AND column_name = 'original_disbursement_id'"
-    )
-    if col_info2 and col_info2[0]["is_nullable"] == "NO":
-        await conn.execute_query(
-            "ALTER TABLE disbursement_refund_bills "
-            "ALTER COLUMN original_disbursement_id DROP NOT NULL"
-        )
-        logger.info("disbursement_refund_bills.original_disbursement_id 已改为 nullable")
 
     logger.info("v030 退货退款模型重构迁移完成")
