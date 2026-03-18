@@ -176,9 +176,6 @@ async def export_units(user: User = Depends(require_permission("stock_view"))):
 
         # 列宽
         col_widths = [14, 24, 16, 22, 14, 10, 8, 12, 14, 12, 12, 24, 18]
-        for idx, w in enumerate(col_widths, 1):
-            ws.column_dimensions[chr(64 + idx) if idx <= 26 else ""].width = w
-        # 修正：openpyxl 用字母列名
         from openpyxl.utils import get_column_letter
         for idx, w in enumerate(col_widths, 1):
             ws.column_dimensions[get_column_letter(idx)].width = w
@@ -249,14 +246,6 @@ async def list_units(
     if warehouse_id:
         query = query.filter(warehouse_id=warehouse_id)
     if search:
-        query = query.filter(
-            code__icontains=search,
-        ) | DemoUnit.filter(
-            product__name__icontains=search,
-        ) | DemoUnit.filter(
-            product__sku__icontains=search,
-        )
-        # 重新组装带其他条件的搜索
         from tortoise.queryset import Q
         q = Q(code__icontains=search) | Q(product__name__icontains=search) | Q(product__sku__icontains=search)
         query = DemoUnit.all().filter(q)
@@ -266,7 +255,7 @@ async def list_units(
             query = query.filter(warehouse_id=warehouse_id)
 
     total = await query.count()
-    units = await query.offset((page - 1) * page_size).limit(page_size).select_related(
+    units = await query.order_by("-created_at").offset((page - 1) * page_size).limit(page_size).select_related(
         "product", "warehouse", "sn_code",
     )
     items = [await _serialize_unit(u) for u in units]

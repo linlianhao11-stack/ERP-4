@@ -16,7 +16,7 @@ from app.models import (
 from app.services.stock_service import update_weighted_entry_date
 from app.services.ar_service import create_receivable_bill
 from app.utils.generators import generate_sequential_no, generate_order_no
-from app.utils.time import now, days_between
+from app.utils.time import now
 from app.logger import get_logger
 
 logger = get_logger("demo")
@@ -185,10 +185,19 @@ async def create_demo_unit(data, user) -> DemoUnit:
 
 # ── 借还流程 ──
 
+@transactions.atomic()
 async def create_demo_loan(data, user) -> DemoLoan:
     """创建借出申请"""
     unit = await _get_unit(data.demo_unit_id)
     _require_status(unit, "in_stock")
+
+    # 一机一借：检查是否已有进行中的借出记录
+    existing = await DemoLoan.filter(
+        demo_unit_id=data.demo_unit_id,
+        status__in=["pending_approval", "approved", "lent_out"],
+    ).count()
+    if existing > 0:
+        raise HTTPException(status_code=400, detail="该样机已有进行中的借出记录")
 
     # 验证借用人
     if data.borrower_type == "customer":
@@ -244,6 +253,7 @@ async def reject_demo_loan(loan_id: int, user) -> DemoLoan:
         raise HTTPException(status_code=400, detail="仅待审批状态可拒绝")
 
     loan.status = "rejected"
+    # 复用 approved_by/approved_at 记录拒绝人和时间
     loan.approved_by = user
     loan.approved_at = now()
     await loan.save()
@@ -512,7 +522,7 @@ async def scrap_demo_unit(unit_id: int, data, user) -> DemoDisposal:
         remark=f"样机报废 {unit.code}: {data.reason}", creator=user,
     )
 
-    # 更新 SN 码状态
+    # SN 码标记为 shipped（已出库），当前 SN 体系无 disposed 状态
     if unit.sn_code_id:
         await SnCode.filter(id=unit.sn_code_id).update(status="shipped")
 
@@ -574,7 +584,7 @@ async def report_loss_demo_unit(unit_id: int, data, user) -> DemoDisposal:
         remark=f"样机丢失 {unit.code}: {data.description}", creator=user,
     )
 
-    # 更新 SN 码状态
+    # SN 码标记为 shipped（已出库），当前 SN 体系无 disposed 状态
     if unit.sn_code_id:
         await SnCode.filter(id=unit.sn_code_id).update(status="shipped")
 
