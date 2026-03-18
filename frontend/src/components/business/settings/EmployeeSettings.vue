@@ -173,7 +173,7 @@ const handleCreateEmployee = async () => {
     await createEmployee({
       code: newEmpCode.value.trim(),
       name: newEmpName.value.trim(),
-      phone: newEmpPhone.value.trim() || null,
+      phone: newEmpPhone.value.trim(),
       department_id: newEmpDeptId.value || null,
       is_salesperson: newEmpIsSalesperson.value
     })

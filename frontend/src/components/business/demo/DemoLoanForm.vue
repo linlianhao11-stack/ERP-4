@@ -248,7 +248,7 @@ const selectHandler = (h) => {
 // 加载数据
 const loadAvailableUnits = async () => {
   try {
-    const { data } = await getDemoUnits({ status: 'in_stock', page_size: 500 })
+    const { data } = await getDemoUnits({ status: 'in_stock', page_size: 200 })
     availableUnits.value = data.items || []
   } catch (e) {
     console.error('加载可借样机失败:', e)
