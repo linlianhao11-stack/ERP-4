@@ -23,12 +23,17 @@ logger = get_logger("migrations")
 _VERSION_RE = re.compile(r"^(v\d{3})_.+\.py$")
 
 # 基线版本：v001-v028 是从旧 migrations.py 拆分出的，已有数据库不需要重新执行
+# 版本号采用 3 位零填充（v001, v002, ...），确保字符串字典序与数字顺序一致
 _BASELINE_MAX = "v028"
 
 
 async def run_migrations():
     """迁移入口（与旧 API 保持一致）"""
     pool = connections.get("default")
+    # pg_advisory_lock 是会话级锁，在连接池环境中 lock/unlock
+    # 可能分配到不同连接导致锁失效。改用原始连接 + 阻塞式锁：
+    # 第一个 worker 获取锁并执行迁移，第二个 worker 阻塞等待，
+    # 等锁释放后所有迁移已完成，幂等检查会让它直接跳过。
     raw_conn = await pool._pool.acquire()
     try:
         await raw_conn.execute("SELECT pg_advisory_lock(20260315)")
@@ -52,7 +57,7 @@ async def _ensure_history_table(conn):
     """)
 
 
-async def _get_applied_versions(conn) -> set:
+async def _get_applied_versions(conn) -> set[str]:
     """获取已执行的迁移版本号集合"""
     rows = await conn.execute_query_dict(
         "SELECT version FROM migration_history"
@@ -60,7 +65,7 @@ async def _get_applied_versions(conn) -> set:
     return {row["version"] for row in rows}
 
 
-def _discover_migrations() -> list:
+def _discover_migrations() -> list[tuple[str, str]]:
     """扫描 migrations/ 目录，返回 [(version, module_name), ...] 按版本排序"""
     migrations_dir = os.path.dirname(__file__)
     results = []
@@ -126,6 +131,10 @@ async def _run_versioned_migrations():
         logger.info(f"执行迁移: {module_name}")
         try:
             mod = importlib.import_module(f"app.migrations.{module_name}")
+            if not hasattr(mod, "up"):
+                raise AttributeError(
+                    f"迁移模块 {module_name} 缺少 up() 函数"
+                )
             await mod.up(conn)
             await conn.execute_query(
                 "INSERT INTO migration_history (version, name) VALUES ($1, $2)",
