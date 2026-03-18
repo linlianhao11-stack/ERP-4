@@ -684,6 +684,11 @@ async def receive_purchase_order(po_id: int, data: ReceiveRequest, user: User = 
             )
 
             poi.received_quantity += recv_item.receive_quantity
+            # 回写实际收货仓库/仓位，确保退货时能找到对应仓库
+            if not poi.target_warehouse_id:
+                poi.target_warehouse_id = wh_id
+            if not poi.target_location_id:
+                poi.target_location_id = loc_id
             await poi.save()
             received_details.append(f"{poi.product.name}×{recv_item.receive_quantity}")
 
@@ -801,6 +806,15 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
 
             # 从仓库扣减库存（汇总该仓库所有仓位的库存）
             wh_id = poi.target_warehouse_id or po.target_warehouse_id
+            if not wh_id:
+                # 回溯：从收货时的库存日志中查找实际入库仓库
+                stock_log = await StockLog.filter(
+                    product_id=poi.product_id, reference_id=po.id,
+                    reference_type="PURCHASE_ORDER",
+                    change_type=StockChangeType.PURCHASE_IN.value,
+                ).order_by("-id").first()
+                if stock_log:
+                    wh_id = stock_log.warehouse_id
             if not wh_id:
                 raise HTTPException(status_code=400, detail=f"{poi.product.name} 缺少仓库信息，无法退货扣减库存")
 
