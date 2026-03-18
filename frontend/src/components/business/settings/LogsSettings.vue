@@ -9,17 +9,102 @@
     <div class="flex gap-2 mb-3 flex-wrap">
       <select v-model="opLogFilter" @change="loadOpLogs" class="input w-auto text-sm">
         <option value="">全部操作</option>
-        <option value="ORDER_CREATE">创建订单</option>
-        <option value="PAYMENT_CREATE">账期收款</option>
-        <option value="PAYMENT_CONFIRM">确认收款</option>
-        <option value="STOCK_RESTOCK">入库</option>
-        <option value="PURCHASE_CREATE">采购下单</option>
-        <option value="PURCHASE_PAY">采购付款</option>
-        <option value="PURCHASE_RECEIVE">采购收货</option>
-        <option value="STOCK_TRANSFER">库存调拨</option>
-        <option value="STOCK_ADJUST">库存调整</option>
-        <option value="USER_CREATE">创建用户</option>
-        <option value="USER_TOGGLE">禁用/启用用户</option>
+        <optgroup label="认证安全">
+          <option value="LOGIN_SUCCESS">登录成功</option>
+          <option value="LOGIN_FAIL">登录失败</option>
+          <option value="PASSWORD_CHANGE">修改密码</option>
+        </optgroup>
+        <optgroup label="用户管理">
+          <option value="USER_CREATE">创建用户</option>
+          <option value="USER_TOGGLE">禁用/启用用户</option>
+          <option value="USER_ROLE_CHANGE">角色变更</option>
+          <option value="USER_PERMISSION_CHANGE">权限变更</option>
+        </optgroup>
+        <optgroup label="订单">
+          <option value="ORDER_CREATE">创建订单</option>
+          <option value="ORDER_CANCEL">取消订单</option>
+          <option value="ORDER_UPDATE_REMARK">修改备注</option>
+        </optgroup>
+        <optgroup label="代发货">
+          <option value="DROPSHIP_CREATE">创建代发</option>
+          <option value="DROPSHIP_SUBMIT">提交代发</option>
+          <option value="DROPSHIP_SHIP">代发发货</option>
+          <option value="DROPSHIP_COMPLETE">完成代发</option>
+          <option value="DROPSHIP_CANCEL">取消代发</option>
+          <option value="DROPSHIP_BATCH_PAY">批量支付</option>
+        </optgroup>
+        <optgroup label="采购">
+          <option value="PURCHASE_CREATE">采购下单</option>
+          <option value="PURCHASE_PAY">采购付款</option>
+          <option value="PURCHASE_APPROVE">采购审核</option>
+          <option value="PURCHASE_REJECT">采购拒绝</option>
+          <option value="PURCHASE_CANCEL">采购取消</option>
+          <option value="PURCHASE_RECEIVE">采购收货</option>
+          <option value="PURCHASE_RETURN">采购退货</option>
+        </optgroup>
+        <optgroup label="库存">
+          <option value="STOCK_RESTOCK">入库</option>
+          <option value="STOCK_ADJUST">库存调整</option>
+          <option value="STOCK_TRANSFER">库存调拨</option>
+        </optgroup>
+        <optgroup label="物流">
+          <option value="SHIPMENT_CREATE">创建发货单</option>
+          <option value="SHIPMENT_UPDATE">更新发货单</option>
+          <option value="SHIPMENT_DELETE">删除发货单</option>
+        </optgroup>
+        <optgroup label="财务收款">
+          <option value="PAYMENT_CREATE">账期收款</option>
+          <option value="PAYMENT_CONFIRM">确认收款</option>
+        </optgroup>
+        <optgroup label="发票">
+          <option value="INVOICE_CREATE">创建发票</option>
+          <option value="INVOICE_UPDATE">更新发票</option>
+          <option value="INVOICE_CONFIRM">确认发票</option>
+          <option value="INVOICE_VOID">作废发票</option>
+          <option value="INVOICE_CANCEL">取消发票</option>
+        </optgroup>
+        <optgroup label="凭证">
+          <option value="VOUCHER_CREATE">创建凭证</option>
+          <option value="VOUCHER_SUBMIT">提交凭证</option>
+          <option value="VOUCHER_APPROVE">审核凭证</option>
+          <option value="VOUCHER_REJECT">驳回凭证</option>
+          <option value="VOUCHER_POST">过账</option>
+          <option value="VOUCHER_UNPOST">反过账</option>
+          <option value="VOUCHER_BATCH_SUBMIT">批量提交</option>
+          <option value="VOUCHER_BATCH_APPROVE">批量审核</option>
+          <option value="VOUCHER_BATCH_POST">批量过账</option>
+        </optgroup>
+        <optgroup label="客户/供应商">
+          <option value="CUSTOMER_CREATE">新建客户</option>
+          <option value="CUSTOMER_UPDATE">更新客户</option>
+          <option value="CUSTOMER_DELETE">删除客户</option>
+          <option value="SUPPLIER_CREATE">新建供应商</option>
+          <option value="SUPPLIER_UPDATE">更新供应商</option>
+          <option value="SUPPLIER_DELETE">删除供应商</option>
+          <option value="CREDIT_REFUND">在账资金退款</option>
+        </optgroup>
+        <optgroup label="产品">
+          <option value="PRODUCT_CREATE">新建产品</option>
+          <option value="PRODUCT_UPDATE">更新产品</option>
+          <option value="PRODUCT_DELETE">删除产品</option>
+          <option value="PRODUCT_IMPORT">导入产品</option>
+        </optgroup>
+        <optgroup label="数据导出">
+          <option value="PRODUCT_EXPORT">导出产品</option>
+          <option value="STOCK_EXPORT">导出库存</option>
+          <option value="ORDER_EXPORT">导出订单</option>
+          <option value="PURCHASE_EXPORT">导出采购单</option>
+          <option value="VOUCHER_EXPORT">导出凭证</option>
+          <option value="LEDGER_EXPORT">导出账簿</option>
+          <option value="REPORT_EXPORT">导出报表</option>
+          <option value="DEMO_EXPORT">导出样机</option>
+        </optgroup>
+        <optgroup label="系统">
+          <option value="BACKUP_CREATE">创建备份</option>
+          <option value="BACKUP_RESTORE">恢复备份</option>
+          <option value="BACKUP_DOWNLOAD">下载备份</option>
+          <option value="BACKUP_DELETE">删除备份</option>
+        </optgroup>
       </select>
       <button @click="loadOpLogs" class="btn btn-secondary btn-sm">刷新</button>
     </div>
