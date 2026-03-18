@@ -28,6 +28,7 @@ from app.utils.pagination import apply_cursor_pagination, encode_cursor
 from app.utils.batch_load import batch_load_related
 from app.logger import get_logger
 from app.utils.response import paginated_response
+from app.services.operation_log_service import log_operation
 
 logger = get_logger("logistics")
 
@@ -509,6 +510,8 @@ async def ship_order_items(order_id: int, data: ShipRequest, user: User = Depend
         except Exception as e:
             logger.warning("订阅快递100失败", extra={"data": {"shipment_id": shipment.id, "error": str(e)}})
 
+    await log_operation(user, "SHIPMENT_CREATE", "SHIPMENT", target_id=shipment.id, detail=f"订单 {order.order_no} 创建发货单")
+
     return {
         "message": _no_logistics_message(data.carrier_code) if is_no_logistics else "发货成功",
         "shipment": _shipment_to_dict(shipment),
@@ -556,6 +559,8 @@ async def add_shipment(order_id: int, data: ShipmentUpdate, user: User = Depends
         except Exception as e:
             logger.warning(f"KD100订阅失败（不影响物流单创建）: {e}")
 
+    await log_operation(user, "SHIPMENT_ADD", "SHIPMENT", target_id=shipment.id, detail=f"订单 {order.order_no} 追加发货单")
+
     return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "物流单已添加", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
 
@@ -596,6 +601,8 @@ async def ship_order(shipment_id: int, data: ShipmentUpdate, user: User = Depend
         except Exception as e:
             logger.warning(f"KD100订阅失败（不影响发货）: {e}")
 
+    await log_operation(user, "SHIPMENT_UPDATE", "SHIPMENT", target_id=shipment.id, detail=f"更新发货单 #{shipment.id}")
+
     return {"message": _no_logistics_message(data.carrier_code) if is_no_logistics else "发货信息已保存", "shipment": _shipment_to_dict(shipment, tracking_info)}
 
 
@@ -620,6 +627,8 @@ async def update_shipment_sn(shipment_id: int, data: SNCodeUpdate, user: User = 
 
         shipment.sn_code = data.sn_code or None
         await shipment.save()
+
+    await log_operation(user, "SHIPMENT_UPDATE_SN", "SHIPMENT", target_id=shipment.id, detail=f"更新发货单 SN 码 #{shipment.id}")
 
     return {"message": "SN码已保存", "shipment": _shipment_to_dict(shipment)}
 
@@ -750,6 +759,8 @@ async def delete_shipment(shipment_id: int, user: User = Depends(require_permiss
                 else:
                     order.shipping_status = ShippingStatus.PENDING.value
                 await order.save()
+
+    await log_operation(user, "SHIPMENT_DELETE", "SHIPMENT", target_id=shipment_id, detail=f"删除发货单 #{shipment_id}，订单 {order.order_no}" if order else f"删除发货单 #{shipment_id}")
 
     return {"message": "物流单已删除"}
 

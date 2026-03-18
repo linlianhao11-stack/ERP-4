@@ -329,6 +329,7 @@ async def export_orders(
     output.seek(0)
     filename = f"订单明细_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
+    await log_operation(user, "ORDER_EXPORT", "ORDER", None, "导出订单列表 CSV")
     return StreamingResponse(
         iter([output.getvalue().encode('utf-8')]),
         media_type="text/csv",

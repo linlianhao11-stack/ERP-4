@@ -26,6 +26,7 @@ from app.services.dropship_service import (
 )
 from app.utils.time import now
 from app.utils.errors import parse_date
+from app.services.operation_log_service import log_operation
 
 logger = get_logger("dropship")
 
@@ -505,6 +506,8 @@ async def create_order(
 ):
     """创建代采代发订单，submit=true 时自动提交"""
     order = await create_dropship_order(data, user, submit=submit)
+    await log_operation(user, "DROPSHIP_CREATE", "DROPSHIP_ORDER", target_id=order.id, detail=f"创建代发订单 {order.ds_no}")
+
     return {
         "id": order.id,
         "ds_no": order.ds_no,
@@ -560,6 +563,7 @@ async def update_order(
 
     await order.save()
     logger.info(f"更新代采代发订单: {order.ds_no}")
+    await log_operation(user, "DROPSHIP_UPDATE", "DROPSHIP_ORDER", target_id=order.id, detail=f"更新代发订单 {order.ds_no}")
 
     return {
         "id": order.id,
@@ -582,6 +586,8 @@ async def submit_order(
 ):
     """提交代采代发订单（草稿 → 待付款）"""
     order = await submit_dropship_order(order_id, user)
+    await log_operation(user, "DROPSHIP_SUBMIT", "DROPSHIP_ORDER", target_id=order.id, detail=f"提交代发订单 {order.ds_no}")
+
     return {
         "id": order.id,
         "ds_no": order.ds_no,
@@ -608,6 +614,7 @@ async def urge_payment(
     order.urged_at = now()
     await order.save()
     logger.info(f"代采代发催付: {order.ds_no}")
+    await log_operation(user, "DROPSHIP_URGE", "DROPSHIP_ORDER", target_id=order.id, detail=f"催付代发订单 {order.ds_no}")
 
     return {
         "id": order.id,
@@ -631,6 +638,8 @@ async def batch_pay(
         employee_id=data.employee_id,
         user=user,
     )
+    await log_operation(user, "DROPSHIP_BATCH_PAY", "DROPSHIP_ORDER", detail=f"批量支付代发订单 {len(data.order_ids)} 笔")
+
     return result
 
 
@@ -652,6 +661,8 @@ async def ship_order(
         phone=data.phone,
         user=user,
     )
+    await log_operation(user, "DROPSHIP_SHIP", "DROPSHIP_ORDER", target_id=order.id, detail=f"代发订单 {order.ds_no} 确认发货")
+
     return {
         "id": order.id,
         "ds_no": order.ds_no,
@@ -690,6 +701,8 @@ async def refresh_tracking(
                     logger.info(f"快递已签收，自动完成: {order.ds_no}")
             await order.save()
 
+            await log_operation(user, "DROPSHIP_REFRESH", "DROPSHIP_ORDER", target_id=order.id, detail=f"刷新代发订单 {order.ds_no} 物流信息")
+
             return {
                 "id": order.id,
                 "ds_no": order.ds_no,
@@ -698,6 +711,8 @@ async def refresh_tracking(
                 "tracking_status": _parse_tracking_status(order.last_tracking_info, order.status),
             }
         else:
+            await log_operation(user, "DROPSHIP_REFRESH", "DROPSHIP_ORDER", target_id=order.id, detail=f"刷新代发订单 {order.ds_no} 物流信息")
+
             return {
                 "id": order.id,
                 "message": resp.get("message", "查询无结果"),
@@ -728,6 +743,7 @@ async def complete_order(
     order.status = "completed"
     await order.save()
     logger.info(f"代采代发手动完成: {order.ds_no}")
+    await log_operation(user, "DROPSHIP_COMPLETE", "DROPSHIP_ORDER", target_id=order.id, detail=f"完成代发订单 {order.ds_no}")
 
     return {
         "id": order.id,
@@ -747,6 +763,8 @@ async def cancel_order(
 ):
     """取消订单：按状态分别处理冲销逻辑"""
     order = await cancel_dropship_order(order_id, data.reason, user)
+    await log_operation(user, "DROPSHIP_CANCEL", "DROPSHIP_ORDER", target_id=order.id, detail=f"取消代发订单 {order.ds_no}")
+
     return {
         "id": order.id,
         "ds_no": order.ds_no,

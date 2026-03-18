@@ -9,6 +9,7 @@ from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, SystemSetting
 from app.schemas.ai import ChatRequest, FeedbackRequest, ExportRequest
 from app.services.ai_chat_service import process_chat, check_ai_available, get_preset_queries
+from app.services.operation_log_service import log_operation
 from app.ai.rate_limiter import user_limiter, global_limiter
 from app.config import DATABASE_URL, AI_DB_PASSWORD
 from app.logger import get_logger
@@ -140,6 +141,7 @@ async def ai_export(body: ExportRequest, user: User = Depends(require_permission
     filename = f"{body.title}.xlsx"
     from urllib.parse import quote
     encoded_name = quote(filename)
+    await log_operation(user, "AI_EXPORT", "SYSTEM", None, f"AI 对话导出 Excel: {body.title}")
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

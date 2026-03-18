@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
+from app.services.operation_log_service import log_operation
 from app.utils.response import paginated_response
 
 
@@ -66,6 +67,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
         if data.account_set_id is not None:
             create_kwargs["account_set_id"] = data.account_set_id
         m = await model_class.create(**create_kwargs)
+        await log_operation(user, f"{entity_name.upper()}_CREATE", entity_name.upper(), m.id, f"新增{tag} {code} {name}")
         return {"id": m.id, "message": "添加成功"}
 
     @router.put("/{method_id}")
@@ -87,6 +89,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
                     raise HTTPException(status_code=400, detail="编码已存在")
             m.code = data.code.strip()
         await m.save()
+        await log_operation(user, f"{entity_name.upper()}_UPDATE", entity_name.upper(), m.id, f"更新{tag} {m.code} {m.name}")
         return {"message": "更新成功"}
 
     @router.delete("/{method_id}")
@@ -96,6 +99,7 @@ def create_method_router(prefix: str, tag: str, model_class, entity_name: str):
             raise HTTPException(status_code=404, detail=f"{entity_name}不存在")
         m.is_active = False
         await m.save()
+        await log_operation(user, f"{entity_name.upper()}_DELETE", entity_name.upper(), m.id, f"删除{tag} {m.code} {m.name}")
         return {"message": "删除成功"}
 
     return router

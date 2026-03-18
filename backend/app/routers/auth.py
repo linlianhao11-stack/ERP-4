@@ -54,6 +54,8 @@ async def login(data: LoginRequest, request: Request):
         if not user or not verify_password(data.password, user.password_hash):
             attempts.append(now_ts)
             _login_attempts[client_ip] = attempts
+            await log_operation(user, "LOGIN_FAIL", "AUTH", None,
+                f"登录失败，用户名: {data.username}，IP: {client_ip}")
             raise HTTPException(status_code=401, detail="用户名或密码错误")
         # Success - clear attempts
         _login_attempts.pop(client_ip, None)

@@ -160,6 +160,7 @@ async def export_products(user: User = Depends(require_permission("stock_view"))
     output = io.BytesIO()
     df.to_excel(output, index=False, engine='openpyxl')
     output.seek(0)
+    await log_operation(user, "PRODUCT_EXPORT", "PRODUCT", None, "导出产品列表 Excel")
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -492,6 +493,8 @@ async def import_products(file: UploadFile = File(...), user: User = Depends(req
     if stocked > 0: msg_parts.append(f"入库{stocked}条")
     if skipped > 0: msg_parts.append(f"跳过{skipped}条")
 
+    await log_operation(user, "PRODUCT_IMPORT", "PRODUCT", None,
+        f"批量导入产品，新增 {created} 条，更新 {updated} 条，入库 {stocked} 条")
     result = {"message": f"导入完成: {', '.join(msg_parts) if msg_parts else '无数据处理'}"}
     if errors:
         result["errors"] = errors[:20]
@@ -528,6 +531,7 @@ async def get_product(product_id: int, user: User = Depends(get_current_user)):
 async def create_product(data: ProductCreate, user: User = Depends(require_permission("stock_edit"))):
     sku = await _generate_next_sku()
     p = await Product.create(sku=sku, **data.model_dump())
+    await log_operation(user, "PRODUCT_CREATE", "PRODUCT", p.id, f"新建产品 {p.sku} {p.name}")
     return {"id": p.id, "sku": sku, "message": "创建成功"}
 
 
@@ -539,6 +543,7 @@ async def update_product(product_id: int, data: ProductUpdate, user: User = Depe
     update_data = data.model_dump(exclude_unset=True)
     if update_data:
         await Product.filter(id=product_id).update(**update_data)
+    await log_operation(user, "PRODUCT_UPDATE", "PRODUCT", p.id, f"更新产品 {p.sku} {p.name}")
     return {"message": "更新成功"}
 
 
@@ -549,4 +554,5 @@ async def delete_product(product_id: int, user: User = Depends(require_permissio
         raise HTTPException(status_code=404, detail="商品不存在")
     p.is_active = False
     await p.save()
+    await log_operation(user, "PRODUCT_DELETE", "PRODUCT", p.id, f"删除产品 {p.sku} {p.name}")
     return {"message": "删除成功"}

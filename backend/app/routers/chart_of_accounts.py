@@ -6,6 +6,7 @@ from app.models import User
 from app.models.accounting import AccountSet, ChartOfAccount
 from app.models.voucher import VoucherEntry
 from app.schemas.accounting import ChartOfAccountCreate, ChartOfAccountUpdate
+from app.services.operation_log_service import log_operation
 from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/chart-of-accounts", tags=["会计科目"])
@@ -70,6 +71,7 @@ async def create_account(
                 account_set_id=account_set_id, code=data.parent_code
             ).update(is_leaf=False)
 
+    await log_operation(user, "ACCOUNT_CREATE", "ACCOUNT", account.id, f"新建科目 {data.code} {data.name}")
     return {"id": account.id, "message": "创建成功"}
 
 
@@ -85,6 +87,7 @@ async def update_account(
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items()}
     if update_data:
         await ChartOfAccount.filter(id=account_id).update(**update_data)
+    await log_operation(user, "ACCOUNT_UPDATE", "ACCOUNT", account.id, f"更新科目 {account.code}")
     return {"message": "更新成功"}
 
 
@@ -106,4 +109,5 @@ async def deactivate_account(
         raise HTTPException(status_code=400, detail="该科目已被凭证引用，无法停用")
     account.is_active = False
     await account.save()
+    await log_operation(user, "ACCOUNT_DEACTIVATE", "ACCOUNT", account.id, f"停用科目 {account.code}")
     return {"message": "已停用"}

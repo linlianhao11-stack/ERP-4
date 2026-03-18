@@ -14,6 +14,7 @@ from app.models.voucher import Voucher, VoucherEntry
 from app.models.system_setting import SystemSetting
 from app.schemas.accounting import VoucherCreate, VoucherUpdate
 from app.logger import get_logger
+from app.services.operation_log_service import log_operation
 from tortoise.expressions import Q
 from io import BytesIO
 from starlette.responses import StreamingResponse as _StreamingResponse
@@ -113,6 +114,7 @@ async def batch_submit_vouchers(
             v.status = "pending"
             await v.save()
             success.append(v.id)
+    await log_operation(user, "VOUCHER_BATCH_SUBMIT", "VOUCHER", None, f"批量提交 {len(success)} 张凭证")
     return {"success": success, "failed": failed}
 
 
@@ -138,6 +140,7 @@ async def batch_approve_vouchers(
             v.approved_at = datetime.now(timezone.utc)
             await v.save()
             success.append(v.id)
+    await log_operation(user, "VOUCHER_BATCH_APPROVE", "VOUCHER", None, f"批量审核 {len(success)} 张凭证")
     return {"success": success, "failed": failed}
 
 
@@ -165,6 +168,7 @@ async def batch_post_vouchers(
             v.posted_at = datetime.now(timezone.utc)
             await v.save()
             success.append(v.id)
+    await log_operation(user, "VOUCHER_BATCH_POST", "VOUCHER", None, f"批量过账 {len(success)} 张凭证")
     return {"success": success, "failed": failed}
 
 
@@ -279,6 +283,7 @@ async def export_voucher_entries(
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
+    await log_operation(user, "VOUCHER_EXPORT", "VOUCHER", None, "导出凭证分录 Excel")
     return _StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -410,6 +415,7 @@ async def create_voucher(
             )
 
     logger.info(f"创建凭证: {voucher_no}")
+    await log_operation(user, "VOUCHER_CREATE", "VOUCHER", v.id, f"创建凭证 {voucher_no}")
     return {"id": v.id, "voucher_no": voucher_no, "message": "创建成功"}
 
 
@@ -481,6 +487,7 @@ async def update_voucher(
         if update_fields:
             await Voucher.filter(id=voucher_id).update(**update_fields)
 
+    await log_operation(user, "VOUCHER_UPDATE", "VOUCHER", v.id, f"更新凭证 {v.voucher_no}")
     return {"message": "更新成功"}
 
 
@@ -494,9 +501,11 @@ async def delete_voucher(
         raise HTTPException(status_code=404, detail="凭证不存在")
     if v.status != "draft":
         raise HTTPException(status_code=400, detail="只有草稿状态的凭证可以删除")
+    voucher_no = v.voucher_no
     async with transactions.in_transaction():
         await VoucherEntry.filter(voucher=v).delete()
         await v.delete()
+    await log_operation(user, "VOUCHER_DELETE", "VOUCHER", v.id, f"删除凭证 {voucher_no}")
     return {"message": "删除成功"}
 
 
@@ -512,6 +521,7 @@ async def submit_voucher(
         raise HTTPException(status_code=400, detail="只有草稿状态的凭证可以提交")
     v.status = "pending"
     await v.save()
+    await log_operation(user, "VOUCHER_SUBMIT", "VOUCHER", v.id, f"提交凭证 {v.voucher_no}")
     return {"message": "已提交审核"}
 
 
@@ -535,6 +545,7 @@ async def approve_voucher(
     v.approved_by = user
     v.approved_at = datetime.now(timezone.utc)
     await v.save()
+    await log_operation(user, "VOUCHER_APPROVE", "VOUCHER", v.id, f"审核凭证 {v.voucher_no}")
     return {"message": "审核通过"}
 
 
@@ -550,6 +561,7 @@ async def reject_voucher(
         raise HTTPException(status_code=400, detail="只有待审核状态的凭证可以驳回")
     v.status = "draft"
     await v.save()
+    await log_operation(user, "VOUCHER_REJECT", "VOUCHER", v.id, f"驳回凭证 {v.voucher_no}")
     return {"message": "已驳回"}
 
 
@@ -567,6 +579,7 @@ async def post_voucher(
     v.posted_by = user
     v.posted_at = datetime.now(timezone.utc)
     await v.save()
+    await log_operation(user, "VOUCHER_POST", "VOUCHER", v.id, f"过账凭证 {v.voucher_no}")
     return {"message": "过账成功"}
 
 
@@ -589,6 +602,7 @@ async def unpost_voucher(
     v.posted_by = None
     v.posted_at = None
     await v.save()
+    await log_operation(user, "VOUCHER_UNPOST", "VOUCHER", v.id, f"反过账凭证 {v.voucher_no}")
     return {"message": "反过账成功"}
 
 

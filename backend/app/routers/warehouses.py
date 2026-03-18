@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User, Warehouse, Location, WarehouseStock, AccountSet
 from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
+from app.services.operation_log_service import log_operation
 from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/warehouses", tags=["仓库管理"])
@@ -53,6 +54,7 @@ async def create_warehouse(data: WarehouseCreate, user: User = Depends(require_p
         if data.account_set_id is not None:
             create_kwargs["account_set_id"] = data.account_set_id
         wh = await Warehouse.create(**create_kwargs)
+    await log_operation(user, "WAREHOUSE_CREATE", "WAREHOUSE", wh.id, f"新建仓库 {data.name}")
     return {"id": wh.id, "message": "创建成功"}
 
 
@@ -73,6 +75,7 @@ async def update_warehouse(warehouse_id: int, data: WarehouseUpdate, user: User 
             await Warehouse.filter(is_default=True).update(is_default=False)
         if update_data:
             await Warehouse.filter(id=warehouse_id).update(**update_data)
+    await log_operation(user, "WAREHOUSE_UPDATE", "WAREHOUSE", wh.id, f"更新仓库 {wh.name}")
     return {"message": "更新成功"}
 
 
@@ -93,4 +96,5 @@ async def delete_warehouse(warehouse_id: int, user: User = Depends(require_permi
         raise HTTPException(status_code=400, detail="仓库下有仓位，请先删除仓位")
     wh.is_active = False
     await wh.save()
+    await log_operation(user, "WAREHOUSE_DELETE", "WAREHOUSE", wh.id, f"删除仓库 {wh.name}")
     return {"message": "删除成功"}

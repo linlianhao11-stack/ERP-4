@@ -4,6 +4,7 @@ from typing import Optional
 from app.auth.dependencies import get_current_user, require_permission
 from app.models import User
 from app.models.department import Department
+from app.services.operation_log_service import log_operation
 from app.utils.response import paginated_response
 
 router = APIRouter(prefix="/api/departments", tags=["部门管理"])
@@ -33,6 +34,7 @@ async def create_department(data: DepartmentCreate, user: User = Depends(require
     max_sort = await Department.all().order_by("-sort_order").first()
     sort_order = (max_sort.sort_order + 1) if max_sort else 1
     d = await Department.create(code=code, name=data.name.strip(), sort_order=sort_order)
+    await log_operation(user, "DEPARTMENT_CREATE", "DEPARTMENT", d.id, f"新建部门 {data.name}")
     return {"id": d.id, "message": "添加成功"}
 
 
@@ -48,6 +50,7 @@ async def update_department(dept_id: int, data: DepartmentUpdate, user: User = D
             raise HTTPException(status_code=400, detail="部门编码已存在")
         d.code = data.code.strip()
     await d.save()
+    await log_operation(user, "DEPARTMENT_UPDATE", "DEPARTMENT", d.id, f"更新部门 {d.name}")
     return {"message": "更新成功"}
 
 
@@ -62,4 +65,5 @@ async def delete_department(dept_id: int, user: User = Depends(require_permissio
         raise HTTPException(status_code=400, detail=f"该部门下有 {active_employees} 名在职员工，无法删除")
     d.is_active = False
     await d.save()
+    await log_operation(user, "DEPARTMENT_DELETE", "DEPARTMENT", d.id, f"删除部门 {d.name}")
     return {"message": "删除成功"}
