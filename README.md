@@ -224,9 +224,8 @@ npm run build
 
 ## API 文档
 
-启动后端后访问：
-- Swagger UI: `http://localhost:8090/docs`
-- ReDoc: `http://localhost:8090/redoc`
+- **端点索引**：[API_INDEX.md](./API_INDEX.md)（全部 240+ 个端点，无需启动即可查看）
+- **交互式文档**：需设置 `DEBUG=true` 后访问 `http://localhost:8090/docs`（Swagger UI）或 `/redoc`，生产环境默认关闭
 
 ## 权限体系
 
