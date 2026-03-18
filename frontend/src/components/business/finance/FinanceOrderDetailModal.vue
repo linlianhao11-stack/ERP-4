@@ -8,10 +8,10 @@ import { useAppStore } from '../../../stores/app'
 import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
-import { getOrder, createOrder } from '../../../api/orders'
+import { getOrder, createOrder, updateOrderRemark } from '../../../api/orders'
 import { getLocations } from '../../../api/warehouses'
 import StatusBadge from '../../common/StatusBadge.vue'
-import { Maximize2, Minimize2, Copy } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Copy, Pencil } from 'lucide-vue-next'
 
 const props = defineProps({
   orderId: { type: Number, default: null },
@@ -27,6 +27,35 @@ const { hasPermission } = usePermission()
 // --- 详情状态 ---
 const isDetailExpanded = ref(false)
 const orderDetail = reactive({})
+
+// --- 备注编辑状态 ---
+const isEditingRemark = ref(false)
+const editingRemark = ref('')
+const remarkSaving = ref(false)
+
+const startEditRemark = () => {
+  editingRemark.value = orderDetail.remark || ''
+  isEditingRemark.value = true
+}
+
+const cancelEditRemark = () => {
+  isEditingRemark.value = false
+  editingRemark.value = ''
+}
+
+const saveRemark = async () => {
+  remarkSaving.value = true
+  try {
+    await updateOrderRemark(orderDetail.id, editingRemark.value)
+    orderDetail.remark = editingRemark.value
+    isEditingRemark.value = false
+    appStore.showToast('备注更新成功')
+  } catch (e) {
+    appStore.showToast(e.response?.data?.detail || '备注保存失败', 'error')
+  } finally {
+    remarkSaving.value = false
+  }
+}
 
 // --- 退货状态 ---
 const showReturnForm = ref(false)
@@ -121,6 +150,7 @@ watch(() => props.visible, async (val) => {
     // 关闭时重置状态
     showReturnForm.value = false
     isDetailExpanded.value = false
+    isEditingRemark.value = false
   }
 })
 
@@ -287,7 +317,39 @@ const cancelReturnForm = () => {
                 <span v-if="rr.remark" class="text-xs text-muted">{{ rr.remark }}</span>
               </div>
             </div>
-            <div v-if="orderDetail.remark" class="col-span-2 pt-2 border-t border-line"><span class="text-muted">备注:</span> <span class="text-secondary">{{ orderDetail.remark }}</span></div>
+            <div class="col-span-2 pt-2 border-t border-line">
+              <template v-if="isEditingRemark">
+                <div class="text-muted text-xs mb-1.5">备注</div>
+                <textarea
+                  v-model="editingRemark"
+                  class="input text-sm"
+                  rows="3"
+                  placeholder="输入订单备注信息..."
+                  @keyup.escape="cancelEditRemark"
+                ></textarea>
+                <div class="flex items-center gap-3 mt-2">
+                  <button @click="saveRemark" :disabled="remarkSaving" class="text-success-emphasis text-xs font-medium">
+                    {{ remarkSaving ? '保存中...' : '保存' }}
+                  </button>
+                  <button @click="cancelEditRemark" class="text-muted text-xs">取消</button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="flex items-start gap-2">
+                  <div class="flex-1 min-w-0">
+                    <span class="text-muted">备注:</span>
+                    <span class="text-secondary">{{ orderDetail.remark || '无备注' }}</span>
+                  </div>
+                  <button
+                    @click="startEditRemark"
+                    class="text-muted hover:text-primary transition-colors flex-shrink-0 mt-0.5"
+                    title="编辑备注"
+                  >
+                    <Pencil :size="14" />
+                  </button>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
 
