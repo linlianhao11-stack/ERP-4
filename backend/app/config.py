@@ -122,3 +122,17 @@ PASSWORD_EXPIRY_DAYS = int(os.environ.get("PASSWORD_EXPIRY_DAYS", "90"))
 
 # AI 数据库只读用户密码
 AI_DB_PASSWORD = os.environ.get("AI_DB_PASSWORD", "")
+
+
+def build_ai_dsn() -> str:
+    """构建 AI 只读用户的数据库连接字符串"""
+    import re
+    from urllib.parse import quote_plus
+    match = re.match(r'postgres(?:ql)?://[^@]+@([^/]+)/([\w-]+)', DATABASE_URL)
+    if not match:
+        raise RuntimeError("无法解析 DATABASE_URL")
+    host_port = match.group(1)
+    dbname = match.group(2)
+    if not AI_DB_PASSWORD:
+        raise RuntimeError("AI_DB_PASSWORD 环境变量未设置，无法连接 AI 只读数据库")
+    return f"postgresql://erp_ai_readonly:{quote_plus(AI_DB_PASSWORD)}@{host_port}/{dbname}"

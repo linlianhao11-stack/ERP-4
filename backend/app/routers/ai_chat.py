@@ -11,27 +11,11 @@ from app.schemas.ai import ChatRequest, FeedbackRequest, ExportRequest
 from app.services.ai_chat_service import process_chat, check_ai_available, get_preset_queries
 from app.services.operation_log_service import log_operation
 from app.ai.rate_limiter import user_limiter, global_limiter
-from app.config import DATABASE_URL, AI_DB_PASSWORD
+from app.config import build_ai_dsn
 from app.logger import get_logger
 
 logger = get_logger("ai.chat")
 router = APIRouter(prefix="/api/ai", tags=["AI助手"])
-
-
-def _build_ai_dsn() -> str:
-    """构建 AI 只读用户的数据库连接字符串"""
-    # 从主 DSN 解析 host/port/dbname
-    # DATABASE_URL 格式: postgres://user:pass@host:port/dbname
-    import re
-    from urllib.parse import quote_plus
-    match = re.match(r'postgres(?:ql)?://[^@]+@([^/]+)/([\w-]+)', DATABASE_URL)
-    if not match:
-        raise RuntimeError("无法解析 DATABASE_URL")
-    host_port = match.group(1)
-    dbname = match.group(2)
-    if not AI_DB_PASSWORD:
-        raise RuntimeError("AI_DB_PASSWORD 环境变量未设置，无法连接 AI 只读数据库")
-    return f"postgresql://erp_ai_readonly:{quote_plus(AI_DB_PASSWORD)}@{host_port}/{dbname}"
 
 
 @router.get("/status")
@@ -84,7 +68,7 @@ async def ai_chat(body: ChatRequest, user: User = Depends(require_permission("ai
     if not clean_msg:
         raise HTTPException(status_code=400, detail="请输入查询内容")
 
-    dsn = _build_ai_dsn()
+    dsn = build_ai_dsn()
 
     async def event_stream():
         try:
