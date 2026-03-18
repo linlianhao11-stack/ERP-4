@@ -237,6 +237,11 @@ const submitReturn = async () => {
     for (const i of items) {
       const whId = i.warehouse_id || headerWarehouseId
       const locId = i.location_id || await getFirstLocation(whId)
+      if (!locId) {
+        appStore.showToast(`${i.product_name} 的仓库下没有可用仓位`, 'error')
+        returnSubmitting.value = false
+        return
+      }
       orderItems.push({
         product_id: i.product_id,
         quantity: i.qty,
@@ -249,7 +254,7 @@ const submitReturn = async () => {
     await createOrder({
       order_type: 'RETURN',
       customer_id: orderDetail.customer?.id,
-      warehouse_id: headerWarehouseId || orderItems[0].warehouse_id,
+      warehouse_id: headerWarehouseId || null,
       related_order_id: orderDetail.id,
       refunded: returnForm.refunded,
       items: orderItems,
