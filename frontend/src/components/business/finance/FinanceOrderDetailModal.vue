@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
 import { usePermission } from '../../../composables/usePermission'
 import { getOrder, createOrder, updateOrderRemark } from '../../../api/orders'
-import { getLocations } from '../../../api/warehouses'
+import { useWarehousesStore } from '../../../stores/warehouses'
 import StatusBadge from '../../common/StatusBadge.vue'
 import { Maximize2, Minimize2, Copy, Pencil } from 'lucide-vue-next'
 
@@ -23,6 +23,8 @@ const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const { fmt, fmtDate } = useFormat()
 const { hasPermission } = usePermission()
+const warehousesStore = useWarehousesStore()
+const warehouses = computed(() => warehousesStore.warehouses.filter(w => !w.is_virtual))
 
 // --- 详情状态 ---
 const isDetailExpanded = ref(false)
@@ -175,20 +177,32 @@ const viewRelatedOrder = async (id) => {
 }
 
 // --- 退货逻辑 ---
-const openReturnForm = () => {
+/** 获取仓库下的仓位列表 */
+const getReturnLocations = (warehouseId) => {
+  if (!warehouseId) return []
+  return warehousesStore.getLocationsByWarehouse(warehouseId)
+}
+
+const openReturnForm = async () => {
+  await warehousesStore.ensureLoaded()
+  const headerWhId = orderDetail.warehouse?.id
   returnForm.items = orderDetail.items
     .filter(i => i.available_return_quantity > 0)
-    .map(i => ({
-      product_id: i.product_id,
-      product_name: i.product_name,
-      product_sku: i.product_sku,
-      unit_price: i.unit_price,
-      cost_price: i.cost_price,
-      max_qty: i.available_return_quantity,
-      qty: 0,
-      warehouse_id: i.warehouse_id,
-      location_id: i.location_id,
-    }))
+    .map(i => {
+      const whId = i.warehouse_id || headerWhId || ''
+      const locs = getReturnLocations(whId)
+      return {
+        product_id: i.product_id,
+        product_name: i.product_name,
+        product_sku: i.product_sku,
+        unit_price: i.unit_price,
+        cost_price: i.cost_price,
+        max_qty: i.available_return_quantity,
+        qty: 0,
+        warehouse_id: whId,
+        location_id: locs.length === 1 ? locs[0].id : '',
+      }
+    })
   returnForm.refunded = false
   showReturnForm.value = true
 }
@@ -206,58 +220,33 @@ const submitReturn = async () => {
     }
   }
 
+  // 校验每行都选了仓库和仓位
+  for (const item of items) {
+    if (!item.warehouse_id) {
+      appStore.showToast(`${item.product_name} 请选择退货仓库`, 'error')
+      return
+    }
+    if (!item.location_id) {
+      appStore.showToast(`${item.product_name} 请选择退货仓位`, 'error')
+      return
+    }
+  }
+
   returnSubmitting.value = true
   try {
-    // 优先用订单头仓库，否则从行级仓库取（多仓出库场景）
-    const headerWarehouseId = orderDetail.warehouse?.id
-    // 检查每行是否有仓库信息（头级或行级）
-    for (const item of items) {
-      if (!headerWarehouseId && !item.warehouse_id) {
-        appStore.showToast(`${item.product_name} 无仓库信息，无法退货`, 'error')
-        returnSubmitting.value = false
-        return
-      }
-    }
-
-    // 为没有行级仓库的商品查询默认仓位
-    const warehouseLocationCache = {}
-    const getFirstLocation = async (whId) => {
-      if (warehouseLocationCache[whId] !== undefined) return warehouseLocationCache[whId]
-      try {
-        const { data: rawLocs } = await getLocations({ warehouse_id: whId })
-        const locs = rawLocs.items || rawLocs
-        warehouseLocationCache[whId] = locs.length ? locs[0].id : null
-      } catch {
-        warehouseLocationCache[whId] = null
-      }
-      return warehouseLocationCache[whId]
-    }
-
-    const orderItems = []
-    for (const i of items) {
-      const whId = i.warehouse_id || headerWarehouseId
-      const locId = i.location_id || await getFirstLocation(whId)
-      if (!locId) {
-        appStore.showToast(`${i.product_name} 的仓库下没有可用仓位`, 'error')
-        returnSubmitting.value = false
-        return
-      }
-      orderItems.push({
-        product_id: i.product_id,
-        quantity: i.qty,
-        unit_price: i.unit_price,
-        warehouse_id: whId,
-        location_id: locId,
-      })
-    }
-
     await createOrder({
       order_type: 'RETURN',
       customer_id: orderDetail.customer?.id,
-      warehouse_id: headerWarehouseId || null,
+      warehouse_id: null,
       related_order_id: orderDetail.id,
       refunded: returnForm.refunded,
-      items: orderItems,
+      items: items.map(i => ({
+        product_id: i.product_id,
+        quantity: i.qty,
+        unit_price: i.unit_price,
+        warehouse_id: parseInt(i.warehouse_id),
+        location_id: parseInt(i.location_id),
+      })),
     })
 
     appStore.showToast('退货单创建成功')
@@ -517,9 +506,10 @@ const cancelReturnForm = () => {
               <thead class="bg-elevated">
                 <tr>
                   <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">商品</th>
-                  <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">单价</th>
+                  <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">退回仓库</th>
+                  <th class="px-2 py-2 text-left text-xs font-semibold text-secondary">仓位</th>
                   <th class="px-2 py-2 text-right text-xs font-semibold text-secondary">可退</th>
-                  <th class="px-2 py-2 text-center text-xs font-semibold text-secondary" style="width:100px">退货数量</th>
+                  <th class="px-2 py-2 text-center text-xs font-semibold text-secondary" style="width:90px">退货数量</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-line">
@@ -528,10 +518,21 @@ const cancelReturnForm = () => {
                     <div class="font-medium">{{ item.product_name }}</div>
                     <div class="text-[11px] text-muted font-mono">{{ item.product_sku }}</div>
                   </td>
-                  <td class="px-2 py-2.5 text-right">{{ fmt(item.unit_price) }}</td>
+                  <td class="px-2 py-2.5">
+                    <select v-model="item.warehouse_id" @change="item.location_id = ''" class="input text-xs" style="min-width:100px">
+                      <option value="">选择仓库</option>
+                      <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
+                    </select>
+                  </td>
+                  <td class="px-2 py-2.5">
+                    <select v-model="item.location_id" class="input text-xs" style="min-width:80px" :disabled="!item.warehouse_id">
+                      <option value="">{{ item.warehouse_id ? '选择仓位' : '先选仓库' }}</option>
+                      <option v-for="l in getReturnLocations(item.warehouse_id)" :key="l.id" :value="l.id">{{ l.code }}</option>
+                    </select>
+                  </td>
                   <td class="px-2 py-2.5 text-right text-muted">{{ item.max_qty }}</td>
                   <td class="px-2 py-2.5 text-center">
-                    <input type="number" v-model.number="item.qty" :min="0" :max="item.max_qty" class="input text-center" style="width:80px" />
+                    <input type="number" v-model.number="item.qty" :min="0" :max="item.max_qty" class="input text-center" style="width:75px" />
                   </td>
                 </tr>
               </tbody>
