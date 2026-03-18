@@ -41,6 +41,7 @@ from app.routers import (
     dropship,
     demo,
     daily_report,
+    refunds,
 )
 
 
@@ -239,6 +240,7 @@ app.include_router(bank_accounts.router)
 app.include_router(dropship.router)
 app.include_router(demo.router)
 app.include_router(daily_report.router)
+app.include_router(refunds.router)
 
 # 静态文件服务（生产环境）
 static_dir = os.path.join(os.path.dirname(__file__), "static")
