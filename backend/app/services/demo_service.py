@@ -295,6 +295,21 @@ async def lend_demo_unit(loan_id: int, user) -> DemoLoan:
     unit.current_holder_id = loan.borrower_id
     await unit.save()
 
+    # 扣减样机仓库存
+    demo_stock = await WarehouseStock.filter(
+        warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+    ).first()
+    before_qty = demo_stock.quantity if demo_stock else 0
+    await update_weighted_entry_date(
+        unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+    )
+    await StockLog.create(
+        product_id=unit.product_id, warehouse_id=unit.warehouse_id,
+        change_type="TRANSFER_OUT", quantity=-1,
+        before_qty=before_qty, after_qty=before_qty - 1,
+        remark=f"样机借出 {loan.loan_no}", creator=user,
+    )
+
     # 更新 SN 码状态
     if unit.sn_code_id:
         await SnCode.filter(id=unit.sn_code_id).update(status="shipped")
@@ -334,6 +349,21 @@ async def return_demo_unit(loan_id: int, data, user) -> DemoLoan:
     unit.total_loan_count += 1
     unit.total_loan_days += loan_days
     await unit.save()
+
+    # 归还入库：样机仓库存 +1
+    demo_stock = await WarehouseStock.filter(
+        warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+    ).first()
+    before_qty = demo_stock.quantity if demo_stock else 0
+    await update_weighted_entry_date(
+        unit.warehouse_id, unit.product_id, 1, unit.cost_price,
+    )
+    await StockLog.create(
+        product_id=unit.product_id, warehouse_id=unit.warehouse_id,
+        change_type="RESTOCK", quantity=1,
+        before_qty=before_qty, after_qty=before_qty + 1,
+        remark=f"样机归还入库 {loan.loan_no}", creator=user,
+    )
 
     # 恢复 SN 码状态
     if unit.sn_code_id:
