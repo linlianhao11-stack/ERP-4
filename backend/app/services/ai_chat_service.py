@@ -322,6 +322,99 @@ async def _process_chat_inner(
             }}
             return
 
+        if resp_type == "multi_sql":
+            queries = r1_result.get("queries", [])
+            if not queries or not isinstance(queries, list):
+                yield {"event": "done", "data": {"type": "answer", "message_id": message_id, "analysis": r1_result.get("explanation", "未能生成查询")}}
+                return
+
+            queries = queries[:10]
+            tables = []
+            all_sqls = []
+            total_queries = len(queries)
+
+            for qi, q in enumerate(queries):
+                title = q.get("title", f"查询 {qi + 1}")
+                raw_sql = q.get("sql", "")
+                if not raw_sql:
+                    continue
+
+                is_safe, sanitized, reason = validate_sql(raw_sql, allowed_tables=allowed)
+                if not is_safe:
+                    logger.warning(f"multi_sql 第 {qi+1} 条校验失败: {reason}")
+                    continue
+
+                yield {"event": "progress", "data": {"stage": "executing", "message": f"正在查询: {title} ({qi+1}/{total_queries})..."}}
+
+                try:
+                    pool = await get_ai_pool(db_dsn)
+                    async with pool.acquire() as conn:
+                        async with conn.transaction(readonly=True):
+                            rows = await conn.fetch(sanitized)
+                            if len(rows) > 1000:
+                                rows = rows[:1000]
+
+                    if rows:
+                        columns = list(rows[0].keys())
+                        row_data = [[_serialize_value(r[c]) for c in columns] for r in rows]
+                        tables.append({"title": title, "columns": columns, "rows": row_data, "row_count": len(rows)})
+                        all_sqls.append(sanitized)
+                    else:
+                        tables.append({"title": title, "columns": [], "rows": [], "row_count": 0})
+                        all_sqls.append(sanitized)
+                except Exception as e:
+                    logger.warning(f"multi_sql 第 {qi+1} 条执行失败: {e}")
+                    continue
+
+            if not tables:
+                yield {"event": "error", "data": {"message": "所有查询均执行失败，请换个说法试试", "retryable": True, "error_type": "execution"}}
+                return
+
+            yield {"event": "progress", "data": {"stage": "analyzing", "message": "正在分析数据..."}}
+            analysis_prompt = build_analysis_prompt(config.get("ai.prompt.analysis"))
+            data_summary = f"用户问题: {message}\n\n查询了 {len(tables)} 组数据:\n"
+            for t in tables:
+                data_summary += f"\n### {t['title']} ({t['row_count']} 行)\n"
+                if t['columns']:
+                    data_summary += f"列: {t['columns']}\n"
+                    for row in t['rows'][:10]:
+                        data_summary += str(row) + "\n"
+
+            v3_result = await call_deepseek(
+                messages=[
+                    {"role": "system", "content": analysis_prompt},
+                    {"role": "user", "content": data_summary},
+                ],
+                api_key=api_key,
+                base_url=config.get("base_url", DEFAULT_BASE_URL),
+                model=config.get("model_analysis", DEFAULT_MODEL_ANALYSIS),
+                temperature=0.7,
+                max_tokens=2048,
+                timeout=60.0,
+            )
+
+            analysis_text = "查询完成。"
+            chart_config = None
+            suggestions = None
+            if v3_result:
+                analysis_text = v3_result.get("analysis", "查询完成。")
+                chart_config = v3_result.get("chart_config")
+                suggestions = v3_result.get("suggestions")
+
+            yield {"event": "done", "data": {
+                "type": "answer",
+                "message_id": message_id,
+                "analysis": analysis_text,
+                "tables": tables,
+                "table_data": None,
+                "chart_config": chart_config,
+                "sqls": all_sqls,
+                "sql": None,
+                "row_count": sum(t["row_count"] for t in tables),
+                "suggestions": suggestions,
+            }}
+            return
+
         if resp_type != "sql" or not r1_result.get("sql"):
             yield {"event": "done", "data": {"type": "clarification", "message_id": message_id, "message": "我是业务数据查询助手，只能帮你查询 ERP 系统中的销售、采购、库存、应收应付等数据。请试试问我具体的业务问题吧！", "options": ["本月销售概况", "库存状态", "应收账款汇总"]}}
             return
