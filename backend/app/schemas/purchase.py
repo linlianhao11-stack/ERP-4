@@ -30,6 +30,7 @@ class PurchaseReturnRequest(BaseModel):
     is_refunded: bool = False
     tracking_no: Optional[str] = None
     refund_method: Optional[str] = None
+    refund_info: Optional[str] = None  # 退款备注信息
 
 
 class ReceiveItemRequest(BaseModel):

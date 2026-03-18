@@ -1,6 +1,6 @@
 from typing import Optional
 from decimal import Decimal
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,7 +22,7 @@ from app.services.order_service import (
     process_rebate_deduction, process_order_settlement, release_cancelled_stock
 )
 from app.constants import (
-    OrderType, ShippingStatus, PaymentSource, BillStatus, ReceiptBillStatus,
+    OrderType, ShippingStatus, PaymentSource, BillStatus,
     ORDER_TYPE_NAMES,
 )
 from app.services.operation_log_service import log_operation
@@ -95,6 +95,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 refunded=data.refunded if data.order_type == OrderType.RETURN else False,
                 refund_method=data.refund_method if data.order_type == OrderType.RETURN else None,
                 refund_amount=data.refund_amount if data.order_type == OrderType.RETURN else None,
+                refund_info=data.refund_info if data.order_type == OrderType.RETURN else "",
                 remark=data.remark, employee=employee,
                 creator=user, is_cleared=is_cleared,
                 shipping_status=shipping_status,
@@ -171,10 +172,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
             order.total_amount = total_amount
             order.total_cost = total_cost
             order.total_profit = total_profit
-            if data.order_type == OrderType.RETURN and data.refunded:
-                # 不再自动 is_cleared，等待财务确认退款
-                order.paid_amount = abs(total_amount)
-            elif is_cleared:
+            if is_cleared:
                 order.paid_amount = abs(total_amount)
             await order.save()
 
@@ -219,36 +217,6 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 except Exception as e:
                     logger.error(f"退货自动生成红字应收单失败: {e}")
                     raise HTTPException(status_code=500, detail=f"订单已创建但财务单据生成失败: {e}")
-
-            # 6.6 钩子：销售退货 + 已退款 → 自动生成退款收款单（按账套拆分，draft 状态）
-            if data.order_type == OrderType.RETURN and data.refunded and amount_by_account_set:
-                try:
-                    from app.models.ar_ap import ReceivableBill, ReceiptBill
-                    for as_id, group_amount in amount_by_account_set.items():
-                        # 查找对应的红字应收单（上面 6.5b 已创建）
-                        ar_bill = await ReceivableBill.filter(
-                            account_set_id=as_id,
-                            customer_id=order.customer_id,
-                            order_id=order.id,
-                        ).order_by("-id").first()
-                        related_order = await order.related_order if order.related_order_id else None
-                        original_order_no = related_order.order_no if related_order else ""
-                        await ReceiptBill.create(
-                            bill_no=generate_order_no("SK"),
-                            account_set_id=as_id,
-                            customer_id=order.customer_id,
-                            receivable_bill=ar_bill,
-                            receipt_date=datetime.now().date(),
-                            amount=-abs(group_amount),
-                            payment_method=data.refund_method or "",
-                            bill_type="return_refund",
-                            return_order=order,
-                            status=ReceiptBillStatus.DRAFT.value,
-                            remark=f"销售退货退款 | 退货单：{order.order_no} | 原订单：{original_order_no}",
-                            creator=user,
-                        )
-                except Exception as e:
-                    logger.error(f"销售退货自动生成退款收款单失败: {e}")
 
             # 7. 操作日志
             order_type_names = ORDER_TYPE_NAMES
@@ -837,11 +805,11 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                         creator=user,
                         account_set_id=order.account_set_id
                     )
-                    # 推送会计模块：创建退款收款单（红字应收 + 退款收款）
+                    # 推送会计模块：创建红字应收单
                     if order.account_set_id:
                         try:
-                            from app.models.ar_ap import ReceivableBill, ReceiptBill
-                            ar_bill = await ReceivableBill.create(
+                            from app.models.ar_ap import ReceivableBill
+                            await ReceivableBill.create(
                                 bill_no=generate_order_no("YS"),
                                 account_set_id=order.account_set_id,
                                 customer_id=customer.id,
@@ -853,22 +821,8 @@ async def cancel_order(order_id: int, data: CancelRequest, user: User = Depends(
                                 status=BillStatus.PENDING.value,
                                 creator=user,
                             )
-                            await ReceiptBill.create(
-                                bill_no=generate_order_no("SK"),
-                                account_set_id=order.account_set_id,
-                                customer_id=customer.id,
-                                receivable_bill=ar_bill,
-                                receipt_date=date.today(),
-                                amount=-abs(refund_amount),
-                                payment_method=data.refund_payment_method or "",
-                                bill_type="return_refund",
-                                return_order=order,
-                                status=ReceiptBillStatus.DRAFT.value,
-                                remark=f"取消订单退款 | 订单：{order.order_no}",
-                                creator=user,
-                            )
                         except Exception as e:
-                            logger.error(f"取消订单自动生成退款收款单失败: {e}")
+                            logger.error(f"取消订单自动生成红字应收单失败: {e}")
 
             if order.order_type == OrderType.CREDIT:
                 cancel_balance_amount = abs(order.total_amount) - (abs(new_order.total_amount) if new_order else Decimal("0"))

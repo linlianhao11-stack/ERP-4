@@ -303,10 +303,10 @@ async def process_order_settlement(data, customer, order, total_amount, user, or
 
     elif customer and data.order_type == OrderType.RETURN:
         if not data.refunded:
-            # 仅 CREDIT 退货需调整余额（减少应收），CASH 退货未退款无需改余额
-            related_order = await Order.filter(id=data.related_order_id).first() if data.related_order_id else None
-            if related_order and related_order.order_type == OrderType.CREDIT:
-                await Customer.filter(id=customer.id).update(balance=F('balance') + total_amount)
+            # 不需要退款：退货金额转为客户在账资金，立即结清
+            await Customer.filter(id=customer.id).update(balance=F('balance') + total_amount)
+            order.is_cleared = True
+            await order.save()
 
     # 计算 credit_used 返回值
     credit_used = 0

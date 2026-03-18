@@ -26,6 +26,7 @@ class OrderCreate(BaseModel):
     account_set_id: Optional[int] = None
     refund_method: Optional[str] = None
     refund_amount: Optional[Decimal] = None
+    refund_info: Optional[str] = None  # 退款备注信息
 
 class CancelItemAllocation(BaseModel):
     order_item_id: int

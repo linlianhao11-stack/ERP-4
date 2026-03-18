@@ -186,7 +186,6 @@ async def list_disbursement_bills(
             "disbursement_date": str(b.disbursement_date),
             "amount": str(b.amount),
             "disbursement_method": b.disbursement_method,
-            "bill_type": getattr(b, 'bill_type', 'normal'),
             "status": b.status,
             "voucher_no": b.voucher_no,
             "remark": b.remark,
@@ -390,7 +389,7 @@ async def list_pending_voucher_bills(
         result.append({
             "id": d.id, "type": "disbursement",
             "bill_no": d.bill_no,
-            "type_label": "退款" if getattr(d, 'bill_type', '') == "return_refund" else "付款",
+            "type_label": "付款",
             "partner_name": d.supplier.name if d.supplier else "",
             "partner_id": d.supplier_id,
             "amount": float(d.amount),

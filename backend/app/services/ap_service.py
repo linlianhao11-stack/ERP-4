@@ -105,19 +105,6 @@ async def confirm_disbursement_bill(disbursement_id: int, user) -> DisbursementB
                     pb.status = "partial"
                 await pb.save()
 
-        # 退款付款单确认后，更新采购退货单状态
-        if db.bill_type == "return_refund" and db.purchase_return_id:
-            try:
-                from app.models.purchase import PurchaseReturn
-                pr = await PurchaseReturn.filter(id=db.purchase_return_id).select_for_update().first()
-                if pr:
-                    pr.is_refunded = True
-                    pr.refund_status = "completed"
-                    await pr.save()
-                    logger.info(f"退款确认，采购退货单 {pr.return_no} 已标记退款完成")
-            except Exception as e:
-                logger.error(f"退款确认更新采购退货单状态失败: {e}")
-
     logger.info(f"确认付款单: {db.bill_no}")
     return db
 

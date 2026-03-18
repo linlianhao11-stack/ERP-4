@@ -187,7 +187,6 @@ async def list_receipt_bills(
             "amount": str(b.amount),
             "payment_method": b.payment_method,
             "is_advance": b.is_advance,
-            "bill_type": getattr(b, 'bill_type', 'normal'),
             "status": b.status,
             "voucher_no": b.voucher_no,
             "remark": b.remark,
@@ -484,7 +483,7 @@ async def list_pending_voucher_bills(
         result.append({
             "id": r.id, "type": "receipt",
             "bill_no": r.bill_no,
-            "type_label": "退款" if getattr(r, 'bill_type', '') == "return_refund" else "收款",
+            "type_label": "收款",
             "partner_name": r.customer.name if r.customer else "",
             "partner_id": r.customer_id,
             "amount": float(r.amount),

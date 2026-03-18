@@ -922,27 +922,10 @@ async def return_purchase_order(po_id: int, data: PurchaseReturnRequest, user: U
                 logger.error(f"采购退货会计推送失败: {e}")
                 ap_bill = None
 
-            # 退款付款单（draft 状态，使用 DisbursementBill + bill_type="return_refund"）
+            # 保存退款备注信息，等待财务在退款管理中确认
             if data.is_refunded and total_return_amount > 0:
-                try:
-                    from app.models.ar_ap import DisbursementBill
-                    from datetime import date
-                    await DisbursementBill.create(
-                        bill_no=generate_order_no("FK"),
-                        account_set_id=po.account_set_id,
-                        supplier_id=po.supplier_id,
-                        payable_bill=ap_bill,
-                        disbursement_date=date.today(),
-                        amount=-abs(total_return_amount),
-                        disbursement_method=data.refund_method or "",
-                        bill_type="return_refund",
-                        purchase_return=pr,
-                        status="draft",
-                        remark=f"采购退货退款 | 退货单：{return_no} | 原采购单：{po.po_no}",
-                        creator=user,
-                    )
-                except Exception as e:
-                    logger.error(f"采购退货退款付款单创建失败: {e}")
+                pr.refund_info = data.refund_info or ""
+                await pr.save()
 
         await log_operation(user, "PURCHASE_RETURN", "PURCHASE_ORDER", po.id,
             f"采购退货 {po.po_no}，{', '.join(return_details)}，退货金额 ¥{float(total_return_amount):.2f}，{'已退款' if data.is_refunded else '转为在账资金'}，退货单号 {return_no}，状态→{po.status}")
