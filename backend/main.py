@@ -1,5 +1,7 @@
 """ERP 系统后端入口"""
 import os
+import time
+import uuid
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -13,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import CORS_ORIGINS
 from app.rate_limit import limiter
+from app.logger import get_logger, request_id_var
 from app.database import init_db, close_db
 from app.exceptions import http_exception_handler, unhandled_exception_handler
 from app.migrations import run_migrations
@@ -130,6 +133,51 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 app.add_middleware(RequestSizeLimitMiddleware)
+
+# 请求日志中间件（记录每个请求的耗时/状态码/路径）
+_access_logger = get_logger("access")
+_SKIP_PREFIXES = ("/health", "/assets/")
+_SLOW_THRESHOLD_MS = 1000  # 超过 1s 视为慢请求
+
+
+class AccessLogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith(_SKIP_PREFIXES):
+            return await call_next(request)
+
+        # 设置请求 ID（UUID 前 8 位）
+        rid = uuid.uuid4().hex[:8]
+        request_id_var.set(rid)
+
+        start = time.monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            _access_logger.error(
+                "%s %s 500 %dms", request.method, path, duration_ms,
+                extra={"data": {"client": request.client.host if request.client else "-"}}
+            )
+            raise
+        duration_ms = int((time.monotonic() - start) * 1000)
+        status = response.status_code
+
+        # 根据状态码和耗时决定日志级别
+        if status >= 500:
+            log_fn = _access_logger.error
+        elif duration_ms >= _SLOW_THRESHOLD_MS:
+            log_fn = _access_logger.warning
+        else:
+            log_fn = _access_logger.info
+
+        log_fn(
+            "%s %s %d %dms", request.method, path, status, duration_ms,
+            extra={"data": {"client": request.client.host if request.client else "-"}}
+        )
+        return response
+
+app.add_middleware(AccessLogMiddleware)
 
 # 注册所有路由
 app.include_router(auth.router)

@@ -1,7 +1,11 @@
 import logging
 import json
 import sys
+import contextvars
 from datetime import datetime, timezone
+
+# 请求级上下文：request_id 在中间件中设置，日志自动注入
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 
 class StructuredFormatter(logging.Formatter):
@@ -12,6 +16,10 @@ class StructuredFormatter(logging.Formatter):
             "module": record.name,
             "message": record.getMessage(),
         }
+        # 注入请求 ID（如果当前在请求上下文中）
+        rid = request_id_var.get()
+        if rid:
+            log_entry["request_id"] = rid
         if hasattr(record, "data"):
             log_entry["data"] = record.data
         if record.exc_info and record.exc_info[0]:

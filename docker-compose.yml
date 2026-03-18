@@ -4,6 +4,7 @@ services:
     restart: always
     mem_limit: 512m
     cpus: 1.0
+    command: postgres -c log_min_duration_statement=500 -c log_statement=none
     environment:
       POSTGRES_USER: erp
       # .env 文件中必须设置 POSTGRES_PASSWORD，否则容器拒绝启动
