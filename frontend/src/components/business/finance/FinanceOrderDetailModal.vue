@@ -185,7 +185,9 @@ const openReturnForm = () => {
       unit_price: i.unit_price,
       cost_price: i.cost_price,
       max_qty: i.available_return_quantity,
-      qty: 0
+      qty: 0,
+      warehouse_id: i.warehouse_id,
+      location_id: i.location_id,
     }))
   returnForm.refunded = false
   showReturnForm.value = true
@@ -206,34 +208,51 @@ const submitReturn = async () => {
 
   returnSubmitting.value = true
   try {
-    const warehouseId = orderDetail.warehouse?.id
-    if (!warehouseId) {
-      appStore.showToast('原订单无仓库信息，无法退货', 'error')
-      returnSubmitting.value = false
-      return
+    // 优先用订单头仓库，否则从行级仓库取（多仓出库场景）
+    const headerWarehouseId = orderDetail.warehouse?.id
+    // 检查每行是否有仓库信息（头级或行级）
+    for (const item of items) {
+      if (!headerWarehouseId && !item.warehouse_id) {
+        appStore.showToast(`${item.product_name} 无仓库信息，无法退货`, 'error')
+        returnSubmitting.value = false
+        return
+      }
     }
-    let locationId = null
-    try {
-      const { data: rawLocs } = await getLocations({ warehouse_id: warehouseId })
-      const locs = rawLocs.items || rawLocs
-      if (locs.length) locationId = locs[0].id
-    } catch (e) {
-      console.warn('获取仓位失败:', e)
+
+    // 为没有行级仓库的商品查询默认仓位
+    const warehouseLocationCache = {}
+    const getFirstLocation = async (whId) => {
+      if (warehouseLocationCache[whId] !== undefined) return warehouseLocationCache[whId]
+      try {
+        const { data: rawLocs } = await getLocations({ warehouse_id: whId })
+        const locs = rawLocs.items || rawLocs
+        warehouseLocationCache[whId] = locs.length ? locs[0].id : null
+      } catch {
+        warehouseLocationCache[whId] = null
+      }
+      return warehouseLocationCache[whId]
+    }
+
+    const orderItems = []
+    for (const i of items) {
+      const whId = i.warehouse_id || headerWarehouseId
+      const locId = i.location_id || await getFirstLocation(whId)
+      orderItems.push({
+        product_id: i.product_id,
+        quantity: i.qty,
+        unit_price: i.unit_price,
+        warehouse_id: whId,
+        location_id: locId,
+      })
     }
 
     await createOrder({
       order_type: 'RETURN',
       customer_id: orderDetail.customer?.id,
-      warehouse_id: warehouseId,
+      warehouse_id: headerWarehouseId || orderItems[0].warehouse_id,
       related_order_id: orderDetail.id,
       refunded: returnForm.refunded,
-      items: items.map(i => ({
-        product_id: i.product_id,
-        quantity: i.qty,
-        unit_price: i.unit_price,
-        warehouse_id: warehouseId,
-        location_id: locationId,
-      }))
+      items: orderItems,
     })
 
     appStore.showToast('退货单创建成功')
