@@ -280,10 +280,10 @@ async def update_order_remark(order_id: int, data: RemarkUpdate, user: User = De
     new_remark = data.remark
 
     if old_remark == new_remark:
-        return {"id": order.id, "remark": order.remark}
+        return {"id": order.id, "remark": old_remark}
 
     order.remark = new_remark
-    await order.save(update_fields=["remark", "updated_at"])
+    await order.save(update_fields=["remark"])
 
     await log_operation(
         user, "ORDER_UPDATE_REMARK", "ORDER", order.id,
