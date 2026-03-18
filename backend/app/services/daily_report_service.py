@@ -212,6 +212,32 @@ async def _get_setting(key: str) -> str | None:
     return s.value if s else None
 
 
+def _md_to_html(text: str) -> str:
+    """简易 Markdown → HTML（处理加粗、列表、换行）"""
+    import re
+    # 加粗 **text**
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    lines = text.split('\n')
+    result = []
+    in_list = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('- '):
+            if not in_list:
+                result.append('<ul style="margin:8px 0;padding-left:20px">')
+                in_list = True
+            result.append(f'<li>{stripped[2:]}</li>')
+        else:
+            if in_list:
+                result.append('</ul>')
+                in_list = False
+            if stripped:
+                result.append(f'<p style="margin:6px 0">{stripped}</p>')
+    if in_list:
+        result.append('</ul>')
+    return '\n'.join(result)
+
+
 def _build_html(tables: list[dict], analysis: str | None, report_date: str) -> str:
     """拼装 HTML 邮件正文"""
     html = f"""<!DOCTYPE html>
@@ -231,7 +257,7 @@ tr:nth-child(even) {{ background: #f9fafb; }}
 <h1>业务日报 — {report_date}（截至发送时刻）</h1>
 """
     if analysis:
-        html += f'<div class="analysis">{analysis}</div>\n'
+        html += f'<div class="analysis">{_md_to_html(analysis)}</div>\n'
 
     for t in tables:
         html += f"<h2>{t['title']}</h2>\n"
