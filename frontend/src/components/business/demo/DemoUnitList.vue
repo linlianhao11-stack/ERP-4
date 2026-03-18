@@ -46,6 +46,9 @@
             <span :class="statusBadgeClass(u.status)">{{ statusLabel(u.status) }}</span>
           </div>
         </div>
+        <div v-if="u.warehouse_name" class="text-xs text-secondary mb-1">
+          {{ u.warehouse_name }}<span v-if="u.location_code" class="text-muted"> / {{ u.location_code }}</span>
+        </div>
         <div class="flex justify-between items-center text-xs">
           <span class="text-muted">
             {{ u.condition_label || conditionLabel(u.condition) }}
@@ -85,6 +88,10 @@
           <div class="font-medium">{{ u.product_name }}</div>
         </td>
         <td class="px-3 py-2 font-mono text-xs">{{ u.sn_code || '-' }}</td>
+        <td class="px-3 py-2 text-xs">
+          <span>{{ u.warehouse_name || '-' }}</span>
+          <span v-if="u.location_code" class="text-muted"> / {{ u.location_code }}</span>
+        </td>
         <td class="px-3 py-2">
           <span :class="statusBadgeClass(u.status)">{{ statusLabel(u.status) }}</span>
         </td>
@@ -183,6 +190,7 @@ const columns = [
   { key: 'code', label: '编号', sortable: true },
   { key: 'product_name', label: '产品', sortable: true },
   { key: 'sn_code', label: 'SN码' },
+  { key: 'warehouse', label: '所在仓库' },
   { key: 'status', label: '状态', sortable: true },
   { key: 'condition', label: '成色' },
   { key: 'holder', label: '当前持有人' },

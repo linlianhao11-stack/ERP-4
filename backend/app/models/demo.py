@@ -18,6 +18,9 @@ class DemoUnit(models.Model):
     warehouse = fields.ForeignKeyField(
         "models.Warehouse", related_name="demo_units", on_delete=fields.RESTRICT,
     )
+    location = fields.ForeignKeyField(
+        "models.Location", related_name="demo_units", null=True, on_delete=fields.SET_NULL,
+    )
 
     status = fields.CharField(max_length=20, default="in_stock")
     condition = fields.CharField(max_length=10, default="new")

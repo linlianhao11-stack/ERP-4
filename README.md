@@ -1,4 +1,4 @@
-# 轻量级 ERP 系统 v4.26.1
+# 轻量级 ERP 系统 v4.29.0
 
 面向中小贸易/批发企业的全功能进销存管理系统，支持销售、采购、库存、财务、物流、寄售、会计、代采代发等核心业务流程，含完整的业财一体化财务会计模块。
 
@@ -38,12 +38,13 @@ erp-4/
 │   │   ├── database.py         # Tortoise ORM 初始化
 │   │   ├── logger.py           # 统一结构化 JSON 日志（级别可配置）
 │   │   ├── exceptions.py       # 全局异常处理器
-│   │   ├── migrations.py       # 启动时幂等初始化默认数据
+│   │   ├── migrations/         # 版本化迁移（v001~v029，runner.py 幂等执行）
 │   │   ├── auth/               # JWT 签发 & 权限校验（含 token 版本机制）
-│   │   ├── models/             # 数据模型（47 个）
-│   │   ├── routers/            # API 路由（42 个模块，220+ 个端点，含通用 CRUD 工厂）
-│   │   ├── schemas/            # Pydantic 请求/响应模型（24 个文件）
+│   │   ├── models/             # 数据模型（50 个）
+│   │   ├── routers/            # API 路由（43 个模块，240+ 个端点，含通用 CRUD 工厂）
+│   │   ├── schemas/            # Pydantic 请求/响应模型（25 个文件）
 │   │   ├── services/           # 业务逻辑层（19 个服务）
+│   │   ├── services/           # 业务逻辑层（20 个服务）
 │   │   └── utils/              # 工具函数（订单号生成、UTC 时间处理）
 │   ├── backups/                # 备份目录（tar.gz 归档：数据库 + 上传文件）
 │   ├── uploads/                # 上传文件目录（发票 PDF 等，Docker volume 挂载）
@@ -60,10 +61,10 @@ erp-4/
         ├── router/             # 路由定义
         ├── api/                # 后端 API 调用封装（21 个模块）
         ├── stores/             # Pinia 状态管理（10 个 store）
-        ├── views/              # 页面视图（14 个）
-        ├── components/         # 组件（layout / business / common，91 个 .vue）
+        ├── views/              # 页面视图（15 个）
+        ├── components/         # 组件（layout / business / common，98 个 .vue）
         │   ├── layout/         # 布局组件（Sidebar, BottomNav, AppTabs）
-        │   ├── business/       # 业务面板（按模块子目录：sales/purchase/finance/logistics/stock/dropship/settings）
+        │   ├── business/       # 业务面板（按模块子目录：sales/purchase/finance/logistics/stock/demo/dropship/settings）
         │   └── common/         # 通用组件（StatusBadge, FilterBar, SearchableSelect, DateRangePicker, ColumnMenu）
         ├── composables/        # 组合式函数（useApi、useFormat、usePagination、useStock、useColumnConfig、useSearch、useDownload、useDropshipOrder 等 18 个）
         └── styles/             # 全局样式
@@ -75,7 +76,7 @@ erp-4/
 |------|------|------|
 | 仪表盘 | `/dashboard` | 销售统计、库存预警、经营概览、待办事项面板 |
 | 销售管理 | `/sales` | 现款/账期/寄售调拨/寄售结算/退货订单 |
-| 库存管理 | `/stock` | 入库、调拨、盘点调整、库存导出、SN 码管理 |
+| 库存管理 | `/stock` | 入库、调拨、盘点调整、库存导出、SN 码管理、样机管理（借出/归还/处置） |
 | 采购管理 | `/purchase` | 采购订单（创建→审核→付款→收货→退货）完整流程，供应商在账资金管理 |
 | 代采代发 | `/dropship` | 代采代发订单全流程（草稿→待付→已付→已发→完成），付款工作台（按供应商分组批量付款），报表（月度汇总/毛利分析/应收未收） |
 | 寄售管理 | `/consignment` | 寄售调拨、寄售结算、寄售退货 |
@@ -88,7 +89,7 @@ erp-4/
 
 ## 数据模型
 
-核心模型共 47 个：
+核心模型共 50 个：
 
 - **用户与权限**: User
 - **商品**: Product, ProductBrand
@@ -103,6 +104,7 @@ erp-4/
 - **应付**: PayableBill, DisbursementBill（含退货退款 bill_type）, DisbursementRefundBill
 - **发票**: Invoice, InvoiceItem
 - **出入库单**: SalesDeliveryBill, SalesDeliveryItem, PurchaseReceiptBill, PurchaseReceiptItem
+- **样机管理**: DemoUnit, DemoLoan, DemoDisposal
 - **代采代发**: DropshipOrder
 - **物流**: Shipment, ShipmentItem
 - **系统**: OperationLog, SystemSetting

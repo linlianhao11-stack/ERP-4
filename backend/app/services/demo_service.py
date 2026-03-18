@@ -105,6 +105,13 @@ async def create_demo_unit(data, user) -> DemoUnit:
     if not warehouse:
         raise HTTPException(status_code=404, detail="目标仓库不存在")
 
+    # 验证目标仓位
+    target_location = None
+    if data.location_id:
+        target_location = await Location.filter(id=data.location_id, warehouse_id=data.warehouse_id).first()
+        if not target_location:
+            raise HTTPException(status_code=400, detail="目标仓位不存在或不属于该仓库")
+
     # 确定成本
     cost_price = Decimal("0")
 
@@ -115,11 +122,11 @@ async def create_demo_unit(data, user) -> DemoUnit:
         if not src_wh:
             raise HTTPException(status_code=404, detail="源仓库不存在")
 
-        # 查找源仓库库存
-        src_stock = await WarehouseStock.filter(
-            warehouse_id=data.source_warehouse_id,
-            product_id=data.product_id,
-        ).first()
+        # 查找源仓库库存（优先按仓位精确匹配）
+        src_stock_query = {"warehouse_id": data.source_warehouse_id, "product_id": data.product_id}
+        if data.source_location_id:
+            src_stock_query["location_id"] = data.source_location_id
+        src_stock = await WarehouseStock.filter(**src_stock_query).first()
         if not src_stock or src_stock.quantity < 1:
             raise HTTPException(status_code=400, detail="源仓库库存不足")
 
@@ -149,6 +156,7 @@ async def create_demo_unit(data, user) -> DemoUnit:
     before_demo = demo_stock.quantity if demo_stock else 0
     await update_weighted_entry_date(
         data.warehouse_id, data.product_id, 1, cost_price,
+        data.location_id,
     )
 
     await StockLog.create(
@@ -173,6 +181,7 @@ async def create_demo_unit(data, user) -> DemoUnit:
         product_id=data.product_id,
         sn_code=sn,
         warehouse_id=data.warehouse_id,
+        location_id=data.location_id,
         status="in_stock",
         condition=data.condition,
         cost_price=cost_price,

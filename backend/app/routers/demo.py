@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from urllib.parse import quote
 
 from app.auth.dependencies import require_permission
-from app.models import User, DemoUnit, DemoLoan, DemoDisposal, Customer, Employee
+from app.models import User, DemoUnit, DemoLoan, DemoDisposal, Customer, Employee, Location
 from app.schemas.demo import (
     DemoUnitCreate, DemoUnitUpdate,
     DemoLoanCreate, DemoLoanReturn,
@@ -50,6 +50,15 @@ LOAN_STATUS_LABELS = {
 
 async def _serialize_unit(u: DemoUnit) -> dict:
     """样机序列化，需要预加载 product / warehouse / sn_code"""
+    # 解析仓位（nullable FK 不能用 select_related，单独查询）
+    location_code = None
+    location_name = None
+    if u.location_id:
+        loc = await Location.filter(id=u.location_id).first()
+        if loc:
+            location_code = loc.code
+            location_name = loc.name
+
     # 获取持有人名称
     holder_name = None
     if u.current_holder_id:
@@ -85,6 +94,9 @@ async def _serialize_unit(u: DemoUnit) -> dict:
         "sn_code": u.sn_code.sn_code if u.sn_code else None,
         "warehouse_id": u.warehouse_id,
         "warehouse_name": u.warehouse.name if u.warehouse else None,
+        "location_id": u.location_id,
+        "location_code": location_code,
+        "location_name": location_name,
         "status": u.status,
         "status_label": STATUS_LABELS.get(u.status, u.status),
         "condition": u.condition,
@@ -191,7 +203,7 @@ async def export_units(user: User = Depends(require_permission("stock_view"))):
         ws.title = "样机列表"
 
         headers = [
-            "样机编号", "商品名称", "SKU", "SN码", "所属仓库",
+            "样机编号", "商品名称", "SKU", "SN码", "所属仓库", "仓位",
             "状态", "成色", "成本价", "当前持有人",
             "累计借出次数", "累计借出天数", "备注", "入库时间",
         ]
@@ -206,7 +218,7 @@ async def export_units(user: User = Depends(require_permission("stock_view"))):
             cell.alignment = Alignment(horizontal="center")
 
         # 列宽
-        col_widths = [14, 24, 16, 22, 14, 10, 8, 12, 14, 12, 12, 24, 18]
+        col_widths = [14, 24, 16, 22, 14, 10, 10, 8, 12, 14, 12, 12, 24, 18]
         from openpyxl.utils import get_column_letter
         for idx, w in enumerate(col_widths, 1):
             ws.column_dimensions[get_column_letter(idx)].width = w
@@ -227,12 +239,19 @@ async def export_units(user: User = Depends(require_permission("stock_view"))):
                 dt = to_naive(u.created_at)
                 created = dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 
+            location_display = ""
+            if u.location_id:
+                loc = await Location.filter(id=u.location_id).first()
+                if loc:
+                    location_display = f"{loc.code} - {loc.name}" if loc.name else loc.code
+
             row_data = [
                 u.code,
                 u.product.name if u.product else "",
                 u.product.sku if u.product else "",
                 u.sn_code.sn_code if u.sn_code else "",
                 u.warehouse.name if u.warehouse else "",
+                location_display,
                 STATUS_LABELS.get(u.status, u.status),
                 CONDITION_LABELS.get(u.condition, u.condition),
                 float(u.cost_price),

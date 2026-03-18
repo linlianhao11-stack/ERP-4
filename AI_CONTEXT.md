@@ -1,6 +1,6 @@
 # AI_CONTEXT.md — ERP-4 技术架构索引
 
-> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-16 / v4.26.1
+> 本文档为 AI 辅助开发提供项目上下文。最后更新: 2026-03-18 / v4.29.0
 
 ---
 
@@ -10,7 +10,7 @@
 
 - **用户规模**: 小团队多角色协作（admin / user），RBAC 权限控制 30 个粒度
 - **部署方式**: `docker compose up -d`，PostgreSQL 16 + FastAPI + 前端静态文件打包进同一镜像
-- **数据特征**: 单数据库，47 张核心表，支持 SN 码追溯、加权成本核算、应收应付管理（含退货退款闭环、多单合并推送发票、勾单生成凭证）、多账套隔离、6 维辅助核算（客户/供应商/员工/部门/商品/银行）、期末结转、三张财务报表
+- **数据特征**: 单数据库，50 张核心表，支持 SN 码追溯、加权成本核算、样机借还管理、应收应付管理（含退货退款闭环、多单合并推送发票、勾单生成凭证）、多账套隔离、6 维辅助核算（客户/供应商/员工/部门/商品/银行）、期末结转、三张财务报表
 - **文件存储**: `uploads/` 目录存放发票 PDF 附件等上传文件，Docker volume 持久化挂载
 
 ---
@@ -72,13 +72,13 @@ erp-4/
 │       ├── database.py         # Tortoise ORM 初始化/关闭
 │       ├── exceptions.py       # 全局异常处理器
 │       ├── logger.py           # 结构化 JSON 日志
-│       ├── migrations.py       # 增量 DDL 迁移 + 默认数据初始化
+│       ├── migrations/         # 版本化迁移（v001~v029，runner.py 幂等执行 + _applied_migrations 追踪）
 │       │
 │       ├── auth/
 │       │   ├── jwt.py          # create_access_token / verify_token
 │       │   └── dependencies.py # get_current_user / require_permission
 │       │
-│       ├── models/             # Tortoise ORM 模型（46 个类）
+│       ├── models/             # Tortoise ORM 模型（49 个类）
 │       │   ├── user.py         # User
 │       │   ├── product.py      # Product
 │       │   ├── customer.py     # Customer
@@ -99,6 +99,7 @@ erp-4/
 │       │   ├── purchase_receipt.py # PurchaseReceiptBill, PurchaseReceiptItem
 │       │   ├── rebate.py       # RebateLog
 │       │   ├── sn.py           # SnConfig, SnCode
+│       │   ├── demo.py          # DemoUnit, DemoLoan, DemoDisposal（样机管理）
 │       │   ├── dropship.py     # DropshipOrder（代采代发订单，含发货/税率/毛利/物流字段）
 │       │   └── operation_log.py # OperationLog
 │       │
@@ -115,7 +116,7 @@ erp-4/
 │       │   ├── rate_limiter.py       # AI 请求限流器
 │       │   └── encryption.py         # API Key 加密存储
 │       │
-│       ├── routers/            # API 路由（41 个模块）
+│       ├── routers/            # API 路由（42 个模块）
 │       │   ├── auth.py         # /api/auth   — 登录、登出、修改密码
 │       │   ├── users.py        # /api/users  — 用户 CRUD
 │       │   ├── products.py     # /api/products — 产品 CRUD、Excel 导入
@@ -154,11 +155,12 @@ erp-4/
 │       │   ├── product_brands.py # /api/product-brands
 │       │   ├── payment_methods.py # /api/payment-methods（CRUD 工厂）
 │       │   ├── disbursement_methods.py # /api/disbursement-methods（CRUD 工厂）
+│       │   ├── demo.py        # /api/demo — 样机管理（14+端点：样机CRUD+借出/审批/归还+转销售/翻新/报废/丢失+统计+导出）
 │       │   ├── dropship.py    # /api/dropship — 代采代发订单（14端点：CRUD+提交+催付+批量付款+发货+完成+取消+报表+付款工作台）
 │       │   ├── crud_factory.py # 通用 CRUD 路由工厂
 │       │   └── ai_chat.py     # /api/ai — AI 聊天（SSE 流/导出/反馈/状态，4端点）
 │       │
-│       ├── schemas/            # Pydantic 请求/响应模型（25 个文件）
+│       ├── schemas/            # Pydantic 请求/响应模型（26 个文件）
 │       │   ├── auth.py, user.py, product.py, customer.py, supplier.py
 │       │   ├── warehouse.py, stock.py, order.py, finance.py
 │       │   ├── purchase.py, consignment.py, logistics.py
@@ -166,10 +168,11 @@ erp-4/
 │       │   ├── accounting.py   # 账套/科目/期间 schemas
 │       │   ├── ar_ap.py        # 应收应付7个Create schemas
 │       │   ├── voucher_gen.py  # BillRef + GenerateVouchersRequest（勾单生成凭证共享Schema）
+│       │   ├── demo.py          # 样机管理8个Schema（UnitCreate/Update/LoanCreate/Return/Sell/Convert/Scrap/Loss）
 │       │   ├── dropship.py     # 代采代发5个Schema（Create/Update/Ship/Payment/Cancel）
 │       │   └── __init__.py
 │       │
-│       ├── services/           # 业务逻辑层（19 个服务）
+│       ├── services/           # 业务逻辑层（20 个服务）
 │       │   ├── stock_service.py      # 库存变动、加权成本计算
 │       │   ├── order_service.py      # 订单创建、退货
 │       │   ├── backup_service.py     # tar.gz 备份/恢复（SQL dump + uploads）、自动备份循环、兼容旧 .sql 格式
@@ -187,6 +190,7 @@ erp-4/
 │       │   ├── report_service.py     # 财务报表（资产负债表/利润表/现金流量表）
 │       │   ├── report_export.py      # 报表导出（Excel+PDF，3报表×2格式）
 │       │   ├── ai_chat_service.py   # AI NL2SQL 核心服务（意图→SQL→执行→分析）
+│       │   ├── demo_service.py     # 样机管理业务逻辑（入库/借还/转销售/翻新/报废/丢失，含库存联动/SN追踪/应收生成）
 │       │   └── dropship_service.py # 代采代发业务逻辑（订单创建/提交/批量付款/发货/取消，含毛利计算/凭证生成/物流订阅）
 │       │
 │       └── utils/              # 工具函数
@@ -225,11 +229,11 @@ erp-4/
 │       ├── router/
 │       │   └── index.js        # 12 条路由，beforeEach 权限守卫
 │       │
-│       ├── views/              # 页面视图（13 个）
+│       ├── views/              # 页面视图（14 个）
 │       │   ├── LoginView.vue        # 125 行
 │       │   ├── DashboardView.vue    # 160 行 — 统计看板
 │       │   ├── SalesView.vue        # 386 行 — 销售开单（瘦容器，子组件在 business/sales/）
-│       │   ├── StockView.vue        # 287 行 — 库存管理（瘦容器，子组件在 business/stock/）
+│       │   ├── StockView.vue        # 320 行 — 库存管理 + 样机管理（二级 Tab，瘦容器）
 │       │   ├── PurchaseView.vue     # 58 行  — 采购（Tabs 容器）
 │       │   ├── FinanceView.vue      # 71 行  — 财务（Tabs 容器）
 │       │   ├── AccountingView.vue   # 会计（凭证/科目/期间/账簿/应收/应付/发票/出入库/期末处理/财务报表 10个Tab）
@@ -247,9 +251,6 @@ erp-4/
 │       │   │
 │       │   ├── business/       # 业务面板（从大视图拆分）
 │       │   │   ├── sales/                    # 销售子组件
-│       │   │   │   ├── ProductSelector.vue   # 253 行 — 商品选择表格+筛选
-│       │   │   │   ├── ShoppingCart.vue       # 购物车列表（含多账套分组、SearchableSelect 客户搜索）
-│       │   │   │   ├── CartItem.vue          # 购物车商品行组件
 │       │   │   │   └── OrderConfirmModal.vue  # 下单确认弹窗（账套自动推断、退款字段）
 │       │   │   ├── purchase/                 # 采购子组件
 │       │   │   │   ├── PurchaseOrderForm.vue  # 490 行 — 新建/编辑采购单
@@ -262,6 +263,14 @@ erp-4/
 │       │   │   │   └── FinanceUnpaidTab.vue   # 270 行 — 未收款+收款弹窗（含类型/日期/搜索筛选）
 │       │   │   ├── logistics/                # 物流子组件
 │       │   │   │   └── ShipmentDetailModal.vue # 643 行 — 发货详情+发货表单+物流跟踪
+│       │   │   ├── demo/                     # 样机管理子组件（7 个）
+│       │   │   │   ├── DemoManagementPanel.vue  # 顶层容器（统计卡片+内部Tab）
+│       │   │   │   ├── DemoUnitList.vue         # 样机台账列表（含仓库-仓位列）
+│       │   │   │   ├── DemoUnitForm.vue         # 新增样机（仓库仓位联动+库存内嵌下拉）
+│       │   │   │   ├── DemoLoanForm.vue         # 借出申请
+│       │   │   │   ├── DemoLoanList.vue         # 借还记录列表
+│       │   │   │   ├── DemoReturnModal.vue      # 归还确认
+│       │   │   │   └── DemoDisposalModal.vue    # 处置（转销售/翻新/报废/丢失）
 │       │   │   ├── stock/                    # 库存子组件
 │       │   │   │   ├── ProductFormModal.vue   # 144 行 — 商品新增/编辑
 │       │   │   │   ├── RestockModal.vue       # 217 行 — 入库（含SN码）

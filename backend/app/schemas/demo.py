@@ -29,6 +29,7 @@ class DemoUnitCreate(BaseModel):
     product_id: int
     sn_code: str = Field(max_length=200)
     warehouse_id: int  # 目标样机仓
+    location_id: Optional[int] = None  # 目标样机仓位
     condition: DemoCondition = "new"
     notes: Optional[str] = None
     # stock_transfer 专用

@@ -220,8 +220,8 @@
  * 列表逻辑委托给 useStock composable
  * 5个弹窗拆分为独立子组件，各自管理表单状态
  */
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useWarehousesStore } from '../stores/warehouses'
 import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
@@ -239,12 +239,15 @@ import ImportModal from '../components/business/stock/ImportModal.vue'
 import ImportPreviewModal from '../components/business/stock/ImportPreviewModal.vue'
 
 const router = useRouter()
+const route = useRoute()
 const warehousesStore = useWarehousesStore()
 const { getAgeClass } = useFormat()
 const { hasPermission } = usePermission()
 
-// 顶层 Tab
-const topTab = ref('stock')
+// 顶层 Tab — 从 URL query 恢复，刷新不丢失
+const stockValidTabs = ['stock', 'demo']
+const topTab = ref(stockValidTabs.includes(route.query.tab) ? route.query.tab : 'stock')
+watch(topTab, (val) => router.replace({ query: { ...route.query, tab: val === 'stock' ? undefined : val } }))
 
 // 从 composable 获取列表数据和方法
 const {
