@@ -16,7 +16,7 @@ from app.models import (
 from app.models.department import Employee
 from app.models.customer_balance import CustomerAccountBalance
 from app.models.accounting import AccountSet, AccountingPeriod
-from app.schemas.order import OrderCreate, CancelRequest
+from app.schemas.order import OrderCreate, CancelRequest, RemarkUpdate
 from app.services.order_service import (
     validate_order_entities, resolve_item_entities, process_item_stock,
     process_rebate_deduction, process_order_settlement, release_cancelled_stock
@@ -268,6 +268,29 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
 
         except HTTPException:
             raise
+
+
+@router.patch("/{order_id}/remark")
+async def update_order_remark(order_id: int, data: RemarkUpdate, user: User = Depends(require_permission("sales", "finance"))):
+    order = await Order.filter(id=order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    old_remark = order.remark or ""
+    new_remark = data.remark
+
+    if old_remark == new_remark:
+        return {"id": order.id, "remark": order.remark}
+
+    order.remark = new_remark
+    await order.save(update_fields=["remark", "updated_at"])
+
+    await log_operation(
+        user, "ORDER_UPDATE_REMARK", "ORDER", order.id,
+        f"修改订单 {order.order_no} 备注: {old_remark[:50] or '(空)'} → {new_remark[:50] or '(空)'}"
+    )
+
+    return {"id": order.id, "remark": order.remark}
 
 
 @router.get("")

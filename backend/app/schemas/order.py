@@ -40,3 +40,6 @@ class CancelRequest(BaseModel):
     refund_rebate: Optional[Decimal] = Field(default=None, ge=0)
     refund_method: Literal["balance", "cash"] = "balance"
     refund_payment_method: Optional[str] = None
+
+class RemarkUpdate(BaseModel):
+    remark: str = Field("", max_length=2000)
