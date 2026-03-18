@@ -77,10 +77,10 @@ export function useAiChat() {
       // 序列化时剥离 table_data 和 chart_config
       const stripped = messages.value.map(m => {
         if (m.role === 'user') return m
-        const { table_data, chart_config, ...rest } = m
+        const { table_data, tables, chart_config, ...rest } = m
         return {
           ...rest,
-          _hasTableData: !!table_data,
+          _hasTableData: !!table_data || !!tables?.length,
           _hasChartConfig: !!chart_config,
         }
       })

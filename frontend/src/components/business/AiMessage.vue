@@ -63,21 +63,53 @@
           </div>
         </div>
 
+        <!-- 多表格（multi_sql 响应） -->
+        <template v-else-if="msg.tables?.length">
+          <div v-for="(t, ti) in msg.tables" :key="ti" class="mt-3 border rounded-lg overflow-hidden">
+            <div class="px-3 py-2 bg-elevated border-b">
+              <span class="font-semibold text-xs text-secondary">{{ t.title }}</span>
+              <span class="text-[11px] text-muted ml-2">{{ t.row_count }} 行</span>
+            </div>
+            <div v-if="t.columns?.length" class="overflow-x-auto" :class="tableMaxH">
+              <table class="w-full text-sm">
+                <thead class="bg-elevated sticky top-0">
+                  <tr>
+                    <th v-for="col in t.columns" :key="col" class="px-2 py-2 text-left text-xs font-medium text-muted whitespace-nowrap">
+                      {{ col }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, ri) in t.rows" :key="ri" class="border-t">
+                    <td v-for="(cell, ci) in row" :key="ci" class="px-3 py-1.5 whitespace-nowrap" :class="isNumber(cell) ? 'tabular-nums font-mono text-right' : ''">
+                      {{ formatCell(cell) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="px-3 py-3 text-xs text-muted text-center">暂无数据</div>
+          </div>
+        </template>
+
         <!-- 图表 -->
         <AiChartRenderer v-if="msg.chart_config" :config="msg.chart_config" class="mt-3" />
 
         <!-- SQL 折叠 -->
-        <details v-if="msg.sql" class="mt-3">
+        <details v-if="msg.sql || msg.sqls?.length" class="mt-3">
           <summary class="text-xs text-muted cursor-pointer">查看 SQL</summary>
-          <pre class="mt-1 p-2 bg-elevated rounded text-xs font-mono overflow-x-auto">{{ msg.sql }}</pre>
+          <template v-if="msg.sqls?.length">
+            <pre v-for="(s, si) in msg.sqls" :key="si" class="mt-1 p-2 bg-elevated rounded text-xs font-mono overflow-x-auto">{{ s }}</pre>
+          </template>
+          <pre v-else class="mt-1 p-2 bg-elevated rounded text-xs font-mono overflow-x-auto">{{ msg.sql }}</pre>
         </details>
 
         <!-- 操作栏 -->
         <div class="flex items-center gap-3 mt-3 pt-2 border-t">
-          <button v-if="msg.table_data" class="text-xs text-muted hover:text-primary" @click="copyTable" title="复制表格">
+          <button v-if="msg.table_data || msg.tables?.length" class="text-xs text-muted hover:text-primary" @click="copyTable" title="复制表格">
             <Copy :size="14" />
           </button>
-          <div ref="exportMenuRef" class="relative" v-if="msg.table_data">
+          <div ref="exportMenuRef" class="relative" v-if="msg.table_data || msg.tables?.length">
             <button class="text-xs text-muted hover:text-primary" @click="showExportMenu = !showExportMenu" title="导出">
               <Download :size="14" />
             </button>
@@ -204,13 +236,18 @@ onMounted(() => document.addEventListener('pointerdown', handleOutsideClick))
 onUnmounted(() => document.removeEventListener('pointerdown', handleOutsideClick))
 
 const exportCsv = () => {
-  if (!props.msg.table_data) return
-  const { columns, rows } = props.msg.table_data
   const bom = '\uFEFF'
-  const csv = bom + [
-    columns.join(','),
-    ...rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
-  ].join('\n')
+  let csv = bom
+  if (props.msg.tables?.length) {
+    csv += props.msg.tables.map(t => {
+      const header = t.columns.join(',')
+      const body = t.rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+      return `${t.title}\n${header}\n${body}`
+    }).join('\n\n')
+  } else if (props.msg.table_data) {
+    const { columns, rows } = props.msg.table_data
+    csv += [columns.join(','), ...rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))].join('\n')
+  }
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -221,9 +258,18 @@ const exportCsv = () => {
 }
 
 const copyTable = async () => {
-  if (!props.msg.table_data) return
-  const { columns, rows } = props.msg.table_data
-  const tsv = [columns.join('\t'), ...rows.map(r => r.map(c => c ?? '').join('\t'))].join('\n')
+  let tsv = ''
+  if (props.msg.tables?.length) {
+    tsv = props.msg.tables.map(t => {
+      const header = t.columns.join('\t')
+      const body = t.rows.map(r => r.map(c => c ?? '').join('\t')).join('\n')
+      return `--- ${t.title} ---\n${header}\n${body}`
+    }).join('\n\n')
+  } else if (props.msg.table_data) {
+    const { columns, rows } = props.msg.table_data
+    tsv = [columns.join('\t'), ...rows.map(r => r.map(c => c ?? '').join('\t'))].join('\n')
+  }
+  if (!tsv) return
   try {
     await navigator.clipboard.writeText(tsv)
     appStore.showToast('已复制到剪贴板')

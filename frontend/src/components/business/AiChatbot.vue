@@ -158,9 +158,12 @@ const checkStatus = async () => {
 }
 
 const handleExport = async (msg) => {
-  if (!msg.table_data) return
+  if (!msg.table_data && !msg.tables?.length) return
   try {
-    const { data } = await aiExport({ table_data: msg.table_data, title: 'AI查询结果' })
+    const payload = msg.tables?.length
+      ? { tables: msg.tables, title: 'AI查询结果' }
+      : { table_data: msg.table_data, title: 'AI查询结果' }
+    const { data } = await aiExport(payload)
     const url = URL.createObjectURL(data)
     const a = document.createElement('a')
     a.href = url

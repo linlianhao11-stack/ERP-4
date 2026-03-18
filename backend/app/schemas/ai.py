@@ -23,7 +23,8 @@ class ChatResponse(BaseModel):
 
 
 class ExportRequest(BaseModel):
-    table_data: dict
+    table_data: Optional[dict] = None
+    tables: Optional[list[dict]] = None
     title: str = "AI查询结果"
 
 

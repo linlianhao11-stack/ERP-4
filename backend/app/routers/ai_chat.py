@@ -116,24 +116,36 @@ async def ai_export(body: ExportRequest, user: User = Depends(require_permission
     """导出查询结果为 Excel"""
     import openpyxl
 
-    table_data = body.table_data
-    if not table_data or "columns" not in table_data or "rows" not in table_data:
+    wb = openpyxl.Workbook()
+
+    if body.tables:
+        for ti, t in enumerate(body.tables):
+            if ti == 0:
+                ws = wb.active
+            else:
+                ws = wb.create_sheet()
+            ws.title = (t.get("title", f"查询{ti+1}"))[:31]
+            columns = t.get("columns", [])
+            rows = t.get("rows", [])
+            for col, name in enumerate(columns, 1):
+                ws.cell(row=1, column=col, value=name)
+            for row_idx, row in enumerate(rows, 2):
+                for col_idx, val in enumerate(row, 1):
+                    ws.cell(row=row_idx, column=col_idx, value=val)
+    elif body.table_data:
+        ws = wb.active
+        ws.title = body.title[:31]
+        table_data = body.table_data
+        if "columns" not in table_data or "rows" not in table_data:
+            raise HTTPException(status_code=400, detail="无效的表格数据")
+        for col, name in enumerate(table_data["columns"], 1):
+            ws.cell(row=1, column=col, value=name)
+        for row_idx, row in enumerate(table_data["rows"], 2):
+            for col_idx, val in enumerate(row, 1):
+                ws.cell(row=row_idx, column=col_idx, value=val)
+    else:
         raise HTTPException(status_code=400, detail="无效的表格数据")
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = body.title[:31]  # Excel sheet 名最多 31 字符
-
-    # 写表头
-    for col, name in enumerate(table_data["columns"], 1):
-        ws.cell(row=1, column=col, value=name)
-
-    # 写数据行
-    for row_idx, row in enumerate(table_data["rows"], 2):
-        for col_idx, val in enumerate(row, 1):
-            ws.cell(row=row_idx, column=col_idx, value=val)
-
-    # 输出为字节流
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
