@@ -27,6 +27,7 @@ from app.models.customer_balance import CustomerAccountBalance
 from app.models.department import Department, Employee
 from app.models.bank_account import BankAccount
 from app.models.dropship import DropshipOrder
+from app.models.demo import DemoUnit, DemoLoan, DemoDisposal
 
 __all__ = [
     "User", "Warehouse", "Location", "Product", "WarehouseStock", "StockLog",
@@ -45,4 +46,5 @@ __all__ = [
     "Department", "Employee",
     "BankAccount",
     "DropshipOrder",
+    "DemoUnit", "DemoLoan", "DemoDisposal",
 ]

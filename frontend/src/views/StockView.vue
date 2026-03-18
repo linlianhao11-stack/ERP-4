@@ -4,6 +4,16 @@
 -->
 <template>
   <div>
+    <!-- 顶层 Tab：库存 / 样机管理 -->
+    <AppTabs
+      v-model="topTab"
+      :tabs="[
+        { value: 'stock', label: '库存' },
+        { value: 'demo', label: '样机管理' },
+      ]"
+    />
+
+    <template v-if="topTab === 'stock'">
     <!-- 工具栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-2">
       <select v-model="stockWarehouseFilter" @change="resetPage(); loadProductsData()" class="input text-sm" style="width:130px">
@@ -198,6 +208,9 @@
       @confirmed="onImportConfirmed"
       @cancelled="onImportCancelled"
     />
+    </template>
+
+    <DemoManagementPanel v-else-if="topTab === 'demo'" />
   </div>
 </template>
 
@@ -214,6 +227,8 @@ import { useFormat } from '../composables/useFormat'
 import { usePermission } from '../composables/usePermission'
 import { useStock } from '../composables/useStock'
 import ColumnMenu from '../components/common/ColumnMenu.vue'
+import AppTabs from '../components/common/AppTabs.vue'
+import DemoManagementPanel from '../components/business/demo/DemoManagementPanel.vue'
 import { DEFAULT_LOCATION_COLOR } from '../utils/constants'
 
 
@@ -227,6 +242,9 @@ const router = useRouter()
 const warehousesStore = useWarehousesStore()
 const { getAgeClass } = useFormat()
 const { hasPermission } = usePermission()
+
+// 顶层 Tab
+const topTab = ref('stock')
 
 // 从 composable 获取列表数据和方法
 const {
