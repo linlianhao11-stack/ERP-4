@@ -89,6 +89,8 @@ async def import_suppliers(
 
     wb.close()
 
+    await log_operation(user, "SUPPLIER_IMPORT", "SUPPLIER", None,
+        f"批量导入供应商，新增 {created} 条，跳过 {skipped} 条")
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
@@ -160,6 +162,7 @@ async def update_supplier(supplier_id: int, data: SupplierRequest, user: User = 
     update_data = data.model_dump(exclude_unset=True)
     if update_data:
         await Supplier.filter(id=supplier_id).update(**update_data)
+    await log_operation(user, "SUPPLIER_UPDATE", "SUPPLIER", s.id, f"更新供应商 {s.name}")
     return {"message": "更新成功"}
 
 
@@ -183,6 +186,7 @@ async def delete_supplier(supplier_id: int, user: User = Depends(require_permiss
         raise HTTPException(status_code=400, detail=f"该供应商有 {pending_count} 个未完成的采购单，无法删除")
     s.is_active = False
     await s.save()
+    await log_operation(user, "SUPPLIER_DELETE", "SUPPLIER", s.id, f"删除供应商 {s.name}")
     return {"message": "删除成功"}
 
 

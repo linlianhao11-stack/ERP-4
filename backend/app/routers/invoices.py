@@ -181,6 +181,8 @@ async def create_invoice_from_receivable(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await log_operation(user, "INVOICE_CREATE", "INVOICE", inv.id,
+        f"从应收创建发票 {inv.invoice_no}")
     return {"id": inv.id, "invoice_no": inv.invoice_no, "message": "创建成功"}
 
 
@@ -203,6 +205,8 @@ async def create_invoice_from_payable(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await log_operation(user, "INVOICE_CREATE", "INVOICE", inv.id,
+        f"从应付创建发票 {inv.invoice_no}")
     return {"id": inv.id, "invoice_no": inv.invoice_no, "message": "创建成功"}
 
 
@@ -225,6 +229,8 @@ async def create_input_invoice_endpoint(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await log_operation(user, "INVOICE_CREATE", "INVOICE", inv.id,
+        f"手工创建进项发票 {inv.invoice_no}")
     return {"id": inv.id, "invoice_no": inv.invoice_no, "message": "创建成功"}
 
 
@@ -299,6 +305,8 @@ async def confirm_invoice_endpoint(
         inv = await confirm_invoice(invoice_id, user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await log_operation(user, "INVOICE_CONFIRM", "INVOICE", inv.id,
+        f"确认发票 {inv.invoice_no}")
     return {"message": "确认成功", "invoice_no": inv.invoice_no}
 
 
@@ -394,6 +402,8 @@ async def upload_invoice_pdf(
     inv.pdf_files = current_files
     await inv.save()
 
+    await log_operation(user, "INVOICE_UPLOAD_PDF", "INVOICE", inv.id,
+        f"上传发票 PDF {inv.invoice_no}")
     return {"message": "上传成功", "pdf_count": len(current_files), "index": seq - 1}
 
 
@@ -455,4 +465,6 @@ async def delete_invoice_pdf(
     inv.pdf_files = files
     await inv.save()
 
+    await log_operation(user, "INVOICE_DELETE_PDF", "INVOICE", inv.id,
+        f"删除发票 PDF {inv.invoice_no}")
     return {"message": "删除成功", "pdf_count": len(files)}
