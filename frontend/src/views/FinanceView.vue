@@ -36,6 +36,12 @@
       key="rebates"
       :accountSets="accountingStore.accountSets"
     />
+
+    <!-- 跨 Tab 订单详情弹窗（用于收款管理等非订单 tab 查看关联订单） -->
+    <FinanceOrderDetailModal
+      :order-id="crossTabOrderId"
+      v-model:visible="showCrossTabDetail"
+    />
   </div>
 </template>
 
@@ -48,6 +54,7 @@ import { useAccountingStore } from '../stores/accounting'
 import { usePermission } from '../composables/usePermission'
 import FinanceOrdersPanel from '../components/business/FinanceOrdersPanel.vue'
 import FinancePaymentsPanel from '../components/business/FinancePaymentsPanel.vue'
+import FinanceOrderDetailModal from '../components/business/finance/FinanceOrderDetailModal.vue'
 const FinancePayablesPanel = defineAsyncComponent(() => import('../components/business/FinancePayablesPanel.vue'))
 const FinanceLogsPanel = defineAsyncComponent(() => import('../components/business/FinanceLogsPanel.vue'))
 const FinanceRebatesPanel = defineAsyncComponent(() => import('../components/business/FinanceRebatesPanel.vue'))
@@ -65,10 +72,12 @@ watch(financeTab, (val) => router.replace({ query: { ...route.query, tab: val ==
 const ordersPanel = ref(null)
 const paymentsPanel = ref(null)
 
-const handleViewOrder = async (orderId) => {
-  financeTab.value = 'orders'
-  await nextTick()
-  ordersPanel.value?.viewOrder(orderId)
+const crossTabOrderId = ref(null)
+const showCrossTabDetail = ref(false)
+
+const handleViewOrder = (orderId) => {
+  crossTabOrderId.value = orderId
+  showCrossTabDetail.value = true
 }
 
 const needsRefresh = ref({})
