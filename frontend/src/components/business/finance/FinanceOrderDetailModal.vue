@@ -3,7 +3,7 @@
  * 订单详情弹窗（含退货表单）
  * 从 FinanceOrdersTab 拆分出来的独立子组件
  */
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useAppStore } from '../../../stores/app'
 import { useSettingsStore } from '../../../stores/settings'
 import { useFormat } from '../../../composables/useFormat'
@@ -32,10 +32,12 @@ const orderDetail = reactive({})
 const isEditingRemark = ref(false)
 const editingRemark = ref('')
 const remarkSaving = ref(false)
+const remarkTextarea = ref(null)
 
 const startEditRemark = () => {
   editingRemark.value = orderDetail.remark || ''
   isEditingRemark.value = true
+  nextTick(() => remarkTextarea.value?.focus())
 }
 
 const cancelEditRemark = () => {
@@ -166,6 +168,7 @@ const viewRelatedOrder = async (id) => {
     Object.keys(orderDetail).forEach(k => delete orderDetail[k])
     Object.assign(orderDetail, data)
     showReturnForm.value = false
+    isEditingRemark.value = false
   } catch (e) {
     appStore.showToast('加载订单详情失败', 'error')
   }
@@ -321,9 +324,11 @@ const cancelReturnForm = () => {
               <template v-if="isEditingRemark">
                 <div class="text-muted text-xs mb-1.5">备注</div>
                 <textarea
+                  ref="remarkTextarea"
                   v-model="editingRemark"
                   class="input text-sm"
                   rows="3"
+                  maxlength="2000"
                   placeholder="输入订单备注信息..."
                   @keyup.escape="cancelEditRemark"
                 ></textarea>
@@ -344,6 +349,7 @@ const cancelReturnForm = () => {
                     @click="startEditRemark"
                     class="text-muted hover:text-primary transition-colors flex-shrink-0 mt-0.5"
                     title="编辑备注"
+                    aria-label="编辑备注"
                   >
                     <Pencil :size="14" />
                   </button>
