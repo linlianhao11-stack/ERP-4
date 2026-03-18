@@ -15,7 +15,7 @@
 1. **CRITICAL — DSN 构建**：不要手写 DSN 解析。复用 `app/routers/ai_chat.py` 中的 `_build_ai_dsn()` 函数（它正确处理了 `quote_plus`）。实施时将该函数提取到 `app/config.py` 作为公共函数，三处调用统一 import。影响 Task 3（send-now）和 Task 4（lifespan）。
 2. **IMPORTANT — SMTP STARTTLS**：Task 1 的 `send_email` 中，如果端口不是 465 则用 `smtplib.SMTP` + `starttls()` 代替 `SMTP_SSL`。
 3. **IMPORTANT — 定时条件**：Task 2 `daily_report_loop` 的时间判断改为 `now.hour > hour or (now.hour == hour and now.minute >= minute)`，防止应用重启后跳过当天日报。
-4. **IMPORTANT — SQL 时区**：Task 2 所有 SQL 中的 `CURRENT_DATE` 改为 `(NOW() AT TIME ZONE 'Asia/Shanghai')::date`，避免 UTC 时区偏差。
+4. ~~IMPORTANT — SQL 时区~~：**已排除**。PostgreSQL 容器 `TZ=Asia/Shanghai`，`CURRENT_DATE` 已是北京时间，无需修改。
 5. **IMPORTANT — 前端组件位置**：Task 5 的 `DailyReportSettings` 放在 SettingsView 的常规设置 grid `</div>` 之后（grid 外面），不要放在 2 列 grid 内部。使用 `defineAsyncComponent` 异步加载。
 6. **SUGGESTION — smtp_password 检查**：Task 2 `generate_and_send_report` 在发送前检查 `smtp_password` 是否为空，为空则 log warning 并 return。
 7. **SUGGESTION — send-now 防护**：Task 3 的 `send-now` 端点用 `force` 参数让 `generate_and_send_report` 跳过 last_sent_date 检查，而不是清除 last_sent_date（避免失败后状态不一致）。
