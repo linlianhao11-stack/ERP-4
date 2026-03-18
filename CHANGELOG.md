@@ -1,5 +1,35 @@
 # 迭代记录
 
+## v4.30.0 — 退货退款流程重构（2026-03-18）
+
+> 退货退款从「业务员标记已退款」改为「财务确认后推送会计单据」，修正会计单据位置，新增退款管理 Tab。
+
+### 核心变更
+
+- **退款流程**：退货时选择「需要退款」→ 不生成会计单据 → 财务在退款管理确认 → 此时才创建 ReceiptRefundBill/DisbursementRefundBill（直接 confirmed 状态）
+- **会计单据位置修正**：销售退货退款从收款单（ReceiptBill）移至收款退款单（ReceiptRefundBill）；采购退货退款从付款单（DisbursementBill）移至付款退款单（DisbursementRefundBill）
+- **不需要退款**：直接转为客户/供应商在账资金，订单立即结清
+
+### 新增
+
+- **退款管理 Tab**（财务管理）：合并展示销售/采购待退款记录，财务确认后推送会计模块
+- **退款确认 API**：`GET /api/finance/refunds`、`POST /api/finance/refunds/confirm-sales/{id}`、`POST /api/finance/refunds/confirm-purchase/{id}`
+- **退款信息字段**：退货时可填写退款备注（银行账号、退款原因等）
+
+### 模型变更
+
+- `ReceiptRefundBill`：新增 `return_order`、`refund_info`；`original_receipt` 改为 nullable
+- `DisbursementRefundBill`：新增 `purchase_return`、`refund_info`；`original_disbursement` 改为 nullable
+- `ReceiptBill`：移除 `bill_type`、`return_order`
+- `DisbursementBill`：移除 `bill_type`、`purchase_return`
+- `Order`、`PurchaseReturn`：新增 `refund_info`
+
+### 数据迁移
+
+- `v030_refund_redesign`：自动将 `receipt_bills`/`disbursement_bills` 中 `bill_type='return_refund'` 的记录迁移到对应退款单表
+
+---
+
 ## v4.29.0 — 样机管理模块（2026-03-18）
 
 > 新增样机管理完整业务模块，覆盖样机入库、借出/归还、处置（转销售/翻新/报废/丢失），嵌入库存页面二级 Tab。
