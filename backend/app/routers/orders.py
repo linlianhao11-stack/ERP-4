@@ -95,7 +95,7 @@ async def create_order(data: OrderCreate, user: User = Depends(require_permissio
                 refunded=data.refunded if data.order_type == OrderType.RETURN else False,
                 refund_method=data.refund_method if data.order_type == OrderType.RETURN else None,
                 refund_amount=data.refund_amount if data.order_type == OrderType.RETURN else None,
-                refund_info=data.refund_info if data.order_type == OrderType.RETURN else "",
+                refund_info=(data.refund_info or "") if data.order_type == OrderType.RETURN else "",
                 remark=data.remark, employee=employee,
                 creator=user, is_cleared=is_cleared,
                 shipping_status=shipping_status,

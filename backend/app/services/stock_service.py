@@ -67,7 +67,7 @@ async def update_weighted_entry_date(warehouse_id: int, product_id: int, add_qty
                 product_id=product_id,
                 location_id=location_id,
                 quantity=0,
-                weighted_cost=cost_price or (product.cost_price if product else Decimal("0")),
+                weighted_cost=cost_price if cost_price is not None else (product.cost_price if product else Decimal("0")),
                 weighted_entry_date=now()
             )
         except IntegrityError:
@@ -89,7 +89,7 @@ async def update_weighted_entry_date(warehouse_id: int, product_id: int, add_qty
 
     old_date = to_naive(stock.weighted_entry_date) or now()
     old_cost = stock.weighted_cost or Decimal("0")
-    new_cost = cost_price if cost_price else old_cost
+    new_cost = cost_price if cost_price is not None else old_cost
 
     if add_qty > 0 and old_qty + add_qty > 0:
         # 仅在新增库存时重新计算加权入库日期，卖出时保持不变
@@ -97,13 +97,13 @@ async def update_weighted_entry_date(warehouse_id: int, product_id: int, add_qty
         new_days = Decimal(str(old_qty)) * Decimal(str(old_days)) / Decimal(str(old_qty + add_qty))
         stock.weighted_entry_date = now() - timedelta(days=float(new_days))
 
-        if cost_price:
+        if cost_price is not None:
             weighted_cost = (Decimal(str(old_qty)) * old_cost + Decimal(str(add_qty)) * new_cost) / Decimal(str(old_qty + add_qty))
             stock.weighted_cost = Decimal(str(weighted_cost)).quantize(Decimal("0.01"))
     elif old_qty + add_qty <= 0:
         # 库存清零，重置入库日期（下次入库时重新开始计算）
         stock.weighted_entry_date = now()
-        if cost_price:
+        if cost_price is not None:
             stock.weighted_cost = cost_price
     # else: 卖出但仍有库存，保持加权入库日期和成本不变
 

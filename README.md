@@ -38,12 +38,11 @@ erp-4/
 │   │   ├── database.py         # Tortoise ORM 初始化
 │   │   ├── logger.py           # 统一结构化 JSON 日志（级别可配置）
 │   │   ├── exceptions.py       # 全局异常处理器
-│   │   ├── migrations/         # 版本化迁移（v001~v029，runner.py 幂等执行）
+│   │   ├── migrations/         # 版本化迁移（v001~v030，runner.py 幂等执行）
 │   │   ├── auth/               # JWT 签发 & 权限校验（含 token 版本机制）
 │   │   ├── models/             # 数据模型（50 个）
 │   │   ├── routers/            # API 路由（43 个模块，240+ 个端点，含通用 CRUD 工厂）
 │   │   ├── schemas/            # Pydantic 请求/响应模型（25 个文件）
-│   │   ├── services/           # 业务逻辑层（19 个服务）
 │   │   ├── services/           # 业务逻辑层（20 个服务）
 │   │   └── utils/              # 工具函数（订单号生成、UTC 时间处理）
 │   ├── backups/                # 备份目录（tar.gz 归档：数据库 + 上传文件）

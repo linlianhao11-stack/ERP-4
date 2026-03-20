@@ -438,22 +438,31 @@ async def sell_demo_unit(unit_id: int, data, user) -> DemoDisposal:
         remark=f"样机转销售 {unit.code}",
     )
 
-    # 扣减样机仓库存
-    demo_stock = await WarehouseStock.filter(
-        warehouse_id=unit.warehouse_id, product_id=unit.product_id,
-        location_id=unit.location_id,
-    ).first()
-    before_qty = demo_stock.quantity if demo_stock else 0
-    await update_weighted_entry_date(
-        unit.warehouse_id, unit.product_id, -1, unit.cost_price,
-        unit.location_id,
-    )
-    await StockLog.create(
-        product_id=unit.product_id, warehouse_id=unit.warehouse_id,
-        change_type="SALE", quantity=-1,
-        before_qty=before_qty, after_qty=max(before_qty - 1, 0),
-        remark=f"样机转销售 {unit.code}", creator=user,
-    )
+    # 仅 in_stock 状态才扣减库存（lent_out 时借出已经扣过了）
+    if unit.status == "in_stock":
+        demo_stock = await WarehouseStock.filter(
+            warehouse_id=unit.warehouse_id, product_id=unit.product_id,
+            location_id=unit.location_id,
+        ).first()
+        before_qty = demo_stock.quantity if demo_stock else 0
+        await update_weighted_entry_date(
+            unit.warehouse_id, unit.product_id, -1, unit.cost_price,
+            unit.location_id,
+        )
+        await StockLog.create(
+            product_id=unit.product_id, warehouse_id=unit.warehouse_id,
+            change_type="SALE", quantity=-1,
+            before_qty=before_qty, after_qty=max(before_qty - 1, 0),
+            remark=f"样机转销售 {unit.code}", creator=user,
+        )
+    else:
+        # lent_out → sold：库存已在借出时扣减，仅记日志
+        await StockLog.create(
+            product_id=unit.product_id, warehouse_id=unit.warehouse_id,
+            change_type="SALE", quantity=0,
+            before_qty=0, after_qty=0,
+            remark=f"样机转销售（借出中） {unit.code}", creator=user,
+        )
 
     # 更新 SN 码状态
     if unit.sn_code_id:
@@ -620,21 +629,13 @@ async def report_loss_demo_unit(unit_id: int, data, user) -> DemoDisposal:
         )
         rb_id = rb.id
 
-    # 扣减样机仓库存
-    demo_stock = await WarehouseStock.filter(
-        warehouse_id=unit.warehouse_id, product_id=unit.product_id,
-        location_id=unit.location_id,
-    ).first()
-    before_qty = demo_stock.quantity if demo_stock else 0
-    await update_weighted_entry_date(
-        unit.warehouse_id, unit.product_id, -1, unit.cost_price,
-        unit.location_id,
-    )
+    # 注意：不扣减库存 — 借出时已经扣过（lend_demo_unit 中 -1），丢失只是最终状态变更
+    # 仅记录一条日志便于追溯
     await StockLog.create(
         product_id=unit.product_id, warehouse_id=unit.warehouse_id,
-        change_type="ADJUST", quantity=-1,
-        before_qty=before_qty, after_qty=max(before_qty - 1, 0),
-        remark=f"样机丢失 {unit.code}: {data.description}", creator=user,
+        change_type="ADJUST", quantity=0,
+        before_qty=0, after_qty=0,
+        remark=f"样机丢失（借出中） {unit.code}: {data.description}", creator=user,
     )
 
     # SN 码标记为 shipped（已出库），当前 SN 体系无 disposed 状态

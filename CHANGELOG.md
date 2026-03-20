@@ -28,6 +28,16 @@
 
 - `v030_refund_redesign`：自动将 `receipt_bills`/`disbursement_bills` 中 `bill_type='return_refund'` 的记录迁移到对应退款单表
 
+### Bug 修复（v4.30.0 补丁）
+
+- **退款管理字段缺失**：后端 API 统一返回 `order_no`/`partner_name`/`refund_amount`，修复采购退款记录不显示金额、供应商、单号的问题
+- **退款确认后状态不更新**：`refund_status` 从 `"completed"` 改为 `"confirmed"`，与前端判断逻辑对齐
+- **退货创建报错**：`refund_info` 字段 null 安全处理（`data.refund_info or ""`）
+- **迁移脚本溢出**：`bill_no` SUBSTRING 截断到 27 字符再加 `-RF` 后缀，防止超过 varchar(30)；DROP NOT NULL 前置到数据迁移之前
+- **样机转销售重复扣库存**：`lent_out` 状态下转销售不再扣减库存（借出时已扣过）
+- **样机丢失重复扣库存**：`lent_out` 状态下登记丢失不再扣减库存，仅记录日志和创建赔偿应收
+- **加权平均成本计算**：0 成本入库不再导致成本异常增加，修正加权平均算法
+
 ---
 
 ## v4.29.0 — 样机管理模块（2026-03-18）

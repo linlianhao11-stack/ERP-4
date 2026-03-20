@@ -136,7 +136,7 @@ async def test_confirm_purchase_refund_creates_disbursement_refund_bill():
 
 @pytest.mark.asyncio
 async def test_confirm_purchase_refund_updates_status():
-    """确认采购退款后退货单 refund_status 应为 completed"""
+    """确认采购退款后退货单 refund_status 应为 confirmed"""
     from app.routers.refunds import _confirm_purchase_refund
 
     user, account_set = await _create_base_data()
@@ -146,7 +146,7 @@ async def test_confirm_purchase_refund_updates_status():
     await _confirm_purchase_refund(pr.id, user)
 
     updated = await PurchaseReturn.filter(id=pr.id).first()
-    assert updated.refund_status == "completed"
+    assert updated.refund_status == "confirmed"
 
 
 # ---------------------------------------------------------------------------

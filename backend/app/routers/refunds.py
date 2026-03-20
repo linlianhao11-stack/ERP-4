@@ -129,7 +129,7 @@ async def _confirm_purchase_refund(return_id: int, user: User) -> dict:
             await ap_bill.save()
 
         # 5. 标记退货单退款完成
-        pr.refund_status = "completed"
+        pr.refund_status = "confirmed"
         await pr.save()
 
         # 6. 操作日志
@@ -159,8 +159,8 @@ async def list_pending_refunds(user: User = Depends(require_permission("finance"
             "id": o.id,
             "type": "sales",
             "order_no": o.order_no,
-            "customer_name": o.customer.name if o.customer else None,
-            "amount": float(abs(o.total_amount)),
+            "partner_name": o.customer.name if o.customer else None,
+            "refund_amount": float(abs(o.total_amount)),
             "refund_method": o.refund_method,
             "refund_info": o.refund_info,
             "created_at": o.created_at.isoformat() if o.created_at else None,
@@ -175,13 +175,13 @@ async def list_pending_refunds(user: User = Depends(require_permission("finance"
         items.append({
             "id": pr.id,
             "type": "purchase",
-            "return_no": pr.return_no,
-            "supplier_name": pr.supplier.name if pr.supplier else None,
-            "amount": float(pr.total_amount),
+            "order_no": pr.return_no,
+            "partner_name": pr.supplier.name if pr.supplier else None,
+            "refund_amount": float(pr.total_amount),
             "refund_method": pr.refund_method,
             "refund_info": pr.refund_info,
             "created_at": pr.created_at.isoformat() if pr.created_at else None,
-            "po_no": pr.purchase_order.po_no if pr.purchase_order else None,
+            "related_order_no": pr.purchase_order.po_no if pr.purchase_order else None,
         })
 
     # 合并后按 created_at 降序
